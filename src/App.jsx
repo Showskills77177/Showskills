@@ -276,22 +276,14 @@ export default function App() {
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 
       <header className="border-b border-slate-100 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex flex-row flex-wrap items-center gap-x-2 gap-y-0.5 sm:gap-x-3">
-            <img
-              src={showskillsLogo}
-              alt="ShowSkills Rewards"
-              className="h-9 w-auto sm:h-10"
-              width={745}
-              height={235}
-            />
-            <p className="max-w-[11rem] text-[10px] leading-snug text-slate-500 sm:max-w-none sm:text-[11px]">
-              UK skill-based competitions
-            </p>
-          </div>
-          <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 sm:inline">
-            Secure checkout with Stripe
-          </span>
+        <div className="mx-auto w-full max-w-5xl px-4 py-4 text-center sm:px-6">
+          <img
+            src={showskillsLogo}
+            alt="ShowSkills Rewards"
+            className="mx-auto block h-9 w-auto sm:h-10"
+            width={745}
+            height={235}
+          />
         </div>
       </header>
 
@@ -526,6 +518,11 @@ export default function App() {
               Full Terms and Conditions
             </button>
           </div>
+          <p className="mt-6 text-center">
+            <span className="inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+              Secure checkout with Stripe
+            </span>
+          </p>
           <p className="mt-8 border-t border-slate-100 pt-8 text-center text-xs leading-relaxed text-slate-500">
             This is a skill-based competition, not a lottery. Not affiliated with Cristiano Ronaldo, Manchester United
             FC or Apple.
