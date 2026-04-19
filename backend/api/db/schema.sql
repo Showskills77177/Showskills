@@ -1,4 +1,4 @@
--- PostgreSQL schema for ShowSkills admin (run once: psql $DATABASE_URL -f api/db/schema.sql)
+-- PostgreSQL schema for ShowSkills admin (run once: psql $DATABASE_URL -f backend/api/db/schema.sql)
 -- Postal / free-postal entries are intentionally NOT stored here.
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";

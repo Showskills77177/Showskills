@@ -1,6 +1,6 @@
 /**
  * Local API server for `npm run dev:api` (port 3000).
- * Vite proxies `/api` here. Production still uses Vercel serverless routes under `/api`.
+ * Vite proxies `/api` here. Production uses a single Vercel function: `api/[[...slug]].js`.
  */
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
@@ -72,7 +72,7 @@ app.post('/api/login', (req, res) => {
   return res.status(401).json({ error: 'Invalid credentials' })
 })
 
-const kickupsUploadHandler = (await import('./api/submissions/kickups-upload.mjs')).default
+const kickupsUploadHandler = (await import('./backend/api/submissions/kickups-upload.mjs')).default
 app.post(
   '/api/submissions/kickups/upload',
   kickupVideoUpload.single('video'),
@@ -81,22 +81,22 @@ app.post(
 
 async function mountApiRoutes() {
   const modules = [
-    { path: '/api/admin/login', file: './api/admin/login.js' },
-    { path: '/api/admin/logout', file: './api/admin/logout.js' },
-    { path: '/api/admin/me', file: './api/admin/me.js' },
-    { path: '/api/admin/stats', file: './api/admin/stats.js' },
-    { path: '/api/admin/users', file: './api/admin/users.js' },
-    { path: '/api/admin/entries', file: './api/admin/entries.js' },
-    { path: '/api/admin/tickets', file: './api/admin/tickets.js' },
-    { path: '/api/admin/payments', file: './api/admin/payments.js' },
-    { path: '/api/admin/submissions', file: './api/admin/submissions.js' },
-    { path: '/api/admin/kickup-file', file: './api/admin/kickup-file.js' },
-    { path: '/api/entries/paid-quiz', file: './api/entries/paid-quiz.js' },
-    { path: '/api/submissions/kickups', file: './api/submissions/kickups.js' },
-    { path: '/api/records/stripe-session', file: './api/records/stripe-session.js' },
-    { path: '/api/create-checkout-session', file: './api/create-checkout-session.js' },
-    { path: '/api/create-paypal-order', file: './api/create-paypal-order.js' },
-    { path: '/api/capture-paypal-order', file: './api/capture-paypal-order.js' },
+    { path: '/api/admin/login', file: './backend/api/admin/login.js' },
+    { path: '/api/admin/logout', file: './backend/api/admin/logout.js' },
+    { path: '/api/admin/me', file: './backend/api/admin/me.js' },
+    { path: '/api/admin/stats', file: './backend/api/admin/stats.js' },
+    { path: '/api/admin/users', file: './backend/api/admin/users.js' },
+    { path: '/api/admin/entries', file: './backend/api/admin/entries.js' },
+    { path: '/api/admin/tickets', file: './backend/api/admin/tickets.js' },
+    { path: '/api/admin/payments', file: './backend/api/admin/payments.js' },
+    { path: '/api/admin/submissions', file: './backend/api/admin/submissions.js' },
+    { path: '/api/admin/kickup-file', file: './backend/api/admin/kickup-file.js' },
+    { path: '/api/entries/paid-quiz', file: './backend/api/entries/paid-quiz.js' },
+    { path: '/api/submissions/kickups', file: './backend/api/submissions/kickups.js' },
+    { path: '/api/records/stripe-session', file: './backend/api/records/stripe-session.js' },
+    { path: '/api/create-checkout-session', file: './backend/api/create-checkout-session.js' },
+    { path: '/api/create-paypal-order', file: './backend/api/create-paypal-order.js' },
+    { path: '/api/capture-paypal-order', file: './backend/api/capture-paypal-order.js' },
   ]
 
   for (const { path: routePath, file } of modules) {
@@ -109,7 +109,7 @@ async function mountApiRoutes() {
 await mountApiRoutes()
 
 if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
-  const { recordStripeCheckoutCompleted } = await import('./api/lib/recordSale.mjs')
+  const { recordStripeCheckoutCompleted } = await import('./backend/api/lib/recordSale.mjs')
   const e2eSecret = (process.env.E2E_SECRET || 'e2e-dev-only-secret').trim()
   app.post('/api/e2e/mock-stripe-completion', express.json(), async (req, res) => {
     if ((req.headers['x-e2e-secret'] || '').trim() !== e2eSecret) {

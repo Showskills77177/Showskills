@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
-import { getTicketBundleById } from '../shared/ticketBundles.mjs'
-import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../shared/ticketCheckoutNotice.mjs'
+import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
+import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 
 function parseBody(req) {
   const b = req.body

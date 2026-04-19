@@ -25,9 +25,9 @@ if (!src || !existsSync(src)) {
 }
 
 const { ensureKickupUploadDir, KICKUP_UPLOAD_DIR, localVideoRef } = await import(
-  '../api/lib/kickupUploads.mjs'
+  '../backend/api/lib/kickupUploads.mjs'
 )
-const { query } = await import('../api/lib/db.mjs')
+const { query } = await import('../backend/api/lib/db.mjs')
 
 const ext = extname(src) || '.mp4'
 const id = randomUUID()

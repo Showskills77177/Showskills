@@ -7,7 +7,8 @@ import pg from 'pg'
 
 const { Pool } = pg
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+/** Repo root (`backend/api/lib` → up 3 levels) */
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 loadEnv({ path: join(root, '.env.local') })
 loadEnv({ path: join(root, '.env') })
@@ -16,7 +17,7 @@ let pool
 let sqliteDb
 
 /** True when we should use node-pg (e.g. Vercel). SQLite wins if SQLITE_PATH is set. */
-export function usePostgres() {
+export function dbIsPostgres() {
   if (process.env.SQLITE_PATH?.trim()) return false
   const u = process.env.DATABASE_URL?.trim()
   return Boolean(u && (u.startsWith('postgres://') || u.startsWith('postgresql://')))
@@ -134,7 +135,7 @@ function runSqliteQuery(text, params) {
 }
 
 export function isDbConfigured() {
-  if (usePostgres()) return Boolean(process.env.DATABASE_URL?.trim())
+  if (dbIsPostgres()) return Boolean(process.env.DATABASE_URL?.trim())
   try {
     openSqlite()
     return true
@@ -144,7 +145,7 @@ export function isDbConfigured() {
 }
 
 export async function query(text, params = []) {
-  if (usePostgres()) {
+  if (dbIsPostgres()) {
     const p = getPool()
     if (!p) {
       const err = new Error('DATABASE_URL is not configured')

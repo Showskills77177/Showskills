@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { parseJsonBody, json } from '../lib/http.mjs'
-import { query, isDbConfigured, isUniqueViolation, usePostgres } from '../lib/db.mjs'
+import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from '../lib/db.mjs'
 
 /**
  * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     }
 
     const entryId = randomUUID()
-    const allVal = usePostgres() ? allCorrect : allCorrect ? 1 : 0
+    const allVal = dbIsPostgres() ? allCorrect : allCorrect ? 1 : 0
     await query(
       `INSERT INTO competition_entries (id, user_id, competition, entry_type, answers_json, all_correct)
        VALUES ($1, $2, $3, $4, $5, $6)`,

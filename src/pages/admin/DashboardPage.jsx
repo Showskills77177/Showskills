@@ -35,7 +35,7 @@ export default function DashboardPage() {
             <code className="text-amber-100">npm run db:schema</code>, then restart{' '}
             <code className="text-amber-100">npm run dev:api</code>. Hosted: set{' '}
             <code className="text-amber-100">DATABASE_URL</code> and apply{' '}
-            <code className="text-amber-100">api/db/schema.sql</code>.
+            <code className="text-amber-100">backend/api/db/schema.sql</code>.
             {stats.hint ? <span className="mt-1 block text-amber-100/90">{stats.hint}</span> : null}
           </p>
         ) : null}
