@@ -1,19 +1,12 @@
 @import 'tailwindcss';
 
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --ss-bg-deep: #071512;
+  --ss-bg-mid: #0d1f1a;
+  --ss-cream: #f5f5f4;
+  --ss-line: rgba(255, 255, 255, 0.09);
+  --ss-emerald-hot: #34d399;
+  --ss-teal-hot: #2dd4bf;
 }
 
 @theme {
@@ -23,8 +16,8 @@
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--ss-bg-deep);
+  color: #d4d4d4;
   font-family: 'DM Sans', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -34,6 +27,620 @@ body {
   min-height: 100svh;
 }
 
+/* No stray gap between sticky header and first hero row */
+.ss-page-bg > main {
+  margin-top: 0;
+  padding-top: 0;
+}
+
 .font-display {
   font-family: var(--font-display);
+}
+
+/* Header — matchday strip */
+.ss-header {
+  position: relative;
+  isolation: isolate;
+  background-color: rgba(8, 22, 18, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(52, 211, 153, 0.2);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ss-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(167, 243, 208, 0.07) 0%, transparent 55%);
+}
+
+.ss-header::after {
+  display: block;
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(45, 212, 191, 0.45) 30%,
+    rgba(52, 211, 153, 0.55) 50%,
+    rgba(45, 212, 191, 0.45) 70%,
+    transparent
+  );
+}
+
+/* Pitch + night-sky energy (cool tones — not casino gold) */
+.ss-page-bg,
+.ss-footer-bg {
+  background-color: var(--ss-bg-deep);
+  background-image:
+    radial-gradient(ellipse 120% 55% at 50% -15%, rgba(200, 240, 232, 0.14), transparent 52%),
+    radial-gradient(ellipse 50% 40% at 85% 20%, rgba(45, 212, 191, 0.08), transparent 50%),
+    radial-gradient(ellipse 45% 35% at 10% 35%, rgba(52, 211, 153, 0.06), transparent 48%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(6, 45, 38, 0.5), transparent 55%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 56px,
+      rgba(255, 255, 255, 0.025) 56px,
+      rgba(255, 255, 255, 0.025) 57px
+    ),
+    repeating-linear-gradient(
+      -22deg,
+      transparent,
+      transparent 120px,
+      rgba(167, 243, 208, 0.025) 120px,
+      rgba(167, 243, 208, 0.025) 121px
+    ),
+    linear-gradient(168deg, #0f2922 0%, #0a1f19 38%, #071512 100%);
+  background-attachment: fixed;
+  background-size: auto;
+}
+
+.ss-page-bg {
+  position: relative;
+  isolation: isolate;
+}
+
+/*
+ * Decorative ::before uses z-index: 0 + position: fixed, which stacks above in-flow
+ * content (paint order step 6 vs step 3). Keep real page chrome above that layer so
+ * sections don’t read as “missing” under compositing / certain browsers.
+ */
+.ss-page-bg > main,
+.ss-page-bg > footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Soft drifting sparks — white / mint only */
+.ss-page-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 1;
+  background-image:
+    radial-gradient(ellipse 8px 10px at 15% 25%, rgba(255, 255, 255, 0.12), transparent 70%),
+    radial-gradient(ellipse 10px 12px at 78% 18%, rgba(167, 243, 208, 0.1), transparent 68%),
+    radial-gradient(ellipse 6px 8px at 42% 62%, rgba(255, 255, 255, 0.08), transparent 65%),
+    radial-gradient(ellipse 12px 14px at 88% 72%, rgba(110, 231, 183, 0.08), transparent 72%),
+    radial-gradient(ellipse 7px 9px at 22% 88%, rgba(255, 255, 255, 0.09), transparent 62%),
+    radial-gradient(ellipse 9px 11px at 55% 38%, rgba(167, 243, 208, 0.07), transparent 70%),
+    radial-gradient(ellipse 6px 7px at 92% 42%, rgba(255, 255, 255, 0.07), transparent 60%),
+    radial-gradient(ellipse 11px 13px at 8% 55%, rgba(110, 231, 183, 0.06), transparent 72%);
+  background-size:
+    380px 420px,
+    520px 480px,
+    440px 400px,
+    460px 520px,
+    400px 460px,
+    540px 500px,
+    360px 380px,
+    500px 440px;
+  background-repeat: repeat;
+  animation: ss-drift-sparks 36s ease-in-out infinite;
+}
+
+@keyframes ss-drift-sparks {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-1.5%, 1.2%);
+  }
+}
+
+/* Hero strip: extra stadium “flood” wash */
+.ss-hero-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse 85% 65% at 50% 0%, rgba(167, 243, 208, 0.06), transparent 55%);
+}
+
+/*
+ * Kick-ups photo: oversized + centered so object-cover shows ~10% more of the frame
+ * (wider field of view) while overflow clips — full-bleed edges, no letterboxing.
+ */
+.ss-hero-photo-bg-img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 110%;
+  height: 110%;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  object-position: 48% 88%;
+  opacity: 1;
+  filter: saturate(0.78) brightness(0.88) contrast(1.04) hue-rotate(-14deg);
+}
+
+@media (min-width: 640px) {
+  .ss-hero-photo-bg-img {
+    object-position: 46% 85%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ss-hero-photo-bg-img {
+    object-position: 44% 82%;
+  }
+}
+
+/* Colour layer: merges photo into emerald / deep pitch (same family as --ss-bg-deep) */
+.ss-hero-photo-pitch-tint {
+  background:
+    linear-gradient(168deg, rgba(6, 40, 32, 0.55) 0%, transparent 42%),
+    linear-gradient(25deg, transparent 35%, rgba(8, 55, 45, 0.45) 100%),
+    radial-gradient(ellipse 90% 70% at 70% 55%, rgba(16, 100, 80, 0.22), transparent 58%);
+  mix-blend-mode: soft-light;
+}
+
+/* Scrim: green-blacks + softer stops so edges melt into the page background */
+.ss-hero-photo-scrim {
+  background: linear-gradient(
+    to bottom,
+    #071512 0%,
+    rgba(8, 32, 26, 0.95) 32%,
+    rgba(10, 42, 34, 0.5) 50%,
+    rgba(7, 26, 21, 0.2) 64%,
+    rgba(6, 22, 18, 0.45) 100%
+  );
+}
+
+@media (min-width: 1024px) {
+  .ss-hero-photo-scrim {
+    background: linear-gradient(
+      100deg,
+      #071512 0%,
+      rgba(8, 34, 28, 0.96) 26%,
+      rgba(10, 44, 36, 0.58) 42%,
+      rgba(7, 28, 22, 0.22) 54%,
+      rgba(6, 24, 20, 0.52) 100%
+    );
+  }
+}
+
+/* Stack hero content above the wash; do not set position on all children (would override blur `absolute`). */
+.ss-hero-inner {
+  position: relative;
+  z-index: 2;
+}
+
+/* Gradient logotype — sport broadcast, not slots */
+.ss-hero-brand {
+  background: linear-gradient(105deg, #ffffff 0%, #ecfdf5 40%, #6ee7b7 88%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 16px rgba(6, 78, 59, 0.45));
+}
+
+/* Rules — pitch / count-off energy (matches rules illustration) */
+.ss-rules-pitch-guide {
+  background-color: rgba(6, 22, 28, 0.96);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(56, 189, 248, 0.12) 0%, transparent 55%),
+    linear-gradient(180deg, rgba(163, 230, 53, 0.05) 0%, transparent 40%),
+    linear-gradient(165deg, rgba(5, 46, 36, 0.35) 0%, transparent 50%);
+}
+
+.ss-rules-title {
+  text-shadow:
+    0 0 1px rgba(0, 0, 0, 0.9),
+    0 2px 0 rgba(0, 0, 0, 0.85),
+    0 3px 12px rgba(0, 0, 0, 0.5),
+    0 0 28px rgba(190, 242, 100, 0.25);
+}
+
+/* Hero copy + prize card — same shell so columns match height on large screens */
+.ss-prize-panel,
+.ss-hero-copy-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  outline: none;
+  background: linear-gradient(165deg, rgba(15, 40, 34, 0.97) 0%, rgba(7, 21, 18, 0.99) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 20px 50px rgba(0, 0, 0, 0.45),
+    0 0 60px rgba(45, 212, 191, 0.06);
+}
+
+.ss-prize-panel::before,
+.ss-hero-copy-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(45, 212, 191, 0.5),
+    rgba(52, 211, 153, 0.7),
+    rgba(45, 212, 191, 0.5),
+    transparent
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.ss-bundle-frame {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  line-height: 0;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  /* Layered lift: tight edge + mid depth + soft pool under the bundle */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 6px 16px rgba(0, 0, 0, 0.38),
+    0 14px 36px rgba(0, 0, 0, 0.32),
+    0 28px 56px rgba(0, 0, 0, 0.28),
+    0 48px 80px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 50px rgba(45, 212, 191, 0.1);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.ss-bundle-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+/* Rules graphic: figure sets max width; frame is 100% so caption lines up with the art */
+.ss-rules-guide-frame {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
+  border-radius: 0.75rem;
+  border: 2px solid rgba(190, 242, 100, 0.35);
+  background: linear-gradient(165deg, rgba(8, 47, 73, 0.35) 0%, rgba(5, 28, 22, 0.92) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 0 36px rgba(190, 242, 100, 0.08);
+}
+
+.ss-rules-guide-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+/* Kick-ups giveaway: compact jersey thumbnail beside copy */
+.ss-kickups-prize-thumb {
+  display: block;
+  width: 100%;
+  max-width: 9.5rem;
+  line-height: 0;
+  border-radius: 0.65rem;
+  border: 2px solid rgba(190, 242, 100, 0.4);
+  background: linear-gradient(165deg, rgba(8, 47, 73, 0.35) 0%, rgba(5, 28, 22, 0.92) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.45),
+    0 8px 28px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(190, 242, 100, 0.06);
+  overflow: hidden;
+}
+
+.ss-kickups-prize-thumb img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+/* CTA: bright kit-style button — shadow “breathe” only (no scale jackpot pulse) */
+@keyframes ss-cta-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 4px 20px rgba(16, 185, 129, 0.35),
+      0 0 0 0 rgba(45, 212, 191, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 8px 32px rgba(16, 185, 129, 0.45),
+      0 0 28px rgba(45, 212, 191, 0.15);
+  }
+}
+
+.ss-btn-enter {
+  animation: ss-cta-glow 2.8s ease-in-out infinite;
+  transition:
+    transform 0.15s ease,
+    filter 0.2s ease;
+}
+
+.ss-btn-enter:hover {
+  filter: brightness(1.06);
+}
+
+.ss-btn-enter:active {
+  transform: scale(0.98);
+}
+
+/* Hero cue → Ronaldo Legacy Bundle: motion + glow (honours reduced motion) */
+.ss-bundle-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform, filter;
+}
+
+.ss-bundle-arrow svg {
+  overflow: visible;
+}
+
+.ss-bundle-arrow--down {
+  animation:
+    ss-bundle-arrow-nudge-down 1.85s cubic-bezier(0.45, 0, 0.55, 1) infinite,
+    ss-bundle-arrow-pulse 2.5s ease-in-out infinite;
+}
+
+.ss-bundle-arrow--right {
+  animation:
+    ss-bundle-arrow-nudge-right 1.85s cubic-bezier(0.45, 0, 0.55, 1) infinite,
+    ss-bundle-arrow-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes ss-bundle-arrow-nudge-down {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+@keyframes ss-bundle-arrow-nudge-right {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(11px);
+  }
+}
+
+@keyframes ss-bundle-arrow-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(45, 212, 191, 0.35)) drop-shadow(0 0 18px rgba(16, 185, 129, 0.12));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(94, 234, 212, 0.65)) drop-shadow(0 0 28px rgba(52, 211, 153, 0.28));
+  }
+}
+
+@keyframes ss-bundle-arrow-halo {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.05);
+  }
+}
+
+.ss-bundle-arrow__halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ss-bundle-arrow-halo 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-bundle-arrow--down,
+  .ss-bundle-arrow--right {
+    animation: none;
+  }
+
+  .ss-bundle-arrow__halo {
+    animation: none;
+    opacity: 0.35;
+    transform: none;
+  }
+}
+
+.ss-football-icon-glow {
+  filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.2));
+}
+
+/* Ball moves; ground stays — reads as a small bounce off the pitch */
+.ss-football-bounce-wrap {
+  transform-origin: center bottom;
+  animation: ss-football-bounce 2.4s ease-in-out infinite;
+}
+
+.ss-football-bounce-wrap--stagger-1 {
+  animation-delay: -0.85s;
+}
+
+.ss-football-bounce-wrap--stagger-2 {
+  animation-delay: -1.65s;
+}
+
+@keyframes ss-football-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Postal cue — vertical bob + neon (Competitions) */
+.ss-postal-letter-bounce-wrap {
+  transform-origin: center bottom;
+  animation: ss-postal-letter-bob 2.35s ease-in-out infinite;
+}
+
+@keyframes ss-postal-letter-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.ss-postal-letter-glow {
+  filter: drop-shadow(0 0 6px rgba(45, 212, 191, 0.35)) drop-shadow(0 0 16px rgba(94, 234, 212, 0.2));
+}
+
+.ss-postal-ground {
+  margin-top: 3px;
+  height: 3px;
+  width: 4.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(148, 163, 184, 0.12) 20%,
+    rgba(45, 212, 191, 0.4) 50%,
+    rgba(148, 163, 184, 0.12) 80%,
+    transparent 100%
+  );
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    0 0 12px rgba(45, 212, 191, 0.22);
+}
+
+@media (min-width: 640px) {
+  .ss-postal-ground {
+    width: 5.5rem;
+  }
+}
+
+.ss-kickups-35-ball-glow {
+  filter: drop-shadow(0 0 5px rgba(253, 224, 71, 0.38)) drop-shadow(0 0 12px rgba(234, 179, 8, 0.2));
+}
+
+/* Same footprint as .ss-postal-ground — pairs with letter icon on Competitions */
+.ss-kickups-35-ground {
+  margin-top: 6px;
+  height: 3px;
+  width: 5.75rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(161, 98, 7, 0.18) 18%,
+    rgba(250, 204, 21, 0.5) 50%,
+    rgba(161, 98, 7, 0.18) 82%,
+    transparent 100%
+  );
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    0 0 10px rgba(253, 224, 71, 0.22);
+}
+
+@media (min-width: 640px) {
+  .ss-kickups-35-ground {
+    width: 6.75rem;
+  }
+}
+
+.ss-kickups-35-ground--lg {
+  width: 7rem;
+}
+
+@media (min-width: 640px) {
+  .ss-kickups-35-ground--lg {
+    width: 8.25rem;
+  }
+}
+
+.ss-football-ground--wide {
+  width: 5.5rem;
+}
+
+@media (min-width: 640px) {
+  .ss-football-ground--wide {
+    width: 7rem;
+  }
+}
+
+.ss-football-ground {
+  margin-top: 2px;
+  height: 3px;
+  width: 2.75rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(45, 212, 191, 0.15) 20%,
+    rgba(52, 211, 153, 0.45) 50%,
+    rgba(45, 212, 191, 0.15) 80%,
+    transparent 100%
+  );
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    0 0 10px rgba(45, 212, 191, 0.25);
+}
+
+@media (min-width: 640px) {
+  .ss-football-ground {
+    width: 3.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-football-bounce-wrap {
+    animation: none;
+  }
+
+  .ss-postal-letter-bounce-wrap {
+    animation: none;
+  }
 }

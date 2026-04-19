@@ -9,6 +9,17 @@ lerna-debug.log*
 
 node_modules
 dist
+db/*.sqlite
+db/*.sqlite-shm
+db/*.sqlite-wal
+uploads/
+db/e2e.sqlite
+db/e2e.sqlite-shm
+db/e2e.sqlite-wal
+playwright-report/
+test-results/
+.env
+.env.e2e
 dist-ssr
 *.local
 

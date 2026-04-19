@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 640" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1f1a" />
+      <stop offset="100%" stop-color="#050c0a" />
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="640" fill="url(#bg)" />
+  <rect x="0" y="0" width="800" height="640" fill="url(#shine)" />
+  <g opacity="0.9">
+    <rect x="140" y="160" width="520" height="320" rx="14" fill="#0a1612" stroke="#5eead4" stroke-opacity="0.35" stroke-width="2" />
+    <path d="M140 200 L400 360 L660 200" stroke="#6ee7b7" stroke-opacity="0.45" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <rect x="200" y="280" width="400" height="8" rx="2" fill="#34d399" fill-opacity="0.2" />
+    <rect x="200" y="304" width="280" height="8" rx="2" fill="#34d399" fill-opacity="0.12" />
+    <rect x="200" y="328" width="320" height="8" rx="2" fill="#34d399" fill-opacity="0.12" />
+    <circle cx="620" cy="420" r="36" fill="#064e3b" stroke="#34d399" stroke-opacity="0.4" stroke-width="2" />
+    <path d="M605 420 L618 433 L645 406" stroke="#6ee7b7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+  <text x="400" y="560" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="22" font-weight="600" letter-spacing="0.2em">POSTAL ENTRY</text>
+</svg>

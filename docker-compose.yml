@@ -1,0 +1,23 @@
+# Local PostgreSQL for admin dashboard + API persistence.
+# Usage: npm run db:up && npm run db:schema
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: showskills-db
+    environment:
+      POSTGRES_USER: showskills
+      POSTGRES_PASSWORD: showskills
+      POSTGRES_DB: showskills
+    ports:
+      - '5432:5432'
+    volumes:
+      - showskills_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U showskills -d showskills']
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  showskills_pgdata:
