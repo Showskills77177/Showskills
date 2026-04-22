@@ -6,7 +6,7 @@ import { useEntryFlow } from '../entry/entryContext'
 import { SkillMeterIcon } from './siteChrome'
 
 function navClass({ isActive }) {
-  return `rounded-md px-1.5 py-1 transition ${
+  return `max-sm:shrink-0 max-sm:whitespace-nowrap rounded-md px-1.5 py-1 transition ${
     isActive ? 'text-emerald-200' : 'text-stone-400 hover:text-stone-100'
   }`
 }
@@ -20,27 +20,27 @@ export function Layout() {
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
-        <div className="relative z-10 mx-auto grid max-w-5xl min-h-[3.25rem] grid-cols-1 items-center justify-items-center gap-y-2 px-4 py-2 sm:min-h-[3.5rem] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:justify-items-stretch sm:gap-y-0 sm:px-6 sm:py-2">
+        <div className="relative z-10 mx-auto grid max-w-5xl min-h-[3.25rem] grid-cols-1 items-center justify-items-center gap-y-2 px-3 py-2 sm:min-h-[3.5rem] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:justify-items-stretch sm:gap-y-0 sm:px-6 sm:py-2">
           <nav
-            className="order-2 flex w-full max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs font-semibold sm:order-1 sm:w-auto sm:justify-start sm:gap-x-1 sm:justify-self-start sm:text-sm"
+            className="order-2 flex w-full max-w-full flex-nowrap items-center justify-between gap-x-1 overflow-x-auto overflow-y-hidden overscroll-x-contain py-0.5 text-[11px] font-semibold leading-none [-ms-overflow-style:none] [scrollbar-width:none] sm:order-1 sm:w-auto sm:flex-wrap sm:justify-start sm:gap-x-1 sm:overflow-visible sm:py-0 sm:text-sm sm:leading-normal sm:justify-self-start [&::-webkit-scrollbar]:hidden"
             aria-label="Main navigation"
           >
             <NavLink to="/" end className={navClass}>
               Home
             </NavLink>
-            <span className="select-none text-stone-600" aria-hidden>
+            <span className="hidden select-none text-stone-600 sm:inline" aria-hidden>
               —
             </span>
             <NavLink to="/competitions" className={navClass}>
               Competitions
             </NavLink>
-            <span className="select-none text-stone-600" aria-hidden>
+            <span className="hidden select-none text-stone-600 sm:inline" aria-hidden>
               —
             </span>
             <button
               type="button"
               onClick={() => openTerms()}
-              className="rounded-md px-1.5 py-1 text-stone-400 transition hover:text-stone-100"
+              className="max-sm:shrink-0 max-sm:whitespace-nowrap rounded-md px-1.5 py-1 text-stone-400 transition hover:text-stone-100"
             >
               T&amp;C
             </button>
@@ -54,7 +54,7 @@ export function Layout() {
             <div
               role="img"
               aria-hidden
-              className="h-10 w-auto shrink-0 bg-stone-100 [aspect-ratio:745/235] sm:h-11"
+              className="h-9 w-auto shrink-0 bg-stone-100 [aspect-ratio:745/235] sm:h-11"
               style={{
                 maskImage: `url(${showskillsLogo})`,
                 WebkitMaskImage: `url(${showskillsLogo})`,
