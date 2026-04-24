@@ -60,6 +60,9 @@ export default async function handler(req, res) {
   const description = `${bundle.title}: ${bundle.line1}. Skill-based competition — submit answers after payment. ${TICKET_PURCHASE_NON_REFUND_NOTICE}`
 
   try {
+    // Apple Pay & Google Pay: Stripe shows eligible wallet buttons on the hosted Checkout page when your
+    // site origin is added under Dashboard → Settings → Payment method domains (HTTPS).
+    // payment_method_types: ['card'] still allows those wallets; no separate 'apple_pay' type in Checkout.
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
