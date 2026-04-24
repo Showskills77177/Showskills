@@ -5,6 +5,7 @@ import { RequireAdmin } from './admin/RequireAdmin'
 import { Layout } from './components/Layout'
 import HomePage from './pages/HomePage'
 import CompetitionsPage from './pages/CompetitionsPage'
+import KickupsArchivePage from './pages/KickupsArchivePage'
 import AdminLoginPage from './pages/admin/LoginPage'
 import AdminDashboardPage from './pages/admin/DashboardPage'
 import AdminUsersPage from './pages/admin/UsersPage'
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
+            <Route path="archive/35-kickups" element={<KickupsArchivePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

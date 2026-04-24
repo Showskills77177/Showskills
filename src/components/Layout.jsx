@@ -125,7 +125,7 @@ export function Layout() {
           </div>
           <p className="mt-4 max-w-md text-sm text-stone-400">
             Paid draw: skill answers then random winner from correct entries. Free postal entry is in the same Legacy
-            Bundle panel as paid tickets. Separate 35 Kick-Ups giveaway. UK-focused.
+            Bundle panel as paid tickets. UK-focused.
           </p>
           <p className="mt-6 text-center">
             <span className="inline-block rounded-full border border-emerald-500/25 bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-200/90">

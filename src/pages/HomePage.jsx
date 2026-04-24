@@ -2,16 +2,9 @@ import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import prizeBundle from '../assets/prize-bundle-hero.png'
 import kickupsHeroBg from '../assets/kickups-hero-bg.png'
-import rulesKickupsGuide from '../assets/rules-kickups-guide.png'
 import { GRAND_PRIZE_BUNDLE } from '../competitionData'
-import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
 import { useEntryFlow } from '../entry/entryContext'
-import {
-  BundleOfferCopy,
-  GlowingFootballIcon,
-  ShirtGiveawayCtaButton,
-  TicketBundlePrice,
-} from '../components/siteChrome'
+import { BundleOfferCopy, GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
 
 export default function HomePage() {
   const { openEntry } = useEntryFlow()
@@ -40,7 +33,7 @@ export default function HomePage() {
             <div className="ss-hero-copy-panel flex w-full min-h-0 flex-col p-5 text-left sm:p-6 lg:min-h-0 lg:flex-1">
               <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-                Live promotions
+                Live promotion
               </p>
               <div className="flex flex-wrap items-end gap-3 sm:gap-4">
                 <h1 className="ss-hero-brand font-display text-[clamp(2.75rem,10vw,5.25rem)] leading-[0.92] tracking-tight sm:text-[clamp(3.25rem,11vw,5.75rem)]">
@@ -53,12 +46,13 @@ export default function HomePage() {
                 </div>
               </div>
               <p className="mt-5 max-w-xl text-[clamp(1.35rem,4vw,2.1rem)] font-bold leading-snug tracking-tight text-white">
-                Two different prizes. Two ways to enter — Legacy Bundle (pay or post) vs 35 Kick-Ups shirt giveaway.
+                Ronaldo Legacy Bundle — pay online or enter by post, then answer three skill questions for the full kit
+                draw.
               </p>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="mt-6 max-w-xl">
                 <div className="rounded-xl border border-teal-500/30 bg-black/25 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-300/90">A · Legacy Bundle draw</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-300/90">Legacy Bundle draw</p>
                   <p className="mt-2 text-sm font-semibold text-stone-100">Paid bundles or free post</p>
                   <p className="mt-1 text-xs leading-relaxed text-stone-500">
                     Buy tickets online <span className="text-stone-400">or</span> enter by post — same prize. Three Ronaldo
@@ -72,26 +66,12 @@ export default function HomePage() {
                     Open entry
                   </button>
                 </div>
-                <div className="rounded-xl border border-teal-500/30 bg-black/25 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-300/90">B · Free video</p>
-                  <p className="mt-2 text-sm font-semibold text-stone-100">35 Kick-Ups</p>
-                  <p className="mt-1 text-xs leading-relaxed text-stone-500">
-                    Upload one clip. <span className="text-stone-400">Shirt only</span> — not the bundle.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => openEntry('kickups')}
-                    className="mt-3 w-full rounded-lg bg-teal-600/90 py-2 text-xs font-bold text-white hover:bg-teal-500"
-                  >
-                    Open entry
-                  </button>
-                </div>
               </div>
 
               <TicketBundlePrice compact className="mt-6" />
               <p className="mt-4 max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
-                Use <strong className="text-stone-300">Competitions</strong> in the menu for a side-by-side view, or jump in
-                from the cards. Legacy Bundle entry covers paid bundles and postal in one panel; kick-ups stays separate.
+                Use <strong className="text-stone-300">Competitions</strong> in the menu for details, or open entry here.
+                Paid bundles and free postal entry are in the same panel.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:mt-auto lg:border-t lg:border-white/10 lg:pt-6">
                 <Link
@@ -106,12 +86,12 @@ export default function HomePage() {
                 >
                   Prize lineup
                 </a>
-                <a
-                  href="#rules"
-                  className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-sm font-semibold text-teal-200/80 underline decoration-teal-500/50 underline-offset-4 hover:text-teal-100"
+                <Link
+                  to="/archive/35-kickups"
+                  className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300"
                 >
-                  Kick-ups rules
-                </a>
+                  35 Kick-Ups (archived)
+                </Link>
               </div>
             </div>
 
@@ -186,9 +166,8 @@ export default function HomePage() {
               </p>
               <h2 className="font-display text-3xl tracking-tight text-white sm:text-4xl">{GRAND_PRIZE_BUNDLE.title}</h2>
               <p className="mt-2 max-w-md text-sm leading-relaxed text-stone-400">
-                This stack is only for the <strong className="text-stone-300">Ronaldo Legacy Bundle</strong> competition
-                (paid tickets or free postal entry with correct skill answers). It is{' '}
-                <strong className="text-stone-300">not</strong> the prize for the 35 Kick-Ups video giveaway.
+                This stack is for the <strong className="text-stone-300">Ronaldo Legacy Bundle</strong> competition only —
+                paid tickets or free postal entry, with correct skill answers.
               </p>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-500">
                 iPhone Pro Max, signed shirt (United era), signed ball with COA, premium gold case — illustrative; we may
@@ -272,114 +251,6 @@ export default function HomePage() {
                 </p>
               </div>
             </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="rules" className="ss-rules-pitch-guide border-t border-lime-400/20">
-        <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
-          <header className="max-w-3xl text-left">
-            <p className="font-display text-sm font-bold uppercase tracking-[0.35em] text-lime-300/90 drop-shadow-[0_1px_0_rgba(0,0,0,0.85)]">
-              Free giveaway · Not the paid bundle
-            </p>
-            <h2 className="ss-rules-title font-display mt-2 text-[clamp(2.75rem,9vw,4.25rem)] uppercase leading-[0.95] tracking-[0.02em] text-lime-300">
-              35 Kick-Ups challenge
-            </h2>
-            <p className="mt-4 text-base font-medium leading-relaxed text-sky-100/85 sm:text-lg">
-              Separate from the paid bundle: film your run for free. Winner gets the shirt in the panel below — not the
-              phone, ball, or Legacy Bundle.
-            </p>
-          </header>
-
-          <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start lg:gap-14">
-            <div className="flex min-w-0 flex-col gap-8">
-              <div className="flex flex-col gap-4 rounded-2xl border border-lime-400/30 bg-gradient-to-br from-emerald-950/40 to-black/30 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5">
-                <div className="ss-kickups-prize-thumb mx-auto shrink-0 sm:mx-0">
-                  <img
-                    src={KICKUPS_GIVEAWAY_IMAGE}
-                    alt="Prize: signed Cristiano Ronaldo Manchester United number 7 shirt."
-                    width={771}
-                    height={1024}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-auto w-full max-w-none"
-                  />
-                </div>
-                <div className="min-w-0 text-center sm:text-left">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/95">What you win</p>
-                  <p className="mt-2 text-sm font-semibold leading-snug text-white sm:text-base">
-                    Signed Ronaldo United shirt
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-emerald-100/75">
-                    Shirt only — the full-kit bundle is a different competition on this site.
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/80">How to qualify</p>
-                <ol className="mt-4 grid list-none gap-3">
-                  {[
-                    ['1', '35 kick-ups', 'One continuous take — count every touch.'],
-                    ['2', 'Face visible', 'We need to see it’s you the whole time.'],
-                    ['3', 'No edits or cuts', 'Single unbroken recording.'],
-                    ['4', 'We review clips', 'Manual check before a winner is confirmed.'],
-                  ].map(([num, title, desc]) => (
-                    <li
-                      key={title}
-                      className="ss-rules-step flex gap-3 rounded-xl border-2 border-lime-400/30 bg-gradient-to-br from-emerald-950/80 via-[#052e24]/70 to-black/40 p-3.5 shadow-[0_3px_0_0_rgba(0,0,0,0.3)] transition hover:border-lime-300/45 sm:gap-4 sm:p-4"
-                    >
-                      <span
-                        className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-black bg-lime-400 text-base font-black leading-none text-black shadow-[2px_2px_0_0_rgba(0,0,0,0.85)] sm:h-10 sm:w-10 sm:text-lg"
-                        aria-hidden
-                      >
-                        {num}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-display text-base tracking-tight text-white sm:text-lg">{title}</p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-emerald-100/70">{desc}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              <div className="mt-4 flex w-full justify-center sm:mt-5">
-                <ShirtGiveawayCtaButton onClick={() => openEntry('kickups')} />
-              </div>
-            </div>
-
-            <figure className="mx-auto w-full max-w-[360px] lg:mx-0 lg:max-w-none lg:sticky lg:top-24 lg:self-start">
-              <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90 lg:text-left">
-                Film it like this
-              </p>
-              <div className="ss-rules-guide-frame">
-                <img
-                  src={rulesKickupsGuide}
-                  alt="Reference: count-off style clip — recording frame and 35 kick-ups on screen."
-                  width={682}
-                  height={1024}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-auto w-full max-w-none"
-                />
-              </div>
-              <figcaption className="mt-3 text-pretty text-center text-xs leading-relaxed text-lime-200/65 lg:text-left">
-                Match this vibe in your video, then{' '}
-                <button
-                  type="button"
-                  className="font-medium text-lime-300/90 underline underline-offset-2 hover:text-lime-200"
-                  onClick={() => openEntry('kickups')}
-                >
-                  submit your entry
-                </button>{' '}
-                or open{' '}
-                <Link to="/competitions" className="font-medium text-lime-300/90 underline underline-offset-2">
-                  Competitions
-                </Link>
-                .
-              </figcaption>
-            </figure>
           </div>
         </div>
       </section>
