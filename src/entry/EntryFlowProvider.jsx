@@ -7,6 +7,7 @@ import {
 } from '../competitionData'
 import { apiUrl } from '../lib/api'
 import { EntryFlowContext } from './entryContext'
+import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 
 export function EntryFlowProvider({ children }) {
   const [termsOpen, setTermsOpen] = useState(false)
@@ -28,8 +29,7 @@ export function EntryFlowProvider({ children }) {
   const [paidEmail, setPaidEmail] = useState('')
 
   const [kickFullName, setKickFullName] = useState('')
-  const [kickVideoUrl, setKickVideoUrl] = useState('')
-  const [kickVideoFile, setKickVideoFile] = useState(null)
+  const [kickAnswer, setKickAnswer] = useState('')
   const [kickEmail, setKickEmail] = useState('')
   const [kickConsent, setKickConsent] = useState(false)
   const [kickError, setKickError] = useState('')
@@ -90,8 +90,7 @@ export function EntryFlowProvider({ children }) {
       setKickError('')
       setKickSuccess(false)
       setKickFullName('')
-      setKickVideoUrl('')
-      setKickVideoFile(null)
+      setKickAnswer('')
     }
     if (type === 'paid') {
       setPaidError('')
@@ -253,12 +252,6 @@ export function EntryFlowProvider({ children }) {
         setKickError('Please agree to the Terms & Conditions and Privacy Policy.')
         return
       }
-      const url = kickVideoUrl.trim()
-      const file = kickVideoFile
-      if (!file && !url.startsWith('https://')) {
-        setKickError('Upload a video file or paste an https link (e.g. unlisted YouTube or cloud share).')
-        return
-      }
       if (!kickFullName.trim()) {
         setKickError('Please enter your full name.')
         return
@@ -267,30 +260,26 @@ export function EntryFlowProvider({ children }) {
         setKickError('Please enter a valid email address.')
         return
       }
+      const answer = kickAnswer.trim()
+      if (!answer) {
+        setKickError('Please answer the qualification question.')
+        return
+      }
+      if (!isCorrectShirtGiveawayAnswer(answer)) {
+        setKickError('That answer is not correct. Check the Ronaldo shirt question and try again.')
+        return
+      }
       try {
-        let res
-        if (file) {
-          const fd = new FormData()
-          fd.append('fullName', kickFullName.trim())
-          fd.append('email', kickEmail.trim())
-          fd.append('video', file, file.name || 'video.mp4')
-          res = await fetch(apiUrl('/api/submissions/kickups/upload'), {
-            method: 'POST',
-            credentials: 'include',
-            body: fd,
-          })
-        } else {
-          res = await fetch(apiUrl('/api/submissions/kickups'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              fullName: kickFullName.trim(),
-              email: kickEmail.trim(),
-              videoUrl: url,
-            }),
-          })
-        }
+        const res = await fetch(apiUrl('/api/submissions/kickups'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            fullName: kickFullName.trim(),
+            email: kickEmail.trim(),
+            qualificationAnswer: answer,
+          }),
+        })
         if (!res.ok) {
           const j = await res.json().catch(() => ({}))
           throw new Error(j.error || 'Could not submit')
@@ -300,7 +289,7 @@ export function EntryFlowProvider({ children }) {
         setKickError(err instanceof Error ? err.message : 'Submission failed')
       }
     },
-    [kickConsent, kickEmail, kickFullName, kickVideoUrl, kickVideoFile],
+    [kickAnswer, kickConsent, kickEmail, kickFullName],
   )
 
   const value = useMemo(
@@ -346,10 +335,8 @@ export function EntryFlowProvider({ children }) {
       paypalCaptureOrderApi,
       kickFullName,
       setKickFullName,
-      kickVideoUrl,
-      setKickVideoUrl,
-      kickVideoFile,
-      setKickVideoFile,
+      kickAnswer,
+      setKickAnswer,
       kickEmail,
       setKickEmail,
       kickConsent,
@@ -391,8 +378,7 @@ export function EntryFlowProvider({ children }) {
       paypalCreateOrderApi,
       paypalCaptureOrderApi,
       kickFullName,
-      kickVideoUrl,
-      kickVideoFile,
+      kickAnswer,
       kickEmail,
       kickConsent,
       kickError,

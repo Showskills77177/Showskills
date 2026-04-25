@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from '../lib/db.mjs'
+import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
 
 /**
  * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
@@ -28,8 +29,9 @@ export default async function handler(req, res) {
   const competition =
     typeof body.competition === 'string' ? body.competition.trim().slice(0, 120) : 'ronaldo_legacy_bundle'
   const entryType = body.entryType === 'free' ? 'free' : 'paid'
-  const allCorrect = Boolean(body.allCorrect)
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
+  const validation = validatePaidSkillAnswers(answers.q1, answers.q2, answers.q3)
+  const allCorrect = validation.allCorrect
 
   if (!fullName || !email.includes('@')) {
     return json(res, 400, { error: 'fullName and valid email required' })
@@ -60,7 +62,7 @@ export default async function handler(req, res) {
       [entryId, userId, competition, entryType, JSON.stringify(answers), allVal],
     )
 
-    return json(res, 201, { ok: true })
+    return json(res, 201, { ok: true, validation })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not save entry' })

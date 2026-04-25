@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { COMPETITION_NAME_POSTAL } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 
 function PaidTicketNonRefundCallout({ qualifier }) {
   return (
@@ -66,7 +67,7 @@ export function TermsModal({ open, onClose }) {
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
             promotions in the United Kingdom, including the paid <strong>Ronaldo Legacy Bundle</strong> skill competition
-            and the separate <strong>35 Kick-Ups free shirt giveaway</strong>. By entering, you agree to these terms.
+            and the separate <strong>free Ronaldo shirt giveaway</strong>. By entering, you agree to these terms.
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">1. Eligibility and age</h3>
@@ -109,17 +110,16 @@ export function TermsModal({ open, onClose }) {
           </p>
           <PaidTicketNonRefundCallout qualifier="Paid online ticket bundles only (not free postal entry):" />
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">5. 35 Kick-Ups free giveaway (separate)</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">5. Free Ronaldo shirt giveaway (separate)</h3>
           <p className="mb-3">
-            The <strong>35 Kick-Ups</strong> promotion is a <strong>separate, free engagement giveaway</strong> for
-            promotion only. Entry is <strong>free</strong> (no payment). You submit a video meeting the published
-            rules; the prize is a <strong>Ronaldo signed shirt only</strong> (not the full bundle). It does{' '}
-            <strong>not</strong> form part of the paid Ronaldo Legacy Bundle competition unless expressly stated.
+            The Ronaldo shirt giveaway is a <strong>separate, free engagement giveaway</strong> for promotion only. Entry
+            is <strong>free</strong> (no payment). You answer one simple qualification question; the prize is a{' '}
+            <strong>Ronaldo signed shirt only</strong> (not the full bundle). It does <strong>not</strong> form part of
+            the paid Ronaldo Legacy Bundle competition unless expressly stated.
           </p>
           <p className="mb-3">
-            Video submissions must show <strong>35 kick-ups in one continuous take</strong>, with your{' '}
-            <strong>face clearly visible</strong>, with <strong>no edits or cuts</strong> that break continuity. We may
-            disqualify entries that cannot be verified or breach these rules.
+            The qualification question is: <strong>{SHIRT_GIVEAWAY_QUESTION}</strong>. Correct eligible entries qualify
+            for the giveaway draw. We may disqualify entries that cannot be verified or breach these rules.
           </p>
           <PaidTicketNonRefundCallout qualifier="If you purchase Legacy Bundle tickets on this site (this giveaway entry itself is free):" />
 

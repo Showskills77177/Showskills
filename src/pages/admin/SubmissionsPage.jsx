@@ -57,7 +57,7 @@ export default function AdminSubmissionsPage() {
     }
     if (
       !window.confirm(
-        'Delete this kick-up entry permanently? The database row will be removed and any uploaded file on disk will be deleted.',
+        'Delete this giveaway entry permanently? The database row will be removed and any uploaded file on disk will be deleted.',
       )
     ) {
       return
@@ -80,10 +80,9 @@ export default function AdminSubmissionsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-stone-100">Kick-up challenge</h1>
+          <h1 className="text-2xl font-semibold text-stone-100">Free shirt giveaway</h1>
           <p className="mt-1 text-sm text-stone-500">
-            Uploaded files and external links are only listed here (not on the public site). Use the link or inline player to
-            review.
+            Ronaldo shirt giveaway entries and any older uploaded/video submissions are listed here for review.
           </p>
         </div>
         <input
@@ -123,7 +122,19 @@ export default function AdminSubmissionsPage() {
               </div>
               {s.video_ref ? (
                 <div className="mt-3 space-y-2">
-                  {s.video_ref.startsWith('local:') ? (
+                  {s.video_ref.startsWith('answer:') ? (
+                    <div className="rounded-lg border border-lime-500/25 bg-lime-950/20 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-lime-300/80">
+                        Qualification answer
+                      </p>
+                      <p className="mt-1 text-sm text-stone-200">
+                        {String(s.video_filename || '').replace(/^Answer:\s*/i, '') || '—'}
+                      </p>
+                      {s.admin_notes ? (
+                        <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-stone-500">{s.admin_notes}</pre>
+                      ) : null}
+                    </div>
+                  ) : s.video_ref.startsWith('local:') ? (
                     <>
                       <a
                         href={apiUrl(`/api/admin/kickup-file?id=${encodeURIComponent(s.id)}`)}
@@ -152,7 +163,7 @@ export default function AdminSubmissionsPage() {
                   )}
                 </div>
               ) : null}
-              {s.video_filename ? (
+              {s.video_filename && !s.video_ref?.startsWith('answer:') ? (
                 <p className="mt-1 text-xs text-stone-500">Filename note: {s.video_filename}</p>
               ) : null}
               <div className="mt-3 flex flex-wrap gap-2">

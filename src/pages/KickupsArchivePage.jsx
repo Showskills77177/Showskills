@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom'
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
 import { useEntryFlow } from '../entry/entryContext'
 import { ShirtGiveawayCtaButton } from '../components/siteChrome'
-import rulesKickupsGuide from '../assets/rules-kickups-guide.png'
+import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 
 /**
- * Archived 35 Kick-Ups giveaway — not promoted on the homepage.
+ * Archived free shirt giveaway — not promoted on the homepage.
  * Kept so the flow and copy can be restored without rebuilding pages.
  */
 export default function KickupsArchivePage() {
@@ -24,7 +24,7 @@ export default function KickupsArchivePage() {
           </Link>
         </p>
         <p className="mt-4 max-w-2xl rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/90">
-          This page is <strong className="text-amber-50">not linked from the homepage</strong>. The 35 Kick-Ups shirt
+          This page is <strong className="text-amber-50">not linked from the homepage</strong>. The free Ronaldo shirt
           giveaway is preserved here so you can bring it back when needed.
         </p>
       </div>
@@ -36,11 +36,11 @@ export default function KickupsArchivePage() {
               Free giveaway · Not the paid bundle
             </p>
             <h1 className="ss-rules-title font-display mt-2 text-[clamp(2.75rem,9vw,4.25rem)] uppercase leading-[0.95] tracking-[0.02em] text-lime-300">
-              35 Kick-Ups challenge
+              Ronaldo shirt giveaway
             </h1>
             <p className="mt-4 text-base font-medium leading-relaxed text-sky-100/85 sm:text-lg">
-              Separate from the paid bundle: film your run for free. Winner gets the shirt in the panel below — not the
-              phone, ball, or Legacy Bundle.
+              Separate from the paid bundle: answer one simple Ronaldo qualification question for free. Winner gets the
+              shirt in the panel below — not the phone, ball, or Legacy Bundle.
             </p>
           </header>
 
@@ -73,10 +73,10 @@ export default function KickupsArchivePage() {
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/80">How to qualify</p>
                 <ol className="mt-4 grid list-none gap-3">
                   {[
-                    ['1', '35 kick-ups', 'One continuous take — count every touch.'],
-                    ['2', 'Face visible', 'We need to see it’s you the whole time.'],
-                    ['3', 'No edits or cuts', 'Single unbroken recording.'],
-                    ['4', 'We review clips', 'Manual check before a winner is confirmed.'],
+                    ['1', 'Answer the question', SHIRT_GIVEAWAY_QUESTION],
+                    ['2', 'Correct answer qualifies', 'Ronaldo R9 or Cristiano Ronaldo qualifies you for the giveaway draw.'],
+                    ['3', 'Free entry', 'No payment and no video upload required.'],
+                    ['4', 'We review entries', 'Manual check before a winner is confirmed.'],
                   ].map(([num, title, desc]) => (
                     <li
                       key={title}
@@ -102,37 +102,20 @@ export default function KickupsArchivePage() {
               </div>
             </div>
 
-            <figure className="mx-auto w-full max-w-[360px] lg:mx-0 lg:max-w-none lg:sticky lg:top-24 lg:self-start">
-              <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90 lg:text-left">
-                Film it like this
+            <aside className="mx-auto w-full max-w-[360px] rounded-2xl border border-lime-400/25 bg-black/25 p-5 lg:mx-0 lg:max-w-none lg:sticky lg:top-24 lg:self-start">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90">Question</p>
+              <p className="mt-3 text-lg font-semibold leading-snug text-white">{SHIRT_GIVEAWAY_QUESTION}</p>
+              <p className="mt-3 text-sm leading-relaxed text-lime-200/70">
+                Type the answer in the giveaway form. Correct entries go into the free shirt draw.
               </p>
-              <div className="ss-rules-guide-frame">
-                <img
-                  src={rulesKickupsGuide}
-                  alt="Reference: count-off style clip — recording frame and 35 kick-ups on screen."
-                  width={682}
-                  height={1024}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-auto w-full max-w-none"
-                />
-              </div>
-              <figcaption className="mt-3 text-pretty text-center text-xs leading-relaxed text-lime-200/65 lg:text-left">
-                Match this vibe in your video, then{' '}
-                <button
-                  type="button"
-                  className="font-medium text-lime-300/90 underline underline-offset-2 hover:text-lime-200"
-                  onClick={() => openEntry('kickups')}
-                >
-                  submit your entry
-                </button>{' '}
-                or open{' '}
-                <Link to="/competitions" className="font-medium text-lime-300/90 underline underline-offset-2">
-                  Competitions
-                </Link>
-                .
-              </figcaption>
-            </figure>
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl border border-lime-400/35 px-4 py-3 text-sm font-bold text-lime-100 hover:bg-lime-950/30"
+                onClick={() => openEntry('kickups')}
+              >
+                Open free giveaway form
+              </button>
+            </aside>
           </div>
         </div>
       </section>

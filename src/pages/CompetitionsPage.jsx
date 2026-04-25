@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import prizeBundle from '../assets/prize-bundle-hero.png'
+import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
+import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
 import { TicketBundlePrice } from '../components/siteChrome'
 import { useEntryFlow } from '../entry/entryContext'
 
@@ -16,25 +17,45 @@ export default function CompetitionsPage() {
         </p>
         <p className="mt-3 max-w-2xl text-sm text-stone-500">
           The separate{' '}
-          <Link to="/archive/35-kickups" className="font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300">
-            35 Kick-Ups shirt giveaway
+          <Link to="/archive/ronaldo-shirt-giveaway" className="font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300">
+            free Ronaldo shirt giveaway
           </Link>{' '}
-          is archived off the homepage but kept on its own page for when you want to run it again.
+          is kept off the homepage but remains available on its own page.
         </p>
 
         <ul className="mt-12 grid list-none gap-8 lg:max-w-2xl">
           <li className="flex flex-col overflow-hidden rounded-2xl border border-teal-500/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-            <div className="flex justify-center bg-gradient-to-b from-teal-950/50 via-stone-950/80 to-stone-950 px-4 pb-2 pt-7">
-              <div className="ss-bundle-frame w-full max-w-[14rem]">
+            <div className="bg-gradient-to-b from-teal-950/50 via-stone-950/80 to-stone-950 px-4 pb-4 pt-7">
+              <div className="ss-bundle-frame mx-auto w-full max-w-xl">
                 <img
-                  src={prizeBundle}
-                  alt="Ronaldo Legacy Bundle promotional artwork: shirt, signed ball, iPhone and gold case."
-                  width={682}
-                  height={1024}
+                  src={legacyBundlePoster}
+                  alt="Ronaldo Legacy Bundle promotional poster with signed shirt, signed ball and gold phone case."
+                  width={1024}
+                  height={576}
                   className="h-auto w-full"
                   loading="lazy"
                   decoding="async"
                 />
+              </div>
+              <div className="mx-auto mt-4 grid max-w-xl gap-3 rounded-xl border border-white/10 bg-black/25 p-3 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+                <div className="mx-auto w-full max-w-[7rem] overflow-hidden rounded-lg border border-white/10 bg-stone-950">
+                  <img
+                    src={iphone17ProMax}
+                    alt="Silver iPhone 17 Pro Max prize photo."
+                    width={768}
+                    height={1024}
+                    className="aspect-[3/4] h-auto w-full object-cover object-center"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-teal-300/90">Phone prize</p>
+                  <p className="mt-1 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
+                  <p className="mt-1 text-xs leading-relaxed text-stone-500">
+                    Presented with the Legacy Bundle prize stack; final colour/spec may vary under substitution terms.
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex flex-1 flex-col p-6 pt-5">

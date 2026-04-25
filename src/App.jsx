@@ -37,7 +37,8 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
-            <Route path="archive/35-kickups" element={<KickupsArchivePage />} />
+            <Route path="archive/ronaldo-shirt-giveaway" element={<KickupsArchivePage />} />
+            <Route path="archive/35-kickups" element={<Navigate to="/archive/ronaldo-shirt-giveaway" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { useEntryFlow } from '../entry/entryContext'
+import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 
 const E2E_SIMULATE_CHECKOUT =
   import.meta.env.VITE_E2E_SIMULATE_CHECKOUT === 'true' ||
@@ -53,10 +54,8 @@ export function EntryModal() {
     paypalCaptureOrderApi,
     kickFullName,
     setKickFullName,
-    kickVideoUrl,
-    setKickVideoUrl,
-    kickVideoFile,
-    setKickVideoFile,
+    kickAnswer,
+    setKickAnswer,
     kickEmail,
     setKickEmail,
     kickConsent,
@@ -69,12 +68,6 @@ export function EntryModal() {
   } = useEntryFlow()
 
   const panelRef = useRef(null)
-  const kickFileInputRef = useRef(null)
-
-  const clearKickFileInput = useCallback(() => {
-    const el = kickFileInputRef.current
-    if (el) el.value = ''
-  }, [])
 
   useEffect(() => {
     if (!entryModalType) return
@@ -108,7 +101,7 @@ export function EntryModal() {
 
   const titles = {
     paid: 'Enter — Ronaldo Legacy Bundle',
-    kickups: 'Enter — 35 Kick-Ups shirt giveaway',
+    kickups: 'Enter — Ronaldo shirt giveaway',
   }
 
   return (
@@ -421,10 +414,9 @@ export function EntryModal() {
           {entryModalType === 'kickups' ? (
             <>
               <p className="text-sm text-stone-500">
-                <strong className="text-lime-200/90">Different competition:</strong> completely free. Upload your 35
-                kick-ups video file <span className="text-stone-400">or</span> paste an{' '}
-                <strong className="text-stone-300">https</strong> link (e.g. unlisted YouTube or a private cloud share).{' '}
-                <strong className="text-stone-300">Prize: signed shirt only</strong> — not the iPhone, ball, or bundle.
+                <strong className="text-lime-200/90">Free giveaway:</strong> answer one simple qualification question to
+                enter the Ronaldo shirt draw. <strong className="text-stone-300">Prize: signed shirt only</strong> — not
+                the iPhone, ball, or Legacy Bundle.
               </p>
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleKickupsGiveawaySubmit}>
                 <div>
@@ -442,49 +434,21 @@ export function EntryModal() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="modal-kick-video-file" className="block text-sm font-medium text-stone-300">
-                    Video file (optional if you use a link)
+                  <label htmlFor="modal-kick-answer" className="block text-sm font-medium text-stone-300">
+                    Qualification question
                   </label>
+                  <p className="mt-1 text-sm text-stone-500">{SHIRT_GIVEAWAY_QUESTION}</p>
                   <input
-                    id="modal-kick-video-file"
-                    ref={kickFileInputRef}
-                    type="file"
-                    accept="video/*,.mp4,.webm,.mov,.m4v,.mkv"
-                    className="mt-2 block w-full text-sm text-stone-400 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-900/50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-emerald-100 hover:file:bg-emerald-800/50"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null
-                      setKickVideoFile(f)
-                      if (f) {
-                        setKickVideoUrl('')
-                        setKickError('')
-                      }
-                    }}
-                  />
-                  {kickVideoFile ? (
-                    <p className="mt-1 text-xs text-stone-500">Selected: {kickVideoFile.name}</p>
-                  ) : null}
-                </div>
-                <div>
-                  <label htmlFor="modal-kick-video-url" className="block text-sm font-medium text-stone-300">
-                    Or video link (https only)
-                  </label>
-                  <input
-                    id="modal-kick-video-url"
-                    type="url"
-                    inputMode="url"
+                    id="modal-kick-answer"
+                    type="text"
                     autoComplete="off"
-                    value={kickVideoUrl}
+                    value={kickAnswer}
                     onChange={(e) => {
-                      const v = e.target.value
-                      setKickVideoUrl(v)
+                      setKickAnswer(e.target.value)
                       setKickError('')
-                      if (v.trim()) {
-                        setKickVideoFile(null)
-                        clearKickFileInput()
-                      }
                     }}
                     className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
-                    placeholder="https://..."
+                    placeholder="Type the answer"
                   />
                 </div>
                 <div>

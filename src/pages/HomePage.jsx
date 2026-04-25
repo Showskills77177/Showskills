@@ -1,7 +1,8 @@
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
-import prizeBundle from '../assets/prize-bundle-hero.png'
 import kickupsHeroBg from '../assets/kickups-hero-bg.png'
+import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
+import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
 import { GRAND_PRIZE_BUNDLE } from '../competitionData'
 import { useEntryFlow } from '../entry/entryContext'
 import { BundleOfferCopy, GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
@@ -87,10 +88,10 @@ export default function HomePage() {
                   Prize lineup
                 </a>
                 <Link
-                  to="/archive/35-kickups"
+                  to="/archive/ronaldo-shirt-giveaway"
                   className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300"
                 >
-                  35 Kick-Ups (archived)
+                  Free shirt giveaway
                 </Link>
               </div>
             </div>
@@ -175,14 +176,39 @@ export default function HomePage() {
               </p>
 
               <div className="mt-6 flex flex-1 flex-col gap-0">
-                <div className="mx-auto w-full max-w-[16.5rem] pb-5 sm:max-w-[18.5rem] sm:pb-6">
+                <div className="mx-auto w-full max-w-md pb-5 sm:pb-6">
                   <div className="ss-bundle-frame">
                     <img
-                      src={prizeBundle}
-                      alt="Ronaldo Legacy Bundle: signed shirt, signed ball in display case, iPhone and 24K gold case on a dark studio set (illustrative)."
-                      width={682}
-                      height={1024}
+                      src={legacyBundlePoster}
+                      alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+                      width={1024}
+                      height={576}
+                      loading="eager"
+                      decoding="async"
                     />
+                  </div>
+                </div>
+                <div className="grid gap-3 rounded-xl border border-white/10 bg-black/25 p-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center">
+                  <div className="mx-auto w-full max-w-[8rem] overflow-hidden rounded-lg border border-white/10 bg-stone-950">
+                    <img
+                      src={iphone17ProMax}
+                      alt="Silver iPhone 17 Pro Max held in hand, illustrative prize photo."
+                      width={768}
+                      height={1024}
+                      loading="lazy"
+                      decoding="async"
+                      className="aspect-[3/4] h-auto w-full object-cover object-center"
+                    />
+                  </div>
+                  <div className="text-center sm:text-left">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-teal-300/90">
+                      Included in the bundle
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
+                    <p className="mt-1 text-xs leading-relaxed text-stone-500">
+                      Shown as the silver model for presentation. Final supplied colour/spec may vary under the prize
+                      substitution terms.
+                    </p>
                   </div>
                 </div>
                 <div className="mt-6 border-t border-white/10 pt-5">
