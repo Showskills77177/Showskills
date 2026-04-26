@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import kickupsHeroBg from '../assets/kickups-hero-bg.png'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
+import iphone17ProMaxGoldCase from '../assets/iphone-17-pro-max-gold-case.png'
 import { GRAND_PRIZE_BUNDLE } from '../competitionData'
 import { useEntryFlow } from '../entry/entryContext'
 import { BundleOfferCopy, GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
@@ -47,11 +48,12 @@ export default function HomePage() {
                 </div>
               </div>
               <p className="mt-5 max-w-xl text-[clamp(1.35rem,4vw,2.1rem)] font-bold leading-snug tracking-tight text-white">
-                Ronaldo Legacy Bundle — pay online or enter by post, then answer three skill questions for the full kit
-                draw.
+                Ronaldo Legacy Bundle — pay online or enter by post, then answer{' '}
+                <span className="ss-pen-highlight whitespace-nowrap text-emerald-100">3 hard skill questions</span> for the
+                full kit draw.
               </p>
 
-              <div className="mt-6 max-w-xl">
+              <div className="ss-legacy-entry-card mt-6 max-w-xl">
                 <div className="rounded-xl border border-teal-500/30 bg-black/25 p-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-teal-300/90">Legacy Bundle draw</p>
                   <p className="mt-2 text-sm font-semibold text-stone-100">Paid bundles or free post</p>
@@ -70,11 +72,41 @@ export default function HomePage() {
               </div>
 
               <TicketBundlePrice compact className="mt-6" />
-              <p className="mt-4 max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
+              <p className="ss-hero-helper-copy mt-4 max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for details, or open entry here.
                 Paid bundles and free postal entry are in the same panel.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:mt-auto lg:border-t lg:border-white/10 lg:pt-6">
+              <div className="ss-legacy-details-card mt-5 max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
+                  Ronaldo Legacy Bundle details
+                </p>
+                <p className="mt-2">
+                  Estimated total stack value is <strong className="text-stone-200">over £3,000</strong>, with collector
+                  legacy value from the signed Ronaldo shirt and museum signed football.
+                </p>
+                <ul className="mt-3 space-y-1.5 text-xs leading-snug text-stone-500 sm:text-sm">
+                  <li>
+                    <strong className="text-stone-300">iPhone 17 Pro Max:</strong> unlocked, 6.9-inch display, 512GB model,
+                    estimated retail value <strong className="text-stone-300">£1,399</strong>.
+                  </li>
+                  <li>
+                    <strong className="text-stone-300">Colour substitution:</strong> if the shown colour is unavailable, an
+                    equivalent colour such as black or another available finish may be supplied.
+                  </li>
+                  <li>
+                    <strong className="text-stone-300">24K gold case:</strong> premium gold-style case for the iPhone 17 Pro
+                    Max, included as part of the prize stack.
+                  </li>
+                  <li>
+                    <strong className="text-stone-300">Museum signed football:</strong> Cristiano Ronaldo museum-style signed
+                    football, presented as a collector item with the bundle.
+                  </li>
+                </ul>
+                <p className="mt-3 text-[11px] leading-snug text-stone-500">
+                  * Images are illustrative. Prize details are subject to the competition terms and availability.
+                </p>
+              </div>
+              <div className="ss-hero-cta-row mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:mt-auto lg:border-t lg:border-white/10 lg:pt-6">
                 <Link
                   to="/competitions"
                   className="ss-btn-enter inline-flex min-h-[3.25rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-3.5 text-center text-base font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.5rem] sm:px-12 sm:text-lg"
@@ -97,38 +129,10 @@ export default function HomePage() {
             </div>
 
             <div
-              className="pointer-events-none absolute bottom-1 right-0 sm:bottom-auto sm:top-[32%] sm:translate-y-[-50%] lg:top-[34%]"
+              className="pointer-events-none absolute right-0 hidden sm:bottom-auto sm:translate-y-[-50%] lg:top-[40%] lg:block"
               aria-hidden
             >
-              <div className="ss-bundle-arrow ss-bundle-arrow--down h-11 w-11 sm:h-12 sm:w-12 lg:hidden">
-                <svg viewBox="0 0 24 24" className="h-full w-full" fill="none" aria-hidden>
-                  <defs>
-                    <linearGradient id="ss-bundle-cue-grad-d" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#99f6e4" />
-                      <stop offset="0.55" stopColor="#2dd4bf" />
-                      <stop offset="1" stopColor="#34d399" />
-                    </linearGradient>
-                  </defs>
-                  <circle
-                    className="ss-bundle-arrow__halo"
-                    cx="12"
-                    cy="12"
-                    r="10.5"
-                    fill="none"
-                    stroke="url(#ss-bundle-cue-grad-d)"
-                    strokeWidth="1.15"
-                    opacity="0.5"
-                  />
-                  <path
-                    stroke="url(#ss-bundle-cue-grad-d)"
-                    strokeWidth="2.35"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4.5v15M5.5 12 12 18.5 18.5 12"
-                  />
-                </svg>
-              </div>
-              <div className="ss-bundle-arrow ss-bundle-arrow--right hidden h-11 w-11 sm:h-12 sm:w-12 lg:flex">
+              <div className="ss-bundle-arrow ss-bundle-arrow--right h-11 w-11 sm:h-12 sm:w-12 lg:flex">
                 <svg viewBox="0 0 24 24" className="h-full w-full" fill="none" aria-hidden>
                   <defs>
                     <linearGradient id="ss-bundle-cue-grad-r" x1="4" y1="12" x2="20" y2="12" gradientUnits="userSpaceOnUse">
@@ -176,39 +180,57 @@ export default function HomePage() {
               </p>
 
               <div className="mt-6 flex flex-1 flex-col gap-0">
-                <div className="mx-auto w-full max-w-md pb-5 sm:pb-6">
-                  <div className="ss-bundle-frame">
-                    <img
-                      src={legacyBundlePoster}
-                      alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
-                      width={1024}
-                      height={576}
-                      loading="eager"
-                      decoding="async"
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-3 rounded-xl border border-white/10 bg-black/25 p-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center">
-                  <div className="mx-auto w-full max-w-[8rem] overflow-hidden rounded-lg border border-white/10 bg-stone-950">
-                    <img
-                      src={iphone17ProMax}
-                      alt="Silver iPhone 17 Pro Max held in hand, illustrative prize photo."
-                      width={768}
-                      height={1024}
-                      loading="lazy"
-                      decoding="async"
-                      className="aspect-[3/4] h-auto w-full object-cover object-center"
-                    />
-                  </div>
-                  <div className="text-center sm:text-left">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-teal-300/90">
-                      Included in the bundle
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
-                    <p className="mt-1 text-xs leading-relaxed text-stone-500">
-                      Shown as the silver model for presentation. Final supplied colour/spec may vary under the prize
-                      substitution terms.
-                    </p>
+                <div className="ss-prize-studio p-2 sm:p-3">
+                  <div className="relative z-[1] grid gap-2">
+                    <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
+                      <div className="ss-prize-studio-photo">
+                        <img
+                          src={legacyBundlePoster}
+                          alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+                          width={1024}
+                          height={576}
+                          loading="eager"
+                          decoding="async"
+                          className="h-auto w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="ss-prize-studio-subgrid mx-auto grid w-full gap-1.5 sm:max-w-[18rem] sm:grid-cols-2 sm:gap-0">
+                      <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
+                        <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
+                          <img
+                            src={iphone17ProMax}
+                            alt="iPhone 17 Pro Max prize photo."
+                            width={768}
+                            height={1024}
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-[3/4] h-auto w-full scale-125 object-cover object-center"
+                          />
+                        </div>
+                        <p className="ss-phone-prize-glow mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em]">
+                          Phone prize
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
+                      </div>
+                      <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
+                        <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
+                          <img
+                            src={iphone17ProMaxGoldCase}
+                            alt="24K gold case for iPhone 17 Pro Max prize photo."
+                            width={960}
+                            height={1024}
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-[3/4] h-auto w-full object-cover object-center"
+                          />
+                        </div>
+                        <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">
+                          Case prize
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-stone-100">24K gold case</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="mt-6 border-t border-white/10 pt-5">
@@ -260,7 +282,7 @@ export default function HomePage() {
                     onClick={() => openEntry('paid')}
                     className="relative z-[1] w-full rounded-xl border border-teal-500/35 bg-teal-950/30 py-3 text-sm font-bold text-teal-100 transition hover:border-teal-400/50 hover:bg-teal-950/50"
                   >
-                    Enter bundle draw
+                    Enter Bundle Draw
                   </button>
                 </div>
                 <TicketBundlePrice className="mt-4" />
@@ -271,7 +293,7 @@ export default function HomePage() {
                     className="font-medium text-zinc-400 underline underline-offset-2 hover:text-zinc-300"
                     onClick={() => openEntry('paid')}
                   >
-                    Enter bundle draw
+                    Enter Bundle Draw
                   </button>
                   .
                 </p>

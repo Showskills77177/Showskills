@@ -250,7 +250,9 @@ export function BundleOfferCopy({ compact = false }) {
   return (
     <div>
       <p
-        className={`font-semibold text-stone-400 ${compact ? 'mb-2 text-[10px] sm:text-xs' : 'mb-3 text-xs sm:text-sm'}`}
+        className={`font-bold uppercase tracking-[0.18em] text-stone-100 ${
+          compact ? 'mb-2 text-[10px] sm:text-xs' : 'mb-3 text-sm sm:text-base'
+        }`}
       >
         What&apos;s included
       </p>
@@ -258,13 +260,21 @@ export function BundleOfferCopy({ compact = false }) {
         {BUNDLE_OFFER_ITEMS.map((line) => (
           <li
             key={line}
-            className={`flex gap-3 leading-snug ${compact ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} text-stone-200`}
+            className={`flex gap-3 font-semibold leading-snug ${
+              compact ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'
+            } text-stone-100`}
           >
             <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-500/70" aria-hidden />
             <span>{line}</span>
           </li>
         ))}
       </ul>
+      <p className="mt-3 text-[9px] leading-snug text-stone-500 sm:text-[10px]">
+        <span className="mr-1 text-amber-300/80" aria-hidden>
+          *
+        </span>
+        Images are illustrative.
+      </p>
     </div>
   )
 }

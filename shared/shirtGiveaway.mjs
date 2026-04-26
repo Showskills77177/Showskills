@@ -1,5 +1,5 @@
 export const SHIRT_GIVEAWAY_QUESTION =
-  'Type either accepted Ronaldo answer: Ronaldo R9 or Cristiano Ronaldo.'
+  'Which Ronaldo is the one from Manchester United: Ronaldo R9 or Cristiano Ronaldo?'
 
 export function isCorrectShirtGiveawayAnswer(answer) {
   const normalized = String(answer || '')

@@ -20,7 +20,7 @@ export function Layout() {
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
-        <div className="relative z-10 mx-auto grid max-w-5xl min-h-[3.25rem] grid-cols-1 items-center justify-items-center gap-y-2 px-3 py-2 sm:min-h-[3.5rem] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:justify-items-stretch sm:gap-y-0 sm:px-6 sm:py-2">
+        <div className="relative z-10 mx-auto grid max-w-5xl min-h-[3.65rem] grid-cols-1 items-center justify-items-center gap-y-2 px-3 py-2.5 sm:min-h-[4rem] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:justify-items-stretch sm:gap-y-0 sm:px-6 sm:py-2.5">
           <nav
             className="order-2 flex w-full max-w-full flex-nowrap items-center justify-between gap-x-1 overflow-x-auto overflow-y-hidden overscroll-x-contain py-0.5 text-[11px] font-semibold leading-none [-ms-overflow-style:none] [scrollbar-width:none] sm:order-1 sm:w-auto sm:flex-wrap sm:justify-start sm:gap-x-1 sm:overflow-visible sm:py-0 sm:text-sm sm:leading-normal sm:justify-self-start [&::-webkit-scrollbar]:hidden"
             aria-label="Main navigation"
@@ -54,7 +54,7 @@ export function Layout() {
             <div
               role="img"
               aria-hidden
-              className="h-9 w-auto shrink-0 bg-stone-100 [aspect-ratio:745/235] sm:h-11"
+              className="h-10 w-auto shrink-0 bg-stone-100 [aspect-ratio:745/235] sm:h-12"
               style={{
                 maskImage: `url(${showskillsLogo})`,
                 WebkitMaskImage: `url(${showskillsLogo})`,

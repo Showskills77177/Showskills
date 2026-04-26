@@ -37,6 +37,36 @@ body {
   font-family: var(--font-display);
 }
 
+.ss-pen-highlight {
+  position: relative;
+  display: inline-block;
+  text-shadow: 0 0 18px rgba(52, 211, 153, 0.14);
+}
+
+.ss-pen-highlight::after {
+  content: '';
+  position: absolute;
+  left: -0.1em;
+  right: -0.1em;
+  bottom: -0.13em;
+  height: 0.34em;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      92deg,
+      transparent 0%,
+      rgba(16, 185, 129, 0.16) 4%,
+      rgba(52, 211, 153, 0.42) 14%,
+      rgba(153, 246, 228, 0.34) 50%,
+      rgba(52, 211, 153, 0.38) 88%,
+      transparent 100%
+    );
+  border-radius: 999px;
+  opacity: 0.96;
+  transform: rotate(-1deg);
+  clip-path: polygon(0 36%, 8% 24%, 21% 38%, 36% 22%, 54% 35%, 72% 25%, 100% 40%, 100% 86%, 82% 72%, 63% 88%, 43% 73%, 24% 86%, 0 74%);
+}
+
 /* Header — matchday strip */
 .ss-header {
   position: relative;
@@ -423,6 +453,235 @@ body {
   vertical-align: top;
 }
 
+.ss-prize-studio {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #050505;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+
+.ss-prize-studio::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 24% at 50% 100%, rgba(245, 158, 11, 0.08), transparent 72%);
+}
+
+.ss-prize-studio-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ss-prize-studio-tile--main {
+  background: transparent;
+}
+
+.ss-prize-studio-photo {
+  overflow: hidden;
+  border-radius: 0.55rem;
+  background: #050505;
+}
+
+.ss-prize-studio-photo img {
+  filter: brightness(0.98) contrast(1.06) saturate(0.94) sepia(0.04);
+}
+
+.ss-prize-studio-subgrid {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.5rem;
+}
+
+.ss-phone-prize-glow {
+  color: #99f6e4;
+  text-shadow:
+    0 0 8px rgba(45, 212, 191, 0.7),
+    0 0 20px rgba(52, 211, 153, 0.42),
+    0 0 34px rgba(16, 185, 129, 0.2);
+  animation: ss-phone-prize-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes ss-phone-prize-pulse {
+  0%,
+  100% {
+    opacity: 0.86;
+    text-shadow:
+      0 0 7px rgba(45, 212, 191, 0.52),
+      0 0 18px rgba(52, 211, 153, 0.3),
+      0 0 30px rgba(16, 185, 129, 0.16);
+  }
+  50% {
+    opacity: 1;
+    text-shadow:
+      0 0 12px rgba(45, 212, 191, 0.95),
+      0 0 28px rgba(52, 211, 153, 0.58),
+      0 0 46px rgba(16, 185, 129, 0.28);
+  }
+}
+
+@media (min-width: 640px) {
+  .ss-prize-studio-subgrid > * + * {
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* Small-phone homepage pass: iPhone 13 mini and similarly narrow devices. */
+@media (max-width: 430px) {
+  .ss-header > div {
+    min-height: 3.45rem;
+    row-gap: 0.35rem;
+    padding: 0.45rem 0.75rem 0.5rem;
+  }
+
+  .ss-header nav {
+    justify-content: center;
+    column-gap: 0.35rem;
+    font-size: 10px;
+    letter-spacing: 0.01em;
+  }
+
+  .ss-header [role='img'] {
+    height: 2.25rem;
+  }
+
+  .ss-hero-inner {
+    gap: 1.45rem;
+    padding: 1.25rem 0.75rem 2.35rem;
+  }
+
+  .ss-hero-copy-panel,
+  .ss-prize-panel {
+    border-radius: 0.9rem;
+    padding: 0.85rem;
+  }
+
+  .ss-hero-copy-panel > p:first-child,
+  .ss-prize-panel > p:first-child {
+    margin-bottom: 0.6rem;
+    padding: 0.32rem 0.6rem;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .ss-hero-brand {
+    font-size: clamp(2.35rem, 16vw, 3.25rem) !important;
+    line-height: 0.9;
+  }
+
+  .ss-hero-copy-panel .ss-football-bounce-wrap {
+    width: 2.15rem;
+    height: 2.15rem;
+  }
+
+  .ss-hero-copy-panel > p:nth-of-type(2) {
+    margin-top: 1rem;
+    font-size: clamp(1.08rem, 5.5vw, 1.32rem);
+    line-height: 1.18;
+  }
+
+  .ss-pen-highlight {
+    white-space: normal;
+  }
+
+  .ss-legacy-entry-card {
+    margin-top: 1rem;
+  }
+
+  .ss-legacy-entry-card > div,
+  .ss-legacy-details-card {
+    border-radius: 0.85rem;
+    padding: 0.85rem;
+  }
+
+  .ss-legacy-details-card {
+    margin-top: 1rem;
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .ss-legacy-details-card ul {
+    margin-top: 0.65rem;
+    gap: 0;
+  }
+
+  .ss-legacy-details-card li + li {
+    margin-top: 0.45rem;
+  }
+
+  .ss-hero-helper-copy {
+    margin-top: 0.9rem;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .ss-hero-cta-row {
+    margin-top: 1.15rem;
+    gap: 0.65rem;
+  }
+
+  .ss-hero-cta-row a {
+    width: 100%;
+    min-height: 2.85rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.76rem;
+  }
+
+  .ss-prize-panel h2 {
+    font-size: 2rem;
+    line-height: 0.95;
+  }
+
+  .ss-prize-panel > p {
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .ss-prize-panel > p + p {
+    margin-top: 0.55rem;
+  }
+
+  .ss-prize-studio {
+    border-radius: 0.85rem;
+    padding: 0.4rem !important;
+  }
+
+  .ss-prize-studio-subgrid {
+    max-width: 15.5rem;
+  }
+
+  .ss-prize-studio-subgrid .ss-prize-studio-photo {
+    max-width: 6.35rem;
+  }
+
+  .ss-prize-studio-subgrid p {
+    line-height: 1.15;
+  }
+}
+
+@media (max-width: 360px) {
+  .ss-hero-inner {
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+
+  .ss-hero-brand {
+    font-size: 2.22rem !important;
+  }
+
+  .ss-hero-copy-panel,
+  .ss-prize-panel {
+    padding: 0.75rem;
+  }
+
+  .ss-legacy-details-card li {
+    font-size: 0.72rem;
+  }
+}
+
 /* Rules graphic: figure sets max width; frame is 100% so caption lines up with the art */
 .ss-rules-guide-frame {
   display: block;
@@ -449,7 +708,7 @@ body {
 .ss-kickups-prize-thumb {
   display: block;
   width: 100%;
-  max-width: 9.5rem;
+  max-width: 12rem;
   line-height: 0;
   border-radius: 0.65rem;
   border: 2px solid rgba(190, 242, 100, 0.4);
