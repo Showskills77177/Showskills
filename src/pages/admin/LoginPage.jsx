@@ -40,7 +40,9 @@ export default function AdminLoginPage() {
               : ''
         const hint =
           res.status === 502 || res.status === 504 || res.status === 404
-            ? ' Run npm run dev:all, or npm run dev:api (node server.js on port 3000).'
+            ? import.meta.env.PROD
+              ? ' Check Vercel env: ADMIN_USER, ADMIN_PASSWORD, ADMIN_JWT_SECRET (32+ chars), then redeploy.'
+              : ' Run npm run dev:all, or npm run dev:api (node server.js on port 3000).'
             : ''
         setError(
           apiMsg ||

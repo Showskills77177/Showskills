@@ -1,7 +1,3 @@
-/**
- * Single Vercel Serverless Function (Hobby plan — max 12 functions per deployment).
- * All `/api/*` requests are handled here; handlers live in `backend/api/`.
- */
 import adminLogin from '../backend/api/admin/login.js'
 import adminLogout from '../backend/api/admin/logout.js'
 import adminMe from '../backend/api/admin/me.js'
@@ -22,24 +18,7 @@ import createCheckoutSession from '../backend/api/create-checkout-session.js'
 import createPayPalOrder from '../backend/api/create-paypal-order.js'
 import capturePayPalOrder from '../backend/api/capture-paypal-order.js'
 
-function getRoutedPath(req) {
-  try {
-    const raw = typeof req.url === 'string' ? req.url : '/'
-    const { pathname } = new URL(raw, 'http://localhost')
-    if (pathname.startsWith('/api/') && !pathname.includes('[') && pathname.length > '/api/'.length) {
-      return pathname.replace(/\/+$/, '') || pathname
-    }
-  } catch {
-    /* ignore */
-  }
-  const slug = req.query?.slug
-  if (slug == null || slug === '') return '/api'
-  if (Array.isArray(slug)) return `/api/${slug.join('/')}`
-  if (typeof slug === 'string') return `/api/${slug}`
-  return '/api'
-}
-
-const routes = {
+export const routes = {
   '/api/admin/login': adminLogin,
   '/api/admin/logout': adminLogout,
   '/api/admin/me': adminMe,
@@ -61,8 +40,13 @@ const routes = {
   '/api/capture-paypal-order': capturePayPalOrder,
 }
 
-export default async function handler(req, res) {
-  const path = getRoutedPath(req)
+export function pathFromSlugParam(prefix, slug) {
+  const parts = Array.isArray(slug) ? slug : slug ? [String(slug)] : []
+  const tail = parts.map((s) => String(s).trim()).filter(Boolean).join('/')
+  return tail ? `${prefix}/${tail}` : prefix
+}
+
+export async function dispatch(req, res, path) {
   const fn = routes[path]
   if (!fn) {
     res.statusCode = 404

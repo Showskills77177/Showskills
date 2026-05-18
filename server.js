@@ -1,6 +1,6 @@
 /**
  * Local API server for `npm run dev:api` (port 3000).
- * Vite proxies `/api` here. Production uses a single Vercel function: `api/[[...slug]].js`.
+ * Vite proxies `/api` here. Production uses `api/*` serverless routes (see `api/_dispatch.mjs`).
  */
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
