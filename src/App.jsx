@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { EntryFlowProvider } from './entry/EntryFlowProvider'
 import { AdminLayout } from './admin/AdminLayout'
 import { RequireAdmin } from './admin/RequireAdmin'
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
+        <Analytics />
       </EntryFlowProvider>
     </BrowserRouter>
   )

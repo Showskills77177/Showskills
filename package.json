@@ -22,13 +22,14 @@
     "test:install": "playwright install chromium"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "multer": "^1.4.5-lts.2",
-    "bcryptjs": "^2.4.3",
     "jose": "^5.10.0",
+    "multer": "^1.4.5-lts.2",
     "pg": "^8.14.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -36,8 +37,8 @@
     "stripe": "^22.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.0",
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.51.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
