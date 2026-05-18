@@ -1,5 +1,5 @@
-import { dispatch, pathFromSlugParam } from '../_dispatch.mjs'
+import { dispatch, pathFromRequest } from '../_dispatch.mjs'
 
 export default async function handler(req, res) {
-  return dispatch(req, res, pathFromSlugParam('/api/admin', req.query?.slug))
+  return dispatch(req, res, pathFromRequest(req, '/api/admin'))
 }

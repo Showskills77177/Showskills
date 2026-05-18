@@ -46,6 +46,21 @@ export function pathFromSlugParam(prefix, slug) {
   return tail ? `${prefix}/${tail}` : prefix
 }
 
+/** Vercel sometimes omits `slug` in query; fall back to the request pathname. */
+export function pathFromRequest(req, prefix) {
+  const fromSlug = pathFromSlugParam(prefix, req.query?.slug)
+  if (fromSlug !== prefix) return fromSlug
+  try {
+    const raw = typeof req.url === 'string' ? req.url : '/'
+    const { pathname } = new URL(raw, 'http://localhost')
+    const normalized = pathname.replace(/\/+$/, '') || pathname
+    if (normalized === prefix || normalized.startsWith(`${prefix}/`)) return normalized
+  } catch {
+    /* ignore */
+  }
+  return fromSlug
+}
+
 export async function dispatch(req, res, path) {
   const fn = routes[path]
   if (!fn) {
