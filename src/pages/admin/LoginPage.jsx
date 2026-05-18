@@ -44,10 +44,13 @@ export default function AdminLoginPage() {
               ? ' Check Vercel env: ADMIN_USER, ADMIN_PASSWORD, ADMIN_JWT_SECRET (32+ chars), then redeploy.'
               : ' Run npm run dev:all, or npm run dev:api (node server.js on port 3000).'
             : ''
+        const missing = Array.isArray(data.missing) ? data.missing.join(', ') : ''
+        const missingLine = missing ? ` Missing on server: ${missing}.` : ''
         setError(
-          apiMsg ||
-            (text.trim() ? `${res.status}: ${text.trim().slice(0, 160)}` : '') ||
-            `Could not reach login API (HTTP ${res.status}).${hint}`,
+          (apiMsg || (text.trim() ? `${res.status}: ${text.trim().slice(0, 160)}` : '')) +
+            missingLine +
+            (data.hint ? ` ${data.hint}` : '') +
+            (!apiMsg && !text.trim() ? `Could not reach login API (HTTP ${res.status}).${hint}` : hint),
         )
         return
       }

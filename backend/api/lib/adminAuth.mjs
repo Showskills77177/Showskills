@@ -94,10 +94,28 @@ export function clearAdminCookieHeader() {
 }
 
 export function isAdminAuthConfigured() {
-  return Boolean(
-    process.env.ADMIN_USER?.trim() &&
-      (process.env.ADMIN_PASSWORD?.trim() || process.env.ADMIN_PASSWORD_HASH?.trim()) &&
-      process.env.ADMIN_JWT_SECRET &&
-      process.env.ADMIN_JWT_SECRET.length >= 32,
-  )
+  return adminAuthConfigStatus().ok
+}
+
+/** Safe for API responses — never exposes secret values. */
+export function adminAuthConfigStatus() {
+  const user = Boolean(process.env.ADMIN_USER?.trim())
+  const password = Boolean(process.env.ADMIN_PASSWORD?.trim())
+  const passwordHash = Boolean(process.env.ADMIN_PASSWORD_HASH?.trim())
+  const jwtRaw = process.env.ADMIN_JWT_SECRET ?? ''
+  const jwt = Boolean(jwtRaw.trim())
+  const jwtLongEnough = jwtRaw.trim().length >= 32
+  const missing = []
+  if (!user) missing.push('ADMIN_USER')
+  if (!password && !passwordHash) missing.push('ADMIN_PASSWORD or ADMIN_PASSWORD_HASH')
+  if (!jwt) missing.push('ADMIN_JWT_SECRET')
+  else if (!jwtLongEnough) missing.push('ADMIN_JWT_SECRET (must be 32+ characters)')
+  return {
+    ok: user && (password || passwordHash) && jwt && jwtLongEnough,
+    missing,
+    hasAdminUser: user,
+    hasAdminPassword: password,
+    hasAdminPasswordHash: passwordHash,
+    adminJwtSecretLength: jwtRaw.trim().length,
+  }
 }

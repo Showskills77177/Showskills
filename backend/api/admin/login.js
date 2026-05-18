@@ -1,4 +1,9 @@
-import { signAdminSession, setAdminCookieHeader, isAdminAuthConfigured } from '../lib/adminAuth.mjs'
+import {
+  signAdminSession,
+  setAdminCookieHeader,
+  isAdminAuthConfigured,
+  adminAuthConfigStatus,
+} from '../lib/adminAuth.mjs'
 import { verifyAdminPassword } from '../lib/password.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
 
@@ -15,7 +20,12 @@ export default async function handler(req, res) {
   }
 
   if (!isAdminAuthConfigured()) {
-    return json(res, 503, { error: 'Admin auth is not configured (set ADMIN_USER, ADMIN_PASSWORD or ADMIN_PASSWORD_HASH, ADMIN_JWT_SECRET).' })
+    const status = adminAuthConfigStatus()
+    return json(res, 503, {
+      error: 'Admin auth is not configured on the server.',
+      missing: status.missing,
+      hint: 'Vercel → Project → Settings → Environment Variables → enable Production → Redeploy.',
+    })
   }
 
   const body = await readJsonBody(req)
