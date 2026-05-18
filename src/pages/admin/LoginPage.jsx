@@ -69,12 +69,17 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-stone-950 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-stone-900/80 p-8 shadow-xl">
         <h1 className="text-center text-lg font-semibold text-stone-100">Admin sign in</h1>
-        <p className="mt-2 text-center text-xs text-stone-500">This area is not linked from the public site.</p>
-        <p className="mt-2 text-center text-[11px] leading-snug text-stone-600">
-          <strong className="font-medium text-stone-500">Local dev:</strong> run{' '}
-          <code className="text-stone-500">npm run dev:all</code> (Express API on :3000 + Vite), or{' '}
-          <code className="text-stone-500">npm run dev:api</code> then <code className="text-stone-500">npm run dev</code>.
-        </p>
+        {import.meta.env.DEV ? (
+          <>
+            <p className="mt-2 text-center text-xs text-stone-500">Local admin — not linked from the public site.</p>
+            <p className="mt-2 text-center text-[11px] leading-snug text-stone-600">
+              Run <code className="text-stone-500">npm run dev:all</code> (API :3000 + Vite), or{' '}
+              <code className="text-stone-500">npm run dev:api</code> then <code className="text-stone-500">npm run dev</code>.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-center text-xs text-stone-500">Staff access only.</p>
+        )}
         <form className="mt-6 flex flex-col gap-4" onSubmit={onSubmit}>
           <div>
             <label htmlFor="admin-user" className="block text-xs font-medium text-stone-400">
