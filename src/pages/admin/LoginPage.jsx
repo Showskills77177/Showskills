@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { AdminLogo } from '../../admin/AdminLogo'
 import { apiUrl } from '../../lib/api'
 
 export default function AdminLoginPage() {
@@ -68,6 +69,9 @@ export default function AdminLoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-stone-950 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-stone-900/80 p-8 shadow-xl">
+        <div className="mb-6 flex justify-center">
+          <AdminLogo linkTo={null} size="lg" />
+        </div>
         <h1 className="text-center text-lg font-semibold text-stone-100">Admin sign in</h1>
         {import.meta.env.DEV ? (
           <>

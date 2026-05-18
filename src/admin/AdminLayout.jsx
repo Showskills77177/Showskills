@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { AdminLogo } from './AdminLogo'
 import { apiFetch } from '../lib/api'
 
 const linkClass = ({ isActive }) =>
@@ -22,7 +23,10 @@ export function AdminLayout() {
     <div className="min-h-screen bg-stone-950 text-stone-200">
       <header className="border-b border-white/10 bg-stone-950/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <span className="text-sm font-semibold tracking-wide text-stone-300">ShowSkills admin</span>
+          <div className="flex items-center gap-3">
+            <AdminLogo size="sm" />
+            <span className="hidden text-xs font-medium uppercase tracking-wider text-stone-500 sm:inline">Admin</span>
+          </div>
           <nav className="flex flex-wrap items-center gap-1">
             <NavLink to="/admin/dashboard" className={linkClass} end={false}>
               Dashboard
