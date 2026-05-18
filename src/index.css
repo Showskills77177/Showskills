@@ -523,34 +523,41 @@ body {
   }
 }
 
-@media (min-width: 640px) {
-  .ss-prize-studio-subgrid > * + * {
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-  }
+.ss-prize-studio-subgrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ss-prize-studio-subgrid > * + * {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ss-mobile-nav-dock {
+  border-top: 1px solid rgba(52, 211, 153, 0.22);
+  background: linear-gradient(180deg, rgba(8, 22, 18, 0.98) 0%, rgba(5, 15, 13, 1) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.ss-mobile-nav-btn {
+  min-height: 3.35rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
 }
 
 /* Small-phone homepage pass: iPhone 13 mini and similarly narrow devices. */
 @media (max-width: 430px) {
-  .ss-header > div {
-    min-height: 3.45rem;
-    row-gap: 0.35rem;
-    padding: 0.45rem 0.75rem 0.5rem;
+  .ss-mobile-nav-dock__grid {
+    gap: 0.65rem;
+    padding: 0.75rem;
   }
 
-  .ss-header nav {
-    justify-content: center;
-    column-gap: 0.35rem;
-    font-size: 10px;
-    letter-spacing: 0.01em;
-  }
-
-  .ss-header [role='img'] {
-    height: 2.25rem;
+  .ss-mobile-nav-btn {
+    min-height: 3.5rem;
+    font-size: 0.95rem;
   }
 
   .ss-hero-inner {
     gap: 1.45rem;
-    padding: 1.25rem 0.75rem 2.35rem;
+    padding: 1rem 0.75rem 2.35rem;
   }
 
   .ss-hero-copy-panel,
@@ -650,11 +657,11 @@ body {
   }
 
   .ss-prize-studio-subgrid {
-    max-width: 15.5rem;
+    max-width: 100%;
   }
 
   .ss-prize-studio-subgrid .ss-prize-studio-photo {
-    max-width: 6.35rem;
+    max-width: 100%;
   }
 
   .ss-prize-studio-subgrid p {

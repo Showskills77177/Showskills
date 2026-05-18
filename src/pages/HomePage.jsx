@@ -30,8 +30,8 @@ export default function HomePage() {
           <div className="ss-hero-photo-scrim absolute inset-0" />
         </div>
 
-        <div className="ss-hero-inner mx-auto grid max-w-5xl gap-10 px-4 pt-9 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:pt-12 lg:pb-20">
-          <div className="relative flex w-full min-h-0 flex-col lg:h-full lg:min-h-0">
+        <div className="ss-hero-inner mx-auto flex max-w-5xl flex-col gap-8 px-4 pt-4 pb-14 sm:gap-10 sm:px-6 sm:pt-11 sm:pb-10 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:pt-12 lg:pb-20">
+          <div className="ss-hero-brand-column relative order-2 flex w-full min-h-0 flex-col lg:order-1 lg:h-full lg:min-h-0">
             <div className="ss-hero-copy-panel flex w-full min-h-0 flex-col p-5 text-left sm:p-6 lg:min-h-0 lg:flex-1">
               <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
@@ -163,7 +163,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div id="prizes" className="scroll-mt-24 flex min-h-0 w-full flex-col">
+          <div id="prizes" className="ss-hero-prize-column scroll-mt-24 order-1 flex min-h-0 w-full flex-col lg:order-2">
             <article className="ss-prize-panel flex h-full min-h-0 flex-col p-5 sm:p-6">
               <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-teal-500/30 bg-teal-950/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-teal-200/90 sm:text-sm">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal-400" aria-hidden />
@@ -195,7 +195,7 @@ export default function HomePage() {
                         />
                       </div>
                     </div>
-                    <div className="ss-prize-studio-subgrid mx-auto grid w-full gap-1.5 sm:max-w-[18rem] sm:grid-cols-2 sm:gap-0">
+                    <div className="ss-prize-studio-subgrid mx-auto grid w-full grid-cols-2 gap-2 sm:max-w-[20rem] sm:gap-0">
                       <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
                         <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
                           <img

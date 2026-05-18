@@ -2,13 +2,34 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
 import { EntryModal } from './EntryModal'
 import { TermsModal } from './TermsModal'
+import { MobileNavDock } from './MobileNavDock'
 import { useEntryFlow } from '../entry/entryContext'
 import { SkillMeterIcon } from './siteChrome'
 
-function navClass({ isActive }) {
-  return `max-sm:shrink-0 max-sm:whitespace-nowrap rounded-md px-1.5 py-1 transition ${
-    isActive ? 'text-emerald-200' : 'text-stone-400 hover:text-stone-100'
+function desktopNavClass({ isActive }) {
+  return `rounded-md px-1.5 py-1 text-white transition ${
+    isActive ? 'opacity-100' : 'opacity-90 hover:opacity-100'
   }`
+}
+
+function LogoMark({ className = 'h-10 sm:h-12' }) {
+  return (
+    <div
+      role="img"
+      aria-hidden
+      className={`w-auto shrink-0 bg-stone-100 [aspect-ratio:745/235] ${className}`}
+      style={{
+        maskImage: `url(${showskillsLogo})`,
+        WebkitMaskImage: `url(${showskillsLogo})`,
+        maskSize: 'contain',
+        WebkitMaskSize: 'contain',
+        maskRepeat: 'no-repeat',
+        WebkitMaskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        WebkitMaskPosition: 'center',
+      }}
+    />
+  )
 }
 
 export function Layout() {
@@ -20,27 +41,42 @@ export function Layout() {
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
-        <div className="relative z-10 mx-auto grid max-w-5xl min-h-[3.65rem] grid-cols-1 items-center justify-items-center gap-y-2 px-3 py-2.5 sm:min-h-[4rem] sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:justify-items-stretch sm:gap-y-0 sm:px-6 sm:py-2.5">
+        {/* Mobile: logo, then menu dock with its own footer strip */}
+        <div className="sm:hidden">
+          <div className="flex justify-center px-4 pb-2 pt-3">
+            <Link
+              to="/"
+              className="outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512]"
+              aria-label="ShowSkills Rewards home"
+            >
+              <LogoMark className="h-11" />
+            </Link>
+          </div>
+          <MobileNavDock />
+        </div>
+
+        {/* Desktop: classic three-column header */}
+        <div className="relative z-10 mx-auto hidden max-w-5xl min-h-[4rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-y-0 px-6 py-2.5 sm:grid">
           <nav
-            className="order-2 flex w-full max-w-full flex-nowrap items-center justify-between gap-x-1 overflow-x-auto overflow-y-hidden overscroll-x-contain py-0.5 text-[11px] font-semibold leading-none [-ms-overflow-style:none] [scrollbar-width:none] sm:order-1 sm:w-auto sm:flex-wrap sm:justify-start sm:gap-x-1 sm:overflow-visible sm:py-0 sm:text-sm sm:leading-normal sm:justify-self-start [&::-webkit-scrollbar]:hidden"
+            className="flex flex-wrap items-center justify-start gap-x-1 text-sm leading-normal"
             aria-label="Main navigation"
           >
-            <NavLink to="/" end className={navClass}>
+            <NavLink to="/" end className={desktopNavClass}>
               Home
             </NavLink>
-            <span className="hidden select-none text-stone-600 sm:inline" aria-hidden>
+            <span className="select-none text-stone-600" aria-hidden>
               —
             </span>
-            <NavLink to="/competitions" className={navClass}>
+            <NavLink to="/competitions" className={desktopNavClass}>
               Competitions
             </NavLink>
-            <span className="hidden select-none text-stone-600 sm:inline" aria-hidden>
+            <span className="select-none text-stone-600" aria-hidden>
               —
             </span>
             <button
               type="button"
               onClick={() => openTerms()}
-              className="max-sm:shrink-0 max-sm:whitespace-nowrap rounded-md px-1.5 py-1 text-stone-400 transition hover:text-stone-100"
+              className="rounded-md px-1.5 py-1 text-white opacity-90 transition hover:opacity-100"
             >
               T&amp;C
             </button>
@@ -48,27 +84,13 @@ export function Layout() {
 
           <Link
             to="/"
-            className="order-1 flex shrink-0 items-center justify-self-center outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512] sm:order-2 sm:justify-self-center"
+            className="flex shrink-0 items-center justify-self-center outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512]"
             aria-label="ShowSkills Rewards home"
           >
-            <div
-              role="img"
-              aria-hidden
-              className="h-10 w-auto shrink-0 bg-stone-100 [aspect-ratio:745/235] sm:h-12"
-              style={{
-                maskImage: `url(${showskillsLogo})`,
-                WebkitMaskImage: `url(${showskillsLogo})`,
-                maskSize: 'contain',
-                WebkitMaskSize: 'contain',
-                maskRepeat: 'no-repeat',
-                WebkitMaskRepeat: 'no-repeat',
-                maskPosition: 'center',
-                WebkitMaskPosition: 'center',
-              }}
-            />
+            <LogoMark />
           </Link>
 
-          <div className="order-3 hidden sm:block" aria-hidden />
+          <div aria-hidden />
         </div>
       </header>
 
@@ -79,20 +101,7 @@ export function Layout() {
           <div className="flex flex-col items-center gap-6">
             <div className="flex items-center justify-center gap-4 sm:gap-5">
               <SkillMeterIcon className="h-6 w-6 shrink-0 text-stone-200 opacity-90 sm:h-7 sm:w-7" />
-              <div
-                aria-hidden
-                className="h-8 w-auto shrink-0 bg-stone-200 [aspect-ratio:745/235] sm:h-9"
-                style={{
-                  maskImage: `url(${showskillsLogo})`,
-                  WebkitMaskImage: `url(${showskillsLogo})`,
-                  maskSize: 'contain',
-                  WebkitMaskSize: 'contain',
-                  maskRepeat: 'no-repeat',
-                  WebkitMaskRepeat: 'no-repeat',
-                  maskPosition: 'center',
-                  WebkitMaskPosition: 'center',
-                }}
-              />
+              <LogoMark className="h-8 sm:h-9" />
               <SkillMeterIcon className="h-6 w-6 shrink-0 scale-x-[-1] text-stone-200 opacity-90 sm:h-7 sm:w-7" />
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
