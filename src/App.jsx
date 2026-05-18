@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { EntryFlowProvider } from './entry/EntryFlowProvider'
 import { AdminLayout } from './admin/AdminLayout'
@@ -19,7 +20,9 @@ const routerBasename =
 
 export default function App() {
   return (
-    <BrowserRouter basename={routerBasename}>
+    <>
+      <Analytics />
+      <BrowserRouter basename={routerBasename}>
       <EntryFlowProvider>
         <Routes>
           <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -44,5 +47,6 @@ export default function App() {
         </Routes>
       </EntryFlowProvider>
     </BrowserRouter>
+    </>
   )
 }
