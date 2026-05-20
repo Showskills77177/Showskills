@@ -101,6 +101,7 @@ export function StripePaymentForm({
           <PaymentElement
             options={{
               layout: 'tabs',
+              terms: { card: 'never', applePay: 'never', googlePay: 'never' },
             }}
           />
         </div>
@@ -113,7 +114,6 @@ export function StripePaymentForm({
           recordPayload={recordPayload}
         />
       </Elements>
-      <p className="mt-2 text-center text-[10px] text-stone-500">Powered by Stripe</p>
     </div>
   )
 }
