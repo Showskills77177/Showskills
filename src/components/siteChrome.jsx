@@ -1,5 +1,7 @@
 import { useId } from 'react'
-import { BUNDLE_OFFER_ITEMS, TICKET_BUNDLES, formatBundlePriceGBP } from '../competitionData'
+import { BUNDLE_OFFER_ITEMS, formatBundlePriceGBP, getVisibleTicketBundles } from '../competitionData'
+
+const PUBLIC_TICKET_BUNDLES = getVisibleTicketBundles({ showTest: false })
 import { TicketBundleIcon } from './TicketBundleIcon'
 
 export function TicketBundlePrice({ className = '', compact = false }) {
@@ -23,7 +25,7 @@ export function TicketBundlePrice({ className = '', compact = false }) {
         Ticket bundles
       </p>
       <ul className="ss-ticket-bundles-list mt-3 space-y-2 text-[0.9375rem] leading-snug text-emerald-50/95 sm:mt-3.5 sm:space-y-2.5 sm:text-base">
-        {TICKET_BUNDLES.map((b) => (
+        {PUBLIC_TICKET_BUNDLES.map((b) => (
           <li
             key={b.id}
             className="flex items-start justify-between gap-3 border-b border-emerald-500/10 pb-2.5 last:border-0 last:pb-0"

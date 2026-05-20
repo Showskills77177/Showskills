@@ -1,7 +1,9 @@
 export {
   TICKET_BUNDLES,
   DEFAULT_TICKET_BUNDLE_ID,
+  TEST_TICKET_BUNDLE_ID,
   getTicketBundleById,
+  getVisibleTicketBundles,
   formatBundlePriceGBP,
 } from '../shared/ticketBundles.mjs'
 export { PAID_SKILL_QUESTIONS, validatePaidSkillAnswers } from '../shared/paidSkillQuestions.mjs'

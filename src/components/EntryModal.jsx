@@ -43,6 +43,11 @@ export function EntryModal() {
     setPaidA3,
     paidQuizError,
     paidQuizResult,
+    paidQuizSubmitted,
+    paidQuizSubmitting,
+    paidEmailConfirmationSent,
+    visibleTicketBundles,
+    showTestBundle,
     paidFullName,
     setPaidFullName,
     paidEmail,
@@ -244,7 +249,51 @@ export function EntryModal() {
                 or choose free postal entry for the same prize pool. Then type three Ronaldo skill answers (no multiple
                 choice). All must be correct to qualify; winner picked at random from correct entries.
               </p>
-              {paidPostCheckout ? (
+              {paidPostCheckout && paidQuizSubmitted ? (
+                <div className="mt-4 flex flex-col gap-4 text-center">
+                  <div className="rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-emerald-950/50 to-stone-950/80 px-5 py-8">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400/90">
+                      Entry complete
+                    </p>
+                    <h3 className="mt-2 font-display text-2xl tracking-wide text-emerald-50">Thank you</h3>
+                    <p className="mt-3 text-sm text-stone-300">Your answers are submitted.</p>
+                    {paidQuizResult === 'qualified' ? (
+                      <p className="mt-3 rounded-lg border border-emerald-700/40 bg-emerald-950/60 px-3 py-2 text-sm text-emerald-100/95">
+                        All three answers were correct — you qualify for the draw.
+                      </p>
+                    ) : (
+                      <p className="mt-3 rounded-lg border border-amber-700/35 bg-amber-950/30 px-3 py-2 text-sm text-amber-100/90">
+                        Thanks for entering. One or more answers were incorrect, so you do not qualify for the prize
+                        under the terms.
+                      </p>
+                    )}
+                    {paidOrderRef ? (
+                      <p className="mt-4 text-xs text-stone-500">
+                        Order: <span className="font-mono text-stone-400">{paidOrderRef}</span>
+                      </p>
+                    ) : null}
+                    {paidTicketNumbers.length ? (
+                      <p className="mt-2 text-xs text-stone-500">
+                        Ticket{paidTicketNumbers.length === 1 ? '' : 's'}:{' '}
+                        <span className="font-mono text-teal-200/90">{paidTicketNumbers.join(', ')}</span>
+                      </p>
+                    ) : null}
+                    <p className="mt-4 text-xs leading-relaxed text-stone-500">
+                      {paidEmailConfirmationSent
+                        ? 'A confirmation email has been sent (check inbox and spam).'
+                        : 'If email is configured, a confirmation will arrive shortly.'}{' '}
+                      Stripe or PayPal may send a separate payment receipt.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeEntry}
+                    className="w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : paidPostCheckout ? (
                 <form className="mt-4 flex flex-col gap-4" onSubmit={handlePaidQuizSubmit}>
                   <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
                     <p className="font-medium text-teal-50">Payment received</p>
@@ -330,19 +379,26 @@ export function EntryModal() {
                   ) : null}
                   <button
                     type="submit"
-                    className="w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110"
+                    disabled={paidQuizSubmitting}
+                    className="w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Submit answers
+                    {paidQuizSubmitting ? 'Submitting…' : 'Submit answers'}
                   </button>
                 </form>
               ) : (
                 <div className="mt-4 flex flex-col gap-4">
+                  {showTestBundle ? (
+                    <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/85">
+                      Test ticket (£0.01) is available in the bundle list for checkout testing.
+                    </p>
+                  ) : null}
                   <TicketBundlePicker
                     paidBundleId={paidBundleId}
                     setPaidBundleId={setPaidBundleId}
                     paidEntryRoute={paidEntryRoute}
                     setPaidEntryRoute={setPaidEntryRoute}
                     selectedTicketBundle={selectedTicketBundle}
+                    visibleTicketBundles={visibleTicketBundles}
                   />
                   {paidEntryRoute === 'tickets' ? (
                     <div className="grid gap-3 sm:grid-cols-2">

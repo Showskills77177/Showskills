@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { COMPETITION_NAME_POSTAL, TICKET_BUNDLES, formatBundlePriceGBP } from '../competitionData'
+import { COMPETITION_NAME_POSTAL, formatBundlePriceGBP } from '../competitionData'
 import { TicketBundleIcon } from './TicketBundleIcon'
 
 /**
@@ -11,7 +11,9 @@ export function TicketBundlePicker({
   paidEntryRoute,
   setPaidEntryRoute,
   selectedTicketBundle,
+  visibleTicketBundles,
 }) {
+  const bundles = visibleTicketBundles?.length ? visibleTicketBundles : []
   const selectValue = paidEntryRoute === 'postal' ? 'postal' : paidBundleId
 
   return (
@@ -39,7 +41,7 @@ export function TicketBundlePicker({
             className="ss-bundle-select w-full min-h-[52px] cursor-pointer appearance-none rounded-xl border border-teal-500/35 bg-gradient-to-b from-stone-900/90 to-black/80 py-3.5 pl-4 pr-12 text-base font-medium text-stone-100 shadow-inner focus:border-teal-400/60 focus:outline-none focus:ring-2 focus:ring-teal-900/50"
           >
           <optgroup label="Pay online">
-            {TICKET_BUNDLES.map((b) => (
+            {bundles.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.title} — {formatBundlePriceGBP(b.totalPence)} ({b.qty} ticket{b.qty === 1 ? '' : 's'})
               </option>
@@ -76,14 +78,14 @@ export function TicketBundlePicker({
       </div>
 
       <div className="mt-2 hidden max-h-[min(52vh,22rem)] gap-2 overflow-y-auto pr-1 md:grid lg:max-h-[14rem] lg:overflow-y-auto xl:max-h-none">
-        {TICKET_BUNDLES.map((b) => (
+        {bundles.map((b) => (
           <label
             key={b.id}
             className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
               paidEntryRoute === 'tickets' && paidBundleId === b.id
                 ? 'border-teal-400/55 bg-teal-950/35 ring-1 ring-teal-500/25'
                 : 'border-white/10 bg-black/20 hover:border-white/18'
-            } ${b.featured ? 'shadow-[0_0_0_1px_rgba(251,191,36,0.12)]' : ''}`}
+            } ${b.featured ? 'shadow-[0_0_0_1px_rgba(251,191,36,0.12)]' : ''} ${b.testOnly ? 'border-amber-500/30' : ''}`}
           >
             <input
               type="radio"
@@ -100,6 +102,11 @@ export function TicketBundlePicker({
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                 <TicketBundleIcon bundleId={b.id} variant="modal" />
                 <span className="font-semibold leading-none text-stone-100">{b.title}</span>
+                {b.testOnly ? (
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200/90">
+                    Test
+                  </span>
+                ) : null}
                 {b.featured ? (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200/90">
                     Popular

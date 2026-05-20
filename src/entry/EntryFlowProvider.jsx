@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   PAID_SKILL_QUESTIONS,
   validatePaidSkillAnswers,
   DEFAULT_TICKET_BUNDLE_ID,
   getTicketBundleById,
+  getVisibleTicketBundles,
 } from '../competitionData'
 import { apiUrl } from '../lib/api'
+import { isTestBundleVisible } from '../lib/showTestBundle'
 import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
@@ -29,6 +32,9 @@ export function EntryFlowProvider({ children }) {
   const [paidA3, setPaidA3] = useState('')
   const [paidQuizError, setPaidQuizError] = useState('')
   const [paidQuizResult, setPaidQuizResult] = useState(null)
+  const [paidQuizSubmitted, setPaidQuizSubmitted] = useState(false)
+  const [paidQuizSubmitting, setPaidQuizSubmitting] = useState(false)
+  const [searchParams] = useSearchParams()
   const [paidFullName, setPaidFullName] = useState('')
   const [paidEmail, setPaidEmail] = useState('')
 
@@ -64,9 +70,27 @@ export function EntryFlowProvider({ children }) {
   const hasPayPal = Boolean(payPalClientId)
   const payPalCurrency = (import.meta.env.VITE_PAYPAL_CURRENCY ?? 'GBP').trim().toUpperCase()
 
+  const showTestBundle = isTestBundleVisible(searchParams)
+  const visibleTicketBundles = useMemo(
+    () => getVisibleTicketBundles({ showTest: showTestBundle }),
+    [showTestBundle],
+  )
+
   const selectedTicketBundle = useMemo(() => {
-    return getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
-  }, [paidBundleId])
+    const fromVisible = visibleTicketBundles.find((b) => b.id === paidBundleId)
+    if (fromVisible) return fromVisible
+    return (
+      getTicketBundleById(paidBundleId) ??
+      visibleTicketBundles[0] ??
+      getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
+    )
+  }, [paidBundleId, visibleTicketBundles])
+
+  useEffect(() => {
+    if (showTestBundle) return
+    const b = getTicketBundleById(paidBundleId)
+    if (b?.testOnly) setPaidBundleId(DEFAULT_TICKET_BUNDLE_ID)
+  }, [showTestBundle, paidBundleId])
 
   const paidTicketQty = selectedTicketBundle.qty
 
@@ -99,6 +123,8 @@ export function EntryFlowProvider({ children }) {
     }
     setPaidPostCheckout(true)
     setPaidQuizResult(null)
+    setPaidQuizSubmitted(false)
+    setPaidQuizSubmitting(false)
     setPaidA1('')
     setPaidA2('')
     setPaidA3('')
@@ -134,6 +160,10 @@ export function EntryFlowProvider({ children }) {
 
   const closeEntry = useCallback(() => {
     setEntryModalType(null)
+    setPaidPostCheckout(false)
+    setPaidQuizSubmitted(false)
+    setPaidQuizSubmitting(false)
+    setPaidQuizResult(null)
     closeStripePayment()
   }, [closeStripePayment])
 
@@ -143,6 +173,8 @@ export function EntryFlowProvider({ children }) {
     setPaidError('')
     setPaidPostCheckout(true)
     setPaidQuizResult(null)
+    setPaidQuizSubmitted(false)
+    setPaidQuizSubmitting(false)
     setPaidA1('')
     setPaidA2('')
     setPaidA3('')
@@ -342,7 +374,7 @@ export function EntryFlowProvider({ children }) {
         setPaidQuizError('Full name and email are required to save your entry.')
         return
       }
-      setPaidQuizResult(allCorrect ? 'qualified' : 'not_qualified')
+      setPaidQuizSubmitting(true)
       try {
         const res = await fetch(apiUrl('/api/entries/paid-quiz'), {
           method: 'POST',
@@ -356,9 +388,19 @@ export function EntryFlowProvider({ children }) {
           }),
         })
         const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setPaidQuizError(
+            typeof data.error === 'string' ? data.error : 'Could not save your entry. Please try again.',
+          )
+          return
+        }
+        setPaidQuizResult(allCorrect ? 'qualified' : 'not_qualified')
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
+        setPaidQuizSubmitted(true)
       } catch {
-        /* non-blocking */
+        setPaidQuizError('Could not save your entry. Check your connection and try again.')
+      } finally {
+        setPaidQuizSubmitting(false)
       }
     },
     [paidA1, paidA2, paidA3, paidEmail, paidFullName],
@@ -444,6 +486,10 @@ export function EntryFlowProvider({ children }) {
       setPaidA3,
       paidQuizError,
       paidQuizResult,
+      paidQuizSubmitted,
+      paidQuizSubmitting,
+      visibleTicketBundles,
+      showTestBundle,
       paidFullName,
       setPaidFullName,
       paidEmail,
@@ -501,6 +547,10 @@ export function EntryFlowProvider({ children }) {
       paidA3,
       paidQuizError,
       paidQuizResult,
+      paidQuizSubmitted,
+      paidQuizSubmitting,
+      visibleTicketBundles,
+      showTestBundle,
       paidFullName,
       paidEmail,
       handlePaidEntry,

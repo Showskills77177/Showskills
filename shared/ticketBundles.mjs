@@ -14,7 +14,21 @@ export const MEGA_BUNDLE_BASE_TICKET_QTY = Math.floor(
 export const MEGA_BUNDLE_BONUS_TICKETS = 1
 export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_BASE_TICKET_QTY + MEGA_BUNDLE_BONUS_TICKETS
 
+/** £0.01 — for payment/quiz testing (enable in UI via ?testbundle=1 or VITE_SHOW_TEST_BUNDLE). */
+export const TEST_TICKET_BUNDLE_ID = 'test1p'
+
 export const TICKET_BUNDLES = [
+  {
+    id: TEST_TICKET_BUNDLE_ID,
+    qty: 1,
+    totalPence: 1,
+    title: 'Test ticket',
+    line1: '1 ticket = £0.01',
+    line2: 'Payment testing only — add ?testbundle=1 to the URL or set VITE_SHOW_TEST_BUNDLE=1',
+    bullets: ['Use for repeated checkout tests'],
+    featured: false,
+    testOnly: true,
+  },
   {
     id: 'single',
     qty: 1,
@@ -77,15 +91,21 @@ export const TICKET_BUNDLES = [
   },
 ]
 
-export const DEFAULT_TICKET_BUNDLE_ID = TICKET_BUNDLES[0].id
+export const DEFAULT_TICKET_BUNDLE_ID = 'single'
 
 export function getTicketBundleById(id) {
   const s = typeof id === 'string' ? id.trim() : ''
   return TICKET_BUNDLES.find((b) => b.id === s) ?? null
 }
 
+/** Bundles shown in the entry modal (hides test tier unless enabled). */
+export function getVisibleTicketBundles({ showTest = false } = {}) {
+  return TICKET_BUNDLES.filter((b) => !b.testOnly || showTest)
+}
+
 export function formatBundlePriceGBP(totalPence) {
   const pounds = totalPence / 100
+  if (totalPence < 100 && !Number.isInteger(pounds)) return `£${pounds.toFixed(2)}`
   if (Number.isInteger(pounds)) return `£${pounds}`
   return `£${pounds.toFixed(2)}`
 }
