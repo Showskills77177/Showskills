@@ -95,6 +95,8 @@ async function mountApiRoutes() {
     { path: '/api/submissions/kickups', file: './backend/api/submissions/kickups.js' },
     { path: '/api/records/stripe-session', file: './backend/api/records/stripe-session.js' },
     { path: '/api/create-checkout-session', file: './backend/api/create-checkout-session.js' },
+    { path: '/api/create-payment-intent', file: './backend/api/create-payment-intent.js' },
+    { path: '/api/record-stripe-payment', file: './backend/api/record-stripe-payment.js' },
     { path: '/api/create-paypal-order', file: './backend/api/create-paypal-order.js' },
     { path: '/api/capture-paypal-order', file: './backend/api/capture-paypal-order.js' },
   ]

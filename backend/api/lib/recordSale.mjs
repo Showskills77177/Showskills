@@ -241,6 +241,70 @@ export async function recordPayPalCapture({
   return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
 }
 
+export async function recordStripePaymentIntentCompleted({
+  paymentIntentId,
+  customerEmail,
+  customerFullName,
+  bundleId,
+  quantity,
+  amountPence,
+  currency,
+}) {
+  if (!isDbConfigured()) return null
+  const email = customerEmail?.trim()
+  if (!email || !email.includes('@')) return null
+
+  await ensureTicketSchema()
+
+  const dup = await query(
+    `SELECT id, ticket_public_id, payment_status, confirmation_email_sent_at FROM tickets WHERE stripe_payment_intent_id = $1`,
+    [paymentIntentId],
+  )
+  if (dup.rows[0]) {
+    return finalizePendingTicket({
+      row: dup.rows[0],
+      customerEmail: email,
+      customerFullName,
+      amountPence,
+      currency,
+      provider: 'stripe',
+      externalId: paymentIntentId,
+      paymentIntentId,
+    })
+  }
+
+  const userId = await upsertUserSimple(email, customerFullName || '')
+  const tid = orderPublicId()
+  const ticketId = randomUUID()
+  const payId = randomUUID()
+  const purchasedAt = new Date().toISOString()
+  const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
+
+  await query(
+    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_payment_intent_id, purchased_at)
+     VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7)`,
+    [ticketId, tid, userId, bundleId || null, qty, paymentIntentId, purchasedAt],
+  )
+
+  await query(
+    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, 'stripe', 'successful', $7)
+     ON CONFLICT (transaction_id) DO NOTHING`,
+    [
+      payId,
+      paymentIntentId,
+      userId,
+      ticketId,
+      amountPence,
+      (currency || 'gbp').toLowerCase(),
+      JSON.stringify({ stripe_payment_intent_id: paymentIntentId }),
+    ],
+  )
+
+  const ticketNumbers = await insertTicketNumbers(ticketId, qty)
+  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
+}
+
 /** Parse comma-separated ticket numbers from Stripe session metadata. */
 export function parseReservedTicketNumbersMetadata(metadata) {
   const raw = metadata?.ticket_numbers

@@ -14,6 +14,7 @@ import {
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
+import { StripePaymentForm } from './StripePaymentForm'
 
 export function EntryModal() {
   const {
@@ -50,6 +51,13 @@ export function EntryModal() {
     handlePaidQuizSubmit,
     markPaidCheckoutComplete,
     hasStripeCheckout,
+    hasStripeElements,
+    stripePublishableKey,
+    paidStripeClientSecret,
+    paidStripePaymentIntentId,
+    paidStripePreparing,
+    prepareStripePayment,
+    paidFormReadyForPayment,
     hasPayPal,
     payPalClientId,
     payPalCurrency,
@@ -440,15 +448,36 @@ export function EntryModal() {
                       {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
                     </button>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && hasStripeCheckout ? (
-                    <button
-                      type="button"
-                      onClick={handlePaidEntry}
-                      disabled={paidLoading}
-                      className="w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3 text-sm font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {paidLoading ? 'Opening checkout…' : 'Continue to payment (card)'}
-                    </button>
+                  {paidEntryRoute === 'tickets' && hasStripeElements ? (
+                    <div className="space-y-3">
+                      {!paidStripeClientSecret ? (
+                        <button
+                          type="button"
+                          onClick={prepareStripePayment}
+                          disabled={paidStripePreparing || !paidFormReadyForPayment}
+                          className="w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3 text-sm font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {paidStripePreparing
+                            ? 'Preparing secure payment…'
+                            : `Pay with card — ${formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}`}
+                        </button>
+                      ) : (
+                        <StripePaymentForm
+                          publishableKey={stripePublishableKey}
+                          clientSecret={paidStripeClientSecret}
+                          paymentIntentId={paidStripePaymentIntentId}
+                          amountLabel={formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}
+                          recordPayload={{
+                            customerEmail: paidEmail.trim(),
+                            customerFullName: paidFullName.trim(),
+                            bundleId: paidBundleId,
+                          }}
+                          disabled={!paidFormReadyForPayment}
+                          onSuccess={markPaidCheckoutComplete}
+                          onError={(msg) => setPaidError(msg)}
+                        />
+                      )}
+                    </div>
                   ) : null}
                   {paidEntryRoute === 'tickets' && hasPayPal ? (
                     <div className={hasStripeCheckout ? 'mt-3' : ''}>

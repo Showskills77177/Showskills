@@ -28,9 +28,15 @@ async function upsertUserSimple(email, fullName) {
   }
 }
 
+function providerColumn(provider) {
+  if (provider === 'stripe') return 'stripe_session_id'
+  if (provider === 'stripe_pi') return 'stripe_payment_intent_id'
+  return 'paypal_order_id'
+}
+
 /**
  * Reserve ticket numbers on a pending ticket row before payment completes.
- * @param {'stripe'|'paypal'} provider
+ * @param {'stripe'|'stripe_pi'|'paypal'} provider
  */
 export async function createPendingTicketCheckout({
   provider,
@@ -44,7 +50,7 @@ export async function createPendingTicketCheckout({
   if (!isDbConfigured() || !externalId) return null
   await ensureTicketSchema()
 
-  const col = provider === 'stripe' ? 'stripe_session_id' : 'paypal_order_id'
+  const col = providerColumn(provider)
   const dup = await query(`SELECT id, ticket_public_id FROM tickets WHERE ${col} = $1`, [externalId])
   if (dup.rows[0]) {
     const nums = await getTicketNumbersForPurchase(dup.rows[0].id)
@@ -66,12 +72,22 @@ export async function createPendingTicketCheckout({
   const tid = orderPublicId()
   const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
   const stripeSessionId = provider === 'stripe' ? externalId : null
+  const stripePaymentIntentId = provider === 'stripe_pi' ? externalId : null
   const paypalOrderId = provider === 'paypal' ? externalId : null
 
   await query(
-    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, paypal_order_id)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)`,
-    [ticketId, tid, userId, bundleId || null, qty, stripeSessionId, paypalOrderId],
+    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, stripe_payment_intent_id, paypal_order_id)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)`,
+    [
+      ticketId,
+      tid,
+      userId,
+      bundleId || null,
+      qty,
+      stripeSessionId,
+      stripePaymentIntentId,
+      paypalOrderId,
+    ],
   )
 
   const nums = await insertPreservedTicketNumbers(ticketId, ticketNumbers)

@@ -23,6 +23,8 @@
     "test:purchase-email": "node scripts/test-purchase-email.mjs"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^6.4.0",
+    "@stripe/stripe-js": "^9.6.0",
     "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",

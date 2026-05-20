@@ -15,6 +15,8 @@ import kickupsUpload from '../backend/api/submissions/kickups-upload.mjs'
 
 import recordStripeSession from '../backend/api/records/stripe-session.js'
 import createCheckoutSession from '../backend/api/create-checkout-session.js'
+import createPaymentIntent from '../backend/api/create-payment-intent.js'
+import recordStripePayment from '../backend/api/record-stripe-payment.js'
 import createPayPalOrder from '../backend/api/create-paypal-order.js'
 import capturePayPalOrder from '../backend/api/capture-paypal-order.js'
 
@@ -36,6 +38,8 @@ export const routes = {
 
   '/api/records/stripe-session': recordStripeSession,
   '/api/create-checkout-session': createCheckoutSession,
+  '/api/create-payment-intent': createPaymentIntent,
+  '/api/record-stripe-payment': recordStripePayment,
   '/api/create-paypal-order': createPayPalOrder,
   '/api/capture-paypal-order': capturePayPalOrder,
 }

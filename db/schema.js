@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   payment_status TEXT NOT NULL DEFAULT 'pending',
   stripe_session_id TEXT UNIQUE,
+  stripe_payment_intent_id TEXT UNIQUE,
   paypal_order_id TEXT UNIQUE,
   purchased_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))

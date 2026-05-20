@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   quantity INTEGER NOT NULL CHECK (quantity > 0),
   payment_status TEXT NOT NULL DEFAULT 'pending',
   stripe_session_id TEXT UNIQUE,
+  stripe_payment_intent_id TEXT UNIQUE,
   paypal_order_id TEXT UNIQUE,
   purchased_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 
 CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets (user_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_stripe ON tickets (stripe_session_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_stripe_pi ON tickets (stripe_payment_intent_id);
 
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS confirmation_email_sent_at TIMESTAMPTZ;
 

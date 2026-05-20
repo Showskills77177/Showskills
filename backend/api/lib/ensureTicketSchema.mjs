@@ -22,6 +22,11 @@ export async function ensureTicketSchema() {
     } catch {
       /* sqlite-only path or already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS stripe_payment_intent_id TEXT UNIQUE`)
+    } catch {
+      /* already exists */
+    }
   } else {
     await query(`
       CREATE TABLE IF NOT EXISTS ticket_numbers (
@@ -35,6 +40,11 @@ export async function ensureTicketSchema() {
     await query(`CREATE INDEX IF NOT EXISTS idx_ticket_numbers_ticket ON ticket_numbers (ticket_id)`)
     try {
       await query(`ALTER TABLE tickets ADD COLUMN confirmation_email_sent_at TEXT`)
+    } catch {
+      /* column already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN stripe_payment_intent_id TEXT UNIQUE`)
     } catch {
       /* column already exists */
     }
