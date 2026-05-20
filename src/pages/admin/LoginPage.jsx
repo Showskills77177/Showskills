@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AdminLogo } from '../../admin/AdminLogo'
 import { apiUrl } from '../../lib/api'
@@ -31,6 +31,15 @@ export default function AdminLoginPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [setupStatus, setSetupStatus] = useState(null)
+  const otpInputRef = useRef(null)
+
+  useEffect(() => {
+    if (otpStep) {
+      const t = setTimeout(() => otpInputRef.current?.focus(), 100)
+      return () => clearTimeout(t)
+    }
+    return undefined
+  }, [otpStep])
 
   useEffect(() => {
     let cancelled = false
@@ -70,12 +79,16 @@ export default function AdminLoginPage() {
     setInfo('')
     setResendLoading(true)
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 25_000)
       const res = await fetch(apiUrl('/api/admin/resend-code'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
       const text = await res.text()
       const { data, apiMsg } = parseLoginResponse(res, text)
       if (!res.ok) {
@@ -87,7 +100,12 @@ export default function AdminLoginPage() {
       setInfo(typeof data.message === 'string' ? data.message : 'A new code has been sent.')
       setResendCooldown(60)
     } catch (err) {
-      setError(`Network error (${err instanceof Error ? err.message : String(err)}).`)
+      const aborted = err instanceof Error && err.name === 'AbortError'
+      setError(
+        aborted
+          ? 'Resend timed out. Try again or sign in with password again.'
+          : `Network error (${err instanceof Error ? err.message : String(err)}).`,
+      )
     } finally {
       setResendLoading(false)
     }
@@ -209,14 +227,16 @@ export default function AdminLoginPage() {
                   Email verification code
                 </label>
                 <input
+                  ref={otpInputRef}
                   id="admin-otp-code"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   autoComplete="one-time-code"
                   maxLength={6}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-center font-mono text-lg tracking-[0.3em] text-stone-100 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                  className="mt-1 w-full min-h-[44px] rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-center font-mono text-lg tracking-[0.3em] text-stone-100 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
                   placeholder="000000"
                 />
               </div>
@@ -225,15 +245,17 @@ export default function AdminLoginPage() {
               <button
                 type="submit"
                 disabled={loading || otpCode.length !== 6}
-                className="rounded-xl bg-teal-700 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
+                className="min-h-[44px] rounded-xl bg-teal-700 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
               >
                 {loading ? 'Verifying…' : 'Verify and continue'}
               </button>
+              <p className="text-center text-xs text-stone-500">Didn&apos;t get the email?</p>
               <button
                 type="button"
                 disabled={resendLoading || resendCooldown > 0}
                 onClick={onResendCode}
-                className="rounded-xl border border-white/15 py-2 text-sm font-medium text-stone-200 hover:border-teal-600/40 hover:text-teal-100 disabled:opacity-50"
+                aria-label="Resend verification code to email"
+                className="min-h-[44px] rounded-xl border border-white/15 py-2.5 text-sm font-medium text-stone-200 hover:border-teal-600/40 hover:text-teal-100 disabled:opacity-50"
               >
                 {resendLoading
                   ? 'Sending…'
