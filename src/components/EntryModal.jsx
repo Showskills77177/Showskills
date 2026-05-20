@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useEntryFlow } from '../entry/entryContext'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 
@@ -12,8 +12,8 @@ import {
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { ErrorBanner } from './ErrorBanner'
+import { PaymentCheckoutSheet } from './PaymentCheckoutSheet'
 import { PayPalPayButton } from './PayPalPayButton'
-import { StripePaymentForm } from './StripePaymentForm'
 import { TicketBundlePicker } from './TicketBundlePicker'
 
 export function EntryModal() {
@@ -57,6 +57,7 @@ export function EntryModal() {
     paidStripePaymentIntentId,
     paidStripePreparing,
     prepareStripePayment,
+    closeStripePayment,
     paidFormReadyForPayment,
     hasPayPal,
     payPalClientId,
@@ -79,7 +80,30 @@ export function EntryModal() {
   } = useEntryFlow()
 
   const panelRef = useRef(null)
-  const stripePanelRef = useRef(null)
+  const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
+
+  const showPaymentSheet =
+    paymentSheetOpen &&
+    entryModalType === 'paid' &&
+    !paidPostCheckout &&
+    paidEntryRoute === 'tickets'
+
+  function handleClosePaymentSheet() {
+    closeStripePayment()
+    setPaymentSheetOpen(false)
+  }
+
+  async function handlePayNow() {
+    if (!paidFormReadyForPayment) {
+      setPaidError('Enter your full name, email, and agree to the terms before paying.')
+      return
+    }
+    setPaidError('')
+    setPaymentSheetOpen(true)
+    if (hasStripeElements && !paidStripeClientSecret) {
+      await prepareStripePayment()
+    }
+  }
 
   const paidAnswerValidation =
     paidQuizResult != null ? validatePaidSkillAnswers(paidA1, paidA2, paidA3) : null
@@ -129,11 +153,23 @@ export function EntryModal() {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
       if (termsOpen) return
+      if (paymentSheetOpen) {
+        handleClosePaymentSheet()
+        return
+      }
       closeEntry()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [entryModalType, closeEntry, termsOpen])
+  }, [entryModalType, closeEntry, termsOpen, paymentSheetOpen])
+
+  useEffect(() => {
+    if (!entryModalType) setPaymentSheetOpen(false)
+  }, [entryModalType])
+
+  useEffect(() => {
+    setPaymentSheetOpen(false)
+  }, [paidBundleId, paidEntryRoute])
 
   useEffect(() => {
     if (entryModalType === 'paid' && paidPostCheckout) {
@@ -143,22 +179,7 @@ export function EntryModal() {
     }
   }, [entryModalType, paidPostCheckout])
 
-  useEffect(() => {
-    if (!paidStripeClientSecret || paidPostCheckout) return
-    const t = requestAnimationFrame(() => {
-      stripePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    })
-    return () => cancelAnimationFrame(t)
-  }, [paidStripeClientSecret, paidPostCheckout])
-
   if (!entryModalType) return null
-
-  const showStripePanel =
-    entryModalType === 'paid' &&
-    !paidPostCheckout &&
-    paidEntryRoute === 'tickets' &&
-    hasStripeElements &&
-    Boolean(paidStripeClientSecret)
 
   const titles = {
     paid: 'Enter — Ronaldo Legacy Bundle',
@@ -182,7 +203,7 @@ export function EntryModal() {
         ref={panelRef}
         className={`relative z-10 flex max-h-[min(92vh,920px)] w-full flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
           entryModalType === 'paid'
-            ? 'ss-entry-modal-panel ss-entry-modal-panel--paid max-w-lg overflow-hidden sm:max-w-2xl lg:max-w-5xl'
+            ? 'ss-entry-modal-panel ss-entry-modal-panel--paid max-w-lg overflow-hidden sm:max-w-xl'
             : 'max-w-lg overflow-hidden'
         }`}
       >
@@ -210,12 +231,8 @@ export function EntryModal() {
           </button>
         </div>
 
-        <div
-          className={`ss-entry-modal-body flex min-h-0 flex-1 flex-col ${
-            entryModalType === 'paid' ? 'overflow-hidden lg:flex-row' : 'overflow-hidden'
-          }`}
-        >
-          <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 lg:min-w-0">
+        <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">
@@ -335,8 +352,9 @@ export function EntryModal() {
                           autoComplete="name"
                           value={paidFullName}
                           onChange={(e) => setPaidFullName(e.target.value)}
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          className="mt-2 w-full select-text rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
                           placeholder="As on ID / bank card"
+                          spellCheck={false}
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -349,8 +367,9 @@ export function EntryModal() {
                           autoComplete="email"
                           value={paidEmail}
                           onChange={(e) => setPaidEmail(e.target.value)}
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          className="mt-2 w-full select-text rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
                           placeholder="you@example.com"
+                          spellCheck={false}
                         />
                       </div>
                     </div>
@@ -411,30 +430,24 @@ export function EntryModal() {
                       {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
                     </button>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && hasStripeElements && !paidStripeClientSecret ? (
+                  {paidEntryRoute === 'tickets' && (hasStripeElements || hasPayPal || E2E_SIMULATE_CHECKOUT) ? (
                     <button
                       type="button"
-                      onClick={prepareStripePayment}
+                      onClick={handlePayNow}
                       disabled={paidStripePreparing || !paidFormReadyForPayment}
-                      className="min-h-[48px] w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3.5 text-base font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50 max-md:text-base"
+                      className="min-h-[52px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-lg font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {paidStripePreparing
-                        ? 'Opening secure payment…'
-                        : `Pay by debit card — ${formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}`}
+                      {paidStripePreparing ? 'Loading…' : 'Pay now'}
                     </button>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && hasStripeElements && !paidStripeClientSecret && !paidStripePreparing ? (
-                    <p className="text-center text-[11px] text-stone-500">
-                      Apple Pay appears in the payment panel on iPhone (Safari). Use the button above for debit card.
+                  {paidEntryRoute === 'tickets' && (hasStripeElements || hasPayPal) && !showPaymentSheet ? (
+                    <p className="text-center text-xs text-stone-500">
+                      Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — choose card, Apple Pay, or
+                      PayPal on the next screen.
                     </p>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && hasPayPal ? (
-                    <div className={hasStripeCheckout ? 'mt-3' : ''}>
-                      {hasStripeCheckout ? (
-                        <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
-                          or pay with
-                        </p>
-                      ) : null}
+                  {paidEntryRoute === 'tickets' && hasPayPal && !hasStripeElements ? (
+                    <div className="mt-3">
                       <PayPalPayButton
                         clientId={payPalClientId}
                         currency={payPalCurrency}
@@ -549,29 +562,6 @@ export function EntryModal() {
           ) : null}
 
           </div>
-
-          {showStripePanel ? (
-            <div
-              ref={stripePanelRef}
-              className="ss-entry-modal-stripe shrink-0 border-t border-white/10 px-4 py-4 sm:px-5 lg:w-[min(22rem,38%)] lg:shrink-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:px-5"
-            >
-              {paidError ? <ErrorBanner message={paidError} /> : null}
-              <StripePaymentForm
-                publishableKey={stripePublishableKey}
-                clientSecret={paidStripeClientSecret}
-                paymentIntentId={paidStripePaymentIntentId}
-                amountLabel={formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}
-                recordPayload={{
-                  customerEmail: paidEmail.trim(),
-                  customerFullName: paidFullName.trim(),
-                  bundleId: paidBundleId,
-                }}
-                disabled={!paidFormReadyForPayment}
-                onSuccess={markPaidCheckoutComplete}
-                onError={(msg) => setPaidError(msg)}
-              />
-            </div>
-          ) : null}
         </div>
 
         <div className="shrink-0 border-t border-white/10 px-5 py-3">
@@ -584,6 +574,46 @@ export function EntryModal() {
           </button>
         </div>
       </div>
+
+      <PaymentCheckoutSheet
+        open={showPaymentSheet}
+        onClose={handleClosePaymentSheet}
+        amountPence={selectedTicketBundle?.totalPence ?? 0}
+        bundleTitle={selectedTicketBundle?.title}
+        bundleLine={selectedTicketBundle?.line1}
+        preparing={paidStripePreparing}
+        paidError={paidError}
+        hasStripeElements={hasStripeElements}
+        stripePublishableKey={stripePublishableKey}
+        paidStripeClientSecret={paidStripeClientSecret}
+        paidStripePaymentIntentId={paidStripePaymentIntentId}
+        paidFormReadyForPayment={paidFormReadyForPayment}
+        recordPayload={{
+          customerEmail: paidEmail.trim(),
+          customerFullName: paidFullName.trim(),
+          bundleId: paidBundleId,
+        }}
+        onStripeSuccess={(info) => {
+          setPaymentSheetOpen(false)
+          markPaidCheckoutComplete(info)
+        }}
+        onStripeError={(msg) => setPaidError(msg)}
+        hasPayPal={hasPayPal}
+        payPalClientId={payPalClientId}
+        payPalCurrency={payPalCurrency}
+        paypalCreateOrderApi={paypalCreateOrderApi}
+        paypalCaptureOrderApi={paypalCaptureOrderApi}
+        paidBundleId={paidBundleId}
+        ticketQuantity={selectedTicketBundle?.qty ?? 1}
+        customerEmail={paidEmail}
+        customerFullName={paidFullName}
+        paidConsent={paidConsent}
+        onPayPalPaid={(info) => {
+          setPaymentSheetOpen(false)
+          markPaidCheckoutComplete(info)
+        }}
+        onPayPalError={(msg) => setPaidError(msg)}
+      />
     </div>
   )
 }

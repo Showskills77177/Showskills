@@ -125,12 +125,17 @@ export function EntryFlowProvider({ children }) {
     }
   }, [stripePublishableKey])
 
-  const closeEntry = useCallback(() => {
-    setEntryModalType(null)
+  const closeStripePayment = useCallback(() => {
     setPaidStripeClientSecret('')
     setPaidStripePaymentIntentId('')
     setPaidStripePreparing(false)
+    setPaidError('')
   }, [])
+
+  const closeEntry = useCallback(() => {
+    setEntryModalType(null)
+    closeStripePayment()
+  }, [closeStripePayment])
 
   const openTerms = useCallback(() => setTermsOpen(true), [])
 
@@ -430,6 +435,7 @@ export function EntryFlowProvider({ children }) {
       paidStripePaymentIntentId,
       paidStripePreparing,
       prepareStripePayment,
+      closeStripePayment,
       paidFormReadyForPayment,
       hasPayPal,
       payPalClientId,
@@ -484,6 +490,7 @@ export function EntryFlowProvider({ children }) {
       paidStripePaymentIntentId,
       paidStripePreparing,
       prepareStripePayment,
+      closeStripePayment,
       paidFormReadyForPayment,
       hasPayPal,
       payPalClientId,

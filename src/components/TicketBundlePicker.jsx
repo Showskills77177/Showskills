@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import { COMPETITION_NAME_POSTAL, TICKET_BUNDLES, formatBundlePriceGBP } from '../competitionData'
 import { TicketBundleIcon } from './TicketBundleIcon'
 
@@ -18,23 +19,25 @@ export function TicketBundlePicker({
       <p className="text-sm font-medium text-stone-300">Pay for tickets or enter by post</p>
 
       <div className="mt-2 max-md:block md:hidden">
-        <label htmlFor="ticket-bundle-select" className="sr-only">
-          Choose ticket bundle or postal entry
+        <label htmlFor="ticket-bundle-select" className="mb-1.5 flex items-center justify-between text-xs text-stone-500">
+          <span>Ticket bundle</span>
+          <span className="text-[10px] uppercase tracking-wide text-teal-400/90">Tap to choose</span>
         </label>
-        <select
-          id="ticket-bundle-select"
-          value={selectValue}
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === 'postal') {
-              setPaidEntryRoute('postal')
-              return
-            }
-            setPaidEntryRoute('tickets')
-            setPaidBundleId(v)
-          }}
-          className="mt-1 w-full min-h-[48px] appearance-none rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-base text-stone-100 focus:border-teal-500/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-        >
+        <div className="relative">
+          <select
+            id="ticket-bundle-select"
+            value={selectValue}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'postal') {
+                setPaidEntryRoute('postal')
+                return
+              }
+              setPaidEntryRoute('tickets')
+              setPaidBundleId(v)
+            }}
+            className="ss-bundle-select w-full min-h-[52px] cursor-pointer appearance-none rounded-xl border border-teal-500/35 bg-gradient-to-b from-stone-900/90 to-black/80 py-3.5 pl-4 pr-12 text-base font-medium text-stone-100 shadow-inner focus:border-teal-400/60 focus:outline-none focus:ring-2 focus:ring-teal-900/50"
+          >
           <optgroup label="Pay online">
             {TICKET_BUNDLES.map((b) => (
               <option key={b.id} value={b.id}>
@@ -43,7 +46,12 @@ export function TicketBundlePicker({
             ))}
           </optgroup>
           <option value="postal">Free postal entry (same draw)</option>
-        </select>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-teal-300/90"
+            aria-hidden
+          />
+        </div>
         {paidEntryRoute === 'tickets' && selectedTicketBundle ? (
           <div className="mt-2 rounded-lg border border-teal-500/20 bg-teal-950/25 px-3 py-2">
             <div className="flex items-center gap-2">

@@ -6,7 +6,6 @@ import { useMediaQuery } from '../hooks/useMediaQuery'
 import { apiUrl } from '../lib/api'
 
 function PayButton({
-  amountLabel,
   disabled,
   onError,
   onSuccess,
@@ -83,24 +82,19 @@ function PayButton({
         compactMobile ? 'min-h-[48px] py-3.5 text-base' : 'py-3 text-sm'
       }`}
     >
-      {paying ? 'Processing…' : `Pay ${amountLabel}`}
+      {paying ? 'Processing…' : 'Pay now'}
     </button>
   )
 }
 
-function PaymentFields({ amountLabel, disabled, onError, onSuccess, paymentIntentId, recordPayload }) {
+function PaymentFields({ disabled, onError, onSuccess, paymentIntentId, recordPayload, compact }) {
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [elementReady, setElementReady] = useState(false)
 
   return (
     <>
-      <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">
-        {isMobile ? 'Apple Pay or debit card' : 'Secure payment'}
-      </p>
-      {isMobile ? (
-        <p className="mt-1 text-[11px] leading-snug text-stone-500">
-          On iPhone, use Apple Pay when it appears, or enter your debit card below.
-        </p>
+      {!compact ? (
+        <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">Card, Apple Pay, Google Pay</p>
       ) : null}
       {!elementReady ? (
         <p className="ss-stripe-payment-loading mt-3 text-sm text-stone-500" aria-live="polite">
@@ -127,7 +121,6 @@ function PaymentFields({ amountLabel, disabled, onError, onSuccess, paymentInten
         />
       </div>
       <PayButton
-        amountLabel={amountLabel}
         disabled={disabled}
         elementReady={elementReady}
         onError={onError}
@@ -152,6 +145,7 @@ export function StripePaymentForm({
   onSuccess,
   onError,
   disabled,
+  compact = false,
 }) {
   const stripePromise = useMemo(() => getStripePromise(publishableKey), [publishableKey])
   const options = useMemo(
@@ -166,15 +160,21 @@ export function StripePaymentForm({
   if (!clientSecret) return null
 
   return (
-    <div className="ss-stripe-payment-shell rounded-xl border border-teal-500/25 bg-black/25 p-4">
+    <div
+      className={
+        compact
+          ? 'ss-stripe-payment-shell'
+          : 'ss-stripe-payment-shell rounded-xl border border-teal-500/25 bg-black/25 p-4'
+      }
+    >
       <Elements key={clientSecret} stripe={stripePromise} options={options}>
         <PaymentFields
-          amountLabel={amountLabel}
           disabled={disabled}
           onError={onError}
           onSuccess={onSuccess}
           paymentIntentId={paymentIntentId}
           recordPayload={recordPayload}
+          compact={compact}
         />
       </Elements>
     </div>

@@ -1645,13 +1645,17 @@ body {
   touch-action: manipulation;
 }
 
-@media (max-width: 767px) {
-  .ss-entry-modal-panel--paid .ss-entry-modal-scroll {
-    max-height: min(42vh, 320px);
-  }
+.ss-payment-sheet {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
 
+.ss-bundle-select {
+  background-image: none;
+}
+
+@media (max-width: 767px) {
   .ss-stripe-payment-element {
-    min-height: 9rem;
+    min-height: 10rem;
   }
 }
 
