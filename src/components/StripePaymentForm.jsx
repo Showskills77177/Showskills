@@ -152,7 +152,7 @@ export function StripePaymentForm({
     () => ({
       clientSecret,
       appearance: stripeElementsAppearance,
-      loader: 'always',
+      loader: 'auto',
     }),
     [clientSecret],
   )

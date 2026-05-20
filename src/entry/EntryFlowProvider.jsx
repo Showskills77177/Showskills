@@ -121,7 +121,7 @@ export function EntryFlowProvider({ children }) {
       setPaidEntryRoute('tickets')
       setPaidStripeClientSecret('')
       setPaidStripePaymentIntentId('')
-      if (stripePublishableKey) preloadStripe(stripePublishableKey)
+      preloadStripe(stripePublishableKey)
     }
   }, [stripePublishableKey])
 
@@ -159,36 +159,21 @@ export function EntryFlowProvider({ children }) {
     paidFullName.trim() &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())
 
-  const prepareStripePayment = useCallback(async () => {
-    setPaidError('')
-    if (!paidFormReadyForPayment) {
-      setPaidError('Enter your full name, email, and agree to the terms before paying.')
-      return
-    }
-    const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
-    if (!bundle) {
-      setPaidError('Choose a ticket bundle.')
-      return
-    }
-    setPaidStripePreparing(true)
-    setPaidStripeClientSecret('')
-    setPaidStripePaymentIntentId('')
-    const controller = new AbortController()
-    let prepareTimeout
-    try {
-      prepareTimeout = setTimeout(() => controller.abort(), 25_000)
+  const fetchPaymentIntent = useCallback(
+    async ({ signal } = {}) => {
+      const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
+      if (!bundle) throw new Error('Choose a ticket bundle.')
       const res = await fetch(apiUrl(stripePaymentIntentApi), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        signal: controller.signal,
+        signal,
         body: JSON.stringify({
           bundleId: bundle.id,
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),
         }),
       })
-      clearTimeout(prepareTimeout)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Could not start card payment')
@@ -203,22 +188,60 @@ export function EntryFlowProvider({ children }) {
       if (Array.isArray(data.ticketNumbers) && data.ticketNumbers.length) {
         setPaidTicketNumbers(data.ticketNumbers)
       }
-    } catch (e) {
-      clearTimeout(prepareTimeout)
-      const aborted = e instanceof Error && e.name === 'AbortError'
-      setPaidError(
-        aborted ? 'Payment setup timed out. Check your connection and try again.' : e instanceof Error ? e.message : 'Could not start card payment',
-      )
-    } finally {
-      setPaidStripePreparing(false)
+    },
+    [paidBundleId, paidEmail, paidFullName, stripePaymentIntentApi],
+  )
+
+  /** Background warm-up once name, email, and consent are filled (Pay now opens faster). */
+  useEffect(() => {
+    if (!paidFormReadyForPayment || paidEntryRoute !== 'tickets' || !hasStripeElements) return
+    if (paidStripeClientSecret) return
+    const ac = new AbortController()
+    const t = setTimeout(() => {
+      fetchPaymentIntent({ signal: ac.signal }).catch(() => {})
+    }, 600)
+    return () => {
+      clearTimeout(t)
+      ac.abort()
     }
   }, [
     paidFormReadyForPayment,
+    paidEntryRoute,
+    hasStripeElements,
+    paidStripeClientSecret,
     paidBundleId,
     paidEmail,
     paidFullName,
-    stripePaymentIntentApi,
+    fetchPaymentIntent,
   ])
+
+  const prepareStripePayment = useCallback(async () => {
+    setPaidError('')
+    if (!paidFormReadyForPayment) {
+      setPaidError('Enter your full name, email, and agree to the terms before paying.')
+      return
+    }
+    if (paidStripeClientSecret) return
+    setPaidStripePreparing(true)
+    const controller = new AbortController()
+    let prepareTimeout
+    try {
+      prepareTimeout = setTimeout(() => controller.abort(), 20_000)
+      await fetchPaymentIntent({ signal: controller.signal })
+    } catch (e) {
+      const aborted = e instanceof Error && e.name === 'AbortError'
+      setPaidError(
+        aborted
+          ? 'Payment setup timed out. Check your connection and try again.'
+          : e instanceof Error
+            ? e.message
+            : 'Could not start card payment',
+      )
+    } finally {
+      clearTimeout(prepareTimeout)
+      setPaidStripePreparing(false)
+    }
+  }, [paidFormReadyForPayment, paidStripeClientSecret, fetchPaymentIntent])
 
   useEffect(() => {
     setPaidStripeClientSecret('')

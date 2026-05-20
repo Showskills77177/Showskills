@@ -12,6 +12,7 @@ import {
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { ErrorBanner } from './ErrorBanner'
+import { preloadStripe } from '../lib/stripeLoader'
 import { PaymentCheckoutSheet } from './PaymentCheckoutSheet'
 import { PayPalPayButton } from './PayPalPayButton'
 import { TicketBundlePicker } from './TicketBundlePicker'
@@ -102,6 +103,8 @@ export function EntryModal() {
     setPaymentSheetOpen(true)
     if (hasStripeElements && !paidStripeClientSecret) {
       await prepareStripePayment()
+    } else if (hasStripeElements && stripePublishableKey) {
+      preloadStripe(stripePublishableKey)
     }
   }
 

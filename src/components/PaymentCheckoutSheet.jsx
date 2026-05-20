@@ -73,17 +73,17 @@ export function PaymentCheckoutSheet({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
         {paidError ? <ErrorBanner message={paidError} /> : null}
 
-        {preparing ? (
+        {preparing && !paidStripeClientSecret ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div
               className="h-9 w-9 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-400"
               aria-hidden
             />
-            <p className="text-sm text-stone-400">Loading secure payment…</p>
+            <p className="text-sm text-stone-400">Setting up payment…</p>
           </div>
         ) : null}
 
-        {!preparing && hasStripeElements && paidStripeClientSecret ? (
+        {hasStripeElements && paidStripeClientSecret ? (
           <StripePaymentForm
             publishableKey={stripePublishableKey}
             clientSecret={paidStripeClientSecret}
@@ -97,7 +97,7 @@ export function PaymentCheckoutSheet({
           />
         ) : null}
 
-        {!preparing && hasPayPal ? (
+        {hasPayPal ? (
           <div className={hasStripeElements && paidStripeClientSecret ? 'mt-6' : ''}>
             {hasStripeElements && paidStripeClientSecret ? (
               <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
