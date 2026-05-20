@@ -28,7 +28,7 @@ export default function HomePage() {
         </div>
 
         <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
-          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-start lg:gap-x-7 lg:gap-y-4 lg:p-6">
+          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-stretch lg:gap-x-7 lg:gap-y-2 lg:p-6">
             <div className="ss-hero-intro flex flex-col gap-4 text-left lg:col-start-1 lg:row-start-1">
               <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
@@ -75,7 +75,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:gap-2">
+            <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:min-h-0 lg:gap-2">
               <div id="prizes" className="ss-hero-prize-column scroll-mt-24">
                 <div className="ss-prize-studio p-2 sm:p-3">
                   <div className="relative z-[1] grid gap-2">
@@ -132,7 +132,7 @@ export default function HomePage() {
                 >
                   Enter Bundle Draw
                 </button>
-                <p className="mt-1.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
+                <p className="ss-hero-bundle-cta-blurb mt-1.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
                   Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
                   case.
                 </p>

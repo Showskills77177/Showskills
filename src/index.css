@@ -488,21 +488,50 @@ body {
     grid-template-rows: auto auto;
   }
 
+  .ss-hero-intro {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+
+  .ss-hero-cta-row {
+    margin-top: auto;
+  }
+
   /* Align dark prize studio with “ShowSkills Rewards”, not the Live promotion pill */
+  .ss-hero-prize-stack {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+  }
+
   .ss-hero-prize-stack .ss-hero-prize-column {
     border-top: 0;
     padding-top: 3.35rem;
     padding-left: 0;
+    flex-shrink: 0;
   }
 
+  /* Sit Enter Bundle Draw on the same row as Enter now / Prize lineup */
   .ss-hero-bundle-cta {
-    margin-top: 0;
+    margin-top: auto;
+    flex-shrink: 0;
+    padding-top: 0.25rem;
   }
 
-  /* Row 2: legacy details and ticket bundles share the same top edge */
+  .ss-hero-bundle-cta .ss-hero-bundle-cta-blurb {
+    margin-top: 0.35rem;
+  }
+
+  /* Row 2: legacy details and ticket bundles share the same top edge; tight under bundle CTA */
   .ss-hero-copy-footer,
   .ss-hero-ticket-bundles {
     align-self: start;
+  }
+
+  .ss-hero-ticket-bundles {
+    margin-top: 0;
+    padding-top: 0;
   }
 
   .ss-hero-copy-footer {

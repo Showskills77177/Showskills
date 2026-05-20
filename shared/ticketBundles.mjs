@@ -6,11 +6,13 @@
 /** Volume rate for the £25 mega tier (pence per ticket). */
 export const MEGA_BUNDLE_PENCE_PER_TICKET = 40
 
-/** £25 at 40p per ticket → floor(2500 ÷ 40) = 62 tickets (customer pays £25). */
+/** £25 bundle: 62 tickets at 40p (£24.80) + 1 bonus ticket = 63 total. */
 export const MEGA_BUNDLE_TOTAL_PENCE = 2500
-export const MEGA_BUNDLE_TICKET_QTY = Math.floor(
+export const MEGA_BUNDLE_BASE_TICKET_QTY = Math.floor(
   MEGA_BUNDLE_TOTAL_PENCE / MEGA_BUNDLE_PENCE_PER_TICKET,
 )
+export const MEGA_BUNDLE_BONUS_TICKETS = 1
+export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_BASE_TICKET_QTY + MEGA_BUNDLE_BONUS_TICKETS
 
 export const TICKET_BUNDLES = [
   {
@@ -75,8 +77,8 @@ export const TICKET_BUNDLES = [
     emoji: '🏆',
     title: 'Mega bundle',
     line1: `£25 — ${MEGA_BUNDLE_TICKET_QTY} tickets`,
-    line2: `40p per ticket (${MEGA_BUNDLE_TICKET_QTY} × 40p = £24.80, pay £25)`,
-    bullets: ['Best volume rate — pay £25 for 62 entries at the 40p rate'],
+    line2: `40p rate: ${MEGA_BUNDLE_BASE_TICKET_QTY} tickets + ${MEGA_BUNDLE_BONUS_TICKETS} bonus`,
+    bullets: ['Best volume rate — pay £25, get 63 entries (62 at 40p + 1 bonus)'],
     featured: false,
   },
 ]

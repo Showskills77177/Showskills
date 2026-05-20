@@ -9,7 +9,7 @@ export function TicketBundlePrice({ className = '', compact = false }) {
           'gap-1 px-2.5 py-1.5 text-xs sm:text-sm'
         } ${className}`}
       >
-        From {formatBundlePriceGBP(75)} (single) · bundles to {formatBundlePriceGBP(2500)} (62 tickets)
+        From {formatBundlePriceGBP(75)} (single) · bundles to {formatBundlePriceGBP(2500)} (63 tickets)
       </p>
     )
   }
