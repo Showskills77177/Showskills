@@ -3,12 +3,14 @@
  * Amounts in pence (GBP). Server must resolve `bundleId` against this list only.
  */
 
-/** Volume rate for the £20 mega tier (pence per ticket). */
+/** Volume rate for the £25 mega tier (pence per ticket). */
 export const MEGA_BUNDLE_PENCE_PER_TICKET = 40
 
-/** £20 at 40p per ticket → 2000 ÷ 40 = 50 tickets (not 45 — that would be £18). */
-export const MEGA_BUNDLE_TOTAL_PENCE = 2000
-export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_TOTAL_PENCE / MEGA_BUNDLE_PENCE_PER_TICKET
+/** £25 at 40p per ticket → floor(2500 ÷ 40) = 62 tickets (customer pays £25). */
+export const MEGA_BUNDLE_TOTAL_PENCE = 2500
+export const MEGA_BUNDLE_TICKET_QTY = Math.floor(
+  MEGA_BUNDLE_TOTAL_PENCE / MEGA_BUNDLE_PENCE_PER_TICKET,
+)
 
 export const TICKET_BUNDLES = [
   {
@@ -67,14 +69,14 @@ export const TICKET_BUNDLES = [
     featured: false,
   },
   {
-    id: 'mega50',
+    id: 'mega25',
     qty: MEGA_BUNDLE_TICKET_QTY,
     totalPence: MEGA_BUNDLE_TOTAL_PENCE,
     emoji: '🏆',
     title: 'Mega bundle',
-    line1: `£20 — ${MEGA_BUNDLE_TICKET_QTY} tickets`,
-    line2: `40p per ticket (${MEGA_BUNDLE_TICKET_QTY} × 40p = £20)`,
-    bullets: ['Best volume rate — pay £20, get every ticket at 40p'],
+    line1: `£25 — ${MEGA_BUNDLE_TICKET_QTY} tickets`,
+    line2: `40p per ticket (${MEGA_BUNDLE_TICKET_QTY} × 40p = £24.80, pay £25)`,
+    bullets: ['Best volume rate — pay £25 for 62 entries at the 40p rate'],
     featured: false,
   },
 ]
