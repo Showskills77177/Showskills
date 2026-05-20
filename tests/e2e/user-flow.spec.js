@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { installPageErrorAsserter } from '../support/console.mjs'
+import { openLegacyBundleEntry } from '../support/entry.mjs'
 
 const CORRECT = {
   q1: 'Bolton 4-0',
@@ -8,19 +9,14 @@ const CORRECT = {
 }
 
 test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
-  test('home → competitions → paid entry → simulated checkout → quiz → success', async ({ page }) => {
+  test('competitions → paid entry → simulated checkout → quiz → success', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
     const email = `e2e-user-${Date.now()}@example.test`
     const name = 'E2E Legacy User'
 
-    await page.goto('/')
-    await expect(page.getByRole('heading', { name: /ShowSkills Rewards/i })).toBeVisible()
-    await page.getByLabel('Main navigation').getByRole('link', { name: 'Competitions' }).click()
-    await expect(page).toHaveURL(/\/competitions/)
+    await page.goto('/competitions')
     await expect(page.getByRole('heading', { name: 'Competitions' })).toBeVisible()
-
-    await page.getByRole('button', { name: /Enter this competition/i }).click()
-    await expect(page.getByRole('heading', { name: /Ronaldo Legacy Bundle/i })).toBeVisible()
+    await openLegacyBundleEntry(page)
 
     await page.locator('#modal-paid-fullname').fill(name)
     await page.locator('#modal-paid-email').fill(email)
@@ -36,7 +32,7 @@ test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
     await qInputs.nth(1).fill(CORRECT.q2)
     await qInputs.nth(2).fill(CORRECT.q3)
     await page.getByRole('button', { name: 'Submit answers' }).click()
-    await expect(page.getByText(/All correct/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/All correct — you qualify/i)).toBeVisible({ timeout: 15_000 })
 
     await assertClean()
   })

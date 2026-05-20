@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { e2eSecret } from '../support/env.mjs'
+import { openLegacyBundleEntry } from '../support/entry.mjs'
 import { openE2eDb, paidTicketNumbersForEmail } from '../support/db.mjs'
 
 test.describe('Ticket numbers on confirmed checkout', () => {
@@ -7,8 +8,7 @@ test.describe('Ticket numbers on confirmed checkout', () => {
     const email = `e2e-tkt-session-${Date.now()}@example.test`
     const name = 'E2E Ticket Session'
 
-    await page.goto('/')
-    await page.getByRole('button', { name: /^Open entry$/i }).first().click()
+    await openLegacyBundleEntry(page)
     await page.locator('#modal-paid-fullname').fill(name)
     await page.locator('#modal-paid-email').fill(email)
     await page.getByRole('checkbox', { name: /I agree to the/i }).check()

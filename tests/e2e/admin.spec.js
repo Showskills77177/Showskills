@@ -14,11 +14,11 @@ test.describe('D) Admin panel', () => {
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
     await expect(page.getByText(/Kick-up submissions pending/i)).toBeVisible()
 
-    await page.getByRole('link', { name: /Users & entries/i }).click()
+    await page.getByRole('navigation').getByRole('link', { name: /Users & entries/i }).click()
     await expect(page.getByRole('heading', { name: /Users & entries/i })).toBeVisible({ timeout: 15_000 })
 
-    await page.getByRole('link', { name: /Kick-up videos/i }).click()
-    await expect(page.getByRole('heading', { name: /Kick-up challenge/i })).toBeVisible()
+    await page.getByRole('navigation').getByRole('link', { name: /Kick-up videos/i }).click()
+    await expect(page.getByRole('heading', { name: /Free shirt giveaway/i })).toBeVisible()
   })
 
   test('unauthenticated user is redirected from /admin/dashboard', async ({ page, context }) => {

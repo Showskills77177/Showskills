@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { openLegacyBundleEntry } from '../support/entry.mjs'
 import {
   openE2eDb,
   countTickets,
@@ -16,8 +17,7 @@ test.describe('B) Mocked payment + persistence', () => {
     const ticketNumsBefore = before.prepare(`SELECT COUNT(*) AS c FROM ticket_numbers`).get().c
     before.close()
 
-    await page.goto('/')
-    await page.getByRole('button', { name: /^Open entry$/i }).first().click()
+    await openLegacyBundleEntry(page)
     await page.locator('#modal-paid-fullname').fill(name)
     await page.locator('#modal-paid-email').fill(email)
     await page.getByRole('checkbox', { name: /I agree to the/i }).check()
@@ -39,7 +39,7 @@ test.describe('B) Mocked payment + persistence', () => {
     await qInputs.nth(1).fill('Nicky Butt')
     await qInputs.nth(2).fill('47')
     await page.getByRole('button', { name: 'Submit answers' }).click()
-    await expect(page.getByText(/All correct/i)).toBeVisible()
+    await expect(page.getByText(/All correct — you qualify/i)).toBeVisible()
 
     const db2 = openE2eDb()
     const entry = latestCompetitionEntryByEmail(db2, email)

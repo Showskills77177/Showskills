@@ -1,6 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { test, expect } from '@playwright/test'
+import { openShirtGiveawayEntry } from '../support/entry.mjs'
 import { openE2eDb, latestKickupByEmail, countKickups } from '../support/db.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -15,8 +17,7 @@ test.describe('C) Free shirt giveaway', () => {
     const before = countKickups(db0)
     db0.close()
 
-    await page.goto('/archive/ronaldo-shirt-giveaway')
-    await page.getByRole('button', { name: /Open free giveaway form/i }).click()
+    await openShirtGiveawayEntry(page)
     await page.getByLabel(/Full name/i).first().fill(name)
     await page.getByLabel(/Qualification question/i).fill('Ronaldo R9')
     await page.getByLabel(/^Email$/i).fill(email)
@@ -47,7 +48,7 @@ test.describe('C) Free shirt giveaway', () => {
         video: {
           name: 'clip.mp4',
           mimeType: 'video/mp4',
-          path: tinyMp4,
+          buffer: readFileSync(tinyMp4),
         },
       },
     })
