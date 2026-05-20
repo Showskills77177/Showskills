@@ -117,27 +117,12 @@ export function buildPurchaseConfirmationHtml(props) {
               </table>
               <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table>
-              <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — each number is unique and tied to your purchase.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 8px 0">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#134e3a;border-radius:12px;border:1px solid #10b981">
-                <tr>
-                  <td style="padding:18px 20px">
-                    <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#ecfdf5">Skill questions (if not done yet)</p>
-                    <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#a7f3d0">After payment you are normally asked for <strong style="color:#ecfdf5">three skill answers straight away</strong> on the website. If you already submitted them, you do not need to do anything else.</p>
-                    <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:#a7f3d0"><strong style="color:#ecfdf5">Only if you have not answered yet:</strong> return to showskills.co.uk and submit your three answers to qualify for the draw. Only entrants with all answers correct are included in the random winner selection.</p>
-                    <a href="${escapeHtml(siteUrl)}" style="display:inline-block;background:linear-gradient(90deg,#0d9488,#059669);color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:10px">Return to submit answers</a>
-                  </td>
-                </tr>
-              </table>
+              <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — each number is unique and tied to your purchase. You will receive a separate email once your skill answers have been checked.</p>
             </td>
           </tr>
           <tr>
             <td style="padding:28px 12px 0;text-align:center;font-size:11px;line-height:1.5;color:#57534e">
-              ShowSkills Rewards — skill-based promotion (UK).<br />
-              This email confirms payment only; qualification requires correct answers per the site terms.
+              ShowSkills Rewards — skill-based promotion (UK).
             </td>
           </tr>
         </table>
@@ -172,11 +157,7 @@ export function buildPurchaseConfirmationText(props) {
     ...ticketNumbers.map((n) => `  • ${n}`),
     '',
     'Keep this email — each ticket number is unique.',
-    '',
-    'After payment you are usually prompted for three skill answers on the site straight away.',
-    'If you already submitted them, no further action is needed.',
-    '',
-    'Only if you have NOT answered yet: return to the site and submit your three skill answers to qualify for the draw.',
+    'You will receive a separate email once your skill answers have been checked.',
     '',
     siteUrl,
   ].join('\n')

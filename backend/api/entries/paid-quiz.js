@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from '../lib/db.mjs'
 import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
+import { sendQuizResultEmail } from '../lib/sendQuizResultEmail.mjs'
 
 /**
  * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
@@ -62,7 +63,17 @@ export default async function handler(req, res) {
       [entryId, userId, competition, entryType, JSON.stringify(answers), allVal],
     )
 
-    return json(res, 201, { ok: true, validation })
+    let quizEmailSent = false
+    if (entryType === 'paid') {
+      const emailResult = await sendQuizResultEmail({
+        to: email,
+        customerFullName: fullName,
+        allCorrect,
+      })
+      quizEmailSent = Boolean(emailResult?.ok)
+    }
+
+    return json(res, 201, { ok: true, validation, quizEmailSent })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not save entry' })

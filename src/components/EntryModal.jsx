@@ -179,10 +179,13 @@ export function EntryModal() {
                     ) : null}
                     <p className="mt-2 text-xs text-teal-200/75">
                       {paidEmailConfirmationSent
-                        ? 'A confirmation email has been sent with your ticket numbers.'
+                        ? 'A confirmation email with your ticket numbers has been sent.'
                         : 'Save your ticket numbers — a confirmation email is sent when email delivery is configured.'}
                     </p>
-                    <p className="mt-2 text-teal-100/90">Submit your three skill answers below to qualify.</p>
+                    <p className="mt-2 text-teal-100/90">
+                      Submit your three skill answers below. You will receive another email telling you whether your
+                      answers are correct.
+                    </p>
                   </div>
                   {PAID_SKILL_QUESTIONS.map((q, i) => (
                     <div key={q.id}>
