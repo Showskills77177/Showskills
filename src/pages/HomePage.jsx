@@ -30,9 +30,9 @@ export default function HomePage() {
           <div className="ss-hero-photo-scrim absolute inset-0" />
         </div>
 
-        <div className="ss-hero-inner mx-auto flex max-w-5xl flex-col gap-8 px-4 pt-4 pb-14 sm:gap-10 sm:px-6 sm:pt-11 sm:pb-10 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-10 lg:pt-12 lg:pb-20">
-          <div className="ss-hero-brand-column relative order-2 flex w-full min-h-0 flex-col lg:order-1 lg:h-full lg:min-h-0">
-            <div className="ss-hero-copy-panel flex w-full min-h-0 flex-col p-5 text-left sm:p-6 lg:min-h-0 lg:flex-1">
+        <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
+          <article className="ss-hero-merged-panel grid gap-6 px-0 py-4 sm:py-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start lg:gap-7 lg:p-6">
+            <div className="ss-hero-copy-column relative order-2 flex w-full min-h-0 flex-col text-left lg:order-1 lg:h-full lg:min-h-0">
               <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                 Live promotion
@@ -53,30 +53,32 @@ export default function HomePage() {
                 full kit draw.
               </p>
 
-              <div className="ss-legacy-entry-card mt-6 max-w-xl">
-                <div className="rounded-xl border border-teal-500/30 bg-black/25 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-300/90">Legacy Bundle draw</p>
-                  <p className="mt-2 text-sm font-semibold text-stone-100">Paid bundles or free post</p>
-                  <p className="mt-1 text-xs leading-relaxed text-stone-500">
-                    Buy tickets online <span className="text-stone-400">or</span> enter by post — same prize. Three Ronaldo
-                    questions. Full kit: phone, shirt, ball, case.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => openEntry('paid')}
-                    className="mt-3 w-full rounded-lg bg-teal-600/90 py-2 text-xs font-bold text-white hover:bg-teal-500"
-                  >
-                    Open entry
-                  </button>
-                </div>
-              </div>
-
               <TicketBundlePrice compact className="mt-6" />
               <p className="ss-hero-helper-copy mt-4 max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for details, or open entry here.
                 Paid bundles and free postal entry are in the same panel.
               </p>
-              <div className="ss-legacy-details-card mt-5 max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400">
+              <div className="ss-hero-cta-row mt-5 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 lg:mt-5 lg:border-t lg:border-white/10 lg:pt-4">
+                <Link
+                  to="/competitions"
+                  className="ss-btn-enter inline-flex min-h-[3rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-3 text-center text-base font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.25rem] sm:px-12 sm:text-lg"
+                >
+                  Enter now
+                </Link>
+                <a
+                  href="#prizes"
+                  className="inline-flex min-h-[3rem] items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40 sm:min-h-[3.25rem]"
+                >
+                  Prize lineup
+                </a>
+                <Link
+                  to="/archive/ronaldo-shirt-giveaway"
+                  className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:py-2.5"
+                >
+                  Free shirt giveaway
+                </Link>
+              </div>
+              <div className="ss-legacy-details-card mt-3 max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 sm:mt-3.5">
                 <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
                   Ronaldo Legacy Bundle details
                 </p>
@@ -106,80 +108,12 @@ export default function HomePage() {
                   * Images are illustrative. Prize details are subject to the competition terms and availability.
                 </p>
               </div>
-              <div className="ss-hero-cta-row mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:mt-auto lg:border-t lg:border-white/10 lg:pt-6">
-                <Link
-                  to="/competitions"
-                  className="ss-btn-enter inline-flex min-h-[3.25rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-3.5 text-center text-base font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.5rem] sm:px-12 sm:text-lg"
-                >
-                  Enter now
-                </Link>
-                <a
-                  href="#prizes"
-                  className="inline-flex items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-3 text-sm font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40"
-                >
-                  Prize lineup
-                </a>
-                <Link
-                  to="/archive/ronaldo-shirt-giveaway"
-                  className="inline-flex items-center justify-center rounded-lg px-4 py-3 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300"
-                >
-                  Free shirt giveaway
-                </Link>
-              </div>
             </div>
 
-            <div
-              className="pointer-events-none absolute right-0 hidden sm:bottom-auto sm:translate-y-[-50%] lg:top-[40%] lg:block"
-              aria-hidden
-            >
-              <div className="ss-bundle-arrow ss-bundle-arrow--right h-11 w-11 sm:h-12 sm:w-12 lg:flex">
-                <svg viewBox="0 0 24 24" className="h-full w-full" fill="none" aria-hidden>
-                  <defs>
-                    <linearGradient id="ss-bundle-cue-grad-r" x1="4" y1="12" x2="20" y2="12" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#99f6e4" />
-                      <stop offset="0.5" stopColor="#2dd4bf" />
-                      <stop offset="1" stopColor="#34d399" />
-                    </linearGradient>
-                  </defs>
-                  <circle
-                    className="ss-bundle-arrow__halo"
-                    cx="12"
-                    cy="12"
-                    r="10.5"
-                    fill="none"
-                    stroke="url(#ss-bundle-cue-grad-r)"
-                    strokeWidth="1.15"
-                    opacity="0.5"
-                  />
-                  <path
-                    stroke="url(#ss-bundle-cue-grad-r)"
-                    strokeWidth="2.35"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 12H19M13 5.5l6.5 6.5-6.5 6.5"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
 
-          <div id="prizes" className="ss-hero-prize-column scroll-mt-24 order-1 flex min-h-0 w-full flex-col lg:order-2">
-            <article className="ss-prize-panel flex h-full min-h-0 flex-col p-5 sm:p-6">
-              <p className="mb-3 inline-flex w-fit items-center gap-2 rounded-full border border-teal-500/30 bg-teal-950/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-teal-200/90 sm:text-sm">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal-400" aria-hidden />
-                Headline prize (paid / postal draw)
-              </p>
-              <h2 className="font-display text-3xl tracking-tight text-white sm:text-4xl">{GRAND_PRIZE_BUNDLE.title}</h2>
-              <p className="mt-2 max-w-md text-sm leading-relaxed text-stone-400">
-                This stack is for the <strong className="text-stone-300">Ronaldo Legacy Bundle</strong> competition only —
-                paid tickets or free postal entry, with correct skill answers.
-              </p>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-500">
-                iPhone Pro Max, signed shirt (United era), signed ball with COA, premium gold case — illustrative; we may
-                substitute similar items.
-              </p>
-
-              <div className="mt-6 flex flex-1 flex-col gap-0">
+            <div id="prizes" className="ss-hero-prize-column scroll-mt-24 order-1 flex min-h-0 w-full flex-col lg:order-2">
+              <div className="flex h-full min-h-0 flex-col">
+              <div className="flex flex-1 flex-col gap-0">
                 <div className="ss-prize-studio p-2 sm:p-3">
                   <div className="relative z-[1] grid gap-2">
                     <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
@@ -195,7 +129,7 @@ export default function HomePage() {
                         />
                       </div>
                     </div>
-                    <div className="ss-prize-studio-subgrid mx-auto grid w-full grid-cols-2 gap-2 sm:max-w-[20rem] sm:gap-0">
+                    <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
                       <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
                         <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
                           <img
@@ -284,22 +218,16 @@ export default function HomePage() {
                   >
                     Enter Bundle Draw
                   </button>
+                  <p className="mt-2.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
+                    Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt,
+                    ball, case.
+                  </p>
                 </div>
                 <TicketBundlePrice className="mt-4" />
-                <p className="mt-4 text-center text-xs text-zinc-500">
-                  Free postal entry for the same draw is available inside{' '}
-                  <button
-                    type="button"
-                    className="font-medium text-zinc-400 underline underline-offset-2 hover:text-zinc-300"
-                    onClick={() => openEntry('paid')}
-                  >
-                    Enter Bundle Draw
-                  </button>
-                  .
-                </p>
               </div>
-            </article>
-          </div>
+            </div>
+            </div>
+          </article>
         </div>
       </section>
     </main>

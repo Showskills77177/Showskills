@@ -42,13 +42,13 @@ export function Layout() {
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
         {/* Mobile: logo, then menu dock with its own footer strip */}
         <div className="sm:hidden">
-          <div className="flex justify-center px-4 pb-2 pt-3">
+          <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-2 pt-3">
             <Link
               to="/"
               className="outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512]"
               aria-label="ShowSkills Rewards home"
             >
-              <LogoMark className="h-11" />
+              <LogoMark className="ss-mobile-header-logo h-11" />
             </Link>
           </div>
           <MobileNavDock />
@@ -89,7 +89,9 @@ export function Layout() {
             <LogoMark />
           </Link>
 
-          <div aria-hidden />
+          <p className="justify-self-end -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95">
+            Prizes that matter
+          </p>
         </div>
       </header>
 

@@ -345,6 +345,7 @@ body {
 }
 
 /* Hero copy + prize card — same shell so columns match height on large screens */
+.ss-hero-merged-panel,
 .ss-prize-panel,
 .ss-hero-copy-panel {
   position: relative;
@@ -408,6 +409,7 @@ body {
   }
 }
 
+.ss-hero-merged-panel::before,
 .ss-prize-panel::before,
 .ss-hero-copy-panel::before {
   content: '';
@@ -428,7 +430,57 @@ body {
   pointer-events: none;
 }
 
-.ss-legacy-entry-card > div,
+.ss-hero-prize-column {
+  padding-top: 0;
+  width: 100%;
+}
+
+/* Mobile/tablet: same horizontal track as header letterhead; sit bundle studio below logo row */
+@media (max-width: 1023px) {
+  .ss-hero-merged-panel {
+    padding-inline: 0;
+    padding-top: 0.35rem;
+    padding-bottom: 1rem;
+    gap: 1.25rem;
+  }
+
+  .ss-hero-copy-column,
+  .ss-hero-prize-column {
+    padding-inline: 0;
+    width: 100%;
+  }
+
+  .ss-hero-prize-column {
+    margin-top: 0.85rem;
+    padding-top: 0.25rem;
+  }
+
+  .ss-hero-prize-column .ss-prize-studio {
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .ss-hero-prize-column .ss-prize-studio-subgrid {
+    align-items: stretch;
+  }
+
+  .ss-hero-prize-column .ss-prize-studio-subgrid .ss-prize-studio-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ss-hero-prize-column {
+    border-top: 0;
+    /* Align black bundle studio with ShowSkills Rewards logotype row in the copy column */
+    padding-top: 3.85rem;
+    padding-left: 0;
+  }
+}
+
 .ss-legacy-details-card {
   border-radius: 0.75rem;
   padding: 0.9rem;
@@ -550,6 +602,10 @@ body {
   letter-spacing: 0.02em;
 }
 
+.ss-mobile-nav-dock__foot p {
+  font-size: 0.625rem;
+}
+
 /* Small-phone homepage pass: iPhone 13 mini and similarly narrow devices. */
 @media (max-width: 430px) {
   .ss-mobile-nav-dock__grid {
@@ -564,13 +620,24 @@ body {
 
   .ss-hero-inner {
     gap: 1.45rem;
-    padding: 1rem 0.75rem 2.35rem;
+    padding: 1.1rem 1rem 2.35rem;
   }
 
+  .ss-hero-merged-panel,
   .ss-hero-copy-panel,
   .ss-prize-panel {
     border-radius: 0.78rem;
     padding: 0.72rem;
+  }
+
+  .ss-hero-merged-panel {
+    padding-inline: 0;
+    padding-top: 0.25rem;
+  }
+
+  .ss-hero-prize-column {
+    margin-top: 1rem;
+    padding-top: 0.35rem;
   }
 
   .ss-hero-copy-panel > p:first-child,
@@ -601,11 +668,6 @@ body {
     white-space: normal;
   }
 
-  .ss-legacy-entry-card {
-    margin-top: 1rem;
-  }
-
-  .ss-legacy-entry-card > div,
   .ss-legacy-details-card {
     border-radius: 0.7rem;
     padding: 0.72rem;
@@ -633,27 +695,35 @@ body {
   }
 
   .ss-hero-cta-row {
-    margin-top: 1.15rem;
-    gap: 0.65rem;
+    margin-top: 1rem;
+    padding-top: 0;
+    gap: 0.5rem;
   }
 
   .ss-hero-cta-row a {
     width: 100%;
-    min-height: 2.85rem;
-    padding: 0.75rem 1rem;
+    min-height: 2.75rem;
+    padding: 0.65rem 1rem;
     font-size: 0.76rem;
   }
 
+  .ss-legacy-details-card {
+    margin-top: 0.65rem;
+  }
+
+  .ss-hero-prize-column h2,
   .ss-prize-panel h2 {
     font-size: 2rem;
     line-height: 0.95;
   }
 
+  .ss-hero-prize-column > div > p,
   .ss-prize-panel > p {
     font-size: 0.78rem;
     line-height: 1.45;
   }
 
+  .ss-hero-prize-column > div > p + p,
   .ss-prize-panel > p + p {
     margin-top: 0.55rem;
   }
@@ -676,6 +746,41 @@ body {
   }
 }
 
+@media (max-width: 390px) {
+  .ss-mobile-logo-row {
+    padding-top: 0.65rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .ss-mobile-header-logo {
+    height: 2.45rem;
+  }
+
+  .ss-mobile-nav-dock__grid {
+    gap: 0.45rem;
+    padding: 0.55rem;
+    padding-top: 0.45rem;
+  }
+
+  .ss-mobile-nav-btn {
+    min-height: 2.55rem;
+    border-radius: 0.65rem;
+    padding: 0.45rem 0.35rem;
+    font-size: 0.74rem;
+    letter-spacing: 0;
+  }
+
+  .ss-mobile-nav-dock__foot {
+    padding-top: 0.38rem;
+    padding-bottom: 0.38rem;
+  }
+
+  .ss-mobile-nav-dock__foot p {
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+  }
+}
+
 @media (max-width: 360px) {
   .ss-hero-inner {
     padding-left: 0.6rem;
@@ -686,6 +791,7 @@ body {
     font-size: 2.22rem !important;
   }
 
+  .ss-hero-merged-panel,
   .ss-hero-copy-panel,
   .ss-prize-panel {
     padding: 0.75rem;
@@ -693,6 +799,49 @@ body {
 
   .ss-legacy-details-card li {
     font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 350px) {
+  .ss-mobile-header-logo {
+    height: 2.25rem;
+  }
+
+  .ss-mobile-nav-dock__grid {
+    gap: 0.35rem;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+
+  .ss-mobile-nav-btn {
+    min-height: 2.35rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 320px) {
+  .ss-mobile-header-logo {
+    height: 2.05rem;
+  }
+
+  .ss-mobile-nav-dock__grid {
+    gap: 0.25rem;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+  }
+
+  .ss-mobile-nav-btn {
+    min-height: 2.2rem;
+    border-radius: 0.55rem;
+    font-size: 0.62rem;
+    line-height: 1.05;
+  }
+
+  .ss-mobile-nav-dock__foot p {
+    font-size: 0.5rem;
+    letter-spacing: 0.11em;
   }
 }
 
