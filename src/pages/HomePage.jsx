@@ -123,7 +123,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-bundle-draw w-full rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-8 py-3.5 text-center text-base font-bold uppercase tracking-[0.1em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:py-4 sm:text-lg"
+                    className="ss-btn-enter ss-hero-bundle-draw-btn w-full inline-flex min-h-[3.5rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-3.5 text-center text-base font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.75rem] sm:px-12 sm:text-lg"
                   >
                     Enter Bundle Draw
                   </button>

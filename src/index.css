@@ -544,7 +544,7 @@ body {
     min-height: 3.25rem;
   }
 
-  .ss-btn-bundle-draw {
+  .ss-hero-bundle-draw-btn {
     min-height: 3.5rem;
   }
 
@@ -648,6 +648,10 @@ body {
 }
 
 .ss-btn-bundle-draw {
+  min-height: 3.25rem;
+}
+
+.ss-hero-bundle-draw-btn {
   min-height: 3.25rem;
 }
 
