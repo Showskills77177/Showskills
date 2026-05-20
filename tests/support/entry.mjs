@@ -1,5 +1,14 @@
 import { expect } from '@playwright/test'
 
+/** Open Legacy Bundle paid entry from the homepage hero. */
+export async function openLegacyBundleEntryFromHome(page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Enter Bundle Draw' }).click()
+  await expect(page.getByRole('heading', { name: /Enter — Ronaldo Legacy Bundle/i })).toBeVisible({
+    timeout: 15_000,
+  })
+}
+
 /** Open Legacy Bundle paid entry modal (stable vs home layout changes). */
 export async function openLegacyBundleEntry(page) {
   await page.goto('/competitions')
@@ -7,6 +16,11 @@ export async function openLegacyBundleEntry(page) {
   await expect(page.getByRole('heading', { name: /Enter — Ronaldo Legacy Bundle/i })).toBeVisible({
     timeout: 15_000,
   })
+}
+
+/** Close the entry modal via the header X (not the footer "Close" button). */
+export async function closeEntryModal(page) {
+  await page.locator('#entry-modal-title').locator('..').getByRole('button', { name: 'Close', exact: true }).click()
 }
 
 /** Open free shirt giveaway modal. */

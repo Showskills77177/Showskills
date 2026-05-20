@@ -30,6 +30,7 @@ test.describe('Edge cases & errors', () => {
 
   test('unknown path falls back to home route', async ({ page }) => {
     await page.goto('/this-route-should-not-exist-xyz')
-    await expect(page.getByRole('button', { name: /Open entry/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ShowSkills Rewards' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Enter Bundle Draw' })).toBeVisible()
   })
 })
