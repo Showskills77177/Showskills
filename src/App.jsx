@@ -13,6 +13,7 @@ import AdminUsersPage from './pages/admin/UsersPage'
 import AdminTicketsPage from './pages/admin/TicketsPage'
 import AdminPaymentsPage from './pages/admin/PaymentsPage'
 import AdminSubmissionsPage from './pages/admin/SubmissionsPage'
+import AdminTestEmailPage from './pages/admin/TestEmailPage'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -34,6 +35,7 @@ export default function App() {
               <Route path="tickets" element={<AdminTicketsPage />} />
               <Route path="payments" element={<AdminPaymentsPage />} />
               <Route path="submissions" element={<AdminSubmissionsPage />} />
+              <Route path="test-email" element={<AdminTestEmailPage />} />
               <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
             </Route>
           </Route>

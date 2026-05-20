@@ -19,7 +19,8 @@
     "test:admin": "playwright test tests/e2e/admin.spec.js",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
     "test:ui": "playwright test --ui",
-    "test:install": "playwright install chromium"
+    "test:install": "playwright install chromium",
+    "test:purchase-email": "node scripts/test-purchase-email.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

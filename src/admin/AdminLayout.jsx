@@ -43,6 +43,9 @@ export function AdminLayout() {
             <NavLink to="/admin/submissions" className={linkClass}>
               Kick-up videos
             </NavLink>
+            <NavLink to="/admin/test-email" className={linkClass}>
+              Test email
+            </NavLink>
             <button
               type="button"
               onClick={logout}

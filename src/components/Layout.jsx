@@ -129,7 +129,7 @@ export function Layout() {
               </button>
             </div>
           </div>
-          <p className="mt-4 max-w-md text-sm text-stone-400">
+          <p className="mx-auto mt-4 max-w-md text-center text-sm text-stone-400">
             Paid draw: skill answers then random winner from correct entries. Free postal entry is in the same Legacy
             Bundle panel as paid tickets. UK-focused.
           </p>
