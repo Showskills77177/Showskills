@@ -51,12 +51,12 @@ export function buildQuizResultHtml(props) {
   const ticketLabel = ticketNumbers.length === 1 ? 'Your ticket number' : 'Your ticket numbers'
 
   const headline = allCorrect ? 'You qualify for the draw' : 'Answers not correct'
-  const headlineColor = allCorrect ? '#ecfdf5' : '#f5f5f4'
-  const borderColor = allCorrect ? 'rgba(52,211,153,0.45)' : 'rgba(245,158,11,0.35)'
+  const headlineColor = allCorrect ? '#ecfdf5' : '#fca5a5'
+  const borderColor = allCorrect ? 'rgba(52,211,153,0.45)' : 'rgba(248,113,113,0.55)'
 
   const resultHtml = allCorrect
     ? `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#d6d3d1">Your three skill answers were <strong style="color:#6ee7b7">all correct</strong>. You are entered in the random winner selection for the Ronaldo Legacy Bundle draw.</p>`
-    : `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#d6d3d1">Your three skill answers were checked: <strong style="color:#fbbf24">one or more were incorrect</strong>. You <strong style="color:#fbbf24">do not qualify</strong> for the prize draw on this entry. Your payment is not refunded.</p>`
+    : `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#d6d3d1">Your three skill answers were checked: <strong style="color:#f87171">one or more were incorrect</strong>. You <strong style="color:#f87171">do not qualify</strong> for the prize draw on this entry. Your payment is not refunded.</p>`
 
   return `<!DOCTYPE html>
 <html lang="en">

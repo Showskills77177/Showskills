@@ -133,11 +133,6 @@ export function Layout() {
             Paid draw: skill answers then random winner from correct entries. Free postal entry is in the same Legacy
             Bundle panel as paid tickets. UK-focused.
           </p>
-          <p className="mt-6 text-center">
-            <span className="inline-block rounded-full border border-emerald-500/25 bg-emerald-950/40 px-3 py-1 text-xs font-semibold text-emerald-200/90">
-              Stripe &amp; PayPal
-            </span>
-          </p>
           <p className="mt-8 border-t border-white/[0.06] pt-8 text-center text-xs leading-relaxed text-stone-600">
             Paid promotion is skill-based (not a lottery); winner chosen at random from entrants who answered all
             questions correctly. Not affiliated with any athlete, club, or brand shown in illustrative prize imagery.
