@@ -53,10 +53,10 @@ export default function HomePage() {
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for the shirt giveaway and a
                 side-by-side view of both promotions.
               </p>
-              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-4 lg:border-t lg:border-white/10 lg:pt-4">
+              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-auto lg:border-t lg:border-white/10 lg:pt-4">
                 <a
                   href="#prizes"
-                  className="ss-btn-bundle-draw ss-hero-aligned-cta inline-flex min-h-[3rem] flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-6 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[3.25rem] sm:px-8 sm:text-base"
+                  className="ss-btn-bundle-draw ss-hero-paired-cta inline-flex min-h-[3rem] max-w-full flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[3.25rem] sm:px-6 sm:text-base"
                 >
                   Prize lineup
                 </a>
@@ -87,7 +87,7 @@ export default function HomePage() {
                       </div>
                     </div>
                     <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
-                      <div className="ss-prize-studio-tile px-1 pb-0.5 sm:px-1.5">
+                      <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
                         <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
                           <img
                             src={iphone17ProMax}
@@ -99,8 +99,12 @@ export default function HomePage() {
                             className="aspect-[3/4] h-auto w-full scale-125 object-cover object-center"
                           />
                         </div>
+                        <p className="ss-phone-prize-glow mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em]">
+                          Phone prize
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
                       </div>
-                      <div className="ss-prize-studio-tile px-1 pb-0.5 sm:px-1.5">
+                      <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
                         <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
                           <img
                             src={iphone17ProMaxGoldCase}
@@ -112,26 +116,30 @@ export default function HomePage() {
                             className="aspect-[3/4] h-auto w-full object-cover object-center"
                           />
                         </div>
+                        <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">
+                          Case prize
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-stone-100">24K gold case</p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="ss-hero-bundle-cta">
-                <div className="ss-hero-bundle-cta-actions lg:border-t lg:border-white/10 lg:pt-4">
+              <div className="ss-hero-bundle-cta mt-1 flex flex-col lg:mt-auto">
+                <p className="ss-hero-bundle-cta-blurb mb-2 max-w-none text-center text-[11px] leading-snug text-stone-500 sm:mb-2.5 sm:text-xs lg:mb-3">
+                  Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
+                  case.
+                </p>
+                <div className="ss-hero-bundle-cta-actions flex flex-col gap-2 sm:flex-row sm:items-stretch lg:border-t lg:border-white/10 lg:pt-4">
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-enter ss-hero-aligned-cta w-full inline-flex min-h-[3rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-2.5 text-center text-sm font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.25rem] sm:px-12 sm:py-3 sm:text-base"
+                    className="ss-btn-enter ss-hero-paired-cta inline-flex min-h-[3rem] max-w-full flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.25rem] sm:px-6 sm:text-base"
                   >
                     Enter Bundle Draw
                   </button>
                 </div>
-                <p className="ss-hero-bundle-cta-blurb mt-1.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
-                  Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
-                  case.
-                </p>
               </div>
             </div>
 

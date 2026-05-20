@@ -495,9 +495,18 @@ body {
     min-height: 100%;
   }
 
+  .ss-hero-cta-row,
+  .ss-hero-bundle-cta-actions {
+    align-items: stretch;
+  }
+
   .ss-hero-cta-row {
     margin-top: auto;
-    align-items: stretch;
+  }
+
+  .ss-hero-bundle-cta {
+    margin-top: auto;
+    width: 100%;
   }
 
   /* Align dark prize studio with “ShowSkills Rewards”, not the Live promotion pill */
@@ -532,30 +541,20 @@ body {
     padding-bottom: 0.5rem;
   }
 
-  /* Enter Bundle Draw: same track as Enter now; button slightly taller */
   .ss-hero-bundle-cta {
-    margin-top: auto;
     flex-shrink: 0;
   }
 
-  .ss-hero-bundle-cta-actions {
-    display: flex;
-    align-items: stretch;
-  }
-
-  .ss-hero-aligned-cta {
+  /* Paired CTAs: Prize lineup (left) and Enter Bundle Draw (right) */
+  .ss-hero-paired-cta {
     min-height: 3rem;
     box-sizing: border-box;
   }
 
   @media (min-width: 640px) {
-    .ss-hero-aligned-cta {
+    .ss-hero-paired-cta {
       min-height: 3.25rem;
     }
-  }
-
-  .ss-hero-bundle-cta .ss-hero-bundle-cta-blurb {
-    margin-top: 0.5rem;
   }
 
   /* Row 2: equal-height panels */
@@ -594,9 +593,6 @@ body {
     flex: 1;
   }
 
-  .ss-hero-cta-row .ss-btn-bundle-draw {
-    width: 100%;
-  }
 }
 
 .ss-legacy-details-card {
