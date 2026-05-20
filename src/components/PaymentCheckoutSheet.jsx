@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { formatBundlePriceGBP } from '../competitionData'
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
@@ -34,7 +35,12 @@ export function PaymentCheckoutSheet({
   paidConsent,
   onPayPalPaid,
   onPayPalError,
+  onClearError,
 }) {
+  useEffect(() => {
+    if (open && onClearError) onClearError()
+  }, [open, onClearError])
+
   if (!open) return null
 
   const amountLabel = formatBundlePriceGBP(amountPence ?? 0)

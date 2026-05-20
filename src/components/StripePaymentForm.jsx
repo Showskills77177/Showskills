@@ -43,9 +43,9 @@ function paymentElementOptions(recordPayload, isMobile) {
         email: email || undefined,
       },
     },
-    // Only `never` fields must be passed in confirmPayment — we collect name/email on the entry form.
-    // Phone is `auto` (we don't ask for it); address is `never` + country passed at confirm.
-    fields: { billingDetails: { email: 'never', name: 'never', phone: 'auto', address: 'never' } },
+    // Only name/email are `never` (collected above and passed in confirmPayment). Do not set phone/address
+    // to `never` unless you also pass them in confirmParams — Stripe will reject the payment.
+    fields: { billingDetails: { email: 'never', name: 'never' } },
     terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
     business: { name: 'ShowSkills Rewards' },
   }
@@ -213,7 +213,7 @@ export function StripePaymentForm({
           : 'ss-stripe-payment-shell rounded-xl border border-teal-500/25 bg-black/25 p-4'
       }
     >
-      <Elements key={clientSecret} stripe={stripePromise} options={options}>
+      <Elements key={`${clientSecret}-billing-v3`} stripe={stripePromise} options={options}>
         <PaymentFields
           disabled={disabled}
           onError={onError}

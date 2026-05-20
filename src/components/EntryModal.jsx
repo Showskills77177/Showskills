@@ -92,6 +92,7 @@ export function EntryModal() {
   function handleClosePaymentSheet() {
     closeStripePayment()
     setPaymentSheetOpen(false)
+    setPaidError('')
   }
 
   async function handlePayNow() {
@@ -616,6 +617,7 @@ export function EntryModal() {
           markPaidCheckoutComplete(info)
         }}
         onPayPalError={(msg) => setPaidError(msg)}
+        onClearError={() => setPaidError('')}
       />
     </div>
   )
