@@ -1,34 +1,14 @@
-import { Link } from 'react-router-dom'
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
 import { useEntryFlow } from '../entry/entryContext'
 import { ShirtGiveawayCtaButton } from '../components/siteChrome'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 
-/**
- * Archived free shirt giveaway — not promoted on the homepage.
- * Kept so the flow and copy can be restored without rebuilding pages.
- */
+/** Free Ronaldo shirt giveaway (direct URL / footer links). */
 export default function KickupsArchivePage() {
   const { openEntry } = useEntryFlow()
 
   return (
     <main className="m-0 p-0">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-        <p className="text-sm text-stone-500">
-          <Link to="/" className="font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300">
-            ← Home
-          </Link>
-          {' · '}
-          <Link to="/competitions" className="font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300">
-            Competitions
-          </Link>
-        </p>
-        <p className="mt-4 max-w-2xl rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/90">
-          This page is <strong className="text-amber-50">not linked from the homepage</strong>. The free Ronaldo shirt
-          giveaway is preserved here so you can bring it back when needed.
-        </p>
-      </div>
-
       <section className="ss-rules-pitch-guide border-t border-lime-400/20">
         <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
           <header className="max-w-3xl text-left">
