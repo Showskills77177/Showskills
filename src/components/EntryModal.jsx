@@ -32,7 +32,6 @@ export function EntryModal() {
     paidPostCheckout,
     paidOrderRef,
     paidTicketNumbers,
-    paidEmailConfirmationSent,
     paidA1,
     setPaidA1,
     paidA2,
@@ -177,16 +176,19 @@ export function EntryModal() {
                         </ul>
                       </div>
                     ) : null}
-                    <p className="mt-2 text-xs text-teal-200/75">
-                      {paidEmailConfirmationSent
-                        ? 'A payment receipt email has been sent.'
-                        : 'A payment receipt is sent when email is configured.'}
-                    </p>
                     <p className="mt-2 text-teal-100/90">
                       Submit your three skill answers below now.{' '}
                       <strong className="text-teal-50">You only qualify for the draw if all answers are correct.</strong>{' '}
-                      We will email you the result; ticket numbers are only sent if you qualify.
+                      One confirmation email (receipt, ticket numbers, and result) is sent after you submit.
+                      Stripe or PayPal may also send their own payment receipt.
                     </p>
+                    {paidQuizResult ? (
+                      <p className="mt-2 text-xs text-teal-200/80">
+                        {paidQuizResult === 'qualified'
+                          ? 'Confirmation email sent (if email is configured).'
+                          : 'Confirmation email sent with your result (if email is configured).'}
+                      </p>
+                    ) : null}
                   </div>
                   {PAID_SKILL_QUESTIONS.map((q, i) => (
                     <div key={q.id}>

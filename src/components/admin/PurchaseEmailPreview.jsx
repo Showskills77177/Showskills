@@ -1,10 +1,5 @@
 import { useMemo, useState } from 'react'
-import {
-  PURCHASE_EMAIL_SAMPLE,
-  buildPurchaseConfirmationHtml,
-  buildPurchaseConfirmationText,
-  purchaseConfirmationSubject,
-} from '../../../shared/purchaseConfirmationEmail.mjs'
+import { PURCHASE_EMAIL_SAMPLE } from '../../../shared/purchaseConfirmationEmail.mjs'
 import {
   buildQuizResultHtml,
   buildQuizResultText,
@@ -12,52 +7,34 @@ import {
 } from '../../../shared/quizResultEmail.mjs'
 
 const EMAIL_TYPES = [
-  { id: 'purchase', label: 'Payment receipt (after pay — before quiz)' },
-  { id: 'quiz_ok', label: 'Qualified — correct answers + ticket numbers' },
-  { id: 'quiz_fail', label: 'Not qualified — incorrect answers' },
+  { id: 'quiz_ok', label: 'Entry email — qualified (correct answers)' },
+  { id: 'quiz_fail', label: 'Entry email — not qualified (wrong answers)' },
 ]
 
 export function PurchaseEmailPreview() {
-  const [emailType, setEmailType] = useState('purchase')
+  const [emailType, setEmailType] = useState('quiz_ok')
   const [ticketCount, setTicketCount] = useState(5)
 
   const siteUrl =
     typeof window !== 'undefined' ? window.location.origin : PURCHASE_EMAIL_SAMPLE.siteUrl
 
-  const purchaseSample = useMemo(
-    () => ({ ...PURCHASE_EMAIL_SAMPLE, ticketNumbers: [], siteUrl }),
-    [siteUrl],
-  )
-
-  const quizSample = useMemo(() => {
+  const sample = useMemo(() => {
     const allCorrect = emailType === 'quiz_ok'
     return {
       customerFullName: PURCHASE_EMAIL_SAMPLE.customerFullName,
       allCorrect,
       siteUrl,
-      orderRef: allCorrect ? PURCHASE_EMAIL_SAMPLE.purchaseRef : undefined,
-      bundleTitle: allCorrect ? PURCHASE_EMAIL_SAMPLE.bundleTitle : undefined,
-      quantity: allCorrect ? PURCHASE_EMAIL_SAMPLE.quantity : undefined,
-      ticketNumbers: allCorrect
-        ? PURCHASE_EMAIL_SAMPLE.ticketNumbers.slice(0, ticketCount)
-        : [],
+      orderRef: PURCHASE_EMAIL_SAMPLE.purchaseRef,
+      bundleTitle: PURCHASE_EMAIL_SAMPLE.bundleTitle,
+      quantity: PURCHASE_EMAIL_SAMPLE.quantity,
+      amountPence: PURCHASE_EMAIL_SAMPLE.amountPence,
+      ticketNumbers: PURCHASE_EMAIL_SAMPLE.ticketNumbers.slice(0, Math.max(1, ticketCount)),
     }
   }, [emailType, siteUrl, ticketCount])
 
-  const { html, text, subject } = useMemo(() => {
-    if (emailType === 'purchase') {
-      return {
-        html: buildPurchaseConfirmationHtml(purchaseSample),
-        text: buildPurchaseConfirmationText(purchaseSample),
-        subject: purchaseConfirmationSubject(purchaseSample.purchaseRef),
-      }
-    }
-    return {
-      html: buildQuizResultHtml(quizSample),
-      text: buildQuizResultText(quizSample),
-      subject: quizResultSubject(quizSample.allCorrect),
-    }
-  }, [emailType, purchaseSample, quizSample])
+  const html = buildQuizResultHtml(sample)
+  const text = buildQuizResultText(sample)
+  const subject = quizResultSubject(sample.orderRef, sample.allCorrect)
 
   return (
     <div className="space-y-8">
@@ -65,8 +42,9 @@ export function PurchaseEmailPreview() {
         <div>
           <h1 className="text-2xl font-semibold text-stone-100">Test email</h1>
           <p className="mt-2 max-w-xl text-sm text-stone-500">
-            Paying only confirms payment. Ticket numbers are emailed only if all three skill answers are
-            correct. Wrong answers → not qualified, no ticket-number email.
+            One email per paid entry, sent after they submit skill answers. Includes payment
+            summary, ticket numbers, and whether they qualified. No separate payment email from
+            ShowSkills (Stripe/PayPal may still send their own receipt).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -84,22 +62,20 @@ export function PurchaseEmailPreview() {
               ))}
             </select>
           </label>
-          {emailType === 'purchase' ? (
-            <label className="flex items-center gap-2 text-sm text-stone-400">
-              Ticket count
-              <select
-                value={ticketCount}
-                onChange={(e) => setTicketCount(Number(e.target.value))}
-                className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-stone-200"
-              >
-                {[1, 3, 5, 10, 20].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+          <label className="flex items-center gap-2 text-sm text-stone-400">
+            Ticket count
+            <select
+              value={ticketCount}
+              onChange={(e) => setTicketCount(Number(e.target.value))}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-stone-200"
+            >
+              {[1, 3, 5, 10, 20].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -112,7 +88,7 @@ export function PurchaseEmailPreview() {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">HTML preview</h2>
           <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0c1a16]">
             <iframe
-              title="Email HTML preview"
+              title="Entry confirmation email preview"
               srcDoc={html}
               className="h-[min(680px,75vh)] w-full"
               sandbox=""

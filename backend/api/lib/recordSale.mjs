@@ -1,7 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { query, isDbConfigured, isUniqueViolation } from './db.mjs'
 import { insertTicketNumbers, getTicketNumbersForPurchase } from './ticketNumbers.mjs'
-import { sendPurchaseConfirmationEmail } from './sendPurchaseEmail.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 
 function orderPublicId() {
@@ -30,37 +29,9 @@ async function upsertUserSimple(email, fullName) {
   }
 }
 
-async function maybeSendPurchaseEmail({
-  ticketId,
-  ticketPublicId,
-  customerEmail,
-  customerFullName,
-  bundleId,
-  quantity,
-  amountPence,
-}) {
-  const sentRow = await query(`SELECT confirmation_email_sent_at FROM tickets WHERE id = $1`, [ticketId])
-  if (sentRow.rows[0]?.confirmation_email_sent_at) {
-    return { emailSent: false, emailSkipped: true, reason: 'already_sent' }
-  }
-
-  const result = await sendPurchaseConfirmationEmail({
-    to: customerEmail,
-    customerFullName,
-    bundleId,
-    quantity,
-    amountPence,
-    ticketNumbers: [],
-    purchaseRef: ticketPublicId,
-  })
-
-  if (result.ok) {
-    const ts = new Date().toISOString()
-    await query(`UPDATE tickets SET confirmation_email_sent_at = $2 WHERE id = $1`, [ticketId, ts])
-    return { emailSent: true, emailId: result.id }
-  }
-
-  return { emailSent: false, emailSkipped: result.skipped, emailError: result.error || result.reason }
+/** No email on payment — one confirmation email is sent after skill answers (Stripe/PayPal may send their own receipt). */
+function paymentEmailDeferred() {
+  return { emailSent: false, emailSkipped: true, reason: 'deferred_until_quiz' }
 }
 
 export async function recordStripeCheckoutCompleted({
@@ -124,17 +95,7 @@ export async function recordStripeCheckoutCompleted({
   )
 
   const ticketNumbers = await insertTicketNumbers(ticketId, qty)
-  const emailMeta = await maybeSendPurchaseEmail({
-    ticketId,
-    ticketPublicId: tid,
-    customerEmail: email,
-    customerFullName,
-    bundleId,
-    quantity: qty,
-    amountPence,
-  })
-
-  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...emailMeta }
+  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
 }
 
 export async function recordPayPalCapture({
@@ -199,15 +160,5 @@ export async function recordPayPalCapture({
   )
 
   const ticketNumbers = await insertTicketNumbers(ticketId, qty)
-  const emailMeta = await maybeSendPurchaseEmail({
-    ticketId,
-    ticketPublicId: tid,
-    customerEmail: email,
-    customerFullName,
-    bundleId,
-    quantity: qty,
-    amountPence,
-  })
-
-  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...emailMeta }
+  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
 }

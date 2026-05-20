@@ -13,7 +13,7 @@ function siteUrl() {
   return (process.env.SITE_URL || 'https://showskills.co.uk').replace(/\/$/, '')
 }
 
-/** Sent after paid entrants submit skill answers — qualified or not. Ticket numbers only when qualified. */
+/** One email after quiz: receipt + ticket numbers + qualified or not. */
 export async function sendQuizResultEmail({
   to,
   customerFullName,
@@ -26,7 +26,7 @@ export async function sendQuizResultEmail({
 }) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY not set — skipping quiz result email')
+    console.warn('[email] RESEND_API_KEY not set — skipping entry confirmation email')
     return { ok: false, skipped: true, reason: 'no_resend_key' }
   }
 
@@ -36,17 +36,15 @@ export async function sendQuizResultEmail({
   }
 
   const bundle = bundleId ? getTicketBundleById(bundleId) : null
-  const nums = allCorrect && Array.isArray(ticketNumbers) ? ticketNumbers : []
-
   const props = {
     customerFullName,
     allCorrect: Boolean(allCorrect),
     siteUrl: siteUrl(),
-    orderRef: allCorrect ? orderRef : undefined,
-    bundleTitle: allCorrect ? bundle?.title ?? bundleId : undefined,
-    quantity: allCorrect ? quantity ?? bundle?.qty : undefined,
-    amountPence: allCorrect ? amountPence ?? bundle?.totalPence : undefined,
-    ticketNumbers: nums,
+    orderRef,
+    bundleTitle: bundle?.title ?? bundleId,
+    quantity: quantity ?? bundle?.qty,
+    amountPence: amountPence ?? bundle?.totalPence,
+    ticketNumbers: Array.isArray(ticketNumbers) ? ticketNumbers : [],
   }
 
   const res = await fetch('https://api.resend.com/emails', {
@@ -58,7 +56,7 @@ export async function sendQuizResultEmail({
     body: JSON.stringify({
       from: purchaseFromEmail(),
       to: [email],
-      subject: quizResultSubject(props.allCorrect),
+      subject: quizResultSubject(orderRef, props.allCorrect),
       html: buildQuizResultHtml(props),
       text: buildQuizResultText(props),
     }),
@@ -67,7 +65,7 @@ export async function sendQuizResultEmail({
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     const msg = data?.message || data?.error || res.statusText
-    console.error('[email] Quiz result Resend failed:', msg)
+    console.error('[email] Entry confirmation Resend failed:', msg)
     return { ok: false, error: String(msg) }
   }
   return { ok: true, id: data.id }

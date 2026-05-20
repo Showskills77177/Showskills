@@ -85,6 +85,7 @@ export async function getLatestPaidPurchaseForEmail(email) {
 
   const ticketNumbers = await getTicketNumbersForPurchase(row.id)
   return {
+    ticketId: row.id,
     orderRef: row.ticket_public_id,
     bundleId: row.bundle_id,
     quantity: row.quantity,

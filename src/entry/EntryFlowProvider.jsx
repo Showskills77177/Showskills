@@ -265,7 +265,7 @@ export function EntryFlowProvider({ children }) {
       }
       setPaidQuizResult(allCorrect ? 'qualified' : 'not_qualified')
       try {
-        await fetch(apiUrl('/api/entries/paid-quiz'), {
+        const res = await fetch(apiUrl('/api/entries/paid-quiz'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -273,10 +273,11 @@ export function EntryFlowProvider({ children }) {
             email: em,
             competition: 'ronaldo_legacy_bundle',
             entryType: 'paid',
-            allCorrect,
             answers: { q1: paidA1, q2: paidA2, q3: paidA3 },
           }),
         })
+        const data = await res.json().catch(() => ({}))
+        if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
       } catch {
         /* non-blocking */
       }

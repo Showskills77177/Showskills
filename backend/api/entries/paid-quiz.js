@@ -69,17 +69,32 @@ export default async function handler(req, res) {
     if (entryType === 'paid') {
       const purchase = await getLatestPaidPurchaseForEmail(email)
       const bundle = purchase?.bundleId ? getTicketBundleById(purchase.bundleId) : null
-      const emailResult = await sendQuizResultEmail({
-        to: email,
-        customerFullName: fullName,
-        allCorrect,
-        orderRef: purchase?.orderRef,
-        bundleId: purchase?.bundleId,
-        quantity: purchase?.quantity,
-        amountPence: bundle?.totalPence,
-        ticketNumbers: allCorrect ? purchase?.ticketNumbers ?? [] : [],
-      })
-      quizEmailSent = Boolean(emailResult?.ok)
+      let alreadySent = false
+      if (purchase?.ticketId) {
+        const sentRow = await query(`SELECT confirmation_email_sent_at FROM tickets WHERE id = $1`, [
+          purchase.ticketId,
+        ])
+        alreadySent = Boolean(sentRow.rows[0]?.confirmation_email_sent_at)
+      }
+      if (purchase && !alreadySent) {
+        const emailResult = await sendQuizResultEmail({
+          to: email,
+          customerFullName: fullName,
+          allCorrect,
+          orderRef: purchase.orderRef,
+          bundleId: purchase.bundleId,
+          quantity: purchase.quantity,
+          amountPence: bundle?.totalPence,
+          ticketNumbers: purchase.ticketNumbers ?? [],
+        })
+        quizEmailSent = Boolean(emailResult?.ok)
+        if (quizEmailSent && purchase.ticketId) {
+          await query(`UPDATE tickets SET confirmation_email_sent_at = $2 WHERE id = $1`, [
+            purchase.ticketId,
+            new Date().toISOString(),
+          ])
+        }
+      }
     }
 
     return json(res, 201, { ok: true, validation, quizEmailSent })
