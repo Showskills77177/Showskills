@@ -545,33 +545,16 @@ body {
     flex-shrink: 0;
   }
 
-  /* Paired CTAs: Prize lineup (left) and Enter Bundle Draw (right) */
-  .ss-hero-paired-cta {
-    min-height: 3rem;
-    box-sizing: border-box;
-  }
-
   .ss-hero-bundle-cta-actions {
-    max-width: 36rem;
+    justify-content: center;
   }
 
-  .ss-hero-paired-cta--draw {
-    width: 10.75rem;
-    max-width: 10.75rem;
+  /* Slightly narrower than full column; centered under the prize studio */
+  .ss-hero-bundle-draw-btn {
     flex: 0 0 auto;
-    white-space: normal;
-  }
-
-  .ss-hero-cta-row .ss-btn-bundle-draw.ss-hero-paired-cta {
-    flex: 0 1 auto;
-    width: auto;
-    max-width: 10.75rem;
-  }
-
-  @media (min-width: 640px) {
-    .ss-hero-paired-cta {
-      min-height: 3.25rem;
-    }
+    width: 100%;
+    max-width: 15.5rem;
+    box-sizing: border-box;
   }
 
   /* Row 2: equal-height panels */
