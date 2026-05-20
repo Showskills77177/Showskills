@@ -9,14 +9,43 @@ import { apiUrl } from '../lib/api'
 function buildConfirmParams(recordPayload) {
   const email = (recordPayload?.customerEmail || '').trim()
   const name = (recordPayload?.customerFullName || '').trim()
+  if (!name) {
+    throw new Error('Enter your full name before paying.')
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Enter a valid email before paying.')
+  }
   return {
-    receipt_email: email || undefined,
+    receipt_email: email,
     payment_method_data: {
       billing_details: {
+        name,
+        email,
+        address: { country: 'GB' },
+      },
+    },
+  }
+}
+
+function paymentElementOptions(recordPayload, isMobile) {
+  const email = (recordPayload?.customerEmail || '').trim()
+  const name = (recordPayload?.customerFullName || '').trim()
+  return {
+    layout: isMobile ? 'accordion' : 'tabs',
+    wallets: {
+      applePay: 'auto',
+      googlePay: 'auto',
+      link: 'never',
+    },
+    defaultValues: {
+      billingDetails: {
         name: name || undefined,
         email: email || undefined,
       },
     },
+    fields: { billingDetails: { email: 'never', name: 'never', phone: 'never', address: 'never' } },
+    terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
+    business: { name: 'ShowSkills Rewards' },
   }
 }
 
@@ -38,10 +67,18 @@ function PayButton({
     setPaying(true)
     onError('')
     try {
+      let confirmParams
+      try {
+        confirmParams = buildConfirmParams(recordPayload)
+      } catch (e) {
+        onError(e instanceof Error ? e.message : 'Missing customer details')
+        setPaying(false)
+        return
+      }
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         redirect: 'if_required',
-        confirmParams: buildConfirmParams(recordPayload),
+        confirmParams,
       })
       if (error) {
         onError(error.message || 'Payment failed')
@@ -103,6 +140,10 @@ function PayButton({
 function PaymentFields({ disabled, onError, onSuccess, paymentIntentId, recordPayload, compact }) {
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [elementReady, setElementReady] = useState(false)
+  const elementOptions = useMemo(
+    () => paymentElementOptions(recordPayload, isMobile),
+    [recordPayload, isMobile],
+  )
 
   return (
     <>
@@ -120,17 +161,7 @@ function PaymentFields({ disabled, onError, onSuccess, paymentIntentId, recordPa
           onLoadError={(e) => {
             onError(e?.error?.message || 'Could not load payment form. Try refreshing or another browser.')
           }}
-          options={{
-            layout: isMobile ? 'accordion' : 'tabs',
-            wallets: {
-              applePay: 'auto',
-              googlePay: 'auto',
-              link: 'never',
-            },
-            fields: { billingDetails: { email: 'never', name: 'never', phone: 'never', address: 'never' } },
-            terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
-            business: { name: 'ShowSkills Rewards' },
-          }}
+          options={elementOptions}
         />
       </div>
       <PayButton
