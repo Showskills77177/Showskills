@@ -5,6 +5,21 @@ import { getStripePromise } from '../lib/stripeLoader'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { apiUrl } from '../lib/api'
 
+/** Billing details for confirmPayment when Payment Element fields are disabled. */
+function buildConfirmParams(recordPayload) {
+  const email = (recordPayload?.customerEmail || '').trim()
+  const name = (recordPayload?.customerFullName || '').trim()
+  return {
+    receipt_email: email || undefined,
+    payment_method_data: {
+      billing_details: {
+        name: name || undefined,
+        email: email || undefined,
+      },
+    },
+  }
+}
+
 function PayButton({
   disabled,
   onError,
@@ -26,9 +41,7 @@ function PayButton({
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         redirect: 'if_required',
-        confirmParams: {
-          receipt_email: recordPayload.customerEmail,
-        },
+        confirmParams: buildConfirmParams(recordPayload),
       })
       if (error) {
         onError(error.message || 'Payment failed')
