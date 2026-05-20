@@ -7,6 +7,7 @@ import {
   isResendProductionMode,
   parseResendSandboxRecipient,
   resolveSiteUrl,
+  getResendApiKey,
 } from './resendConfig.mjs'
 
 /**
@@ -16,7 +17,7 @@ import {
  */
 
 export function isAdminEmailOtpConfigured() {
-  return Boolean(process.env.RESEND_API_KEY?.trim() && adminEmail())
+  return Boolean(getResendApiKey() && adminEmail().includes('@'))
 }
 
 export function adminEmail() {
@@ -56,9 +57,9 @@ export async function sendAdminLoginOtpEmail() {
     throw new Error('ADMIN_EMAIL must be a valid email address')
   }
 
-  const apiKey = process.env.RESEND_API_KEY?.trim()
+  const apiKey = getResendApiKey()
   if (!apiKey) {
-    throw new Error('RESEND_API_KEY is not set — required for admin email verification')
+    throw new Error('RESEND_API_KEY is not set on the server — required for admin email verification')
   }
 
   const to = resolveAdminOtpRecipient(configuredAdmin)
@@ -139,6 +140,7 @@ async function postResendOtp(apiKey, { from, to, html, text }) {
       html,
       text,
     }),
+    signal: AbortSignal.timeout(20_000),
   })
   const data = await res.json().catch(() => ({}))
   return { ok: res.ok, data, status: res.status }
@@ -170,7 +172,7 @@ export function adminOtpVerificationPayload(sent) {
 }
 
 export function getAdminEmailSetupHint() {
-  if (!process.env.RESEND_API_KEY?.trim()) return 'RESEND_API_KEY is missing on the server.'
+  if (!getResendApiKey()) return 'RESEND_API_KEY is missing on the server (Vercel → Production env, then redeploy).'
   if (!adminEmail()) return 'ADMIN_EMAIL is missing on the server.'
   if (!isResendProductionMode() && !resendAccountEmail()) {
     return 'For local testing, set RESEND_ACCOUNT_EMAIL to your Resend signup email (the inbox Resend allows before domain verification).'

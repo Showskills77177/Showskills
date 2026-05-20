@@ -4,7 +4,7 @@ import {
   buildPurchaseConfirmationText,
   purchaseConfirmationSubject,
 } from '../../../shared/purchaseConfirmationEmail.mjs'
-import { resolveResendFrom, formatResendError, resolveSiteUrl } from './resendConfig.mjs'
+import { resolveResendFrom, formatResendError, resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
 
 /**
  * Send purchase confirmation via Resend. Returns { ok, skipped?, error? }.
@@ -19,7 +19,7 @@ export async function sendPurchaseConfirmationEmail({
   ticketNumbers,
   purchaseRef,
 }) {
-  const apiKey = process.env.RESEND_API_KEY?.trim()
+  const apiKey = getResendApiKey()
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not set — skipping purchase confirmation email')
     return { ok: false, skipped: true, reason: 'no_resend_key' }

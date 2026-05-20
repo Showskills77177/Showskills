@@ -4,7 +4,7 @@ import {
   buildQuizResultText,
   quizResultSubject,
 } from '../../../shared/quizResultEmail.mjs'
-import { resolveResendFrom, formatResendError, resolveSiteUrl } from './resendConfig.mjs'
+import { resolveResendFrom, formatResendError, resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
 
 /** One email after quiz: receipt + ticket numbers + qualified or not. */
 export async function sendQuizResultEmail({
@@ -17,7 +17,7 @@ export async function sendQuizResultEmail({
   amountPence,
   ticketNumbers,
 }) {
-  const apiKey = process.env.RESEND_API_KEY?.trim()
+  const apiKey = getResendApiKey()
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not set — skipping entry confirmation email')
     return { ok: false, skipped: true, reason: 'no_resend_key' }

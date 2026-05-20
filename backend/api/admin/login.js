@@ -13,6 +13,7 @@ import {
   getAdminEmailSetupHint,
   adminOtpVerificationPayload,
 } from '../lib/adminEmailOtp.mjs'
+import { getResendApiKey } from '../lib/resendConfig.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 
@@ -67,9 +68,16 @@ export default async function handler(req, res) {
       return json(res, 200, adminOtpVerificationPayload(sent))
     }
 
-    const token = await signAdminSession()
-    res.setHeader('Set-Cookie', setAdminCookieHeader(token))
-    return json(res, 200, { ok: true, verificationRequired: false })
+    const missingEmail = []
+    if (!getResendApiKey()) missingEmail.push('RESEND_API_KEY')
+    if (!process.env.ADMIN_EMAIL?.trim()) missingEmail.push('ADMIN_EMAIL')
+
+    return json(res, 503, {
+      error:
+        'Email verification is not enabled on this server. Add RESEND_API_KEY and ADMIN_EMAIL in Vercel → Production, then redeploy.',
+      missing: missingEmail,
+      hint: 'After redeploy, sign in again — you should see the 6-digit code step.',
+    })
   } catch (e) {
     console.error(e)
     const msg = e instanceof Error ? e.message : 'Could not complete sign in'

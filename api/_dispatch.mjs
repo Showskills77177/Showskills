@@ -1,4 +1,5 @@
 import adminLogin from '../backend/api/admin/login.js'
+import adminSetupStatus from '../backend/api/admin/setup-status.js'
 import adminResendCode from '../backend/api/admin/resend-code.js'
 import adminVerifySms from '../backend/api/admin/verify-sms.js'
 import adminLogout from '../backend/api/admin/logout.js'
@@ -25,6 +26,7 @@ import stripeWebhook from '../backend/api/stripe-webhook.js'
 
 export const routes = {
   '/api/admin/login': adminLogin,
+  '/api/admin/setup-status': adminSetupStatus,
   '/api/admin/resend-code': adminResendCode,
   '/api/admin/verify-sms': adminVerifySms,
   '/api/admin/logout': adminLogout,

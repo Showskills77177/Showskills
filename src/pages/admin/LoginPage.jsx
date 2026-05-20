@@ -30,6 +30,20 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [setupStatus, setSetupStatus] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(apiUrl('/api/admin/setup-status'), { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setSetupStatus(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (resendCooldown <= 0) return undefined
@@ -85,12 +99,16 @@ export default function AdminLoginPage() {
     setInfo('')
     setLoading(true)
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 25_000)
       const res = await fetch(apiUrl('/api/admin/login'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
       const text = await res.text()
       const { data, apiMsg } = parseLoginResponse(res, text)
       if (!res.ok) {
@@ -120,8 +138,11 @@ export default function AdminLoginPage() {
       }
       navigate(from.startsWith('/admin') ? from : '/admin/dashboard', { replace: true })
     } catch (err) {
+      const aborted = err instanceof Error && err.name === 'AbortError'
       setError(
-        `Network error (${err instanceof Error ? err.message : String(err)}). Check API is running and use the same host as the site.`,
+        aborted
+          ? 'Request timed out. Check Vercel deployment and RESEND_API_KEY on Production.'
+          : `Network error (${err instanceof Error ? err.message : String(err)}). Check API is running and use the same host as the site.`,
       )
     } finally {
       setLoading(false)
@@ -250,6 +271,19 @@ export default function AdminLoginPage() {
             ) : (
               <p className="mt-2 text-center text-xs text-stone-500">Staff access only. Email verification may be required.</p>
             )}
+            {setupStatus && !setupStatus.emailOtpEnabled ? (
+              <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/50 px-3 py-2 text-center text-xs text-amber-100/90">
+                Server: email codes are <strong>off</strong>.
+                {setupStatus.emailOtpMissing?.length
+                  ? ` Add ${setupStatus.emailOtpMissing.join(' + ')} on Vercel (Production) and redeploy.`
+                  : ' Check Vercel env vars and redeploy.'}
+              </p>
+            ) : null}
+            {setupStatus?.emailOtpEnabled && setupStatus.maskedAdminEmail ? (
+              <p className="mt-2 text-center text-[11px] text-stone-500">
+                Codes will be sent to {setupStatus.maskedAdminEmail}
+              </p>
+            ) : null}
             <form className="mt-6 flex flex-col gap-4" onSubmit={onPasswordSubmit}>
               <div>
                 <label htmlFor="admin-user" className="block text-xs font-medium text-stone-400">

@@ -11,6 +11,11 @@ export const SHOWSKILLS_EMAIL_FROM = 'ShowSkills Rewards <orders@showskills.co.u
 
 export const SHOWSKILLS_SITE_URL = 'https://showskills.co.uk'
 
+/** Resend key (Vercel integration may use RESEND_API_KEY). */
+export function getResendApiKey() {
+  return (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').trim()
+}
+
 /** True only on Vercel Production — local `node server.js` always uses sandbox rules. */
 export function isResendProductionMode() {
   if (process.env.RESEND_FORCE_SANDBOX === '1') return false
