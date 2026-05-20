@@ -1,8 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { query, isDbConfigured, isUniqueViolation } from './db.mjs'
+import { insertTicketNumbers, getTicketNumbersForPurchase } from './ticketNumbers.mjs'
+import { sendPurchaseConfirmationEmail } from './sendPurchaseEmail.mjs'
+import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 
-function ticketPublicId() {
-  return `TKT-${randomBytes(4).toString('hex').toUpperCase()}`
+function orderPublicId() {
+  return `ORD-${randomBytes(4).toString('hex').toUpperCase()}`
 }
 
 /** After unique violation on email, fetch id */
@@ -27,6 +30,40 @@ async function upsertUserSimple(email, fullName) {
   }
 }
 
+async function maybeSendPurchaseEmail({
+  ticketId,
+  ticketPublicId,
+  customerEmail,
+  customerFullName,
+  bundleId,
+  quantity,
+  amountPence,
+  ticketNumbers,
+}) {
+  const sentRow = await query(`SELECT confirmation_email_sent_at FROM tickets WHERE id = $1`, [ticketId])
+  if (sentRow.rows[0]?.confirmation_email_sent_at) {
+    return { emailSent: false, emailSkipped: true, reason: 'already_sent' }
+  }
+
+  const result = await sendPurchaseConfirmationEmail({
+    to: customerEmail,
+    customerFullName,
+    bundleId,
+    quantity,
+    amountPence,
+    ticketNumbers,
+    purchaseRef: ticketPublicId,
+  })
+
+  if (result.ok) {
+    const ts = new Date().toISOString()
+    await query(`UPDATE tickets SET confirmation_email_sent_at = $2 WHERE id = $1`, [ticketId, ts])
+    return { emailSent: true, emailId: result.id }
+  }
+
+  return { emailSent: false, emailSkipped: result.skipped, emailError: result.error || result.reason }
+}
+
 export async function recordStripeCheckoutCompleted({
   stripeSessionId,
   customerEmail,
@@ -41,16 +78,34 @@ export async function recordStripeCheckoutCompleted({
   const email = customerEmail?.trim()
   if (!email || !email.includes('@')) return null
 
+  await ensureTicketSchema()
+
+  const dup = await query(
+    `SELECT id, ticket_public_id, confirmation_email_sent_at FROM tickets WHERE stripe_session_id = $1`,
+    [stripeSessionId],
+  )
+  if (dup.rows[0]) {
+    const ticketNumbers = await getTicketNumbersForPurchase(dup.rows[0].id)
+    return {
+      ticketId: dup.rows[0].id,
+      ticketPublicId: dup.rows[0].ticket_public_id,
+      ticketNumbers,
+      deduped: true,
+    }
+  }
+
   const userId = await upsertUserSimple(email, customerFullName || '')
 
-  const tid = ticketPublicId()
+  const tid = orderPublicId()
   const ticketId = randomUUID()
   const payId = randomUUID()
   const purchasedAt = new Date().toISOString()
+  const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
+
   await query(
     `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, purchased_at)
      VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7)`,
-    [ticketId, tid, userId, bundleId || null, quantity || 1, stripeSessionId, purchasedAt],
+    [ticketId, tid, userId, bundleId || null, qty, stripeSessionId, purchasedAt],
   )
 
   const txId = paymentIntentId || `stripe_session_${stripeSessionId}`
@@ -69,7 +124,19 @@ export async function recordStripeCheckoutCompleted({
     ],
   )
 
-  return { ticketId, userId, ticketPublicId: tid }
+  const ticketNumbers = await insertTicketNumbers(ticketId, qty)
+  const emailMeta = await maybeSendPurchaseEmail({
+    ticketId,
+    ticketPublicId: tid,
+    customerEmail: email,
+    customerFullName,
+    bundleId,
+    quantity: qty,
+    amountPence,
+    ticketNumbers,
+  })
+
+  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...emailMeta }
 }
 
 export async function recordPayPalCapture({
@@ -85,21 +152,37 @@ export async function recordPayPalCapture({
   const email = customerEmail?.trim()
   if (!email || !email.includes('@')) return null
 
-  const existing = await query(`SELECT id FROM tickets WHERE paypal_order_id = $1`, [paypalOrderId])
+  await ensureTicketSchema()
+
+  const existing = await query(
+    `SELECT id, ticket_public_id, quantity, confirmation_email_sent_at FROM tickets WHERE paypal_order_id = $1`,
+    [paypalOrderId],
+  )
   if (existing.rows[0]) {
-    return { ticketId: existing.rows[0].id, deduped: true }
+    const row = existing.rows[0]
+    let ticketNumbers = await getTicketNumbersForPurchase(row.id)
+    if (!ticketNumbers.length) {
+      ticketNumbers = await insertTicketNumbers(row.id, row.quantity || quantity || 1)
+    }
+    return {
+      ticketId: row.id,
+      ticketPublicId: row.ticket_public_id,
+      ticketNumbers,
+      deduped: true,
+    }
   }
 
   const userId = await upsertUserSimple(email, customerFullName || '')
+  const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
 
-  const tid = ticketPublicId()
+  const tid = orderPublicId()
   const ticketId = randomUUID()
   const payId = randomUUID()
   const purchasedAt = new Date().toISOString()
   await query(
     `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, paypal_order_id, purchased_at)
      VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7)`,
-    [ticketId, tid, userId, bundleId || null, quantity || 1, paypalOrderId, purchasedAt],
+    [ticketId, tid, userId, bundleId || null, qty, paypalOrderId, purchasedAt],
   )
 
   await query(
@@ -117,5 +200,17 @@ export async function recordPayPalCapture({
     ],
   )
 
-  return { ticketId, userId, ticketPublicId: tid }
+  const ticketNumbers = await insertTicketNumbers(ticketId, qty)
+  const emailMeta = await maybeSendPurchaseEmail({
+    ticketId,
+    ticketPublicId: tid,
+    customerEmail: email,
+    customerFullName,
+    bundleId,
+    quantity: qty,
+    amountPence,
+    ticketNumbers,
+  })
+
+  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...emailMeta }
 }

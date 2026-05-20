@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets (user_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_stripe ON tickets (stripe_session_id);
 
+CREATE TABLE IF NOT EXISTS ticket_numbers (
+  id TEXT PRIMARY KEY NOT NULL,
+  ticket_id TEXT NOT NULL,
+  ticket_number TEXT NOT NULL UNIQUE,
+  slot_index INTEGER NOT NULL CHECK (slot_index > 0),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ticket_numbers_ticket ON ticket_numbers (ticket_id);
+
 CREATE TABLE IF NOT EXISTS payments (
   id TEXT PRIMARY KEY NOT NULL,
   transaction_id TEXT NOT NULL UNIQUE,

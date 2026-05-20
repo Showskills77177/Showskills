@@ -100,7 +100,11 @@ export function PayPalPayButton({
           if (!res.ok) {
             throw new Error(typeof cap.error === 'string' ? cap.error : 'PayPal capture failed')
           }
-          onPaidRef.current()
+          onPaidRef.current({
+            orderRef: cap.orderRef,
+            ticketNumbers: Array.isArray(cap.ticketNumbers) ? cap.ticketNumbers : [],
+            emailSent: Boolean(cap.emailSent),
+          })
         },
         onError: (err) => {
           const msg = err?.message || 'PayPal error'

@@ -4,7 +4,6 @@ import { EntryModal } from './EntryModal'
 import { TermsModal } from './TermsModal'
 import { MobileNavDock } from './MobileNavDock'
 import { useEntryFlow } from '../entry/entryContext'
-import { SkillMeterIcon } from './siteChrome'
 
 function desktopNavClass({ isActive }) {
   return `rounded-md px-1.5 py-1 text-white transition ${
@@ -99,10 +98,8 @@ export function Layout() {
       <footer className="ss-footer-bg relative overflow-hidden border-t border-white/[0.06]">
         <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">
           <div className="flex flex-col items-center gap-6">
-            <div className="flex items-center justify-center gap-4 sm:gap-5">
-              <SkillMeterIcon className="h-6 w-6 shrink-0 text-stone-200 opacity-90 sm:h-7 sm:w-7" />
+            <div className="flex items-center justify-center">
               <LogoMark className="h-8 sm:h-9" />
-              <SkillMeterIcon className="h-6 w-6 shrink-0 scale-x-[-1] text-stone-200 opacity-90 sm:h-7 sm:w-7" />
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
               <Link

@@ -76,7 +76,7 @@ export default async function handler(req, res) {
           if (val != null) {
             amountPence = Math.round(parseFloat(String(val), 10) * (cur === 'jpy' ? 1 : 100))
           }
-          await recordPayPalCapture({
+          const recorded = await recordPayPalCapture({
             paypalOrderId: data.id,
             customerEmail,
             customerFullName,
@@ -85,6 +85,16 @@ export default async function handler(req, res) {
             amountPence,
             currency: cur,
           })
+          if (recorded) {
+            return res.status(200).json({
+              status: 'COMPLETED',
+              orderID: data.id,
+              orderRef: recorded.ticketPublicId,
+              ticketNumbers: recorded.ticketNumbers || [],
+              emailSent: Boolean(recorded.emailSent),
+              deduped: Boolean(recorded.deduped),
+            })
+          }
         } catch (dbErr) {
           console.error('PayPal DB record:', dbErr)
         }

@@ -28,6 +28,19 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets (user_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_stripe ON tickets (stripe_session_id);
 
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS confirmation_email_sent_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS ticket_numbers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
+  ticket_number TEXT NOT NULL UNIQUE,
+  slot_index INTEGER NOT NULL CHECK (slot_index > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_numbers_ticket ON ticket_numbers (ticket_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ticket_numbers_number ON ticket_numbers (ticket_number);
+
 CREATE TABLE IF NOT EXISTS payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transaction_id TEXT NOT NULL UNIQUE,

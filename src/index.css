@@ -349,9 +349,10 @@ body {
 .ss-hero-copy-panel {
   position: relative;
   overflow: hidden;
-  border-radius: 1rem;
+  border-radius: 0.85rem;
   border: 1px solid rgba(52, 211, 153, 0.22);
   outline: none;
+  padding: 1rem;
   background: linear-gradient(165deg, rgba(15, 40, 34, 0.97) 0%, rgba(7, 21, 18, 0.99) 100%);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.35),
@@ -425,6 +426,12 @@ body {
   );
   opacity: 0.85;
   pointer-events: none;
+}
+
+.ss-legacy-entry-card > div,
+.ss-legacy-details-card {
+  border-radius: 0.75rem;
+  padding: 0.9rem;
 }
 
 .ss-bundle-frame {
@@ -562,8 +569,8 @@ body {
 
   .ss-hero-copy-panel,
   .ss-prize-panel {
-    border-radius: 0.9rem;
-    padding: 0.85rem;
+    border-radius: 0.78rem;
+    padding: 0.72rem;
   }
 
   .ss-hero-copy-panel > p:first-child,
@@ -600,8 +607,8 @@ body {
 
   .ss-legacy-entry-card > div,
   .ss-legacy-details-card {
-    border-radius: 0.85rem;
-    padding: 0.85rem;
+    border-radius: 0.7rem;
+    padding: 0.72rem;
   }
 
   .ss-legacy-details-card {

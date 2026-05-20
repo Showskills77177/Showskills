@@ -51,6 +51,7 @@ export default defineConfig({
       ADMIN_PASSWORD: adminPass,
       ADMIN_JWT_SECRET: jwtSecret,
       VITE_E2E_SIMULATE_CHECKOUT: '1',
+      VITE_E2E_SECRET: e2eSecret,
       VITE_STRIPE_PUBLISHABLE_KEY: '',
       VITE_STRIPE_PAYMENT_LINK: '',
       VITE_PAYPAL_CLIENT_ID: '',

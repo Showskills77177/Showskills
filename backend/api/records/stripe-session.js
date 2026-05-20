@@ -1,7 +1,7 @@
 import Stripe from 'stripe'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { recordStripeCheckoutCompleted } from '../lib/recordSale.mjs'
-import { isDbConfigured, query } from '../lib/db.mjs'
+import { isDbConfigured } from '../lib/db.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -31,11 +31,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const dup = await query(`SELECT id FROM tickets WHERE stripe_session_id = $1`, [sessionId])
-    if (dup.rows[0]) {
-      return json(res, 200, { ok: true, deduped: true })
-    }
-
     const stripe = new Stripe(secret)
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent'],
@@ -53,7 +48,7 @@ export default async function handler(req, res) {
     const email = session.customer_details?.email || session.customer_email
     const fullName = md.customer_full_name || ''
 
-    await recordStripeCheckoutCompleted({
+    const recorded = await recordStripeCheckoutCompleted({
       stripeSessionId: session.id,
       customerEmail: email,
       customerFullName: fullName,
@@ -64,7 +59,17 @@ export default async function handler(req, res) {
       paymentIntentId: piId || undefined,
     })
 
-    return json(res, 200, { ok: true })
+    if (!recorded) {
+      return json(res, 200, { ok: true, skipped: true, reason: 'not_recorded' })
+    }
+
+    return json(res, 200, {
+      ok: true,
+      deduped: Boolean(recorded.deduped),
+      orderRef: recorded.ticketPublicId,
+      ticketNumbers: recorded.ticketNumbers || [],
+      emailSent: Boolean(recorded.emailSent),
+    })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: e instanceof Error ? e.message : 'Stripe error' })

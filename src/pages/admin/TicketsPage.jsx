@@ -53,7 +53,8 @@ export default function AdminTicketsPage() {
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="border-b border-white/10 bg-stone-900/80 text-xs uppercase text-stone-500">
               <tr>
-                <th className="px-3 py-2">Public ID</th>
+                <th className="px-3 py-2">Order</th>
+                <th className="px-3 py-2">Ticket numbers</th>
                 <th className="px-3 py-2">Customer</th>
                 <th className="px-3 py-2">Bundle</th>
                 <th className="px-3 py-2">Qty</th>
@@ -65,6 +66,11 @@ export default function AdminTicketsPage() {
               {rows.map((t) => (
                 <tr key={t.id} className="hover:bg-white/[0.03]">
                   <td className="px-3 py-2 font-mono text-xs text-stone-400">{t.ticket_public_id}</td>
+                  <td className="max-w-[14rem] px-3 py-2 font-mono text-[11px] leading-relaxed text-stone-400">
+                    {(t.ticket_numbers || []).length
+                      ? (t.ticket_numbers || []).join(', ')
+                      : '—'}
+                  </td>
                   <td className="px-3 py-2">
                     <div className="text-stone-200">{t.full_name || '—'}</div>
                     <div className="text-xs text-stone-500">{t.email || '—'}</div>

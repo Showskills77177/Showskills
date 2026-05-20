@@ -1,0 +1,66 @@
+import { randomBytes, randomUUID } from 'node:crypto'
+import { query, isUniqueViolation } from './db.mjs'
+import { formatTicketNumber } from '../../../shared/ticketNumber.mjs'
+import { ensureTicketSchema } from './ensureTicketSchema.mjs'
+
+function randomSerial() {
+  return randomBytes(4).toString('hex').toUpperCase()
+}
+
+async function generateUniqueTicketNumber() {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const num = formatTicketNumber(randomSerial())
+    const exists = await query(`SELECT 1 FROM ticket_numbers WHERE ticket_number = $1 LIMIT 1`, [num])
+    if (!exists.rows[0]) return num
+  }
+  throw new Error('Could not allocate unique ticket number')
+}
+
+/** Create one row per entry slot (bundle quantity). Returns sorted ticket numbers. */
+export async function insertTicketNumbers(ticketId, quantity) {
+  await ensureTicketSchema()
+  const qty = Math.max(1, Math.min(500, parseInt(String(quantity), 10) || 1))
+  const existing = await query(
+    `SELECT ticket_number FROM ticket_numbers WHERE ticket_id = $1 ORDER BY slot_index ASC`,
+    [ticketId],
+  )
+  if (existing.rows.length >= qty) {
+    return existing.rows.map((r) => r.ticket_number)
+  }
+
+  const numbers = []
+  const startSlot = existing.rows.length + 1
+  for (let slot = startSlot; slot <= qty; slot++) {
+    let inserted = false
+    for (let attempt = 0; attempt < 8 && !inserted; attempt++) {
+      const ticketNumber = await generateUniqueTicketNumber()
+      const id = randomUUID()
+      try {
+        await query(
+          `INSERT INTO ticket_numbers (id, ticket_id, ticket_number, slot_index) VALUES ($1, $2, $3, $4)`,
+          [id, ticketId, ticketNumber, slot],
+        )
+        numbers.push(ticketNumber)
+        inserted = true
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err
+      }
+    }
+    if (!inserted) throw new Error('Could not insert ticket number')
+  }
+
+  const all = await query(
+    `SELECT ticket_number FROM ticket_numbers WHERE ticket_id = $1 ORDER BY slot_index ASC`,
+    [ticketId],
+  )
+  return all.rows.map((r) => r.ticket_number)
+}
+
+export async function getTicketNumbersForPurchase(ticketId) {
+  await ensureTicketSchema()
+  const r = await query(
+    `SELECT ticket_number FROM ticket_numbers WHERE ticket_id = $1 ORDER BY slot_index ASC`,
+    [ticketId],
+  )
+  return r.rows.map((row) => row.ticket_number)
+}

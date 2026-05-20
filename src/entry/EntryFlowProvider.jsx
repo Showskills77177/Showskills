@@ -20,6 +20,9 @@ export function EntryFlowProvider({ children }) {
   const [paidError, setPaidError] = useState('')
   const [paidLoading, setPaidLoading] = useState(false)
   const [paidPostCheckout, setPaidPostCheckout] = useState(false)
+  const [paidOrderRef, setPaidOrderRef] = useState('')
+  const [paidTicketNumbers, setPaidTicketNumbers] = useState([])
+  const [paidEmailConfirmationSent, setPaidEmailConfirmationSent] = useState(false)
   const [paidA1, setPaidA1] = useState('')
   const [paidA2, setPaidA2] = useState('')
   const [paidA3, setPaidA3] = useState('')
@@ -72,7 +75,18 @@ export function EntryFlowProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ sessionId }),
-      }).catch(() => {})
+      })
+        .then((res) => res.json().catch(() => ({})))
+        .then((data) => {
+          if (Array.isArray(data.ticketNumbers) && data.ticketNumbers.length) {
+            setPaidTicketNumbers(data.ticketNumbers)
+          }
+          if (typeof data.orderRef === 'string' && data.orderRef) {
+            setPaidOrderRef(data.orderRef)
+          }
+          if (data.emailSent) setPaidEmailConfirmationSent(true)
+        })
+        .catch(() => {})
     }
     setPaidPostCheckout(true)
     setPaidQuizResult(null)
@@ -105,13 +119,16 @@ export function EntryFlowProvider({ children }) {
 
   const openTerms = useCallback(() => setTermsOpen(true), [])
 
-  const markPaidCheckoutComplete = useCallback(() => {
+  const markPaidCheckoutComplete = useCallback((purchaseInfo) => {
     setPaidPostCheckout(true)
     setPaidQuizResult(null)
     setPaidA1('')
     setPaidA2('')
     setPaidA3('')
     setPaidQuizError('')
+    if (purchaseInfo?.orderRef) setPaidOrderRef(purchaseInfo.orderRef)
+    if (Array.isArray(purchaseInfo?.ticketNumbers)) setPaidTicketNumbers(purchaseInfo.ticketNumbers)
+    if (purchaseInfo?.emailSent) setPaidEmailConfirmationSent(true)
   }, [])
 
   const handlePaidEntry = useCallback(async () => {
@@ -139,8 +156,32 @@ export function EntryFlowProvider({ children }) {
           setPaidLoading(false)
           return
         }
+        const e2eSecret = (import.meta.env.VITE_E2E_SECRET ?? '').trim()
+        if (e2eSecret) {
+          const res = await fetch(apiUrl('/api/e2e/mock-stripe-completion'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-e2e-secret': e2eSecret },
+            body: JSON.stringify({
+              customerEmail: em,
+              customerFullName: fn,
+              bundleId: bundle.id,
+              quantity: bundle.qty,
+              amountPence: bundle.totalPence,
+            }),
+          })
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            throw new Error(typeof data.error === 'string' ? data.error : 'E2E mock checkout failed')
+          }
+          markPaidCheckoutComplete({
+            orderRef: data.ticketPublicId,
+            ticketNumbers: Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [],
+            emailSent: Boolean(data.emailSent),
+          })
+        } else {
+          markPaidCheckoutComplete()
+        }
         setPaidLoading(false)
-        markPaidCheckoutComplete()
         return
       }
 
@@ -312,6 +353,9 @@ export function EntryFlowProvider({ children }) {
       setPaidError,
       paidLoading,
       paidPostCheckout,
+      paidOrderRef,
+      paidTicketNumbers,
+      paidEmailConfirmationSent,
       paidA1,
       setPaidA1,
       paidA2,
@@ -361,6 +405,9 @@ export function EntryFlowProvider({ children }) {
       paidError,
       paidLoading,
       paidPostCheckout,
+      paidOrderRef,
+      paidTicketNumbers,
+      paidEmailConfirmationSent,
       paidA1,
       paidA2,
       paidA3,

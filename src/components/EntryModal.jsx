@@ -30,6 +30,9 @@ export function EntryModal() {
     setPaidError,
     paidLoading,
     paidPostCheckout,
+    paidOrderRef,
+    paidTicketNumbers,
+    paidEmailConfirmationSent,
     paidA1,
     setPaidA1,
     paidA2,
@@ -155,9 +158,32 @@ export function EntryModal() {
               </p>
               {paidPostCheckout ? (
                 <form className="mt-4 flex flex-col gap-4" onSubmit={handlePaidQuizSubmit}>
-                  <p className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-2 text-sm text-teal-100/90">
-                    Payment received — submit your answers below.
-                  </p>
+                  <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
+                    <p className="font-medium text-teal-50">Payment received</p>
+                    {paidOrderRef ? (
+                      <p className="mt-1 text-xs text-teal-200/80">
+                        Order reference: <span className="font-mono">{paidOrderRef}</span>
+                      </p>
+                    ) : null}
+                    {paidTicketNumbers.length ? (
+                      <div className="mt-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">
+                          Your ticket number{paidTicketNumbers.length === 1 ? '' : 's'}
+                        </p>
+                        <ul className="mt-1 space-y-0.5 font-mono text-xs text-teal-50">
+                          {paidTicketNumbers.map((num) => (
+                            <li key={num}>{num}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <p className="mt-2 text-xs text-teal-200/75">
+                      {paidEmailConfirmationSent
+                        ? 'A confirmation email has been sent with your ticket numbers.'
+                        : 'Save your ticket numbers — a confirmation email is sent when email delivery is configured.'}
+                    </p>
+                    <p className="mt-2 text-teal-100/90">Submit your three skill answers below to qualify.</p>
+                  </div>
                   {PAID_SKILL_QUESTIONS.map((q, i) => (
                     <div key={q.id}>
                       <label htmlFor={`modal-paid-q-${q.id}`} className="block text-sm font-medium text-stone-300">
@@ -348,7 +374,7 @@ export function EntryModal() {
                       </ul>
                       <p className="mt-3 text-xs text-zinc-500">
                         <strong className="text-zinc-400">Limit:</strong> one free postal entry per person. Post to:{' '}
-                        <span className="text-zinc-400">[Promoter UK address — add before launch]</span>
+                        <span className="text-zinc-400">ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY</span>
                       </p>
                     </div>
                   ) : null}

@@ -1,4 +1,5 @@
 import { requireAdmin } from '../lib/adminAuth.mjs'
+import { ensureTicketSchema } from '../lib/ensureTicketSchema.mjs'
 import { query, isDbConfigured } from '../lib/db.mjs'
 import { json } from '../lib/http.mjs'
 
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    await ensureTicketSchema()
     const pathAndQuery = req.originalUrl || req.url || '/'
     const url = new URL(pathAndQuery, 'http://local')
     const q = (url.searchParams.get('q') || '').trim()
@@ -40,7 +42,24 @@ export default async function handler(req, res) {
     }
     sql += ` ORDER BY t.created_at DESC LIMIT ${limit}`
     const r = await query(sql, params)
-    return json(res, 200, { rows: r.rows })
+    const rows = r.rows
+    if (rows.length) {
+      const ids = rows.map((row) => row.id)
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ')
+      const numRes = await query(
+        `SELECT ticket_id, ticket_number, slot_index FROM ticket_numbers WHERE ticket_id IN (${placeholders}) ORDER BY slot_index ASC`,
+        ids,
+      )
+      const byTicket = new Map()
+      for (const n of numRes.rows) {
+        if (!byTicket.has(n.ticket_id)) byTicket.set(n.ticket_id, [])
+        byTicket.get(n.ticket_id).push(n.ticket_number)
+      }
+      for (const row of rows) {
+        row.ticket_numbers = byTicket.get(row.id) || []
+      }
+    }
+    return json(res, 200, { rows })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Database error' })

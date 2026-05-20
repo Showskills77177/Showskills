@@ -198,7 +198,7 @@ export function TermsModal({ open, onClose }) {
           <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <p className="mt-6 text-xs text-zinc-500">
-            Promoter: ShowSkills Rewards (insert registered entity name and full postal address before going live).
+            Promoter: ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY.
           </p>
         </div>
         <div className="border-t border-white/10 px-6 py-4">
