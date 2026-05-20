@@ -576,8 +576,8 @@ body {
   }
 
   .ss-legacy-details-card.ss-hero-panel-card {
-    padding: 1.1rem 1.2rem 1.2rem;
-    line-height: 1.55;
+    padding: 0.85rem 1rem 0.9rem;
+    line-height: 1.45;
   }
 
   .ss-hero-ticket-bundles > .ss-hero-panel-card {
@@ -596,8 +596,153 @@ body {
 }
 
 .ss-legacy-details-card {
-  border-radius: 0.75rem;
-  padding: 0.9rem;
+  padding: 0.75rem 0.9rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.28);
+  color: #a8a29e;
+}
+
+.ss-legacy-details-title {
+  margin: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f5f5f4;
+}
+
+.ss-legacy-details-block {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ss-legacy-details-block:first-of-type {
+  margin-top: 0.55rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ss-legacy-details-kicker {
+  margin: 0 0 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(110, 231, 183, 0.88);
+}
+
+.ss-legacy-prize-stack {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ss-legacy-prize-stack li {
+  position: relative;
+  padding-left: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #f5f5f4;
+}
+
+.ss-legacy-prize-stack li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.8);
+}
+
+.ss-legacy-value-blurb {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #d6d3d1;
+}
+
+.ss-legacy-value-blurb strong {
+  font-weight: 600;
+  color: #fafaf9;
+}
+
+.ss-legacy-details-block--notes {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+}
+
+.ss-legacy-details-block--notes .ss-legacy-details-kicker {
+  margin-bottom: 0.35rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+}
+
+.ss-legacy-spec-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ss-legacy-spec-row {
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.ss-legacy-spec-row dt {
+  margin: 0 0 0.15rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #d6d3d1;
+}
+
+.ss-legacy-spec-row dd {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.42;
+  color: #a8a29e;
+}
+
+.ss-legacy-details-footnote {
+  margin: 0.55rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.625rem;
+  line-height: 1.38;
+  color: #78716c;
+}
+
+@media (min-width: 640px) {
+  .ss-legacy-details-card {
+    padding: 0.85rem 1rem 0.85rem;
+  }
+
+  .ss-legacy-prize-stack li {
+    font-size: 0.875rem;
+  }
+
+  .ss-legacy-value-blurb {
+    font-size: 0.8125rem;
+  }
+
+  .ss-legacy-details-block--notes .ss-legacy-spec-row dt {
+    font-size: 0.625rem;
+  }
+
+  .ss-legacy-details-block--notes .ss-legacy-spec-row dd {
+    font-size: 0.8125rem;
+  }
 }
 
 .ss-bundle-frame {
@@ -842,10 +987,6 @@ body {
   letter-spacing: 0.02em;
 }
 
-.ss-mobile-nav-dock__foot p {
-  font-size: 0.625rem;
-}
-
 /* Small-phone homepage pass: iPhone 13 mini and similarly narrow devices. */
 @media (max-width: 430px) {
   .ss-mobile-nav-dock__grid {
@@ -913,22 +1054,19 @@ body {
   }
 
   .ss-legacy-details-card {
-    border-radius: 0.7rem;
-    padding: 0.72rem;
+    padding: 0.7rem 0.8rem 0.75rem;
   }
 
-  .ss-legacy-details-card {
+  .ss-legacy-prize-stack li {
     font-size: 0.78rem;
-    line-height: 1.45;
   }
 
-  .ss-legacy-details-card ul {
-    margin-top: 0.65rem;
-    gap: 0;
+  .ss-legacy-value-blurb {
+    font-size: 0.72rem;
   }
 
-  .ss-legacy-details-card li + li {
-    margin-top: 0.45rem;
+  .ss-legacy-details-block--notes .ss-legacy-spec-row dd {
+    font-size: 0.7rem;
   }
 
   .ss-hero-helper-copy {
@@ -1013,15 +1151,6 @@ body {
     letter-spacing: 0;
   }
 
-  .ss-mobile-nav-dock__foot {
-    padding-top: 0.38rem;
-    padding-bottom: 0.38rem;
-  }
-
-  .ss-mobile-nav-dock__foot p {
-    font-size: 0.55rem;
-    letter-spacing: 0.15em;
-  }
 }
 
 @media (max-width: 360px) {
@@ -1040,8 +1169,8 @@ body {
     padding: 0.75rem;
   }
 
-  .ss-legacy-details-card li {
-    font-size: 0.72rem;
+  .ss-legacy-prize-stack li {
+    font-size: 0.75rem;
   }
 }
 
@@ -1082,10 +1211,6 @@ body {
     line-height: 1.05;
   }
 
-  .ss-mobile-nav-dock__foot p {
-    font-size: 0.5rem;
-    letter-spacing: 0.11em;
-  }
 }
 
 /* Rules graphic: figure sets max width; frame is 100% so caption lines up with the art */
@@ -1402,4 +1527,24 @@ body {
   .ss-postal-letter-bounce-wrap {
     animation: none;
   }
+}
+
+/* Stripe Payment Element — keep iframe above modal layers and scroll traps */
+.ss-stripe-payment-element {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  transform: translateZ(0);
+  min-height: 12rem;
+}
+
+.ss-stripe-payment-element iframe {
+  pointer-events: auto;
+}
+
+.ss-entry-modal-stripe {
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+  transform: translateZ(0);
 }

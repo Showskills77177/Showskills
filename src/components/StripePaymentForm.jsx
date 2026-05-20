@@ -45,6 +45,13 @@ function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId,
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Could not save your purchase')
       }
+      if (data.skipped) {
+        throw new Error(
+          data.reason === 'no_database'
+            ? 'Payment received but tickets could not be saved (database not configured). Contact support with your email.'
+            : 'Payment received but your tickets could not be saved. Contact support with your email.',
+        )
+      }
       onSuccess({
         orderRef: data.orderRef,
         ticketNumbers: Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [],
@@ -96,11 +103,11 @@ export function StripePaymentForm({
   return (
     <div className="rounded-xl border border-teal-500/25 bg-black/25 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">Secure card payment</p>
-      <Elements stripe={stripePromise} options={options}>
-        <div className="mt-3 overflow-hidden [&_iframe]:max-h-[min(420px,55vh)]">
+      <Elements key={clientSecret} stripe={stripePromise} options={options}>
+        <div className="ss-stripe-payment-element mt-3">
           <PaymentElement
             options={{
-              layout: 'tabs',
+              layout: 'auto',
               business: { name: 'ShowSkills Rewards' },
               terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
             }}

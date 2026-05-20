@@ -25,9 +25,6 @@ export function MobileNavDock() {
           T&amp;C
         </button>
       </nav>
-      <div className="ss-mobile-nav-dock__foot border-t border-emerald-900/35 bg-[#050f0d]/95 px-3 py-2 text-center">
-        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500">ShowSkills Rewards</p>
-      </div>
     </div>
   )
 }

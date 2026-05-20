@@ -121,11 +121,15 @@ export function EntryFlowProvider({ children }) {
 
   const closeEntry = useCallback(() => {
     setEntryModalType(null)
+    setPaidStripeClientSecret('')
+    setPaidStripePaymentIntentId('')
+    setPaidStripePreparing(false)
   }, [])
 
   const openTerms = useCallback(() => setTermsOpen(true), [])
 
   const markPaidCheckoutComplete = useCallback((purchaseInfo) => {
+    setPaidError('')
     setPaidPostCheckout(true)
     setPaidQuizResult(null)
     setPaidA1('')
@@ -199,7 +203,7 @@ export function EntryFlowProvider({ children }) {
   useEffect(() => {
     setPaidStripeClientSecret('')
     setPaidStripePaymentIntentId('')
-  }, [paidBundleId, paidEmail, paidFullName])
+  }, [paidBundleId, paidEmail, paidFullName, paidEntryRoute])
 
   const handlePaidEntry = useCallback(async () => {
     setPaidError('')

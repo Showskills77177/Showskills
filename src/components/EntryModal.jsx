@@ -144,7 +144,7 @@ export function EntryModal() {
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 z-0 bg-black/80"
         aria-label="Close entry"
         onClick={closeEntry}
       />
@@ -176,7 +176,7 @@ export function EntryModal() {
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">
@@ -448,36 +448,17 @@ export function EntryModal() {
                       {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
                     </button>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && hasStripeElements ? (
-                    <div className="space-y-3">
-                      {!paidStripeClientSecret ? (
-                        <button
-                          type="button"
-                          onClick={prepareStripePayment}
-                          disabled={paidStripePreparing || !paidFormReadyForPayment}
-                          className="w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3 text-sm font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {paidStripePreparing
-                            ? 'Preparing secure payment…'
-                            : `Pay with card — ${formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}`}
-                        </button>
-                      ) : (
-                        <StripePaymentForm
-                          publishableKey={stripePublishableKey}
-                          clientSecret={paidStripeClientSecret}
-                          paymentIntentId={paidStripePaymentIntentId}
-                          amountLabel={formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}
-                          recordPayload={{
-                            customerEmail: paidEmail.trim(),
-                            customerFullName: paidFullName.trim(),
-                            bundleId: paidBundleId,
-                          }}
-                          disabled={!paidFormReadyForPayment}
-                          onSuccess={markPaidCheckoutComplete}
-                          onError={(msg) => setPaidError(msg)}
-                        />
-                      )}
-                    </div>
+                  {paidEntryRoute === 'tickets' && hasStripeElements && !paidStripeClientSecret ? (
+                    <button
+                      type="button"
+                      onClick={prepareStripePayment}
+                      disabled={paidStripePreparing || !paidFormReadyForPayment}
+                      className="w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3 text-sm font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {paidStripePreparing
+                        ? 'Preparing secure payment…'
+                        : `Pay with card — ${formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}`}
+                    </button>
                   ) : null}
                   {paidEntryRoute === 'tickets' && hasPayPal ? (
                     <div className={hasStripeCheckout ? 'mt-3' : ''}>
@@ -601,7 +582,31 @@ export function EntryModal() {
 
         </div>
 
-        <div className="border-t border-white/10 px-5 py-3">
+        {entryModalType === 'paid' &&
+        !paidPostCheckout &&
+        paidEntryRoute === 'tickets' &&
+        hasStripeElements &&
+        paidStripeClientSecret ? (
+          <div className="ss-entry-modal-stripe shrink-0 border-t border-white/10 px-5 py-4">
+            {paidError ? <ErrorBanner message={paidError} /> : null}
+            <StripePaymentForm
+              publishableKey={stripePublishableKey}
+              clientSecret={paidStripeClientSecret}
+              paymentIntentId={paidStripePaymentIntentId}
+              amountLabel={formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}
+              recordPayload={{
+                customerEmail: paidEmail.trim(),
+                customerFullName: paidFullName.trim(),
+                bundleId: paidBundleId,
+              }}
+              disabled={!paidFormReadyForPayment}
+              onSuccess={markPaidCheckoutComplete}
+              onError={(msg) => setPaidError(msg)}
+            />
+          </div>
+        ) : null}
+
+        <div className="shrink-0 border-t border-white/10 px-5 py-3">
           <button
             type="button"
             onClick={closeEntry}

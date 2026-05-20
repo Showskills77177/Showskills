@@ -7,6 +7,25 @@ import { BUNDLE_OFFER_ITEMS } from '../competitionData'
 import { useEntryFlow } from '../entry/entryContext'
 import { GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
 
+const LEGACY_BUNDLE_SPECS = [
+  {
+    label: 'iPhone 17 Pro Max',
+    body: 'Unlocked, 6.9-inch display, 512GB model. Estimated retail value £1,399.',
+  },
+  {
+    label: 'Colour substitution',
+    body: 'If the shown colour is unavailable, an equivalent colour such as black or another available finish may be supplied.',
+  },
+  {
+    label: '24K gold case',
+    body: 'Premium gold-style case for the iPhone 17 Pro Max, included as part of the prize stack.',
+  },
+  {
+    label: 'Museum signed football',
+    body: 'Cristiano Ronaldo museum-style signed football, presented as a collector item with the bundle.',
+  },
+]
+
 export default function HomePage() {
   const { openEntry } = useEntryFlow()
 
@@ -144,43 +163,46 @@ export default function HomePage() {
             </div>
 
             <div className="ss-hero-copy-footer lg:col-start-1 lg:row-start-2">
-              <div className="ss-legacy-details-card ss-hero-panel-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-base leading-relaxed text-stone-400 lg:max-w-none">
-                <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-100">
-                  Ronaldo Legacy Bundle details
-                </p>
-                <p className="mt-2 text-sm font-semibold uppercase tracking-[0.14em] text-stone-300">Prize stack</p>
-                <ul className="mt-2 space-y-1.5 text-base text-stone-200">
-                  {BUNDLE_OFFER_ITEMS.map((line) => (
-                    <li key={line} className="flex gap-2 leading-snug">
-                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-500/70" aria-hidden />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3">
-                  Estimated total stack value is <strong className="text-stone-200">over £3,000</strong>, with collector
-                  legacy value from the signed Ronaldo shirt and museum signed football.
-                </p>
-                <ul className="mt-3 space-y-1.5 text-sm leading-snug text-stone-500 sm:text-base">
-                  <li>
-                    <strong className="text-stone-300">iPhone 17 Pro Max:</strong> unlocked, 6.9-inch display, 512GB model,
-                    estimated retail value <strong className="text-stone-300">£1,399</strong>.
-                  </li>
-                  <li>
-                    <strong className="text-stone-300">Colour substitution:</strong> if the shown colour is unavailable, an
-                    equivalent colour such as black or another available finish may be supplied.
-                  </li>
-                  <li>
-                    <strong className="text-stone-300">24K gold case:</strong> premium gold-style case for the iPhone 17 Pro
-                    Max, included as part of the prize stack.
-                  </li>
-                  <li>
-                    <strong className="text-stone-300">Museum signed football:</strong> Cristiano Ronaldo museum-style signed
-                    football, presented as a collector item with the bundle.
-                  </li>
-                </ul>
-                <p className="mt-3 text-xs leading-snug text-stone-500">
-                  * Images are illustrative. Prize details are subject to the competition terms and availability.
+              <div className="ss-legacy-details-card ss-hero-panel-card max-w-xl rounded-lg lg:max-w-none">
+                <h2 className="ss-legacy-details-title">Ronaldo Legacy Bundle details</h2>
+
+                <section className="ss-legacy-details-block" aria-labelledby="ss-legacy-prize-stack-heading">
+                  <h3 id="ss-legacy-prize-stack-heading" className="ss-legacy-details-kicker">
+                    Prize stack
+                  </h3>
+                  <ul className="ss-legacy-prize-stack">
+                    {BUNDLE_OFFER_ITEMS.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  <p className="ss-legacy-value-blurb">
+                    Estimated total stack value is <strong>over £3,000</strong>, with collector legacy value from the
+                    signed Ronaldo shirt and museum signed football.
+                  </p>
+                </section>
+
+                <section
+                  className="ss-legacy-details-block ss-legacy-details-block--notes"
+                  aria-labelledby="ss-legacy-prize-notes-heading"
+                >
+                  <h3 id="ss-legacy-prize-notes-heading" className="ss-legacy-details-kicker">
+                    Prize notes
+                  </h3>
+                  <dl className="ss-legacy-spec-list">
+                    {LEGACY_BUNDLE_SPECS.map(({ label, body }) => (
+                      <div key={label} className="ss-legacy-spec-row">
+                        <dt>{label}</dt>
+                        <dd>{body}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+
+                <p className="ss-legacy-details-footnote">
+                  <span className="text-amber-300/85" aria-hidden>
+                    *
+                  </span>{' '}
+                  Images are illustrative. Prize details are subject to the competition terms and availability.
                 </p>
               </div>
             </div>
