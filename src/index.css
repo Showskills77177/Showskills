@@ -497,7 +497,7 @@ body {
 
   .ss-hero-cta-row {
     margin-top: auto;
-    align-items: center;
+    align-items: stretch;
   }
 
   /* Align dark prize studio with “ShowSkills Rewards”, not the Live promotion pill */
@@ -540,12 +540,18 @@ body {
 
   .ss-hero-bundle-cta-actions {
     display: flex;
-    align-items: center;
-    min-height: 3.25rem;
+    align-items: stretch;
   }
 
-  .ss-hero-bundle-draw-btn {
-    min-height: 3.5rem;
+  .ss-hero-aligned-cta {
+    min-height: 3rem;
+    box-sizing: border-box;
+  }
+
+  @media (min-width: 640px) {
+    .ss-hero-aligned-cta {
+      min-height: 3.25rem;
+    }
   }
 
   .ss-hero-bundle-cta .ss-hero-bundle-cta-blurb {
@@ -651,9 +657,6 @@ body {
   min-height: 3.25rem;
 }
 
-.ss-hero-bundle-draw-btn {
-  min-height: 3.25rem;
-}
 
 .ss-prize-studio::before {
   content: '';

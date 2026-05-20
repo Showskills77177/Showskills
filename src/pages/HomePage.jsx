@@ -56,7 +56,7 @@ export default function HomePage() {
               <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-4 lg:border-t lg:border-white/10 lg:pt-4">
                 <a
                   href="#prizes"
-                  className="ss-btn-bundle-draw inline-flex min-h-[3.25rem] flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-8 py-3.5 text-center text-base font-bold uppercase tracking-[0.1em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[3.5rem] sm:flex-[1.4] sm:py-4 sm:text-lg"
+                  className="ss-btn-bundle-draw ss-hero-aligned-cta inline-flex min-h-[3rem] flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-6 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[3.25rem] sm:px-8 sm:text-base"
                 >
                   Prize lineup
                 </a>
@@ -123,7 +123,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-enter ss-hero-bundle-draw-btn w-full inline-flex min-h-[3.5rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-3.5 text-center text-base font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.75rem] sm:px-12 sm:text-lg"
+                    className="ss-btn-enter ss-hero-aligned-cta w-full inline-flex min-h-[3rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-2.5 text-center text-sm font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.25rem] sm:px-12 sm:py-3 sm:text-base"
                   >
                     Enter Bundle Draw
                   </button>
@@ -136,12 +136,12 @@ export default function HomePage() {
             </div>
 
             <div className="ss-hero-copy-footer lg:col-start-1 lg:row-start-2">
-              <div className="ss-legacy-details-card ss-hero-panel-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
+              <div className="ss-legacy-details-card ss-hero-panel-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-base leading-relaxed text-stone-400 lg:max-w-none">
+                <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-100">
                   Ronaldo Legacy Bundle details
                 </p>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300">Prize stack</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-stone-200">
+                <p className="mt-2 text-sm font-semibold uppercase tracking-[0.14em] text-stone-300">Prize stack</p>
+                <ul className="mt-2 space-y-1.5 text-base text-stone-200">
                   {BUNDLE_OFFER_ITEMS.map((line) => (
                     <li key={line} className="flex gap-2 leading-snug">
                       <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-500/70" aria-hidden />
@@ -153,7 +153,7 @@ export default function HomePage() {
                   Estimated total stack value is <strong className="text-stone-200">over £3,000</strong>, with collector
                   legacy value from the signed Ronaldo shirt and museum signed football.
                 </p>
-                <ul className="mt-3 space-y-1.5 text-xs leading-snug text-stone-500 sm:text-sm">
+                <ul className="mt-3 space-y-1.5 text-sm leading-snug text-stone-500 sm:text-base">
                   <li>
                     <strong className="text-stone-300">iPhone 17 Pro Max:</strong> unlocked, 6.9-inch display, 512GB model,
                     estimated retail value <strong className="text-stone-300">£1,399</strong>.
@@ -171,7 +171,7 @@ export default function HomePage() {
                     football, presented as a collector item with the bundle.
                   </li>
                 </ul>
-                <p className="mt-3 text-[11px] leading-snug text-stone-500">
+                <p className="mt-3 text-xs leading-snug text-stone-500">
                   * Images are illustrative. Prize details are subject to the competition terms and availability.
                 </p>
               </div>
