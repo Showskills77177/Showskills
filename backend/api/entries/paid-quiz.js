@@ -5,6 +5,7 @@ import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs
 import { sendQuizResultEmail } from '../lib/sendQuizResultEmail.mjs'
 import { getLatestPaidPurchaseForEmail } from '../lib/ticketNumbers.mjs'
 import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
+import { applyRateLimit } from '../lib/rateLimit.mjs'
 
 /**
  * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
@@ -20,6 +21,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'paid-quiz', max: 15, windowMs: 60_000 })
+  if (limited.blocked) {
+    return json(res, 429, { error: 'Too many submissions. Please wait and try again.' })
   }
 
   if (!isDbConfigured()) {

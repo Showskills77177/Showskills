@@ -47,8 +47,8 @@ export default function HomePage() {
         </div>
 
         <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
-          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-stretch lg:gap-x-7 lg:gap-y-3 lg:p-6">
-            <div className="ss-hero-intro flex flex-col gap-4 text-left lg:col-start-1 lg:row-start-1">
+          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 md:grid-cols-2 md:items-stretch md:gap-x-5 md:gap-y-4 md:px-4 md:py-5 lg:gap-x-7 lg:gap-y-3 lg:p-6">
+            <div className="ss-hero-intro flex flex-col gap-4 text-left md:col-start-1 md:row-start-1">
               <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                 Live promotion
@@ -72,23 +72,17 @@ export default function HomePage() {
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for the shirt giveaway and a
                 side-by-side view of both promotions.
               </p>
-              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-auto lg:border-t lg:border-white/10 lg:pt-4">
-                <a
-                  href="#prizes"
-                  className="ss-btn-bundle-draw ss-btn-prize-lineup shrink-0"
-                >
+              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 md:mt-auto md:border-t md:border-white/10 md:pt-4">
+                <a href="#prizes" className="ss-btn-prize-lineup shrink-0">
                   Prize lineup
                 </a>
-                <Link
-                  to="/archive/ronaldo-shirt-giveaway"
-                  className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:py-2.5"
-                >
+                <Link to="/archive/ronaldo-shirt-giveaway" className="ss-btn-shirt-giveaway shrink-0">
                   Free shirt giveaway
                 </Link>
               </div>
             </div>
 
-            <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:min-h-0 lg:gap-2">
+            <div className="ss-hero-prize-stack flex flex-col gap-2 md:col-start-2 md:row-start-1 md:min-h-0 md:gap-2.5">
               <div id="prizes" className="ss-hero-prize-column scroll-mt-24">
                 <div className="ss-prize-studio ss-prize-studio--hero p-2 sm:p-3">
                   <div className="relative z-[1] grid gap-2">
@@ -145,16 +139,16 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center lg:mt-auto">
+              <div className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center gap-2.5 md:mt-auto md:gap-3">
                 <p className="ss-hero-bundle-cta-blurb text-center text-stone-500">
                   Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
                   case.
                 </p>
-                <div className="ss-hero-bundle-cta-actions flex w-full justify-center lg:border-t lg:border-white/10 lg:pt-4">
+                <div className="ss-hero-bundle-cta-actions flex w-full justify-center md:border-t md:border-white/10 md:pt-3 lg:pt-4">
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-enter ss-hero-bundle-draw-btn"
+                    className="ss-hero-bundle-draw-btn"
                   >
                     Enter Bundle Draw
                   </button>
@@ -162,8 +156,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="ss-hero-copy-footer lg:col-start-1 lg:row-start-2">
-              <div className="ss-legacy-details-card ss-hero-panel-card max-w-xl rounded-lg lg:max-w-none">
+            <div className="ss-hero-copy-footer w-full md:col-start-1 md:row-start-2">
+              <div className="ss-legacy-details-card ss-hero-panel-card w-full max-w-none rounded-lg">
                 <h2 className="ss-legacy-details-title">Ronaldo Legacy Bundle details</h2>
 
                 <section className="ss-legacy-details-block" aria-labelledby="ss-legacy-prize-stack-heading">
@@ -207,7 +201,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="ss-hero-ticket-bundles lg:col-start-2 lg:row-start-2">
+            <div className="ss-hero-ticket-bundles w-full md:col-start-2 md:row-start-2">
               <TicketBundlePrice className="ss-hero-panel-card h-full" />
             </div>
           </article>

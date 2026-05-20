@@ -1,6 +1,8 @@
 import { getPayPalCredentials, paypalAccessToken } from './lib/paypal.js'
 import { recordPayPalCapture } from './lib/recordSale.mjs'
 import { isDbConfigured } from './lib/db.mjs'
+import { applyRateLimit } from './lib/rateLimit.mjs'
+import { assertPayPalCaptureMatchesBundle } from './lib/paymentSecurity.mjs'
 
 function parseBody(req) {
   const b = req.body
@@ -27,6 +29,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'capture-paypal-order', max: 20, windowMs: 60_000 })
+  if (limited.blocked) {
+    return res.status(429).json({ error: 'Too many requests. Please wait and try again.' })
   }
 
   const creds = getPayPalCredentials()
@@ -69,21 +76,18 @@ export default async function handler(req, res) {
       const qty = Math.max(1, parseInt(body.ticketQuantity, 10) || 1)
       if (customerEmail.includes('@')) {
         try {
-          let amountPence = 0
-          const cap = data.purchase_units?.[0]?.payments?.captures?.[0]
-          const cur = (cap?.amount?.currency_code || 'GBP').toLowerCase()
-          const val = cap?.amount?.value
-          if (val != null) {
-            amountPence = Math.round(parseFloat(String(val), 10) * (cur === 'jpy' ? 1 : 100))
+          const bundleCheck = assertPayPalCaptureMatchesBundle(data, bundleId, qty)
+          if (!bundleCheck.ok) {
+            return res.status(400).json({ error: bundleCheck.error })
           }
           const recorded = await recordPayPalCapture({
             paypalOrderId: data.id,
             customerEmail,
             customerFullName,
-            bundleId,
-            quantity: qty,
-            amountPence,
-            currency: cur,
+            bundleId: bundleCheck.bundle.id,
+            quantity: bundleCheck.bundle.qty,
+            amountPence: bundleCheck.amountPence,
+            currency: bundleCheck.currency,
           })
           if (recorded) {
             return res.status(200).json({

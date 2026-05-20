@@ -7,6 +7,7 @@ import {
 } from '../../shared/checkoutTicketDescription.mjs'
 import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
 import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
+import { applyRateLimit } from './lib/rateLimit.mjs'
 
 function parseBody(req) {
   const b = req.body
@@ -33,6 +34,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'create-paypal-order', max: 12, windowMs: 60_000 })
+  if (limited.blocked) {
+    return res.status(429).json({ error: 'Too many payment attempts. Please wait and try again.' })
   }
 
   const creds = getPayPalCredentials()

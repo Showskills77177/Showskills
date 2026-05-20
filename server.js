@@ -41,6 +41,13 @@ app.use(
     credentials: true,
   }),
 )
+const stripeWebhookHandler = (await import('./backend/api/stripe-webhook.js')).default
+app.post(
+  '/api/stripe-webhook',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  adapt(stripeWebhookHandler),
+)
+
 app.use(express.json({ limit: '2mb' }))
 
 /** Simple health check (optional). */

@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { stripeElementsAppearance } from '../lib/stripeAppearance'
+import { getStripePromise } from '../lib/stripeLoader'
 import { apiUrl } from '../lib/api'
 
-function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId, recordPayload }) {
+function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId, recordPayload, elementReady }) {
   const stripe = useStripe()
   const elements = useElements()
   const [paying, setPaying] = useState(false)
@@ -67,7 +67,7 @@ function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId,
   return (
     <button
       type="button"
-      disabled={disabled || paying || !stripe || !elements}
+      disabled={disabled || paying || !stripe || !elements || !elementReady}
       onClick={handlePay}
       className="mt-4 w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
     >
@@ -77,7 +77,7 @@ function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId,
 }
 
 /**
- * Embedded Stripe Payment Element (card, Apple Pay, Google Pay when eligible).
+ * Embedded Stripe Payment Element (card only — faster load, fewer Safari issues).
  */
 export function StripePaymentForm({
   publishableKey,
@@ -89,33 +89,47 @@ export function StripePaymentForm({
   onError,
   disabled,
 }) {
-  const stripePromise = useMemo(() => loadStripe(publishableKey), [publishableKey])
+  const stripePromise = useMemo(() => getStripePromise(publishableKey), [publishableKey])
   const options = useMemo(
     () => ({
       clientSecret,
       appearance: stripeElementsAppearance,
+      loader: 'auto',
     }),
     [clientSecret],
   )
+  const [elementReady, setElementReady] = useState(false)
 
   if (!clientSecret) return null
 
   return (
-    <div className="rounded-xl border border-teal-500/25 bg-black/25 p-4">
+    <div className="ss-stripe-payment-shell rounded-xl border border-teal-500/25 bg-black/25 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">Secure card payment</p>
+      {!elementReady ? (
+        <p className="ss-stripe-payment-loading mt-3 text-sm text-stone-500" aria-live="polite">
+          Loading secure card form…
+        </p>
+      ) : null}
       <Elements key={clientSecret} stripe={stripePromise} options={options}>
-        <div className="ss-stripe-payment-element mt-3">
+        <div className={`ss-stripe-payment-element mt-3 ${elementReady ? 'ss-stripe-payment-element--ready' : ''}`}>
           <PaymentElement
+            onReady={() => setElementReady(true)}
+            onLoadError={(e) => {
+              onError(e?.error?.message || 'Could not load card form. Try refreshing or another browser.')
+            }}
             options={{
-              layout: 'auto',
-              business: { name: 'ShowSkills Rewards' },
+              layout: 'tabs',
+              wallets: { applePay: 'never', googlePay: 'never', link: 'never' },
+              fields: { billingDetails: { email: 'never', name: 'never', phone: 'never', address: 'never' } },
               terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
+              business: { name: 'ShowSkills Rewards' },
             }}
           />
         </div>
         <PayButton
           amountLabel={amountLabel}
           disabled={disabled}
+          elementReady={elementReady}
           onError={onError}
           onSuccess={onSuccess}
           paymentIntentId={paymentIntentId}

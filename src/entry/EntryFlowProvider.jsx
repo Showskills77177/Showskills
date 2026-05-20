@@ -6,6 +6,7 @@ import {
   getTicketBundleById,
 } from '../competitionData'
 import { apiUrl } from '../lib/api'
+import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 
@@ -70,6 +71,10 @@ export function EntryFlowProvider({ children }) {
   const paidTicketQty = selectedTicketBundle.qty
 
   useEffect(() => {
+    if (stripePublishableKey) preloadStripe(stripePublishableKey)
+  }, [stripePublishableKey])
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('checkout') !== 'success') return
     const sessionId = params.get('session_id')
@@ -116,8 +121,9 @@ export function EntryFlowProvider({ children }) {
       setPaidEntryRoute('tickets')
       setPaidStripeClientSecret('')
       setPaidStripePaymentIntentId('')
+      if (stripePublishableKey) preloadStripe(stripePublishableKey)
     }
-  }, [])
+  }, [stripePublishableKey])
 
   const closeEntry = useCallback(() => {
     setEntryModalType(null)

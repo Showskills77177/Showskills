@@ -1,4 +1,5 @@
 import adminLogin from '../backend/api/admin/login.js'
+import adminVerifySms from '../backend/api/admin/verify-sms.js'
 import adminLogout from '../backend/api/admin/logout.js'
 import adminMe from '../backend/api/admin/me.js'
 import adminStats from '../backend/api/admin/stats.js'
@@ -19,9 +20,11 @@ import createPaymentIntent from '../backend/api/create-payment-intent.js'
 import recordStripePayment from '../backend/api/record-stripe-payment.js'
 import createPayPalOrder from '../backend/api/create-paypal-order.js'
 import capturePayPalOrder from '../backend/api/capture-paypal-order.js'
+import stripeWebhook from '../backend/api/stripe-webhook.js'
 
 export const routes = {
   '/api/admin/login': adminLogin,
+  '/api/admin/verify-sms': adminVerifySms,
   '/api/admin/logout': adminLogout,
   '/api/admin/me': adminMe,
   '/api/admin/stats': adminStats,
@@ -42,6 +45,7 @@ export const routes = {
   '/api/record-stripe-payment': recordStripePayment,
   '/api/create-paypal-order': createPayPalOrder,
   '/api/capture-paypal-order': capturePayPalOrder,
+  '/api/stripe-webhook': stripeWebhook,
 }
 
 export function pathFromSlugParam(prefix, slug) {

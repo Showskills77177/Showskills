@@ -5,6 +5,9 @@ import {
   parseReservedTicketNumbersMetadata,
 } from './lib/recordSale.mjs'
 import { isDbConfigured } from './lib/db.mjs'
+import { applyRateLimit } from './lib/rateLimit.mjs'
+import { assertPaymentIntentMatchesBundle } from './lib/paymentSecurity.mjs'
+import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -16,6 +19,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'record-stripe-payment', max: 24, windowMs: 60_000 })
+  if (limited.blocked) {
+    return json(res, 429, { error: 'Too many requests. Please wait and try again.' })
   }
 
   const secret = process.env.STRIPE_SECRET_KEY
@@ -44,6 +52,17 @@ export default async function handler(req, res) {
       return json(res, 400, { error: 'Payment not completed', status: intent.status })
     }
 
+    const resolvedBundleId =
+      bundleId || (typeof intent.metadata?.bundle_id === 'string' ? intent.metadata.bundle_id.trim() : '')
+    const bundleCheck = assertPaymentIntentMatchesBundle(intent, resolvedBundleId)
+    if (!bundleCheck.ok) {
+      return json(res, 400, { error: bundleCheck.error })
+    }
+    const bundle = bundleCheck.bundle ?? getTicketBundleById(resolvedBundleId)
+    if (!bundle) {
+      return json(res, 400, { error: 'Invalid bundleId' })
+    }
+
     if (!isDbConfigured()) {
       return json(res, 200, {
         ok: true,
@@ -54,16 +73,19 @@ export default async function handler(req, res) {
     }
 
     const md = intent.metadata || {}
-    const qty = Math.max(1, parseInt(md.ticket_quantity, 10) || 1)
-    const email = customerEmail || intent.receipt_email || ''
+    const email = (customerEmail || intent.receipt_email || '').trim().toLowerCase()
+    const receiptEmail = (intent.receipt_email || '').trim().toLowerCase()
+    if (receiptEmail && email && receiptEmail !== email) {
+      return json(res, 400, { error: 'Email does not match payment record' })
+    }
     const fullName = customerFullName || md.customer_full_name || ''
 
     const recorded = await recordStripePaymentIntentCompleted({
       paymentIntentId: intent.id,
-      customerEmail: email,
+      customerEmail: email || receiptEmail,
       customerFullName: fullName,
-      bundleId: bundleId || md.bundle_id,
-      quantity: qty,
+      bundleId: bundle.id,
+      quantity: bundle.qty,
       amountPence: intent.amount_received || intent.amount,
       currency: intent.currency || 'gbp',
       reservedTicketNumbers: parseReservedTicketNumbersMetadata(md),

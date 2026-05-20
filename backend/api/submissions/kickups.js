@@ -5,6 +5,7 @@ import {
   SHIRT_GIVEAWAY_QUESTION,
   isCorrectShirtGiveawayAnswer,
 } from '../../../shared/shirtGiveaway.mjs'
+import { applyRateLimit } from '../lib/rateLimit.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -17,6 +18,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'kickups-submit', max: 10, windowMs: 60_000 })
+  if (limited.blocked) {
+    return json(res, 429, { error: 'Too many submissions. Please wait and try again.' })
   }
 
   if (!isDbConfigured()) {

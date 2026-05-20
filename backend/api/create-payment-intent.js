@@ -8,6 +8,7 @@ import {
 } from '../../shared/checkoutTicketDescription.mjs'
 import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
 import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
+import { applyRateLimit } from './lib/rateLimit.mjs'
 
 function parseBody(req) {
   const b = req.body
@@ -34,6 +35,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'create-payment-intent', max: 12, windowMs: 60_000 })
+  if (limited.blocked) {
+    return res.status(429).json({ error: 'Too many payment attempts. Please wait and try again.' })
   }
 
   const secret = process.env.STRIPE_SECRET_KEY
@@ -75,7 +81,7 @@ export default async function handler(req, res) {
       currency,
       description,
       receipt_email: customerEmail,
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
       metadata: buildStripePaymentMetadata({
         bundleId: bundle.id,
         qty: bundle.qty,

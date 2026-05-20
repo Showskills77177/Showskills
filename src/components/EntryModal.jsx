@@ -15,6 +15,7 @@ import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNo
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
+import { TicketBundleIcon } from './TicketBundleIcon'
 
 export function EntryModal() {
   const {
@@ -102,10 +103,24 @@ export function EntryModal() {
 
   useEffect(() => {
     if (!entryModalType) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const scrollY = window.scrollY
+    const { style } = document.body
+    const prev = {
+      position: style.position,
+      top: style.top,
+      width: style.width,
+      overflow: style.overflow,
+    }
+    style.position = 'fixed'
+    style.top = `-${scrollY}px`
+    style.width = '100%'
+    style.overflow = 'hidden'
     return () => {
-      document.body.style.overflow = prev
+      style.position = prev.position
+      style.top = prev.top
+      style.width = prev.width
+      style.overflow = prev.overflow
+      window.scrollTo(0, scrollY)
     }
   }, [entryModalType])
 
@@ -130,6 +145,13 @@ export function EntryModal() {
 
   if (!entryModalType) return null
 
+  const showStripePanel =
+    entryModalType === 'paid' &&
+    !paidPostCheckout &&
+    paidEntryRoute === 'tickets' &&
+    hasStripeElements &&
+    Boolean(paidStripeClientSecret)
+
   const titles = {
     paid: 'Enter — Ronaldo Legacy Bundle',
     kickups: 'Enter — Ronaldo shirt giveaway',
@@ -150,7 +172,11 @@ export function EntryModal() {
       />
       <div
         ref={panelRef}
-        className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-stone-950 shadow-2xl"
+        className={`relative z-10 flex max-h-[min(92vh,920px)] w-full flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
+          entryModalType === 'paid'
+            ? 'ss-entry-modal-panel ss-entry-modal-panel--paid max-w-lg overflow-hidden sm:max-w-2xl lg:max-w-5xl'
+            : 'max-w-lg overflow-hidden'
+        }`}
       >
         <div
           className={`h-1 w-full ${
@@ -176,7 +202,12 @@ export function EntryModal() {
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div
+          className={`ss-entry-modal-body flex min-h-0 flex-1 flex-col ${
+            entryModalType === 'paid' ? 'overflow-hidden lg:flex-row' : 'overflow-hidden'
+          }`}
+        >
+          <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 lg:min-w-0">
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">
@@ -279,7 +310,7 @@ export function EntryModal() {
                 <div className="mt-4 flex flex-col gap-4">
                   <div>
                     <p className="text-sm font-medium text-stone-300">Pay for tickets or enter by post</p>
-                    <div className="mt-2 grid max-h-[min(52vh,22rem)] gap-2 overflow-y-auto pr-1 sm:max-h-none">
+                    <div className="mt-2 grid max-h-[min(52vh,22rem)] gap-2 overflow-y-auto pr-1 sm:max-h-none lg:max-h-[14rem] lg:overflow-y-auto xl:max-h-none">
                       {TICKET_BUNDLES.map((b) => (
                         <label
                           key={b.id}
@@ -301,11 +332,9 @@ export function EntryModal() {
                             className="mt-1 h-4 w-4 shrink-0 border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50"
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-base" aria-hidden>
-                                {b.emoji}
-                              </span>
-                              <span className="font-semibold text-stone-100">{b.title}</span>
+                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                              <TicketBundleIcon bundleId={b.id} variant="modal" />
+                              <span className="font-semibold leading-none text-stone-100">{b.title}</span>
                               {b.featured ? (
                                 <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200/90">
                                   Popular
@@ -580,31 +609,28 @@ export function EntryModal() {
             </>
           ) : null}
 
-        </div>
-
-        {entryModalType === 'paid' &&
-        !paidPostCheckout &&
-        paidEntryRoute === 'tickets' &&
-        hasStripeElements &&
-        paidStripeClientSecret ? (
-          <div className="ss-entry-modal-stripe shrink-0 border-t border-white/10 px-5 py-4">
-            {paidError ? <ErrorBanner message={paidError} /> : null}
-            <StripePaymentForm
-              publishableKey={stripePublishableKey}
-              clientSecret={paidStripeClientSecret}
-              paymentIntentId={paidStripePaymentIntentId}
-              amountLabel={formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}
-              recordPayload={{
-                customerEmail: paidEmail.trim(),
-                customerFullName: paidFullName.trim(),
-                bundleId: paidBundleId,
-              }}
-              disabled={!paidFormReadyForPayment}
-              onSuccess={markPaidCheckoutComplete}
-              onError={(msg) => setPaidError(msg)}
-            />
           </div>
-        ) : null}
+
+          {showStripePanel ? (
+            <div className="ss-entry-modal-stripe shrink-0 border-t border-white/10 px-4 py-4 sm:px-5 lg:w-[min(22rem,38%)] lg:shrink-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:px-5">
+              {paidError ? <ErrorBanner message={paidError} /> : null}
+              <StripePaymentForm
+                publishableKey={stripePublishableKey}
+                clientSecret={paidStripeClientSecret}
+                paymentIntentId={paidStripePaymentIntentId}
+                amountLabel={formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}
+                recordPayload={{
+                  customerEmail: paidEmail.trim(),
+                  customerFullName: paidFullName.trim(),
+                  bundleId: paidBundleId,
+                }}
+                disabled={!paidFormReadyForPayment}
+                onSuccess={markPaidCheckoutComplete}
+                onError={(msg) => setPaidError(msg)}
+              />
+            </div>
+          ) : null}
+        </div>
 
         <div className="shrink-0 border-t border-white/10 px-5 py-3">
           <button

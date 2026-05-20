@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { BUNDLE_OFFER_ITEMS, TICKET_BUNDLES, formatBundlePriceGBP } from '../competitionData'
+import { TicketBundleIcon } from './TicketBundleIcon'
 
 export function TicketBundlePrice({ className = '', compact = false }) {
   if (compact) {
@@ -27,13 +28,17 @@ export function TicketBundlePrice({ className = '', compact = false }) {
             key={b.id}
             className="flex items-start justify-between gap-3 border-b border-emerald-500/10 pb-2.5 last:border-0 last:pb-0"
           >
-            <span className="min-w-0">
-              <span className="mr-1.5" aria-hidden>
-                {b.emoji}
+            <span className="ss-ticket-bundle-row-copy grid min-w-0 grid-cols-[1.125rem_minmax(0,1fr)] gap-x-1.5 gap-y-0.5">
+              <TicketBundleIcon bundleId={b.id} variant="panel" className="col-start-1 row-start-1" />
+              <span className="col-start-2 row-start-1 text-[0.9375rem] font-semibold leading-snug text-stone-100 sm:text-base">
+                {b.title}
               </span>
-              <span className="text-[0.9375rem] font-semibold text-stone-100 sm:text-base">{b.title}</span>
-              <span className="mt-0.5 block text-sm text-emerald-200/80">{b.line1}</span>
-              {b.line2 ? <span className="block text-xs text-stone-500 sm:text-[0.8125rem]">{b.line2}</span> : null}
+              <span className="col-start-2 row-start-2 text-sm leading-snug text-emerald-200/80">{b.line1}</span>
+              {b.line2 ? (
+                <span className="col-start-2 row-start-3 text-xs leading-snug text-stone-500 sm:text-[0.8125rem]">
+                  {b.line2}
+                </span>
+              ) : null}
             </span>
             <span className="shrink-0 font-display text-lg tabular-nums text-white sm:text-xl">
               {formatBundlePriceGBP(b.totalPence)}

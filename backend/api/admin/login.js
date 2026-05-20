@@ -1,11 +1,15 @@
 import {
   signAdminSession,
   setAdminCookieHeader,
+  signAdminSmsPending,
+  setAdminSmsPendingCookieHeader,
   isAdminAuthConfigured,
   adminAuthConfigStatus,
 } from '../lib/adminAuth.mjs'
 import { verifyAdminPassword } from '../lib/password.mjs'
+import { sendAdminLoginOtpEmail, isAdminEmailOtpConfigured, maskAdminEmail } from '../lib/adminEmailOtp.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
+import { applyRateLimit } from '../lib/rateLimit.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -17,6 +21,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS')
     return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'admin-login', max: 8, windowMs: 900_000 })
+  if (limited.blocked) {
+    return json(res, 429, { error: 'Too many login attempts. Try again later.' })
   }
 
   if (!isAdminAuthConfigured()) {
@@ -42,11 +51,24 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (isAdminEmailOtpConfigured()) {
+      const { codeHash } = await sendAdminLoginOtpEmail()
+      const pending = await signAdminSmsPending(codeHash)
+      res.setHeader('Set-Cookie', setAdminSmsPendingCookieHeader(pending))
+      return json(res, 200, {
+        ok: true,
+        verificationRequired: true,
+        channel: 'email',
+        maskedDestination: maskAdminEmail(),
+      })
+    }
+
     const token = await signAdminSession()
     res.setHeader('Set-Cookie', setAdminCookieHeader(token))
-    return json(res, 200, { ok: true })
+    return json(res, 200, { ok: true, verificationRequired: false })
   } catch (e) {
     console.error(e)
-    return json(res, 500, { error: 'Could not create session' })
+    const msg = e instanceof Error ? e.message : 'Could not complete sign in'
+    return json(res, 500, { error: msg })
   }
 }
