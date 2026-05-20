@@ -111,7 +111,11 @@ async function mountApiRoutes() {
 await mountApiRoutes()
 
 if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
-  const { recordStripeCheckoutCompleted } = await import('./backend/api/lib/recordSale.mjs')
+  const { recordStripeCheckoutCompleted, recordStripePaymentIntentCompleted } = await import(
+    './backend/api/lib/recordSale.mjs',
+  )
+  const { reserveTicketNumbers } = await import('./backend/api/lib/ticketNumbers.mjs')
+  const { createPendingTicketCheckout } = await import('./backend/api/lib/pendingCheckout.mjs')
   const e2eSecret = (process.env.E2E_SECRET || 'e2e-dev-only-secret').trim()
   app.post('/api/e2e/mock-stripe-completion', express.json(), async (req, res) => {
     if ((req.headers['x-e2e-secret'] || '').trim() !== e2eSecret) {
@@ -149,6 +153,62 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
     } catch (e) {
       console.error(e)
       return res.status(500).json({ error: e instanceof Error ? e.message : 'e2e mock failed' })
+    }
+  })
+
+  app.post('/api/e2e/mock-stripe-payment-intent', express.json(), async (req, res) => {
+    if ((req.headers['x-e2e-secret'] || '').trim() !== e2eSecret) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    const body = req.body || {}
+    const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim() : ''
+    const customerFullName =
+      typeof body.customerFullName === 'string' ? body.customerFullName.trim() : 'E2E User'
+    const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'medium10'
+    const quantity = Number(body.quantity) > 0 ? Number(body.quantity) : 10
+    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 600
+    const paymentIntentId =
+      typeof body.paymentIntentId === 'string' && body.paymentIntentId.trim()
+        ? body.paymentIntentId.trim()
+        : `pi_e2e_${Date.now()}`
+    if (!customerEmail.includes('@')) {
+      return res.status(400).json({ error: 'customerEmail required' })
+    }
+    try {
+      const ticketNumbers = await reserveTicketNumbers(quantity)
+      await createPendingTicketCheckout({
+        provider: 'stripe_pi',
+        externalId: paymentIntentId,
+        bundleId,
+        quantity,
+        ticketNumbers,
+        customerEmail,
+        customerFullName,
+      })
+      const r = await recordStripePaymentIntentCompleted({
+        paymentIntentId,
+        customerEmail,
+        customerFullName,
+        bundleId,
+        quantity,
+        amountPence,
+        currency: 'gbp',
+        reservedTicketNumbers: ticketNumbers,
+      })
+      if (!r?.ticketId) {
+        return res.status(400).json({ error: 'Could not record payment intent sale' })
+      }
+      if (!r.ticketNumbers?.length || r.ticketNumbers.length !== quantity) {
+        return res.status(500).json({
+          error: 'Ticket numbers missing or wrong count',
+          expected: quantity,
+          got: r.ticketNumbers?.length ?? 0,
+        })
+      }
+      return res.status(200).json({ ok: true, ...r })
+    } catch (e) {
+      console.error(e)
+      return res.status(500).json({ error: e instanceof Error ? e.message : 'e2e mock PI failed' })
     }
   })
 }

@@ -97,11 +97,12 @@ export function StripePaymentForm({
     <div className="rounded-xl border border-teal-500/25 bg-black/25 p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">Secure card payment</p>
       <Elements stripe={stripePromise} options={options}>
-        <div className="mt-3">
+        <div className="mt-3 overflow-hidden [&_iframe]:max-h-[min(420px,55vh)]">
           <PaymentElement
             options={{
               layout: 'tabs',
-              terms: { card: 'never', applePay: 'never', googlePay: 'never' },
+              business: { name: 'ShowSkills Rewards' },
+              terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
             }}
           />
         </div>

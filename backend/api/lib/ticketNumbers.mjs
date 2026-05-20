@@ -109,6 +109,14 @@ export async function getTicketNumbersForPurchase(ticketId) {
   return r.rows.map((row) => row.ticket_number)
 }
 
+/** After payment, guarantee one ticket number per bundle slot (idempotent). */
+export async function ensureTicketNumbersForPurchase(ticketId, quantity) {
+  const qty = Math.max(1, Math.min(500, parseInt(String(quantity), 10) || 1))
+  const existing = await getTicketNumbersForPurchase(ticketId)
+  if (existing.length >= qty) return existing.slice(0, qty)
+  return insertTicketNumbers(ticketId, qty)
+}
+
 /** Latest paid purchase for an email (for qualified draw confirmation email). */
 export async function getLatestPaidPurchaseForEmail(email) {
   await ensureTicketSchema()

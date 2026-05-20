@@ -3,7 +3,7 @@ import { query, isDbConfigured, isUniqueViolation } from './db.mjs'
 import {
   insertTicketNumbers,
   insertPreservedTicketNumbers,
-  getTicketNumbersForPurchase,
+  ensureTicketNumbersForPurchase,
 } from './ticketNumbers.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 
@@ -48,8 +48,9 @@ async function finalizePendingTicket({
   externalId,
   paymentIntentId,
 }) {
-  const ticketNumbers = await getTicketNumbersForPurchase(row.id)
+  const qty = Math.max(1, parseInt(String(row.quantity), 10) || 1)
   if (row.payment_status === 'paid') {
+    const ticketNumbers = await ensureTicketNumbersForPurchase(row.id, qty)
     return {
       ticketId: row.id,
       ticketPublicId: row.ticket_public_id,
@@ -57,6 +58,8 @@ async function finalizePendingTicket({
       deduped: true,
     }
   }
+
+  let ticketNumbers = await ensureTicketNumbersForPurchase(row.id, qty)
 
   const userId = await upsertUserSimple(customerEmail, customerFullName || '')
   const purchasedAt = new Date().toISOString()
@@ -83,9 +86,11 @@ async function finalizePendingTicket({
       (currency || 'gbp').toLowerCase(),
       provider,
       JSON.stringify(
-        provider === 'stripe'
-          ? { stripe_session_id: externalId }
-          : { paypal_order_id: externalId },
+        paymentIntentId
+          ? { stripe_payment_intent_id: paymentIntentId }
+          : provider === 'stripe'
+            ? { stripe_session_id: externalId }
+            : { paypal_order_id: externalId },
       ),
     ],
   )
@@ -116,7 +121,7 @@ export async function recordStripeCheckoutCompleted({
   await ensureTicketSchema()
 
   const dup = await query(
-    `SELECT id, ticket_public_id, payment_status, confirmation_email_sent_at FROM tickets WHERE stripe_session_id = $1`,
+    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE stripe_session_id = $1`,
     [stripeSessionId],
   )
   if (dup.rows[0]) {
@@ -249,6 +254,7 @@ export async function recordStripePaymentIntentCompleted({
   quantity,
   amountPence,
   currency,
+  reservedTicketNumbers,
 }) {
   if (!isDbConfigured()) return null
   const email = customerEmail?.trim()
@@ -257,11 +263,11 @@ export async function recordStripePaymentIntentCompleted({
   await ensureTicketSchema()
 
   const dup = await query(
-    `SELECT id, ticket_public_id, payment_status, confirmation_email_sent_at FROM tickets WHERE stripe_payment_intent_id = $1`,
+    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE stripe_payment_intent_id = $1`,
     [paymentIntentId],
   )
   if (dup.rows[0]) {
-    return finalizePendingTicket({
+    const finalized = await finalizePendingTicket({
       row: dup.rows[0],
       customerEmail: email,
       customerFullName,
@@ -271,6 +277,14 @@ export async function recordStripePaymentIntentCompleted({
       externalId: paymentIntentId,
       paymentIntentId,
     })
+    if (!finalized.ticketNumbers?.length) {
+      const nums = await ensureTicketNumbersForPurchase(
+        dup.rows[0].id,
+        dup.rows[0].quantity || quantity || 1,
+      )
+      return { ...finalized, ticketNumbers: nums }
+    }
+    return finalized
   }
 
   const userId = await upsertUserSimple(email, customerFullName || '')
@@ -301,7 +315,11 @@ export async function recordStripePaymentIntentCompleted({
     ],
   )
 
-  const ticketNumbers = await insertTicketNumbers(ticketId, qty)
+  const reserved = Array.isArray(reservedTicketNumbers) ? reservedTicketNumbers.filter(Boolean) : []
+  const ticketNumbers =
+    reserved.length === qty
+      ? await insertPreservedTicketNumbers(ticketId, reserved)
+      : await insertTicketNumbers(ticketId, qty)
   return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
 }
 

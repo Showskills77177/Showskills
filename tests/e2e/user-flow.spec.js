@@ -28,6 +28,7 @@ test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
 
     await page.getByRole('button', { name: /E2E simulated checkout/i }).click()
     await expect(page.getByText(/Payment received/i)).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(/SS-[A-F0-9]{8}/)).toBeVisible({ timeout: 10_000 })
 
     const qInputs = page.locator('input[placeholder="Type your answer"]')
     await expect(qInputs).toHaveCount(3)

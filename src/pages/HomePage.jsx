@@ -37,7 +37,7 @@ export default function HomePage() {
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                 Live promotion
               </p>
-              <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+              <div className="hidden flex-wrap items-end gap-3 sm:flex sm:gap-4">
                 <h1 className="ss-hero-brand font-display text-[clamp(2.75rem,10vw,5.25rem)] leading-[0.92] tracking-tight sm:text-[clamp(3.25rem,11vw,5.75rem)]">
                   ShowSkills Rewards
                 </h1>

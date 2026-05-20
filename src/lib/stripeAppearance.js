@@ -24,5 +24,20 @@ export const stripeElementsAppearance = {
       color: '#a8a29e',
       fontWeight: '500',
     },
+    '.TermsText': {
+      display: 'none',
+    },
+    '.TermsLink': {
+      display: 'none',
+    },
+    '.RedirectText': {
+      display: 'none',
+    },
+    '.Text--redirect': {
+      display: 'none',
+    },
+    '.SecondaryLink': {
+      display: 'none',
+    },
   },
 }

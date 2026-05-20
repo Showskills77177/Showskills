@@ -26,6 +26,8 @@ export function latestCompetitionEntryByEmail(db, email) {
     .get(email)
 }
 
+export { paidTicketNumbersForEmail } from './tickets.mjs'
+
 export function latestKickupByEmail(db, email) {
   return db
     .prepare(`SELECT * FROM kickup_submissions WHERE lower(email) = lower(?) ORDER BY created_at DESC LIMIT 1`)

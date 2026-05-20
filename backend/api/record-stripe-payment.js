@@ -1,6 +1,9 @@
 import Stripe from 'stripe'
 import { parseJsonBody, json } from './lib/http.mjs'
-import { recordStripePaymentIntentCompleted } from './lib/recordSale.mjs'
+import {
+  recordStripePaymentIntentCompleted,
+  parseReservedTicketNumbersMetadata,
+} from './lib/recordSale.mjs'
 import { isDbConfigured } from './lib/db.mjs'
 
 export default async function handler(req, res) {
@@ -63,6 +66,7 @@ export default async function handler(req, res) {
       quantity: qty,
       amountPence: intent.amount_received || intent.amount,
       currency: intent.currency || 'gbp',
+      reservedTicketNumbers: parseReservedTicketNumbersMetadata(md),
     })
 
     if (!recorded) {
