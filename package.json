@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "node server.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
+    "dev:api": "node scripts/kill-port.mjs 3000 && node server.js",
+    "dev:all": "node scripts/kill-port.mjs 3000 && concurrently -k \"npm run dev\" \"node scripts/kill-port.mjs 3000 && node server.js\"",
     "dev:e2e": "concurrently -k \"PORT=3001 node server.js\" \"VITE_PROXY_API_TARGET=http://127.0.0.1:3001 vite --port 5173 --strictPort\"",
     "build": "vite build",
     "lint": "eslint .",
@@ -20,7 +20,8 @@
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
     "test:ui": "playwright test --ui",
     "test:install": "playwright install chromium",
-    "test:purchase-email": "node scripts/test-purchase-email.mjs"
+    "test:purchase-email": "node scripts/test-purchase-email.mjs",
+    "test:admin-email": "node scripts/test-admin-otp-email.mjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^6.4.0",

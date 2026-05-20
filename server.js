@@ -19,6 +19,22 @@ if (dbUrl?.startsWith('postgres')) {
   console.log('API database: SQLite at', resolve(process.cwd(), sqliteRel))
 }
 
+const resendKey = process.env.RESEND_API_KEY?.trim()
+if (resendKey?.startsWith('re_')) {
+  const { getAdminEmailSetupHint, isAdminEmailOtpConfigured } = await import(
+    './backend/api/lib/adminEmailOtp.mjs'
+  )
+  if (isAdminEmailOtpConfigured()) {
+    const hint = getAdminEmailSetupHint()
+    if (hint) console.warn('[email]', hint)
+    else console.log('[email] Resend configured (admin OTP + quiz confirmations)')
+  } else {
+    console.log('[email] Resend key set; set ADMIN_EMAIL for admin OTP step')
+  }
+} else {
+  console.warn('[email] RESEND_API_KEY not set — purchase/quiz emails and admin OTP are disabled')
+}
+
 const PORT = parseInt(process.env.PORT || '3000', 10)
 
 function adapt(handler) {
@@ -49,11 +65,6 @@ app.post(
 )
 
 app.use(express.json({ limit: '2mb' }))
-
-/** Simple health check (optional). */
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true })
-})
 
 /**
  * POST /api/login — env-based check (curl-friendly).
@@ -86,36 +97,40 @@ app.post(
   adapt(kickupsUploadHandler),
 )
 
-async function mountApiRoutes() {
-  const modules = [
-    { path: '/api/admin/login', file: './backend/api/admin/login.js' },
-    { path: '/api/admin/logout', file: './backend/api/admin/logout.js' },
-    { path: '/api/admin/me', file: './backend/api/admin/me.js' },
-    { path: '/api/admin/stats', file: './backend/api/admin/stats.js' },
-    { path: '/api/admin/users', file: './backend/api/admin/users.js' },
-    { path: '/api/admin/entries', file: './backend/api/admin/entries.js' },
-    { path: '/api/admin/tickets', file: './backend/api/admin/tickets.js' },
-    { path: '/api/admin/payments', file: './backend/api/admin/payments.js' },
-    { path: '/api/admin/submissions', file: './backend/api/admin/submissions.js' },
-    { path: '/api/admin/kickup-file', file: './backend/api/admin/kickup-file.js' },
-    { path: '/api/entries/paid-quiz', file: './backend/api/entries/paid-quiz.js' },
-    { path: '/api/submissions/kickups', file: './backend/api/submissions/kickups.js' },
-    { path: '/api/records/stripe-session', file: './backend/api/records/stripe-session.js' },
-    { path: '/api/create-checkout-session', file: './backend/api/create-checkout-session.js' },
-    { path: '/api/create-payment-intent', file: './backend/api/create-payment-intent.js' },
-    { path: '/api/record-stripe-payment', file: './backend/api/record-stripe-payment.js' },
-    { path: '/api/create-paypal-order', file: './backend/api/create-paypal-order.js' },
-    { path: '/api/capture-paypal-order', file: './backend/api/capture-paypal-order.js' },
-  ]
+/** Same handlers as Vercel production (`api/_dispatch.mjs`) — avoids missing local routes. */
+const { routes } = await import('./api/_dispatch.mjs')
+const SKIP_ROUTE_MOUNT = new Set([
+  '/api/stripe-webhook',
+  '/api/submissions/kickups/upload',
+])
 
-  for (const { path: routePath, file } of modules) {
-    const mod = await import(file)
-    const handler = mod.default
-    app.all(routePath, adapt(handler))
-  }
+for (const [routePath, handler] of Object.entries(routes)) {
+  if (SKIP_ROUTE_MOUNT.has(routePath)) continue
+  app.all(routePath, adapt(handler))
 }
 
-await mountApiRoutes()
+const mountedPaths = Object.keys(routes)
+  .filter((p) => !SKIP_ROUTE_MOUNT.has(p))
+  .sort()
+for (const required of ['/api/admin/verify-sms', '/api/admin/resend-code']) {
+  if (!mountedPaths.includes(required)) {
+    console.error(`[api] FATAL: ${required} missing from dispatch routes`)
+    process.exit(1)
+  }
+}
+console.log(
+  `[api] Mounted ${mountedPaths.length} routes (admin login, verify-sms, resend-code, Resend OTP)`,
+)
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    port: PORT,
+    adminVerifySms: mountedPaths.includes('/api/admin/verify-sms'),
+    adminResendCode: mountedPaths.includes('/api/admin/resend-code'),
+    resendOtp: Boolean(process.env.RESEND_API_KEY?.trim() && process.env.ADMIN_EMAIL?.trim()),
+  })
+})
 
 if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
   const { recordStripeCheckoutCompleted, recordStripePaymentIntentCompleted } = await import(
@@ -224,6 +239,18 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found', path: req.path })
 })
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
+})
+server.on('error', (err) => {
+  if (err?.code === 'EADDRINUSE') {
+    console.error(
+      `\nPort ${PORT} is already in use — local API did not start.\n` +
+        `  lsof -ti :${PORT} | xargs kill -9\n` +
+        `  Then run: npm run dev:all\n` +
+        `Without the API on :${PORT}, /admin/login may hit an old process and email will fail.\n`,
+    )
+    process.exit(1)
+  }
+  throw err
 })

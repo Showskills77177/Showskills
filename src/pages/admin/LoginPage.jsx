@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AdminLogo } from '../../admin/AdminLogo'
 import { apiUrl } from '../../lib/api'
@@ -24,12 +24,65 @@ export default function AdminLoginPage() {
   const [otpCode, setOtpCode] = useState('')
   const [otpStep, setOtpStep] = useState(false)
   const [maskedDestination, setMaskedDestination] = useState('')
+  const [sandboxNote, setSandboxNote] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [resendCooldown])
+
+  function applyOtpStepFromResponse(data) {
+    setOtpStep(true)
+    setMaskedDestination(
+      typeof data.maskedDestination === 'string'
+        ? data.maskedDestination
+        : typeof data.maskedPhone === 'string'
+          ? data.maskedPhone
+          : '',
+    )
+    setSandboxNote(typeof data.sandboxNote === 'string' ? data.sandboxNote : '')
+    setOtpCode('')
+  }
+
+  const onResendCode = useCallback(async () => {
+    if (resendCooldown > 0 || resendLoading) return
+    setError('')
+    setInfo('')
+    setResendLoading(true)
+    try {
+      const res = await fetch(apiUrl('/api/admin/resend-code'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const text = await res.text()
+      const { data, apiMsg } = parseLoginResponse(res, text)
+      if (!res.ok) {
+        setError(apiMsg || `Could not resend code (HTTP ${res.status}).`)
+        if (res.status === 401) setOtpStep(false)
+        return
+      }
+      applyOtpStepFromResponse(data)
+      setInfo(typeof data.message === 'string' ? data.message : 'A new code has been sent.')
+      setResendCooldown(60)
+    } catch (err) {
+      setError(`Network error (${err instanceof Error ? err.message : String(err)}).`)
+    } finally {
+      setResendLoading(false)
+    }
+  }, [resendCooldown, resendLoading])
 
   async function onPasswordSubmit(e) {
     e.preventDefault()
     setError('')
+    setInfo('')
     setLoading(true)
     try {
       const res = await fetch(apiUrl('/api/admin/login'), {
@@ -41,11 +94,15 @@ export default function AdminLoginPage() {
       const text = await res.text()
       const { data, apiMsg } = parseLoginResponse(res, text)
       if (!res.ok) {
-        const hint =
-          res.status === 502 || res.status === 504 || res.status === 404
+        const resendSandbox =
+          apiMsg.includes('testing emails to your own email') ||
+          apiMsg.includes('verify a domain')
+        const hint = resendSandbox
+          ? ' Local: ensure `npm run dev:api` is running on port 3000 (not an old server). Codes must go to RESEND_ACCOUNT_EMAIL in .env until showskills.co.uk is verified on Resend.'
+          : res.status === 502 || res.status === 504 || res.status === 404
             ? import.meta.env.PROD
               ? ' Check Vercel env vars and redeploy.'
-              : ' Run npm run dev:all or dev:api.'
+              : ' Run npm run dev:all. If the terminal shows EADDRINUSE on port 3000, kill that port and restart.'
             : ''
         const missing = Array.isArray(data.missing) ? data.missing.join(', ') : ''
         setError(
@@ -57,15 +114,8 @@ export default function AdminLoginPage() {
         return
       }
       if (data.verificationRequired || data.smsRequired) {
-        setOtpStep(true)
-        setMaskedDestination(
-          typeof data.maskedDestination === 'string'
-            ? data.maskedDestination
-            : typeof data.maskedPhone === 'string'
-              ? data.maskedPhone
-              : '',
-        )
-        setOtpCode('')
+        applyOtpStepFromResponse(data)
+        setResendCooldown(60)
         return
       }
       navigate(from.startsWith('/admin') ? from : '/admin/dashboard', { replace: true })
@@ -81,6 +131,7 @@ export default function AdminLoginPage() {
   async function onOtpSubmit(e) {
     e.preventDefault()
     setError('')
+    setInfo('')
     setLoading(true)
     try {
       const res = await fetch(apiUrl('/api/admin/verify-sms'), {
@@ -92,7 +143,14 @@ export default function AdminLoginPage() {
       const text = await res.text()
       const { data, apiMsg } = parseLoginResponse(res, text)
       if (!res.ok) {
-        setError(apiMsg || `Verification failed (HTTP ${res.status}).`)
+        const notFound =
+          res.status === 404 &&
+          (apiMsg === 'Not found' || String(data?.path || '').includes('verify-sms'))
+        setError(
+          notFound
+            ? 'Verify endpoint not found on the local API. Restart npm run dev:all (server.js must include /api/admin/verify-sms).'
+            : apiMsg || `Verification failed (HTTP ${res.status}).`,
+        )
         if (res.status === 401 && apiMsg.includes('expired')) {
           setOtpStep(false)
         }
@@ -119,6 +177,11 @@ export default function AdminLoginPage() {
               Enter the 6-digit code sent to{' '}
               <span className="font-mono text-stone-300">{maskedDestination || 'your email'}</span>.
             </p>
+            {sandboxNote ? (
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-950/40 px-3 py-2 text-center text-xs text-amber-200/90">
+                {sandboxNote}
+              </p>
+            ) : null}
             <form className="mt-6 flex flex-col gap-4" onSubmit={onOtpSubmit}>
               <div>
                 <label htmlFor="admin-otp-code" className="block text-xs font-medium text-stone-400">
@@ -137,6 +200,7 @@ export default function AdminLoginPage() {
                 />
               </div>
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
+              {info ? <p className="text-sm text-teal-400/90">{info}</p> : null}
               <button
                 type="submit"
                 disabled={loading || otpCode.length !== 6}
@@ -146,11 +210,25 @@ export default function AdminLoginPage() {
               </button>
               <button
                 type="button"
+                disabled={resendLoading || resendCooldown > 0}
+                onClick={onResendCode}
+                className="rounded-xl border border-white/15 py-2 text-sm font-medium text-stone-200 hover:border-teal-600/40 hover:text-teal-100 disabled:opacity-50"
+              >
+                {resendLoading
+                  ? 'Sending…'
+                  : resendCooldown > 0
+                    ? `Resend code (${resendCooldown}s)`
+                    : 'Resend code'}
+              </button>
+              <button
+                type="button"
                 className="text-xs text-stone-500 underline underline-offset-2 hover:text-stone-300"
                 onClick={() => {
                   setOtpStep(false)
                   setOtpCode('')
                   setError('')
+                  setInfo('')
+                  setResendCooldown(0)
                 }}
               >
                 Back to password
@@ -163,7 +241,10 @@ export default function AdminLoginPage() {
               <>
                 <p className="mt-2 text-center text-xs text-stone-500">Local admin — not linked from the public site.</p>
                 <p className="mt-2 text-center text-[11px] leading-snug text-stone-600">
-                  Email code step appears when RESEND_API_KEY and ADMIN_EMAIL are set on the API server.
+                  Requires API on port 3000 (<code className="text-stone-500">npm run dev:all</code>). If sign-in
+                  fails with a Resend error, check the terminal for{' '}
+                  <code className="text-stone-500">EADDRINUSE</code> — kill port 3000 and restart. Local codes go to{' '}
+                  <code className="text-stone-500">RESEND_ACCOUNT_EMAIL</code> until the domain is verified.
                 </p>
               </>
             ) : (

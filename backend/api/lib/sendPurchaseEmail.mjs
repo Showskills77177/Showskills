@@ -4,14 +4,7 @@ import {
   buildPurchaseConfirmationText,
   purchaseConfirmationSubject,
 } from '../../../shared/purchaseConfirmationEmail.mjs'
-
-function purchaseFromEmail() {
-  return (process.env.PURCHASE_EMAIL_FROM || process.env.RESEND_FROM || 'ShowSkills Rewards <orders@showskills.co.uk>').trim()
-}
-
-function siteUrl() {
-  return (process.env.SITE_URL || 'https://showskills.co.uk').replace(/\/$/, '')
-}
+import { resolveResendFrom, formatResendError, resolveSiteUrl } from './resendConfig.mjs'
 
 /**
  * Send purchase confirmation via Resend. Returns { ok, skipped?, error? }.
@@ -47,11 +40,11 @@ export async function sendPurchaseConfirmationEmail({
     amountPence: amountPence ?? bundle?.totalPence ?? 0,
     ticketNumbers,
     purchaseRef,
-    siteUrl: siteUrl(),
+    siteUrl: resolveSiteUrl(),
   }
 
   const payload = {
-    from: purchaseFromEmail(),
+    from: resolveResendFrom(),
     to: [email],
     subject: purchaseConfirmationSubject(purchaseRef),
     html: buildPurchaseConfirmationHtml(emailProps),
@@ -69,9 +62,9 @@ export async function sendPurchaseConfirmationEmail({
 
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const msg = data?.message || data?.error || res.statusText
+    const msg = formatResendError(data, res.status)
     console.error('[email] Resend failed:', msg)
-    return { ok: false, error: String(msg) }
+    return { ok: false, error: msg }
   }
   return { ok: true, id: data.id }
 }

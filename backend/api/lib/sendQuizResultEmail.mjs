@@ -4,14 +4,7 @@ import {
   buildQuizResultText,
   quizResultSubject,
 } from '../../../shared/quizResultEmail.mjs'
-
-function purchaseFromEmail() {
-  return (process.env.PURCHASE_EMAIL_FROM || process.env.RESEND_FROM || 'ShowSkills Rewards <orders@showskills.co.uk>').trim()
-}
-
-function siteUrl() {
-  return (process.env.SITE_URL || 'https://showskills.co.uk').replace(/\/$/, '')
-}
+import { resolveResendFrom, formatResendError, resolveSiteUrl } from './resendConfig.mjs'
 
 /** One email after quiz: receipt + ticket numbers + qualified or not. */
 export async function sendQuizResultEmail({
@@ -39,7 +32,7 @@ export async function sendQuizResultEmail({
   const props = {
     customerFullName,
     allCorrect: Boolean(allCorrect),
-    siteUrl: siteUrl(),
+    siteUrl: resolveSiteUrl(),
     orderRef,
     bundleTitle: bundle?.title ?? bundleId,
     quantity: quantity ?? bundle?.qty,
@@ -54,7 +47,7 @@ export async function sendQuizResultEmail({
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: purchaseFromEmail(),
+      from: resolveResendFrom(),
       to: [email],
       subject: quizResultSubject(orderRef, props.allCorrect),
       html: buildQuizResultHtml(props),
@@ -64,9 +57,9 @@ export async function sendQuizResultEmail({
 
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const msg = data?.message || data?.error || res.statusText
+    const msg = formatResendError(data, res.status)
     console.error('[email] Entry confirmation Resend failed:', msg)
-    return { ok: false, error: String(msg) }
+    return { ok: false, error: msg }
   }
   return { ok: true, id: data.id }
 }

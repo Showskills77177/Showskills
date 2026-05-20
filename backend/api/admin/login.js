@@ -7,7 +7,12 @@ import {
   adminAuthConfigStatus,
 } from '../lib/adminAuth.mjs'
 import { verifyAdminPassword } from '../lib/password.mjs'
-import { sendAdminLoginOtpEmail, isAdminEmailOtpConfigured, maskAdminEmail } from '../lib/adminEmailOtp.mjs'
+import {
+  sendAdminLoginOtpEmail,
+  isAdminEmailOtpConfigured,
+  getAdminEmailSetupHint,
+  adminOtpVerificationPayload,
+} from '../lib/adminEmailOtp.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 
@@ -52,15 +57,14 @@ export default async function handler(req, res) {
 
   try {
     if (isAdminEmailOtpConfigured()) {
-      const { codeHash } = await sendAdminLoginOtpEmail()
-      const pending = await signAdminSmsPending(codeHash)
+      const hint = getAdminEmailSetupHint()
+      if (hint) {
+        return json(res, 503, { error: hint })
+      }
+      const sent = await sendAdminLoginOtpEmail()
+      const pending = await signAdminSmsPending(sent.codeHash)
       res.setHeader('Set-Cookie', setAdminSmsPendingCookieHeader(pending))
-      return json(res, 200, {
-        ok: true,
-        verificationRequired: true,
-        channel: 'email',
-        maskedDestination: maskAdminEmail(),
-      })
+      return json(res, 200, adminOtpVerificationPayload(sent))
     }
 
     const token = await signAdminSession()
