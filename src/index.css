@@ -551,6 +551,23 @@ body {
     box-sizing: border-box;
   }
 
+  .ss-hero-bundle-cta-actions {
+    max-width: 36rem;
+  }
+
+  .ss-hero-paired-cta--draw {
+    width: 10.75rem;
+    max-width: 10.75rem;
+    flex: 0 0 auto;
+    white-space: normal;
+  }
+
+  .ss-hero-cta-row .ss-btn-bundle-draw.ss-hero-paired-cta {
+    flex: 0 1 auto;
+    width: auto;
+    max-width: 10.75rem;
+  }
+
   @media (min-width: 640px) {
     .ss-hero-paired-cta {
       min-height: 3.25rem;

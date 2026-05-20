@@ -131,11 +131,11 @@ export default function HomePage() {
                   Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
                   case.
                 </p>
-                <div className="ss-hero-bundle-cta-actions flex flex-col gap-2 sm:flex-row sm:items-stretch lg:border-t lg:border-white/10 lg:pt-4">
+                <div className="ss-hero-bundle-cta-actions flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:border-t lg:border-white/10 lg:pt-4">
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-enter ss-hero-paired-cta inline-flex min-h-[3rem] max-w-full flex-1 items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.25rem] sm:px-6 sm:text-base"
+                    className="ss-btn-enter ss-hero-paired-cta ss-hero-paired-cta--draw inline-flex min-h-[3rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-4 py-2 text-center text-xs font-bold uppercase leading-tight tracking-[0.06em] text-emerald-950 sm:min-h-[3.25rem] sm:px-5 sm:py-2.5 sm:text-sm"
                   >
                     Enter Bundle Draw
                   </button>
