@@ -42,7 +42,7 @@ export function Layout() {
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
         {/* Mobile: logo, then menu dock with its own footer strip */}
         <div className="sm:hidden">
-          <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-2 pt-3">
+          <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-1 pt-3">
             <Link
               to="/"
               className="outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512]"

@@ -1,6 +1,6 @@
 /**
  * Ticket bundle row icons — Lucide (ISC), https://lucide.dev
- * Fixed footprint; slot height matches bundle title line-height for alignment.
+ * Fixed footprint; per-tier colour only (same shapes you approved earlier).
  */
 import { Flame, Layers, Rocket, Sparkles, Ticket, Trophy } from 'lucide-react'
 
@@ -13,10 +13,18 @@ const BUNDLE_ICONS = {
   mega25: Trophy,
 }
 
+/** Tier colours — icons only, not CTA buttons */
+const BUNDLE_TONE = {
+  single: 'text-zinc-300',
+  small5: 'text-amber-400',
+  medium10: 'text-violet-400',
+  bigger20: 'text-rose-400',
+  whale40: 'text-indigo-400',
+  mega25: 'text-yellow-400',
+}
+
 const SLOT_CLASS = {
-  /** Homepage ticket panel — matches 0.9375rem / base title line */
   panel: 'h-[1.1875rem] w-[1.125rem] sm:h-[1.375rem] sm:w-[1.125rem]',
-  /** Entry modal bundle title row */
   modal: 'h-5 w-[1.125rem]',
 }
 
@@ -31,11 +39,12 @@ export function TicketBundleIcon({
   className = '',
 }) {
   const Icon = BUNDLE_ICONS[bundleId] ?? Ticket
+  const tone = BUNDLE_TONE[bundleId] ?? BUNDLE_TONE.single
   const slot = SLOT_CLASS[variant] ?? SLOT_CLASS.panel
   const icon = ICON_CLASS[variant] ?? ICON_CLASS.panel
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center text-emerald-400/95 ${slot} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center ${tone} ${slot} ${className}`}
       aria-hidden
     >
       <Icon className={icon} strokeWidth={2} absoluteStrokeWidth />

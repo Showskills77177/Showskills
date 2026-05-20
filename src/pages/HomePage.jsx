@@ -72,11 +72,17 @@ export default function HomePage() {
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for the shirt giveaway and a
                 side-by-side view of both promotions.
               </p>
-              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 md:mt-auto md:border-t md:border-white/10 md:pt-4">
-                <a href="#prizes" className="ss-btn-prize-lineup shrink-0">
+              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 md:mt-auto md:border-t md:border-white/10 md:pt-4">
+                <a
+                  href="#prizes"
+                  className="ss-hero-cta-prize-lineup inline-flex min-h-[3rem] w-full shrink-0 items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40 sm:w-auto sm:min-h-[3.25rem]"
+                >
                   Prize lineup
                 </a>
-                <Link to="/archive/ronaldo-shirt-giveaway" className="ss-btn-shirt-giveaway shrink-0">
+                <Link
+                  to="/archive/ronaldo-shirt-giveaway"
+                  className="ss-hero-cta-shirt-link inline-flex w-full items-center justify-center self-center rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:w-auto sm:py-2.5"
+                >
                   Free shirt giveaway
                 </Link>
               </div>
