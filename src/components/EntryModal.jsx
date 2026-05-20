@@ -7,7 +7,6 @@ const E2E_SIMULATE_CHECKOUT =
   import.meta.env.VITE_E2E_SIMULATE_CHECKOUT === '1'
 import {
   COMPETITION_NAME_POSTAL,
-  TICKET_BUNDLES,
   formatBundlePriceGBP,
   validatePaidSkillAnswers,
 } from '../competitionData'
@@ -15,7 +14,7 @@ import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNo
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
-import { TicketBundleIcon } from './TicketBundleIcon'
+import { TicketBundlePicker } from './TicketBundlePicker'
 
 export function EntryModal() {
   const {
@@ -80,6 +79,7 @@ export function EntryModal() {
   } = useEntryFlow()
 
   const panelRef = useRef(null)
+  const stripePanelRef = useRef(null)
 
   const paidAnswerValidation =
     paidQuizResult != null ? validatePaidSkillAnswers(paidA1, paidA2, paidA3) : null
@@ -142,6 +142,14 @@ export function EntryModal() {
       })
     }
   }, [entryModalType, paidPostCheckout])
+
+  useEffect(() => {
+    if (!paidStripeClientSecret || paidPostCheckout) return
+    const t = requestAnimationFrame(() => {
+      stripePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+    return () => cancelAnimationFrame(t)
+  }, [paidStripeClientSecret, paidPostCheckout])
 
   if (!entryModalType) return null
 
@@ -308,87 +316,13 @@ export function EntryModal() {
                 </form>
               ) : (
                 <div className="mt-4 flex flex-col gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-stone-300">Pay for tickets or enter by post</p>
-                    <div className="mt-2 grid max-h-[min(52vh,22rem)] gap-2 overflow-y-auto pr-1 sm:max-h-none lg:max-h-[14rem] lg:overflow-y-auto xl:max-h-none">
-                      {TICKET_BUNDLES.map((b) => (
-                        <label
-                          key={b.id}
-                          className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
-                            paidEntryRoute === 'tickets' && paidBundleId === b.id
-                              ? 'border-teal-400/55 bg-teal-950/35 ring-1 ring-teal-500/25'
-                              : 'border-white/10 bg-black/20 hover:border-white/18'
-                          } ${b.featured ? 'shadow-[0_0_0_1px_rgba(251,191,36,0.12)]' : ''}`}
-                        >
-                          <input
-                            type="radio"
-                            name="legacy-draw-entry"
-                            value={b.id}
-                            checked={paidEntryRoute === 'tickets' && paidBundleId === b.id}
-                            onChange={() => {
-                              setPaidEntryRoute('tickets')
-                              setPaidBundleId(b.id)
-                            }}
-                            className="mt-1 h-4 w-4 shrink-0 border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                              <TicketBundleIcon bundleId={b.id} variant="modal" />
-                              <span className="font-semibold leading-none text-stone-100">{b.title}</span>
-                              {b.featured ? (
-                                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200/90">
-                                  Popular
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-0.5 text-sm text-teal-200/90">{b.line1}</p>
-                            {b.line2 ? <p className="text-xs text-stone-500">{b.line2}</p> : null}
-                            {b.bullets?.length ? (
-                              <ul className="mt-1.5 space-y-0.5 text-xs text-stone-400">
-                                {b.bullets.map((t) => (
-                                  <li key={t}>✓ {t}</li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </div>
-                          <div className="shrink-0 self-start font-display text-lg leading-none text-white tabular-nums">
-                            {formatBundlePriceGBP(b.totalPence)}
-                          </div>
-                        </label>
-                      ))}
-                      <label
-                        className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
-                          paidEntryRoute === 'postal'
-                            ? 'border-stone-400/45 bg-stone-900/40 ring-1 ring-stone-500/20'
-                            : 'border-white/10 bg-black/20 hover:border-white/18'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="legacy-draw-entry"
-                          value="postal"
-                          checked={paidEntryRoute === 'postal'}
-                          onChange={() => setPaidEntryRoute('postal')}
-                          className="mt-1 h-4 w-4 shrink-0 border-white/20 bg-black/40 text-stone-400 focus:ring-stone-500/50"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-base" aria-hidden>
-                              ✉️
-                            </span>
-                            <span className="font-semibold text-stone-100">Free postal entry</span>
-                            <span className="rounded-full bg-stone-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-stone-300/90">
-                              Same draw
-                            </span>
-                          </div>
-                          <p className="mt-0.5 text-sm text-stone-400">
-                            No payment. Post your details and the three written skill answers — same Ronaldo Legacy Bundle
-                            prize pool as paid tickets. One postal entry per person.
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
+                  <TicketBundlePicker
+                    paidBundleId={paidBundleId}
+                    setPaidBundleId={setPaidBundleId}
+                    paidEntryRoute={paidEntryRoute}
+                    setPaidEntryRoute={setPaidEntryRoute}
+                    selectedTicketBundle={selectedTicketBundle}
+                  />
                   {paidEntryRoute === 'tickets' ? (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="sm:col-span-2">
@@ -482,12 +416,17 @@ export function EntryModal() {
                       type="button"
                       onClick={prepareStripePayment}
                       disabled={paidStripePreparing || !paidFormReadyForPayment}
-                      className="w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3 text-sm font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-h-[48px] w-full rounded-xl border border-teal-500/30 bg-gradient-to-r from-slate-700 to-slate-800 py-3.5 text-base font-bold text-white shadow-lg transition hover:from-slate-600 hover:to-slate-700 disabled:cursor-not-allowed disabled:opacity-50 max-md:text-base"
                     >
                       {paidStripePreparing
-                        ? 'Preparing secure payment…'
-                        : `Pay with card — ${formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}`}
+                        ? 'Opening secure payment…'
+                        : `Pay by debit card — ${formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)}`}
                     </button>
+                  ) : null}
+                  {paidEntryRoute === 'tickets' && hasStripeElements && !paidStripeClientSecret && !paidStripePreparing ? (
+                    <p className="text-center text-[11px] text-stone-500">
+                      Apple Pay appears in the payment panel on iPhone (Safari). Use the button above for debit card.
+                    </p>
                   ) : null}
                   {paidEntryRoute === 'tickets' && hasPayPal ? (
                     <div className={hasStripeCheckout ? 'mt-3' : ''}>
@@ -612,7 +551,10 @@ export function EntryModal() {
           </div>
 
           {showStripePanel ? (
-            <div className="ss-entry-modal-stripe shrink-0 border-t border-white/10 px-4 py-4 sm:px-5 lg:w-[min(22rem,38%)] lg:shrink-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:px-5">
+            <div
+              ref={stripePanelRef}
+              className="ss-entry-modal-stripe shrink-0 border-t border-white/10 px-4 py-4 sm:px-5 lg:w-[min(22rem,38%)] lg:shrink-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:px-5"
+            >
               {paidError ? <ErrorBanner message={paidError} /> : null}
               <StripePaymentForm
                 publishableKey={stripePublishableKey}

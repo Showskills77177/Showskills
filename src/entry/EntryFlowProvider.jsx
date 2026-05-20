@@ -168,17 +168,22 @@ export function EntryFlowProvider({ children }) {
     setPaidStripePreparing(true)
     setPaidStripeClientSecret('')
     setPaidStripePaymentIntentId('')
+    const controller = new AbortController()
+    let prepareTimeout
     try {
+      prepareTimeout = setTimeout(() => controller.abort(), 25_000)
       const res = await fetch(apiUrl(stripePaymentIntentApi), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        signal: controller.signal,
         body: JSON.stringify({
           bundleId: bundle.id,
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),
         }),
       })
+      clearTimeout(prepareTimeout)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Could not start card payment')
@@ -194,7 +199,11 @@ export function EntryFlowProvider({ children }) {
         setPaidTicketNumbers(data.ticketNumbers)
       }
     } catch (e) {
-      setPaidError(e instanceof Error ? e.message : 'Could not start card payment')
+      clearTimeout(prepareTimeout)
+      const aborted = e instanceof Error && e.name === 'AbortError'
+      setPaidError(
+        aborted ? 'Payment setup timed out. Check your connection and try again.' : e instanceof Error ? e.message : 'Could not start card payment',
+      )
     } finally {
       setPaidStripePreparing(false)
     }

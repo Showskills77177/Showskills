@@ -2,9 +2,19 @@ import { useCallback, useMemo, useState } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { stripeElementsAppearance } from '../lib/stripeAppearance'
 import { getStripePromise } from '../lib/stripeLoader'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { apiUrl } from '../lib/api'
 
-function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId, recordPayload, elementReady }) {
+function PayButton({
+  amountLabel,
+  disabled,
+  onError,
+  onSuccess,
+  paymentIntentId,
+  recordPayload,
+  elementReady,
+  compactMobile,
+}) {
   const stripe = useStripe()
   const elements = useElements()
   const [paying, setPaying] = useState(false)
@@ -69,15 +79,69 @@ function PayButton({ amountLabel, disabled, onError, onSuccess, paymentIntentId,
       type="button"
       disabled={disabled || paying || !stripe || !elements || !elementReady}
       onClick={handlePay}
-      className="mt-4 w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`mt-3 w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
+        compactMobile ? 'min-h-[48px] py-3.5 text-base' : 'py-3 text-sm'
+      }`}
     >
       {paying ? 'Processing…' : `Pay ${amountLabel}`}
     </button>
   )
 }
 
+function PaymentFields({ amountLabel, disabled, onError, onSuccess, paymentIntentId, recordPayload }) {
+  const isMobile = useMediaQuery('(max-width: 767px)')
+  const [elementReady, setElementReady] = useState(false)
+
+  return (
+    <>
+      <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">
+        {isMobile ? 'Apple Pay or debit card' : 'Secure payment'}
+      </p>
+      {isMobile ? (
+        <p className="mt-1 text-[11px] leading-snug text-stone-500">
+          On iPhone, use Apple Pay when it appears, or enter your debit card below.
+        </p>
+      ) : null}
+      {!elementReady ? (
+        <p className="ss-stripe-payment-loading mt-3 text-sm text-stone-500" aria-live="polite">
+          Loading payment options…
+        </p>
+      ) : null}
+      <div className={`ss-stripe-payment-element mt-3 ${elementReady ? 'ss-stripe-payment-element--ready' : ''}`}>
+        <PaymentElement
+          onReady={() => setElementReady(true)}
+          onLoadError={(e) => {
+            onError(e?.error?.message || 'Could not load payment form. Try refreshing or another browser.')
+          }}
+          options={{
+            layout: isMobile ? 'accordion' : 'tabs',
+            wallets: {
+              applePay: 'auto',
+              googlePay: 'auto',
+              link: 'never',
+            },
+            fields: { billingDetails: { email: 'never', name: 'never', phone: 'never', address: 'never' } },
+            terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
+            business: { name: 'ShowSkills Rewards' },
+          }}
+        />
+      </div>
+      <PayButton
+        amountLabel={amountLabel}
+        disabled={disabled}
+        elementReady={elementReady}
+        onError={onError}
+        onSuccess={onSuccess}
+        paymentIntentId={paymentIntentId}
+        recordPayload={recordPayload}
+        compactMobile={isMobile}
+      />
+    </>
+  )
+}
+
 /**
- * Embedded Stripe Payment Element (card only — faster load, fewer Safari issues).
+ * Embedded Stripe Payment Element — Apple Pay on Safari/iOS when domain is registered in Stripe.
  */
 export function StripePaymentForm({
   publishableKey,
@@ -94,42 +158,19 @@ export function StripePaymentForm({
     () => ({
       clientSecret,
       appearance: stripeElementsAppearance,
-      loader: 'auto',
+      loader: 'always',
     }),
     [clientSecret],
   )
-  const [elementReady, setElementReady] = useState(false)
 
   if (!clientSecret) return null
 
   return (
     <div className="ss-stripe-payment-shell rounded-xl border border-teal-500/25 bg-black/25 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">Secure card payment</p>
-      {!elementReady ? (
-        <p className="ss-stripe-payment-loading mt-3 text-sm text-stone-500" aria-live="polite">
-          Loading secure card form…
-        </p>
-      ) : null}
       <Elements key={clientSecret} stripe={stripePromise} options={options}>
-        <div className={`ss-stripe-payment-element mt-3 ${elementReady ? 'ss-stripe-payment-element--ready' : ''}`}>
-          <PaymentElement
-            onReady={() => setElementReady(true)}
-            onLoadError={(e) => {
-              onError(e?.error?.message || 'Could not load card form. Try refreshing or another browser.')
-            }}
-            options={{
-              layout: 'tabs',
-              wallets: { applePay: 'never', googlePay: 'never', link: 'never' },
-              fields: { billingDetails: { email: 'never', name: 'never', phone: 'never', address: 'never' } },
-              terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
-              business: { name: 'ShowSkills Rewards' },
-            }}
-          />
-        </div>
-        <PayButton
+        <PaymentFields
           amountLabel={amountLabel}
           disabled={disabled}
-          elementReady={elementReady}
           onError={onError}
           onSuccess={onSuccess}
           paymentIntentId={paymentIntentId}
