@@ -9,6 +9,7 @@ import {
   COMPETITION_NAME_POSTAL,
   TICKET_BUNDLES,
   formatBundlePriceGBP,
+  validatePaidSkillAnswers,
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { ErrorBanner } from './ErrorBanner'
@@ -70,6 +71,26 @@ export function EntryModal() {
   } = useEntryFlow()
 
   const panelRef = useRef(null)
+
+  const paidAnswerValidation =
+    paidQuizResult != null ? validatePaidSkillAnswers(paidA1, paidA2, paidA3) : null
+  const paidAnswerInputClass = (questionIndex) => {
+    const base =
+      'mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2'
+    if (!paidAnswerValidation) {
+      return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
+    }
+    const correct =
+      questionIndex === 0
+        ? paidAnswerValidation.q1
+        : questionIndex === 1
+          ? paidAnswerValidation.q2
+          : paidAnswerValidation.q3
+    if (!correct) {
+      return `${base} border-red-500/80 bg-red-950/45 text-red-100 placeholder:text-red-400/40 focus:border-red-500/70 focus:ring-red-900/50`
+    }
+    return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
+  }
 
   useEffect(() => {
     if (!entryModalType) return
@@ -190,27 +211,44 @@ export function EntryModal() {
                       </p>
                     ) : null}
                   </div>
-                  {PAID_SKILL_QUESTIONS.map((q, i) => (
-                    <div key={q.id}>
-                      <label htmlFor={`modal-paid-q-${q.id}`} className="block text-sm font-medium text-stone-300">
-                        {i + 1}. {q.prompt}
-                      </label>
-                      <input
-                        id={`modal-paid-q-${q.id}`}
-                        type="text"
-                        autoComplete="off"
-                        value={i === 0 ? paidA1 : i === 1 ? paidA2 : paidA3}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          if (i === 0) setPaidA1(v)
-                          else if (i === 1) setPaidA2(v)
-                          else setPaidA3(v)
-                        }}
-                        className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                        placeholder="Type your answer"
-                      />
-                    </div>
-                  ))}
+                  {PAID_SKILL_QUESTIONS.map((q, i) => {
+                    const qCorrect = paidAnswerValidation
+                      ? i === 0
+                        ? paidAnswerValidation.q1
+                        : i === 1
+                          ? paidAnswerValidation.q2
+                          : paidAnswerValidation.q3
+                      : null
+                    const showIncorrect = paidQuizResult && qCorrect === false
+                    return (
+                      <div key={q.id}>
+                        <label
+                          htmlFor={`modal-paid-q-${q.id}`}
+                          className={`block text-sm font-medium ${showIncorrect ? 'text-red-300' : 'text-stone-300'}`}
+                        >
+                          {i + 1}. {q.prompt}
+                        </label>
+                        <input
+                          id={`modal-paid-q-${q.id}`}
+                          type="text"
+                          autoComplete="off"
+                          value={i === 0 ? paidA1 : i === 1 ? paidA2 : paidA3}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            if (i === 0) setPaidA1(v)
+                            else if (i === 1) setPaidA2(v)
+                            else setPaidA3(v)
+                          }}
+                          className={paidAnswerInputClass(i)}
+                          placeholder="Type your answer"
+                          aria-invalid={showIncorrect || undefined}
+                        />
+                        {showIncorrect ? (
+                          <p className="mt-1 text-xs font-medium text-red-400">Incorrect</p>
+                        ) : null}
+                      </div>
+                    )
+                  })}
                   {paidQuizError ? <ErrorBanner message={paidQuizError} /> : null}
                   {paidQuizResult === 'qualified' ? (
                     <p className="rounded-lg border border-emerald-700/40 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-100/95">

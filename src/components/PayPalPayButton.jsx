@@ -74,7 +74,11 @@ export function PayPalPayButton({
           const res = await fetch(createOrderUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bundleId }),
+            body: JSON.stringify({
+              bundleId,
+              customerEmail: customerEmail?.trim() || '',
+              customerFullName: customerFullName?.trim() || '',
+            }),
           })
           const data = await res.json().catch(() => ({}))
           if (!res.ok) {

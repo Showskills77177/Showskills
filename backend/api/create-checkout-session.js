@@ -1,6 +1,12 @@
 import Stripe from 'stripe'
 import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import {
+  buildCheckoutDescription,
+  STRIPE_CHECKOUT_DESCRIPTION_MAX,
+} from '../../shared/checkoutTicketDescription.mjs'
+import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
+import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
 
 function parseBody(req) {
   const b = req.body
@@ -57,7 +63,13 @@ export default async function handler(req, res) {
     typeof body.customerFullName === 'string' ? body.customerFullName.trim().slice(0, 200) : ''
 
   const productName = `Ronaldo Legacy Bundle — ${bundle.qty} ticket${bundle.qty === 1 ? '' : 's'}`
-  const description = `${bundle.title}: ${bundle.line1}. Skill-based competition — submit answers after payment. ${TICKET_PURCHASE_NON_REFUND_NOTICE}`
+  const ticketNumbers = await reserveTicketNumbers(bundle.qty)
+  const description = buildCheckoutDescription({
+    bundleSummary: `${bundle.title}: ${bundle.line1}. Submit skill answers after payment.`,
+    ticketNumbers,
+    nonRefundNotice: TICKET_PURCHASE_NON_REFUND_NOTICE,
+    maxLength: STRIPE_CHECKOUT_DESCRIPTION_MAX,
+  })
 
   try {
     // Apple Pay & Google Pay: Stripe shows eligible wallet buttons on the hosted Checkout page when your
@@ -90,8 +102,23 @@ export default async function handler(req, res) {
         bundle_id: bundle.id,
         ticket_quantity: String(bundle.qty),
         customer_full_name: customerFullName || '',
+        ticket_numbers: ticketNumbers.join(','),
       },
     })
+
+    try {
+      await createPendingTicketCheckout({
+        provider: 'stripe',
+        externalId: session.id,
+        bundleId: bundle.id,
+        quantity: bundle.qty,
+        ticketNumbers,
+        customerEmail,
+        customerFullName,
+      })
+    } catch (pendingErr) {
+      console.error('createPendingTicketCheckout (stripe):', pendingErr)
+    }
 
     return res.status(200).json({ sessionId: session.id, url: session.url })
   } catch (err) {

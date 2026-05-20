@@ -1,6 +1,12 @@
 import { getPayPalCredentials, getCheckoutCurrency, paypalAccessToken } from './lib/paypal.js'
 import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import {
+  buildCheckoutDescription,
+  PAYPAL_CHECKOUT_DESCRIPTION_MAX,
+} from '../../shared/checkoutTicketDescription.mjs'
+import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
+import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
 
 function parseBody(req) {
   const b = req.body
@@ -43,6 +49,18 @@ export default async function handler(req, res) {
 
   const currency = getCheckoutCurrency()
   const value = (bundle.totalPence / 100).toFixed(2)
+  const customerEmail =
+    typeof body.customerEmail === 'string' ? body.customerEmail.trim().slice(0, 320) : ''
+  const customerFullName =
+    typeof body.customerFullName === 'string' ? body.customerFullName.trim().slice(0, 200) : ''
+
+  const ticketNumbers = await reserveTicketNumbers(bundle.qty)
+  const description = buildCheckoutDescription({
+    bundleSummary: `Ronaldo Legacy Bundle — ${bundle.qty} ticket(s). Submit skill answers after payment.`,
+    ticketNumbers,
+    nonRefundNotice: TICKET_PURCHASE_NON_REFUND_NOTICE,
+    maxLength: PAYPAL_CHECKOUT_DESCRIPTION_MAX,
+  })
 
   try {
     const token = await paypalAccessToken(creds)
@@ -60,8 +78,8 @@ export default async function handler(req, res) {
               currency_code: currency,
               value,
             },
-            description: `Ronaldo Legacy Bundle — ${bundle.qty} ticket(s). ${TICKET_PURCHASE_NON_REFUND_NOTICE}`,
-            custom_id: `ronaldo_legacy_bundle|${bundle.id}|qty:${bundle.qty}`,
+            description,
+            custom_id: `ronaldo_legacy_bundle|${bundle.id}|qty:${bundle.qty}|tickets:${ticketNumbers.length}`,
           },
         ],
         application_context: {
@@ -76,6 +94,20 @@ export default async function handler(req, res) {
       const msg = data.message || data.error || JSON.stringify(data)
       console.error('PayPal create order:', msg)
       return res.status(502).json({ error: typeof msg === 'string' ? msg : 'PayPal create order failed' })
+    }
+
+    try {
+      await createPendingTicketCheckout({
+        provider: 'paypal',
+        externalId: data.id,
+        bundleId: bundle.id,
+        quantity: bundle.qty,
+        ticketNumbers,
+        customerEmail,
+        customerFullName,
+      })
+    } catch (pendingErr) {
+      console.error('createPendingTicketCheckout (paypal):', pendingErr)
     }
 
     return res.status(200).json({ orderID: data.id })

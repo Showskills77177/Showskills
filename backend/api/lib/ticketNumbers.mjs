@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { query, isUniqueViolation } from './db.mjs'
+import { query, isUniqueViolation, isDbConfigured } from './db.mjs'
 import { formatTicketNumber } from '../../../shared/ticketNumber.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 
@@ -14,6 +14,50 @@ async function generateUniqueTicketNumber() {
     if (!exists.rows[0]) return num
   }
   throw new Error('Could not allocate unique ticket number')
+}
+
+/** Allocate unique ticket numbers before checkout (for Stripe/PayPal descriptions). */
+export async function reserveTicketNumbers(quantity) {
+  const qty = Math.max(1, Math.min(500, parseInt(String(quantity), 10) || 1))
+  if (!isDbConfigured()) {
+    return Array.from({ length: qty }, () => formatTicketNumber(randomSerial()))
+  }
+  await ensureTicketSchema()
+  const numbers = []
+  for (let i = 0; i < qty; i++) {
+    numbers.push(await generateUniqueTicketNumber())
+  }
+  return numbers
+}
+
+/** Insert pre-reserved numbers (checkout pending row). Skips if rows already exist. */
+export async function insertPreservedTicketNumbers(ticketId, ticketNumbers) {
+  await ensureTicketSchema()
+  const list = Array.isArray(ticketNumbers) ? ticketNumbers.filter(Boolean) : []
+  const existing = await query(
+    `SELECT ticket_number FROM ticket_numbers WHERE ticket_id = $1 ORDER BY slot_index ASC`,
+    [ticketId],
+  )
+  if (existing.rows.length >= list.length && list.length > 0) {
+    return existing.rows.map((r) => r.ticket_number)
+  }
+
+  const numbers = []
+  for (let slot = 0; slot < list.length; slot++) {
+    const ticketNumber = list[slot]
+    const id = randomUUID()
+    try {
+      await query(
+        `INSERT INTO ticket_numbers (id, ticket_id, ticket_number, slot_index) VALUES ($1, $2, $3, $4)`,
+        [id, ticketId, ticketNumber, slot + 1],
+      )
+      numbers.push(ticketNumber)
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err
+      throw new Error('Reserved ticket number already in use')
+    }
+  }
+  return numbers
 }
 
 /** Create one row per entry slot (bundle quantity). Returns sorted ticket numbers. */

@@ -18,7 +18,7 @@ test.describe('B) Mocked payment + persistence', () => {
     await page.getByRole('checkbox', { name: /I agree to the/i }).check()
     await page.getByRole('button', { name: /E2E simulated checkout/i }).click()
     await expect(page.getByText(/Payment received/i)).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByText(/SS-TKT-/)).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/SS-[A-F0-9]{8}/)).toBeVisible({ timeout: 10_000 })
 
     const db1 = openE2eDb()
     expect(countTickets(db1)).toBeGreaterThan(ticketsBefore)

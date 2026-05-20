@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { parseJsonBody, json } from '../lib/http.mjs'
-import { recordStripeCheckoutCompleted } from '../lib/recordSale.mjs'
+import { recordStripeCheckoutCompleted, parseReservedTicketNumbersMetadata } from '../lib/recordSale.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 
 export default async function handler(req, res) {
@@ -57,6 +57,7 @@ export default async function handler(req, res) {
       amountPence: session.amount_total || 0,
       currency: session.currency || 'gbp',
       paymentIntentId: piId || undefined,
+      reservedTicketNumbers: parseReservedTicketNumbersMetadata(md),
     })
 
     if (!recorded) {
