@@ -486,6 +486,7 @@ body {
 @media (min-width: 1024px) {
   .ss-hero-merged-panel {
     grid-template-rows: auto auto;
+    align-items: stretch;
   }
 
   .ss-hero-intro {
@@ -496,6 +497,7 @@ body {
 
   .ss-hero-cta-row {
     margin-top: auto;
+    align-items: center;
   }
 
   /* Align dark prize studio with “ShowSkills Rewards”, not the Live promotion pill */
@@ -507,47 +509,79 @@ body {
 
   .ss-hero-prize-stack .ss-hero-prize-column {
     border-top: 0;
-    padding-top: 3.35rem;
+    padding-top: 3.15rem;
     padding-left: 0;
     flex-shrink: 0;
   }
 
-  /* Sit Enter Bundle Draw on the same row as Enter now / Prize lineup */
+  .ss-prize-studio--hero {
+    padding: 0.7rem 0.9rem 1.15rem;
+  }
+
+  .ss-prize-studio--hero .ss-prize-studio-tile--main {
+    padding-top: 0.55rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .ss-prize-studio--hero .ss-prize-studio-tile--main .ss-prize-studio-photo {
+    padding-top: 0.2rem;
+  }
+
+  .ss-prize-studio--hero .ss-prize-studio-subgrid {
+    padding-top: 0.7rem;
+    padding-bottom: 0.5rem;
+  }
+
+  /* Enter Bundle Draw: same track as Enter now; button slightly taller */
   .ss-hero-bundle-cta {
     margin-top: auto;
     flex-shrink: 0;
-    padding-top: 0.25rem;
+  }
+
+  .ss-hero-bundle-cta-actions {
+    display: flex;
+    align-items: center;
+    min-height: 3.25rem;
+  }
+
+  .ss-btn-bundle-draw {
+    min-height: 3.5rem;
   }
 
   .ss-hero-bundle-cta .ss-hero-bundle-cta-blurb {
-    margin-top: 0.35rem;
+    margin-top: 0.5rem;
   }
 
-  /* Row 2: legacy details and ticket bundles share the same top edge; tight under bundle CTA */
+  /* Row 2: equal-height panels */
   .ss-hero-copy-footer,
   .ss-hero-ticket-bundles {
-    align-self: start;
-  }
-
-  .ss-hero-ticket-bundles {
-    margin-top: 0;
-    padding-top: 0;
-  }
-
-  .ss-hero-copy-footer {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    align-self: stretch;
+    min-height: 100%;
   }
 
-  .ss-legacy-details-card {
+  .ss-hero-panel-card {
+    display: flex;
     flex: 1;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+
+  .ss-legacy-details-card.ss-hero-panel-card {
     padding: 1.1rem 1.2rem 1.2rem;
     line-height: 1.55;
   }
 
-  .ss-hero-ticket-bundles > div {
-    min-height: 100%;
+  .ss-hero-ticket-bundles > .ss-hero-panel-card {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .ss-hero-ticket-bundles .ss-ticket-bundles-list {
+    flex: 1;
   }
 }
 
@@ -589,6 +623,24 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #050505;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38);
+}
+
+.ss-prize-studio--hero {
+  padding: 0.55rem 0.7rem 0.95rem;
+}
+
+.ss-prize-studio--hero .ss-prize-studio-tile--main {
+  padding-top: 0.4rem;
+  padding-bottom: 0.25rem;
+}
+
+.ss-prize-studio--hero .ss-prize-studio-subgrid {
+  padding-top: 0.55rem;
+  padding-bottom: 0.35rem;
+}
+
+.ss-btn-bundle-draw {
+  min-height: 3.25rem;
 }
 
 .ss-prize-studio::before {

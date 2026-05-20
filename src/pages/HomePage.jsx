@@ -28,7 +28,7 @@ export default function HomePage() {
         </div>
 
         <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
-          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-stretch lg:gap-x-7 lg:gap-y-2 lg:p-6">
+          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-stretch lg:gap-x-7 lg:gap-y-3 lg:p-6">
             <div className="ss-hero-intro flex flex-col gap-4 text-left lg:col-start-1 lg:row-start-1">
               <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
@@ -77,7 +77,7 @@ export default function HomePage() {
 
             <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:min-h-0 lg:gap-2">
               <div id="prizes" className="ss-hero-prize-column scroll-mt-24">
-                <div className="ss-prize-studio p-2 sm:p-3">
+                <div className="ss-prize-studio ss-prize-studio--hero p-2 sm:p-3">
                   <div className="relative z-[1] grid gap-2">
                     <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
                       <div className="ss-prize-studio-photo">
@@ -125,13 +125,15 @@ export default function HomePage() {
               </div>
 
               <div className="ss-hero-bundle-cta">
-                <button
-                  type="button"
-                  onClick={() => openEntry('paid')}
-                  className="w-full rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 py-3 text-sm font-bold text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110"
-                >
-                  Enter Bundle Draw
-                </button>
+                <div className="ss-hero-bundle-cta-actions lg:border-t lg:border-white/10 lg:pt-4">
+                  <button
+                    type="button"
+                    onClick={() => openEntry('paid')}
+                    className="ss-btn-bundle-draw w-full rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-8 py-3.5 text-center text-base font-bold uppercase tracking-[0.1em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:py-4 sm:text-lg"
+                  >
+                    Enter Bundle Draw
+                  </button>
+                </div>
                 <p className="ss-hero-bundle-cta-blurb mt-1.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
                   Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
                   case.
@@ -140,7 +142,7 @@ export default function HomePage() {
             </div>
 
             <div className="ss-hero-copy-footer lg:col-start-1 lg:row-start-2">
-              <div className="ss-legacy-details-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none">
+              <div className="ss-legacy-details-card ss-hero-panel-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none">
                 <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
                   Ronaldo Legacy Bundle details
                 </p>
@@ -182,7 +184,7 @@ export default function HomePage() {
             </div>
 
             <div className="ss-hero-ticket-bundles lg:col-start-2 lg:row-start-2">
-              <TicketBundlePrice className="h-full" />
+              <TicketBundlePrice className="ss-hero-panel-card h-full" />
             </div>
           </article>
         </div>
