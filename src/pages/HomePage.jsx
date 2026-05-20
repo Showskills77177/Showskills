@@ -56,7 +56,7 @@ export default function HomePage() {
               <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-auto lg:border-t lg:border-white/10 lg:pt-4">
                 <a
                   href="#prizes"
-                  className="ss-btn-bundle-draw inline-flex min-h-[3rem] max-w-full flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[3.25rem] sm:px-6 sm:text-base"
+                  className="ss-btn-bundle-draw ss-btn-prize-lineup inline-flex min-h-[2.4rem] max-w-full flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-4 py-2 text-center text-xs font-bold uppercase tracking-[0.08em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[2.6rem] sm:px-5 sm:py-2 sm:text-sm"
                 >
                   Prize lineup
                 </a>
@@ -126,16 +126,16 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="ss-hero-bundle-cta mt-1 flex flex-col lg:mt-auto">
-                <p className="ss-hero-bundle-cta-blurb mb-2 max-w-none text-center text-[11px] leading-snug text-stone-500 sm:mb-2.5 sm:text-xs lg:mb-3">
+              <div className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center lg:mt-auto">
+                <p className="ss-hero-bundle-cta-blurb mb-2 w-full text-center text-[11px] leading-snug text-stone-500 sm:mb-2.5 sm:text-xs lg:mb-3">
                   Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
                   case.
                 </p>
-                <div className="ss-hero-bundle-cta-actions flex w-full flex-col items-center gap-2 sm:gap-2.5 lg:border-t lg:border-white/10 lg:pt-4">
+                <div className="ss-hero-bundle-cta-actions flex w-full justify-center lg:border-t lg:border-white/10 lg:pt-4">
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-enter ss-hero-bundle-draw-btn inline-flex min-h-[3rem] w-full max-w-[15.5rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-emerald-950 sm:min-h-[3.25rem] sm:px-6 sm:text-base"
+                    className="ss-btn-enter ss-hero-bundle-draw-btn inline-flex min-h-[2.4rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-emerald-950 sm:min-h-[2.6rem] sm:px-6 sm:text-base"
                   >
                     Enter Bundle Draw
                   </button>

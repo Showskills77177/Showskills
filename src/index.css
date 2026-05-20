@@ -507,6 +507,7 @@ body {
   .ss-hero-bundle-cta {
     margin-top: auto;
     width: 100%;
+    align-items: center;
   }
 
   /* Align dark prize studio with “ShowSkills Rewards”, not the Live promotion pill */
@@ -545,16 +546,33 @@ body {
     flex-shrink: 0;
   }
 
+  /* Center Enter Bundle Draw on the same axis as the black prize studio panel */
   .ss-hero-bundle-cta-actions {
+    display: flex;
     justify-content: center;
+    align-items: center;
+    width: 100%;
   }
 
-  /* Slightly narrower than full column; centered under the prize studio */
   .ss-hero-bundle-draw-btn {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 15.5rem;
+    width: auto;
+    max-width: calc(100% - 1.5rem);
+    margin-inline: auto;
     box-sizing: border-box;
+  }
+
+  /* ~20% smaller than default hero primary CTA */
+  .ss-btn-prize-lineup {
+    transform: none;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+  }
+
+  @media (min-width: 640px) {
+    .ss-btn-prize-lineup {
+      font-size: 0.875rem;
+    }
   }
 
   /* Row 2: equal-height panels */
