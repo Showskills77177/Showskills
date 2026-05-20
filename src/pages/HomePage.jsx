@@ -56,7 +56,7 @@ export default function HomePage() {
               <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-auto lg:border-t lg:border-white/10 lg:pt-4">
                 <a
                   href="#prizes"
-                  className="ss-btn-bundle-draw ss-btn-prize-lineup inline-flex min-h-[2.4rem] max-w-full flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-4 py-2 text-center text-xs font-bold uppercase tracking-[0.08em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[2.6rem] sm:px-5 sm:py-2 sm:text-sm"
+                  className="ss-btn-bundle-draw ss-btn-prize-lineup shrink-0"
                 >
                   Prize lineup
                 </a>
@@ -135,7 +135,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => openEntry('paid')}
-                    className="ss-btn-enter ss-hero-bundle-draw-btn inline-flex min-h-[2.4rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-5 py-2.5 text-center text-sm font-bold uppercase tracking-[0.08em] text-emerald-950 sm:min-h-[2.6rem] sm:px-6 sm:text-base"
+                    className="ss-btn-enter ss-hero-bundle-draw-btn"
                   >
                     Enter Bundle Draw
                   </button>

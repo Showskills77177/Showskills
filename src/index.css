@@ -495,9 +495,12 @@ body {
     min-height: 100%;
   }
 
-  .ss-hero-cta-row,
+  .ss-hero-cta-row {
+    align-items: center;
+  }
+
   .ss-hero-bundle-cta-actions {
-    align-items: stretch;
+    align-items: center;
   }
 
   .ss-hero-cta-row {
@@ -552,27 +555,6 @@ body {
     justify-content: center;
     align-items: center;
     width: 100%;
-  }
-
-  .ss-hero-bundle-draw-btn {
-    flex: 0 0 auto;
-    width: auto;
-    max-width: calc(100% - 1.5rem);
-    margin-inline: auto;
-    box-sizing: border-box;
-  }
-
-  /* ~20% smaller than default hero primary CTA */
-  .ss-btn-prize-lineup {
-    transform: none;
-    font-size: 0.7rem;
-    letter-spacing: 0.06em;
-  }
-
-  @media (min-width: 640px) {
-    .ss-btn-prize-lineup {
-      font-size: 0.875rem;
-    }
   }
 
   /* Row 2: equal-height panels */
@@ -669,6 +651,85 @@ body {
 
 .ss-btn-bundle-draw {
   min-height: 3.25rem;
+}
+
+.ss-hero-bundle-cta-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Right: wider green CTA, centered under the black prize studio */
+.ss-hero-bundle-draw-btn {
+  display: inline-flex;
+  min-height: 3rem;
+  min-width: 14.25rem;
+  width: min(100%, 18.5rem);
+  max-width: 18.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-inline: auto;
+  padding: 0.625rem 1.75rem;
+  border-radius: 0.75rem;
+  background-image: linear-gradient(to right, #34d399, #2dd4bf);
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #022c22;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .ss-hero-bundle-draw-btn {
+    min-height: 3.25rem;
+    min-width: 15.25rem;
+    font-size: 1rem;
+    padding: 0.7rem 2rem;
+  }
+}
+
+/* Left: compact teal CTA — no flex growth */
+.ss-btn-prize-lineup {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 3rem;
+  max-width: 10.25rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(20, 184, 166, 0.35);
+  background-image: linear-gradient(to right, rgba(17, 94, 89, 0.9), rgba(6, 78, 59, 0.9));
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ccfbf1;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transition:
+    filter 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ss-btn-prize-lineup:hover {
+  filter: brightness(1.1);
+  border-color: rgba(45, 212, 191, 0.5);
+}
+
+@media (min-width: 640px) {
+  .ss-btn-prize-lineup {
+    min-height: 3.25rem;
+    max-width: 10.75rem;
+    padding: 0.55rem 1.125rem;
+    font-size: 0.75rem;
+  }
 }
 
 
