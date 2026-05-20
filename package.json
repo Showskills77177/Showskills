@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "node server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\"",
-    "dev:e2e": "concurrently -k \"node server.js\" \"vite --port 5173 --strictPort\"",
+    "dev:e2e": "concurrently -k \"PORT=3001 node server.js\" \"VITE_PROXY_API_TARGET=http://127.0.0.1:3001 vite --port 5173 --strictPort\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

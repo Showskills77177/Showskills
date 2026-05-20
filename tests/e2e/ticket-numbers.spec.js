@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { e2eSecret } from '../support/env.mjs'
-import { openE2eDb, paidTicketNumbersForEmail } from '../support/tickets.mjs'
+import { openE2eDb, paidTicketNumbersForEmail } from '../support/db.mjs'
 
 test.describe('Ticket numbers on confirmed checkout', () => {
   test('mock session checkout creates paid ticket with SS- numbers', async ({ page }) => {

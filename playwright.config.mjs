@@ -26,7 +26,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     /** Must match vite --port in dev:e2e (strict — fails if busy). */
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -37,8 +37,8 @@ export default defineConfig({
   webServer: {
     /** API on :3001 + Vite :5173 so tests do not clash with a normal dev:all on :3000/:5173. */
     command: 'npm run dev:e2e',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: process.env.PW_REUSE_SERVER === '1',
+    url: 'http://localhost:5173',
+    reuseExistingServer: process.env.PW_REUSE_SERVER !== '0',
     timeout: 120_000,
     env: {
       ...process.env,

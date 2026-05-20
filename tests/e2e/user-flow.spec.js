@@ -15,7 +15,7 @@ test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
 
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /ShowSkills Rewards/i })).toBeVisible()
-    await page.getByRole('link', { name: 'Competitions' }).click()
+    await page.getByLabel('Main navigation').getByRole('link', { name: 'Competitions' }).click()
     await expect(page).toHaveURL(/\/competitions/)
     await expect(page.getByRole('heading', { name: 'Competitions' })).toBeVisible()
 
