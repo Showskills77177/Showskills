@@ -3,6 +3,7 @@ import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import {
   buildCheckoutDescription,
+  buildStripePaymentMetadata,
   STRIPE_CHECKOUT_DESCRIPTION_MAX,
 } from '../../shared/checkoutTicketDescription.mjs'
 import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
@@ -64,8 +65,7 @@ export default async function handler(req, res) {
   try {
     const ticketNumbers = await reserveTicketNumbers(bundle.qty)
     const description = buildCheckoutDescription({
-      bundleSummary: `${bundle.title}: ${bundle.line1}. Submit skill answers after payment.`,
-      ticketNumbers,
+      bundleSummary: `${bundle.title}: ${bundle.line1} (${bundle.qty} ticket${bundle.qty === 1 ? '' : 's'}). Submit skill answers after payment.`,
       nonRefundNotice: TICKET_PURCHASE_NON_REFUND_NOTICE,
       maxLength: STRIPE_CHECKOUT_DESCRIPTION_MAX,
     })
@@ -76,13 +76,11 @@ export default async function handler(req, res) {
       description,
       receipt_email: customerEmail,
       automatic_payment_methods: { enabled: true },
-      metadata: {
-        competition: 'ronaldo_legacy_bundle',
-        bundle_id: bundle.id,
-        ticket_quantity: String(bundle.qty),
-        customer_full_name: customerFullName,
-        ticket_numbers: ticketNumbers.join(','),
-      },
+      metadata: buildStripePaymentMetadata({
+        bundleId: bundle.id,
+        qty: bundle.qty,
+        customerFullName,
+      }),
     })
 
     if (!paymentIntent.client_secret) {

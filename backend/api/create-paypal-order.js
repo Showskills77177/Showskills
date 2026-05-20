@@ -57,7 +57,6 @@ export default async function handler(req, res) {
   const ticketNumbers = await reserveTicketNumbers(bundle.qty)
   const description = buildCheckoutDescription({
     bundleSummary: `Ronaldo Legacy Bundle — ${bundle.qty} ticket(s). Submit skill answers after payment.`,
-    ticketNumbers,
     nonRefundNotice: TICKET_PURCHASE_NON_REFUND_NOTICE,
     maxLength: PAYPAL_CHECKOUT_DESCRIPTION_MAX,
   })
