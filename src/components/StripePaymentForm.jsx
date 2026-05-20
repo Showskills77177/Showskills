@@ -43,7 +43,9 @@ function paymentElementOptions(recordPayload, isMobile) {
         email: email || undefined,
       },
     },
-    fields: { billingDetails: { email: 'never', name: 'never', phone: 'never', address: 'never' } },
+    // Only `never` fields must be passed in confirmPayment — we collect name/email on the entry form.
+    // Phone is `auto` (we don't ask for it); address is `never` + country passed at confirm.
+    fields: { billingDetails: { email: 'never', name: 'never', phone: 'auto', address: 'never' } },
     terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
     business: { name: 'ShowSkills Rewards' },
   }
