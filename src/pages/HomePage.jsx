@@ -127,7 +127,7 @@ export default function HomePage() {
               </div>
 
               <div className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center lg:mt-auto">
-                <p className="ss-hero-bundle-cta-blurb mb-2 w-full text-center text-[11px] leading-snug text-stone-500 sm:mb-2.5 sm:text-xs lg:mb-3">
+                <p className="ss-hero-bundle-cta-blurb text-center text-stone-500">
                   Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
                   case.
                 </p>

@@ -653,6 +653,32 @@ body {
   min-height: 3.25rem;
 }
 
+.ss-hero-bundle-cta-blurb {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0.35rem 0 0.45rem;
+  padding-inline: 0.9rem;
+  font-size: 0.6875rem;
+  line-height: 1.28;
+  letter-spacing: 0.01em;
+}
+
+@media (min-width: 640px) {
+  .ss-hero-bundle-cta-blurb {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ss-hero-bundle-cta-blurb {
+    margin-top: 0.25rem;
+    margin-bottom: 0.55rem;
+    padding-inline: 0.9rem;
+  }
+}
+
 .ss-hero-bundle-cta-actions {
   display: flex;
   justify-content: center;
