@@ -58,6 +58,17 @@ export const TICKET_BUNDLES = [
     bullets: [],
     featured: false,
   },
+  {
+    id: 'mega50',
+    qty: 50,
+    totalPence: 2000,
+    emoji: '🏆',
+    title: 'Mega bundle',
+    line1: '50 tickets = £20',
+    line2: '£0.40 per ticket',
+    bullets: ['Best volume rate'],
+    featured: false,
+  },
 ]
 
 export const DEFAULT_TICKET_BUNDLE_ID = TICKET_BUNDLES[0].id

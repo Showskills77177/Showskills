@@ -28,8 +28,9 @@ export default function HomePage() {
         </div>
 
         <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
-          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-start lg:gap-x-7 lg:gap-y-4 lg:p-6">
-            <div className="ss-hero-intro flex flex-col gap-4 text-left lg:col-start-1 lg:row-start-1">
+          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-stretch lg:gap-x-7 lg:gap-y-5 lg:p-6">
+            <div className="ss-hero-left flex flex-col gap-4 lg:col-start-1 lg:row-start-1">
+            <div className="ss-hero-intro flex flex-col gap-4 text-left">
               <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                 Live promotion
@@ -73,6 +74,49 @@ export default function HomePage() {
                   Free shirt giveaway
                 </Link>
               </div>
+            </div>
+
+            <div className="ss-hero-copy-footer lg:flex lg:flex-1 lg:flex-col">
+              <div className="ss-legacy-details-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none lg:flex-1">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
+                  Ronaldo Legacy Bundle details
+                </p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300">Prize stack</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-stone-200">
+                  {BUNDLE_OFFER_ITEMS.map((line) => (
+                    <li key={line} className="flex gap-2 leading-snug">
+                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-500/70" aria-hidden />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3">
+                  Estimated total stack value is <strong className="text-stone-200">over £3,000</strong>, with collector
+                  legacy value from the signed Ronaldo shirt and museum signed football.
+                </p>
+                <ul className="mt-3 space-y-1.5 text-xs leading-snug text-stone-500 sm:text-sm">
+                  <li>
+                    <strong className="text-stone-300">iPhone 17 Pro Max:</strong> unlocked, 6.9-inch display, 512GB model,
+                    estimated retail value <strong className="text-stone-300">£1,399</strong>.
+                  </li>
+                  <li>
+                    <strong className="text-stone-300">Colour substitution:</strong> if the shown colour is unavailable, an
+                    equivalent colour such as black or another available finish may be supplied.
+                  </li>
+                  <li>
+                    <strong className="text-stone-300">24K gold case:</strong> premium gold-style case for the iPhone 17 Pro
+                    Max, included as part of the prize stack.
+                  </li>
+                  <li>
+                    <strong className="text-stone-300">Museum signed football:</strong> Cristiano Ronaldo museum-style signed
+                    football, presented as a collector item with the bundle.
+                  </li>
+                </ul>
+                <p className="mt-3 text-[11px] leading-snug text-stone-500">
+                  * Images are illustrative. Prize details are subject to the competition terms and availability.
+                </p>
+              </div>
+            </div>
             </div>
 
             <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:gap-2">
@@ -137,52 +181,8 @@ export default function HomePage() {
                   case.
                 </p>
               </div>
-            </div>
 
-            <div className="ss-hero-copy-footer lg:col-start-1 lg:row-start-2">
-              <div className="ss-legacy-details-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
-                  Ronaldo Legacy Bundle details
-                </p>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-stone-300">Prize stack</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-stone-200">
-                  {BUNDLE_OFFER_ITEMS.map((line) => (
-                    <li key={line} className="flex gap-2 leading-snug">
-                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-emerald-500/70" aria-hidden />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3">
-                  Estimated total stack value is <strong className="text-stone-200">over £3,000</strong>, with collector
-                  legacy value from the signed Ronaldo shirt and museum signed football.
-                </p>
-                <ul className="mt-3 space-y-1.5 text-xs leading-snug text-stone-500 sm:text-sm">
-                  <li>
-                    <strong className="text-stone-300">iPhone 17 Pro Max:</strong> unlocked, 6.9-inch display, 512GB model,
-                    estimated retail value <strong className="text-stone-300">£1,399</strong>.
-                  </li>
-                  <li>
-                    <strong className="text-stone-300">Colour substitution:</strong> if the shown colour is unavailable, an
-                    equivalent colour such as black or another available finish may be supplied.
-                  </li>
-                  <li>
-                    <strong className="text-stone-300">24K gold case:</strong> premium gold-style case for the iPhone 17 Pro
-                    Max, included as part of the prize stack.
-                  </li>
-                  <li>
-                    <strong className="text-stone-300">Museum signed football:</strong> Cristiano Ronaldo museum-style signed
-                    football, presented as a collector item with the bundle.
-                  </li>
-                </ul>
-                <p className="mt-3 text-[11px] leading-snug text-stone-500">
-                  * Images are illustrative. Prize details are subject to the competition terms and availability.
-                </p>
-              </div>
-            </div>
-
-            <div className="ss-hero-ticket-bundles lg:col-start-2 lg:row-start-2">
-              <TicketBundlePrice className="h-full" />
+              <TicketBundlePrice className="ss-hero-ticket-bundles mt-0.5 shrink-0" />
             </div>
           </article>
         </div>

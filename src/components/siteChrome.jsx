@@ -9,7 +9,7 @@ export function TicketBundlePrice({ className = '', compact = false }) {
           'gap-1 px-2.5 py-1.5 text-xs sm:text-sm'
         } ${className}`}
       >
-        From {formatBundlePriceGBP(75)} (single) · bundles to {formatBundlePriceGBP(1800)} (40 tickets)
+        From {formatBundlePriceGBP(75)} (single) · bundles to {formatBundlePriceGBP(2000)} (50 tickets)
       </p>
     )
   }
@@ -19,7 +19,7 @@ export function TicketBundlePrice({ className = '', compact = false }) {
       className={`w-full rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-4 py-3 shadow-[0_0_24px_rgba(16,185,129,0.12)] sm:px-5 sm:py-4 ${className}`}
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200/85">Ticket bundles</p>
-      <ul className="mt-3 space-y-2 text-sm leading-snug text-emerald-50/95">
+      <ul className="mt-2.5 space-y-1.5 text-sm leading-snug text-emerald-50/95 sm:space-y-2">
         {TICKET_BUNDLES.map((b) => (
           <li key={b.id} className="flex items-start justify-between gap-3 border-b border-emerald-500/10 pb-2 last:border-0 last:pb-0">
             <span className="min-w-0">
