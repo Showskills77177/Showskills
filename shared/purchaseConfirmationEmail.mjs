@@ -125,9 +125,10 @@ export function buildPurchaseConfirmationHtml(props) {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#134e3a;border-radius:12px;border:1px solid #10b981">
                 <tr>
                   <td style="padding:18px 20px">
-                    <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#ecfdf5">Next step: qualify for the draw</p>
-                    <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:#a7f3d0">Return to the site and submit <strong style="color:#ecfdf5">three skill answers</strong>. Only entrants with all answers correct are included in the random winner selection.</p>
-                    <a href="${escapeHtml(siteUrl)}" style="display:inline-block;background:linear-gradient(90deg,#0d9488,#059669);color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:10px">Submit answers on showskills.co.uk</a>
+                    <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#ecfdf5">Skill questions (if not done yet)</p>
+                    <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#a7f3d0">After payment you are normally asked for <strong style="color:#ecfdf5">three skill answers straight away</strong> on the website. If you already submitted them, you do not need to do anything else.</p>
+                    <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:#a7f3d0"><strong style="color:#ecfdf5">Only if you have not answered yet:</strong> return to showskills.co.uk and submit your three answers to qualify for the draw. Only entrants with all answers correct are included in the random winner selection.</p>
+                    <a href="${escapeHtml(siteUrl)}" style="display:inline-block;background:linear-gradient(90deg,#0d9488,#059669);color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:10px">Return to submit answers</a>
                   </td>
                 </tr>
               </table>
@@ -172,7 +173,10 @@ export function buildPurchaseConfirmationText(props) {
     '',
     'Keep this email — each ticket number is unique.',
     '',
-    'Next step: return to the site and submit your three skill answers to qualify for the draw.',
+    'After payment you are usually prompted for three skill answers on the site straight away.',
+    'If you already submitted them, no further action is needed.',
+    '',
+    'Only if you have NOT answered yet: return to the site and submit your three skill answers to qualify for the draw.',
     '',
     siteUrl,
   ].join('\n')
