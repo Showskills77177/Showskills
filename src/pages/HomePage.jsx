@@ -28,9 +28,8 @@ export default function HomePage() {
         </div>
 
         <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
-          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-stretch lg:gap-x-7 lg:gap-y-5 lg:p-6">
-            <div className="ss-hero-left flex flex-col gap-4 lg:col-start-1 lg:row-start-1">
-            <div className="ss-hero-intro flex flex-col gap-4 text-left">
+          <article className="ss-hero-merged-panel grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 lg:grid-cols-2 lg:items-start lg:gap-x-7 lg:gap-y-4 lg:p-6">
+            <div className="ss-hero-intro flex flex-col gap-4 text-left lg:col-start-1 lg:row-start-1">
               <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                 Live promotion
@@ -76,8 +75,72 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="ss-hero-copy-footer lg:flex lg:flex-1 lg:flex-col">
-              <div className="ss-legacy-details-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none lg:flex-1">
+            <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:gap-2">
+              <div id="prizes" className="ss-hero-prize-column scroll-mt-24">
+                <div className="ss-prize-studio p-2 sm:p-3">
+                  <div className="relative z-[1] grid gap-2">
+                    <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
+                      <div className="ss-prize-studio-photo">
+                        <img
+                          src={legacyBundlePoster}
+                          alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+                          width={1024}
+                          height={576}
+                          loading="eager"
+                          decoding="async"
+                          className="h-auto w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
+                      <div className="ss-prize-studio-tile px-1 pb-0.5 sm:px-1.5">
+                        <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
+                          <img
+                            src={iphone17ProMax}
+                            alt="iPhone 17 Pro Max prize photo."
+                            width={768}
+                            height={1024}
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-[3/4] h-auto w-full scale-125 object-cover object-center"
+                          />
+                        </div>
+                      </div>
+                      <div className="ss-prize-studio-tile px-1 pb-0.5 sm:px-1.5">
+                        <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
+                          <img
+                            src={iphone17ProMaxGoldCase}
+                            alt="24K gold case for iPhone 17 Pro Max prize photo."
+                            width={960}
+                            height={1024}
+                            loading="lazy"
+                            decoding="async"
+                            className="aspect-[3/4] h-auto w-full object-cover object-center"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ss-hero-bundle-cta">
+                <button
+                  type="button"
+                  onClick={() => openEntry('paid')}
+                  className="w-full rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 py-3 text-sm font-bold text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110"
+                >
+                  Enter Bundle Draw
+                </button>
+                <p className="mt-1.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
+                  Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
+                  case.
+                </p>
+              </div>
+            </div>
+
+            <div className="ss-hero-copy-footer lg:col-start-1 lg:row-start-2">
+              <div className="ss-legacy-details-card max-w-xl rounded-xl border border-white/10 bg-black/25 p-4 text-sm leading-relaxed text-stone-400 lg:max-w-none">
                 <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-stone-100">
                   Ronaldo Legacy Bundle details
                 </p>
@@ -117,72 +180,9 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            </div>
 
-            <div className="ss-hero-prize-stack flex flex-col gap-2 lg:col-start-2 lg:row-start-1 lg:gap-2">
-              <div id="prizes" className="ss-hero-prize-column scroll-mt-24">
-              <div className="ss-prize-studio p-2 sm:p-3">
-                <div className="relative z-[1] grid gap-2">
-                  <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
-                    <div className="ss-prize-studio-photo">
-                      <img
-                        src={legacyBundlePoster}
-                        alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
-                        width={1024}
-                        height={576}
-                        loading="eager"
-                        decoding="async"
-                        className="h-auto w-full"
-                      />
-                    </div>
-                  </div>
-                  <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
-                    <div className="ss-prize-studio-tile px-1 pb-0.5 sm:px-1.5">
-                      <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
-                        <img
-                          src={iphone17ProMax}
-                          alt="iPhone 17 Pro Max prize photo."
-                          width={768}
-                          height={1024}
-                          loading="lazy"
-                          decoding="async"
-                          className="aspect-[3/4] h-auto w-full scale-125 object-cover object-center"
-                        />
-                      </div>
-                    </div>
-                    <div className="ss-prize-studio-tile px-1 pb-0.5 sm:px-1.5">
-                      <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] rounded-md">
-                        <img
-                          src={iphone17ProMaxGoldCase}
-                          alt="24K gold case for iPhone 17 Pro Max prize photo."
-                          width={960}
-                          height={1024}
-                          loading="lazy"
-                          decoding="async"
-                          className="aspect-[3/4] h-auto w-full object-cover object-center"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              </div>
-
-              <div className="ss-hero-bundle-cta">
-                <button
-                  type="button"
-                  onClick={() => openEntry('paid')}
-                  className="w-full rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 py-3 text-sm font-bold text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110"
-                >
-                  Enter Bundle Draw
-                </button>
-                <p className="mt-1.5 text-center text-[11px] leading-snug text-stone-500 sm:text-xs">
-                  Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
-                  case.
-                </p>
-              </div>
-
-              <TicketBundlePrice className="ss-hero-ticket-bundles mt-0.5 shrink-0" />
+            <div className="ss-hero-ticket-bundles lg:col-start-2 lg:row-start-2">
+              <TicketBundlePrice className="h-full" />
             </div>
           </article>
         </div>

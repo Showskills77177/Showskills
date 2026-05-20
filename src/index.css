@@ -434,7 +434,6 @@ body {
 .ss-hero-prize-stack,
 .ss-hero-bundle-cta,
 .ss-hero-ticket-bundles,
-.ss-hero-left,
 .ss-hero-intro,
 .ss-hero-copy-footer {
   width: 100%;
@@ -485,6 +484,10 @@ body {
 }
 
 @media (min-width: 1024px) {
+  .ss-hero-merged-panel {
+    grid-template-rows: auto auto;
+  }
+
   /* Align dark prize studio with “ShowSkills Rewards”, not the Live promotion pill */
   .ss-hero-prize-stack .ss-hero-prize-column {
     border-top: 0;
@@ -496,26 +499,26 @@ body {
     margin-top: 0;
   }
 
-  .ss-hero-prize-stack .ss-hero-ticket-bundles {
-    margin-top: 0.15rem;
-  }
-
-  .ss-hero-left {
-    min-height: 100%;
+  /* Row 2: legacy details and ticket bundles share the same top edge */
+  .ss-hero-copy-footer,
+  .ss-hero-ticket-bundles {
+    align-self: start;
   }
 
   .ss-hero-copy-footer {
-    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
   .ss-legacy-details-card {
-    padding: 1.15rem 1.2rem 1.25rem;
+    flex: 1;
+    padding: 1.1rem 1.2rem 1.2rem;
     line-height: 1.55;
   }
 
-  .ss-hero-ticket-bundles {
-    padding-top: 0.65rem;
-    padding-bottom: 0.7rem;
+  .ss-hero-ticket-bundles > div {
+    min-height: 100%;
   }
 }
 
