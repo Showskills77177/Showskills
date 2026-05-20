@@ -16,28 +16,35 @@ export function TicketBundlePrice({ className = '', compact = false }) {
 
   return (
     <div
-      className={`w-full rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-4 py-3 shadow-[0_0_24px_rgba(16,185,129,0.12)] sm:px-5 sm:py-4 ${className}`}
+      className={`ss-ticket-bundles-panel flex w-full flex-col rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-4 py-3 shadow-[0_0_24px_rgba(16,185,129,0.12)] sm:px-5 sm:py-4 ${className}`}
     >
       <p className="ss-ticket-bundles-heading text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200/85">
         Ticket bundles
       </p>
-      <ul className="ss-ticket-bundles-list mt-4 space-y-1.5 text-sm leading-snug text-emerald-50/95 sm:mt-[1.15rem] sm:space-y-2">
+      <ul className="ss-ticket-bundles-list mt-3 space-y-2 text-[0.9375rem] leading-snug text-emerald-50/95 sm:mt-3.5 sm:space-y-2.5 sm:text-base">
         {TICKET_BUNDLES.map((b) => (
-          <li key={b.id} className="flex items-start justify-between gap-3 border-b border-emerald-500/10 pb-2 last:border-0 last:pb-0">
+          <li
+            key={b.id}
+            className="flex items-start justify-between gap-3 border-b border-emerald-500/10 pb-2.5 last:border-0 last:pb-0"
+          >
             <span className="min-w-0">
               <span className="mr-1.5" aria-hidden>
                 {b.emoji}
               </span>
-              <span className="font-medium text-stone-100">{b.title}</span>
-              <span className="mt-0.5 block text-xs text-emerald-200/75">{b.line1}</span>
-              {b.line2 ? <span className="block text-xs text-stone-500">{b.line2}</span> : null}
+              <span className="text-[0.9375rem] font-semibold text-stone-100 sm:text-base">{b.title}</span>
+              <span className="mt-0.5 block text-sm text-emerald-200/80">{b.line1}</span>
+              {b.line2 ? <span className="block text-xs text-stone-500 sm:text-[0.8125rem]">{b.line2}</span> : null}
             </span>
-            <span className="shrink-0 font-display text-base tabular-nums text-white">
+            <span className="shrink-0 font-display text-lg tabular-nums text-white sm:text-xl">
               {formatBundlePriceGBP(b.totalPence)}
             </span>
           </li>
         ))}
       </ul>
+      <p className="ss-ticket-bundles-footnote mt-auto border-t border-emerald-500/10 pt-2.5 text-[10px] leading-snug text-stone-500 sm:pt-3 sm:text-[11px]">
+        <span aria-hidden>* </span>
+        All ticket bundles are non-refundable.
+      </p>
     </div>
   )
 }

@@ -577,11 +577,19 @@ body {
 
   .ss-hero-ticket-bundles > .ss-hero-panel-card {
     padding-top: 1rem;
-    padding-bottom: 1rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .ss-hero-ticket-bundles .ss-ticket-bundles-panel {
+    min-height: 100%;
   }
 
   .ss-hero-ticket-bundles .ss-ticket-bundles-list {
     flex: 1;
+  }
+
+  .ss-hero-cta-row .ss-btn-bundle-draw {
+    width: 100%;
   }
 }
 

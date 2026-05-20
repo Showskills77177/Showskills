@@ -53,16 +53,10 @@ export default function HomePage() {
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for the shirt giveaway and a
                 side-by-side view of both promotions.
               </p>
-              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 lg:mt-4 lg:border-t lg:border-white/10 lg:pt-4">
-                <Link
-                  to="/competitions"
-                  className="ss-btn-enter inline-flex min-h-[3rem] items-center justify-center rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 px-10 py-3 text-center text-base font-bold uppercase tracking-[0.12em] text-emerald-950 sm:min-h-[3.25rem] sm:px-12 sm:text-lg"
-                >
-                  Enter now
-                </Link>
+              <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch sm:gap-2.5 lg:mt-4 lg:border-t lg:border-white/10 lg:pt-4">
                 <a
                   href="#prizes"
-                  className="inline-flex min-h-[3rem] items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40 sm:min-h-[3.25rem]"
+                  className="ss-btn-bundle-draw inline-flex min-h-[3.25rem] flex-1 items-center justify-center rounded-xl border border-teal-500/35 bg-gradient-to-r from-teal-800/90 to-emerald-900/90 px-8 py-3.5 text-center text-base font-bold uppercase tracking-[0.1em] text-teal-50 shadow-lg transition hover:border-teal-400/50 hover:brightness-110 sm:min-h-[3.5rem] sm:flex-[1.4] sm:py-4 sm:text-lg"
                 >
                   Prize lineup
                 </a>
