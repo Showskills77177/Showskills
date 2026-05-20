@@ -698,16 +698,16 @@ body {
   flex: 0 0 auto;
   width: auto;
   min-height: 3rem;
-  min-width: 9.5rem;
-  max-width: 12.5rem;
+  min-width: 10.5rem;
+  max-width: 13.75rem;
   align-items: center;
   justify-content: center;
-  padding: 0.55rem 1.25rem;
+  padding: 0.6rem 1.4rem;
   border-radius: 0.75rem;
   border: 1px solid rgba(20, 184, 166, 0.35);
   background-image: linear-gradient(to right, rgba(17, 94, 89, 0.9), rgba(6, 78, 59, 0.9));
   text-align: center;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.07em;
@@ -727,10 +727,10 @@ body {
 @media (min-width: 640px) {
   .ss-btn-prize-lineup {
     min-height: 3.25rem;
-    min-width: 10.25rem;
-    max-width: 13.25rem;
-    padding: 0.625rem 1.5rem;
-    font-size: 0.875rem;
+    min-width: 11.25rem;
+    max-width: 14.5rem;
+    padding: 0.65rem 1.65rem;
+    font-size: 0.9375rem;
   }
 }
 
