@@ -38,7 +38,6 @@ async function maybeSendPurchaseEmail({
   bundleId,
   quantity,
   amountPence,
-  ticketNumbers,
 }) {
   const sentRow = await query(`SELECT confirmation_email_sent_at FROM tickets WHERE id = $1`, [ticketId])
   if (sentRow.rows[0]?.confirmation_email_sent_at) {
@@ -51,7 +50,7 @@ async function maybeSendPurchaseEmail({
     bundleId,
     quantity,
     amountPence,
-    ticketNumbers,
+    ticketNumbers: [],
     purchaseRef: ticketPublicId,
   })
 
@@ -133,7 +132,6 @@ export async function recordStripeCheckoutCompleted({
     bundleId,
     quantity: qty,
     amountPence,
-    ticketNumbers,
   })
 
   return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...emailMeta }
@@ -209,7 +207,6 @@ export async function recordPayPalCapture({
     bundleId,
     quantity: qty,
     amountPence,
-    ticketNumbers,
   })
 
   return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...emailMeta }

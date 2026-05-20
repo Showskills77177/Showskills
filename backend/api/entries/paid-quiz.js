@@ -3,6 +3,8 @@ import { parseJsonBody, json } from '../lib/http.mjs'
 import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from '../lib/db.mjs'
 import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
 import { sendQuizResultEmail } from '../lib/sendQuizResultEmail.mjs'
+import { getLatestPaidPurchaseForEmail } from '../lib/ticketNumbers.mjs'
+import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
 
 /**
  * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
@@ -65,10 +67,17 @@ export default async function handler(req, res) {
 
     let quizEmailSent = false
     if (entryType === 'paid') {
+      const purchase = await getLatestPaidPurchaseForEmail(email)
+      const bundle = purchase?.bundleId ? getTicketBundleById(purchase.bundleId) : null
       const emailResult = await sendQuizResultEmail({
         to: email,
         customerFullName: fullName,
         allCorrect,
+        orderRef: purchase?.orderRef,
+        bundleId: purchase?.bundleId,
+        quantity: purchase?.quantity,
+        amountPence: bundle?.totalPence,
+        ticketNumbers: allCorrect ? purchase?.ticketNumbers ?? [] : [],
       })
       quizEmailSent = Boolean(emailResult?.ok)
     }

@@ -38,7 +38,7 @@ function ticketChipHtml(ticketNumber) {
   return `<span style="display:block;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;font-weight:600;line-height:1.3;letter-spacing:0.02em;color:#ecfdf5;background:#064e3b;border:1px solid rgba(52,211,153,0.45);border-radius:6px;padding:5px 6px;text-align:center;word-break:break-all">${escapeHtml(ticketNumber)}</span>`
 }
 
-function buildTicketGridHtml(ticketNumbers) {
+export function buildTicketGridHtml(ticketNumbers) {
   const rows = []
   for (let i = 0; i < ticketNumbers.length; i += 2) {
     const left = ticketNumbers[i]
@@ -77,9 +77,10 @@ export function buildPurchaseConfirmationHtml(props) {
     siteUrl,
   } = props
   const price = formatBundlePriceGBP(amountPence)
-  const ticketLabel = ticketNumbers.length === 1 ? 'Ticket number' : 'Ticket numbers'
   const logoSrc = emailLogoUrl(siteUrl)
-  const ticketsHtml = buildTicketGridHtml(ticketNumbers)
+  const showTickets = ticketNumbers.length > 0
+  const ticketLabel = ticketNumbers.length === 1 ? 'Ticket number' : 'Ticket numbers'
+  const ticketsHtml = showTickets ? buildTicketGridHtml(ticketNumbers) : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -103,7 +104,12 @@ export function buildPurchaseConfirmationHtml(props) {
           <tr>
             <td style="background:linear-gradient(180deg,#0f2922 0%,#0a1f19 100%);border:1px solid rgba(52,211,153,0.35);border-radius:16px;padding:28px 24px">
               <p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#e7e5e4">Hi ${escapeHtml(customerFullName || 'there')},</p>
-              <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#d6d3d1">Thank you for your purchase. Your payment was successful and your ticket numbers are below.</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#d6d3d1">Thank you for your purchase. Your payment was successful.</p>
+              ${
+                showTickets
+                  ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#d6d3d1">You qualify for the Ronaldo Legacy Bundle draw. Your ticket numbers are below.</p>`
+                  : `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#d6d3d1"><strong style="color:#ecfdf5">Important:</strong> paying for tickets does not enter you into the draw by itself. On the website, submit your three skill answers straight after payment. <strong style="color:#ecfdf5">You only qualify if all three answers are correct</strong> — we will email you the result. If you qualify, your ticket numbers will be in that email.</p>`
+              }
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:rgba(0,0,0,0.25);border-radius:12px;border:1px solid rgba(255,255,255,0.08)">
                 <tr>
                   <td style="padding:14px 16px">
@@ -115,9 +121,13 @@ export function buildPurchaseConfirmationHtml(props) {
                   </td>
                 </tr>
               </table>
-              <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p>
+              ${
+                showTickets
+                  ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table>
-              <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — each number is unique and tied to your purchase. You will receive a separate email once your skill answers have been checked.</p>
+              <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — each number is unique and linked to your qualified draw entry.</p>`
+                  : ''
+              }
             </td>
           </tr>
           <tr>
@@ -153,11 +163,19 @@ export function buildPurchaseConfirmationText(props) {
     `Bundle: ${bundleTitle} (${quantity} ticket${quantity === 1 ? '' : 's'})`,
     `Amount paid: ${price}`,
     '',
-    `Your ticket number${ticketNumbers.length === 1 ? '' : 's'}:`,
-    ...ticketNumbers.map((n) => `  • ${n}`),
-    '',
-    'Keep this email — each ticket number is unique.',
-    'You will receive a separate email once your skill answers have been checked.',
+    ...(ticketNumbers.length
+      ? [
+          'You qualify for the draw. Your ticket numbers:',
+          ...ticketNumbers.map((n) => `  • ${n}`),
+          '',
+          'Keep this email — each ticket number is linked to your qualified entry.',
+        ]
+      : [
+          'Submit your three skill answers on the website straight after payment.',
+          'You only qualify for the draw if all three answers are correct.',
+          'We will email you whether your answers are correct or not.',
+          'If you qualify, your ticket numbers will be in that email.',
+        ]),
     '',
     siteUrl,
   ].join('\n')

@@ -1,3 +1,4 @@
+import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
 import {
   buildQuizResultHtml,
   buildQuizResultText,
@@ -12,8 +13,17 @@ function siteUrl() {
   return (process.env.SITE_URL || 'https://showskills.co.uk').replace(/\/$/, '')
 }
 
-/** Sent after paid entrants submit skill answers (correct or not). */
-export async function sendQuizResultEmail({ to, customerFullName, allCorrect }) {
+/** Sent after paid entrants submit skill answers — qualified or not. Ticket numbers only when qualified. */
+export async function sendQuizResultEmail({
+  to,
+  customerFullName,
+  allCorrect,
+  orderRef,
+  bundleId,
+  quantity,
+  amountPence,
+  ticketNumbers,
+}) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not set — skipping quiz result email')
@@ -25,10 +35,18 @@ export async function sendQuizResultEmail({ to, customerFullName, allCorrect }) 
     return { ok: false, skipped: true, reason: 'invalid_email' }
   }
 
+  const bundle = bundleId ? getTicketBundleById(bundleId) : null
+  const nums = allCorrect && Array.isArray(ticketNumbers) ? ticketNumbers : []
+
   const props = {
     customerFullName,
     allCorrect: Boolean(allCorrect),
     siteUrl: siteUrl(),
+    orderRef: allCorrect ? orderRef : undefined,
+    bundleTitle: allCorrect ? bundle?.title ?? bundleId : undefined,
+    quantity: allCorrect ? quantity ?? bundle?.qty : undefined,
+    amountPence: allCorrect ? amountPence ?? bundle?.totalPence : undefined,
+    ticketNumbers: nums,
   }
 
   const res = await fetch('https://api.resend.com/emails', {

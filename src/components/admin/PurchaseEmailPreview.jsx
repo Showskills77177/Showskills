@@ -12,9 +12,9 @@ import {
 } from '../../../shared/quizResultEmail.mjs'
 
 const EMAIL_TYPES = [
-  { id: 'purchase', label: 'Purchase confirmation (after payment)' },
-  { id: 'quiz_ok', label: 'Quiz result — all correct' },
-  { id: 'quiz_fail', label: 'Quiz result — not correct' },
+  { id: 'purchase', label: 'Payment receipt (after pay — before quiz)' },
+  { id: 'quiz_ok', label: 'Qualified — correct answers + ticket numbers' },
+  { id: 'quiz_fail', label: 'Not qualified — incorrect answers' },
 ]
 
 export function PurchaseEmailPreview() {
@@ -24,19 +24,25 @@ export function PurchaseEmailPreview() {
   const siteUrl =
     typeof window !== 'undefined' ? window.location.origin : PURCHASE_EMAIL_SAMPLE.siteUrl
 
-  const purchaseSample = useMemo(() => {
-    const tickets = PURCHASE_EMAIL_SAMPLE.ticketNumbers.slice(0, Math.max(1, ticketCount))
-    return { ...PURCHASE_EMAIL_SAMPLE, ticketNumbers: tickets, quantity: tickets.length, siteUrl }
-  }, [ticketCount, siteUrl])
-
-  const quizSample = useMemo(
-    () => ({
-      customerFullName: PURCHASE_EMAIL_SAMPLE.customerFullName,
-      allCorrect: emailType === 'quiz_ok',
-      siteUrl,
-    }),
-    [emailType, siteUrl],
+  const purchaseSample = useMemo(
+    () => ({ ...PURCHASE_EMAIL_SAMPLE, ticketNumbers: [], siteUrl }),
+    [siteUrl],
   )
+
+  const quizSample = useMemo(() => {
+    const allCorrect = emailType === 'quiz_ok'
+    return {
+      customerFullName: PURCHASE_EMAIL_SAMPLE.customerFullName,
+      allCorrect,
+      siteUrl,
+      orderRef: allCorrect ? PURCHASE_EMAIL_SAMPLE.purchaseRef : undefined,
+      bundleTitle: allCorrect ? PURCHASE_EMAIL_SAMPLE.bundleTitle : undefined,
+      quantity: allCorrect ? PURCHASE_EMAIL_SAMPLE.quantity : undefined,
+      ticketNumbers: allCorrect
+        ? PURCHASE_EMAIL_SAMPLE.ticketNumbers.slice(0, ticketCount)
+        : [],
+    }
+  }, [emailType, siteUrl, ticketCount])
 
   const { html, text, subject } = useMemo(() => {
     if (emailType === 'purchase') {
@@ -59,8 +65,8 @@ export function PurchaseEmailPreview() {
         <div>
           <h1 className="text-2xl font-semibold text-stone-100">Test email</h1>
           <p className="mt-2 max-w-xl text-sm text-stone-500">
-            Paid flow sends two emails: ticket confirmation after payment, then a result email after skill
-            answers are checked (correct or not).
+            Paying only confirms payment. Ticket numbers are emailed only if all three skill answers are
+            correct. Wrong answers → not qualified, no ticket-number email.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

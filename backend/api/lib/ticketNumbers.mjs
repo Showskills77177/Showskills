@@ -64,3 +64,30 @@ export async function getTicketNumbersForPurchase(ticketId) {
   )
   return r.rows.map((row) => row.ticket_number)
 }
+
+/** Latest paid purchase for an email (for qualified draw confirmation email). */
+export async function getLatestPaidPurchaseForEmail(email) {
+  await ensureTicketSchema()
+  const e = email.trim().toLowerCase()
+  const u = await query(`SELECT id FROM users WHERE lower(email) = $1`, [e])
+  if (!u.rows[0]) return null
+
+  const t = await query(
+    `SELECT id, ticket_public_id, bundle_id, quantity
+     FROM tickets
+     WHERE user_id = $1 AND payment_status = 'paid'
+     ORDER BY COALESCE(purchased_at, created_at) DESC
+     LIMIT 1`,
+    [u.rows[0].id],
+  )
+  const row = t.rows[0]
+  if (!row) return null
+
+  const ticketNumbers = await getTicketNumbersForPurchase(row.id)
+  return {
+    orderRef: row.ticket_public_id,
+    bundleId: row.bundle_id,
+    quantity: row.quantity,
+    ticketNumbers,
+  }
+}
