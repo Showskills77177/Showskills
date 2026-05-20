@@ -663,20 +663,20 @@ body {
 /* Right: wider green CTA, centered under the black prize studio */
 .ss-hero-bundle-draw-btn {
   display: inline-flex;
-  min-height: 3rem;
+  min-height: 2.85rem;
   min-width: 14.25rem;
   width: min(100%, 18.5rem);
   max-width: 18.5rem;
   align-items: center;
   justify-content: center;
   margin-inline: auto;
-  padding: 0.625rem 1.75rem;
+  padding: 0.59rem 1.75rem;
   border-radius: 0.75rem;
   background-image: linear-gradient(to right, #34d399, #2dd4bf);
   text-align: center;
   font-size: 0.875rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.19;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #022c22;
@@ -685,10 +685,10 @@ body {
 
 @media (min-width: 640px) {
   .ss-hero-bundle-draw-btn {
-    min-height: 3.25rem;
+    min-height: 3.09rem;
     min-width: 15.25rem;
     font-size: 1rem;
-    padding: 0.7rem 2rem;
+    padding: 0.665rem 2rem;
   }
 }
 
