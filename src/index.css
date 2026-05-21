@@ -1841,8 +1841,13 @@ body {
     margin-top: 0.25rem;
   }
 
-  .ss-entry-consent-label span {
-    word-break: break-word;
+  .ss-entry-consent-text {
+    hyphens: none;
+  }
+
+  .ss-entry-consent-text button {
+    display: inline;
+    white-space: normal;
   }
 
   .ss-entry-checkout-actions {
