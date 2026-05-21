@@ -48,7 +48,6 @@ export function EntryModal() {
     paidQuizSubmitting,
     paidEmailConfirmationSent,
     visibleTicketBundles,
-    showTestBundle,
     paidFullName,
     setPaidFullName,
     paidEmail,
@@ -382,11 +381,6 @@ export function EntryModal() {
                 </form>
               ) : (
                 <div className="mt-4 flex flex-col gap-4">
-                  {showTestBundle ? (
-                    <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/85">
-                      Test ticket (£0.30, Stripe minimum) is in the bundle list for checkout testing.
-                    </p>
-                  ) : null}
                   <TicketBundlePicker
                     paidBundleId={paidBundleId}
                     setPaidBundleId={setPaidBundleId}

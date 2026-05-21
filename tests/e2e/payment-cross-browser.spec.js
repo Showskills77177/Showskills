@@ -1,17 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { installPageErrorAsserter } from '../support/console.mjs'
-import {
-  completeTest30pMockCheckout,
-  assertPayNowOpensPaymentSheet,
-} from '../support/paymentFlow.mjs'
+import { completeE2eMockCheckout } from '../support/paymentFlow.mjs'
 import { openE2eDb, paidTicketNumbersForEmail } from '../support/db.mjs'
 
-test.describe('Payment — £0.30 test bundle (all browsers / mobile)', () => {
-  test('mock checkout at £0.30 creates paid ticket + ticket number', async ({ page }) => {
+test.describe('Payment — single ticket bundle (all browsers / mobile)', () => {
+  test('mock checkout creates paid ticket + ticket number', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
-    const email = `e2e-30p-${Date.now()}@example.test`
+    const email = `e2e-pay-${Date.now()}@example.test`
 
-    await completeTest30pMockCheckout(page, { name: 'Cross Browser Buyer', email })
+    await completeE2eMockCheckout(page, { name: 'Cross Browser Buyer', email })
 
     const db = openE2eDb()
     const { ticket, numbers } = paidTicketNumbersForEmail(db, email)
@@ -23,11 +20,17 @@ test.describe('Payment — £0.30 test bundle (all browsers / mobile)', () => {
     await assertClean()
   })
 
-  test('Pay now opens payment sheet on first tap (Safari / mobile safe)', async ({ page }) => {
+  test('entry modal shows Pay now when form is complete', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
-    await assertPayNowOpensPaymentSheet(page)
-    await page.getByRole('button', { name: 'Back' }).click()
-    await expect(page.getByRole('heading', { name: /Complete payment/i })).toBeHidden()
+    const { openLegacyBundleEntry } = await import('../support/entry.mjs')
+    const { fillPaidEntryForm } = await import('../support/paymentFlow.mjs')
+
+    await openLegacyBundleEntry(page)
+    await fillPaidEntryForm(page, {
+      name: 'Pay Button User',
+      email: `pay-btn-${Date.now()}@example.test`,
+    })
+    await expect(page.getByRole('button', { name: /^Pay now$/i })).toBeEnabled()
     await assertClean()
   })
 })

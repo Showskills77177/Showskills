@@ -32,7 +32,7 @@ test.describe('Ticket numbers on confirmed checkout', () => {
       data: {
         customerEmail: email,
         customerFullName: 'E2E PI User',
-        bundleId: 'test30p',
+        bundleId: 'single',
         quantity: qty,
         amountPence: 30,
       },

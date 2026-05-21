@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { openShirtGiveawayEntry } from '../support/entry.mjs'
-import { completeTest30pMockCheckout } from '../support/paymentFlow.mjs'
+import { completeE2eMockCheckout } from '../support/paymentFlow.mjs'
 
 test.describe('Edge cases & errors', () => {
   test('shirt giveaway rejects incorrect qualification answer', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Edge cases & errors', () => {
 
   test('paid quiz accepts lenient correct answers (Bolton, Butt, 47)', async ({ page }) => {
     const email = `lenient-${Date.now()}@example.test`
-    await completeTest30pMockCheckout(page, { name: 'Lenient Answers', email })
+    await completeE2eMockCheckout(page, { name: 'Lenient Answers', email })
 
     const qInputs = page.locator('input[placeholder="Type your answer"]')
     await qInputs.nth(0).fill('Bolton')
@@ -27,7 +27,7 @@ test.describe('Edge cases & errors', () => {
 
   test('paid quiz shows not qualified for wrong answers', async ({ page }) => {
     const email = `wrong-${Date.now()}@example.test`
-    await completeTest30pMockCheckout(page, { name: 'Wrong Answers', email })
+    await completeE2eMockCheckout(page, { name: 'Wrong Answers', email })
 
     const qInputs = page.locator('input[placeholder="Type your answer"]')
     await qInputs.nth(0).fill('wrong')

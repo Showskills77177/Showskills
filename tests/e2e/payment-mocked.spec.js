@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { completeTest30pMockCheckout } from '../support/paymentFlow.mjs'
+import { completeE2eMockCheckout } from '../support/paymentFlow.mjs'
 import {
   openE2eDb,
   countTickets,
@@ -17,7 +17,7 @@ test.describe('B) Mocked payment + persistence', () => {
     const ticketNumsBefore = before.prepare(`SELECT COUNT(*) AS c FROM ticket_numbers`).get().c
     before.close()
 
-    await completeTest30pMockCheckout(page, { name, email })
+    await completeE2eMockCheckout(page, { name, email })
 
     const db1 = openE2eDb()
     expect(countTickets(db1)).toBeGreaterThan(ticketsBefore)

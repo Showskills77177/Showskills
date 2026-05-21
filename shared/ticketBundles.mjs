@@ -14,21 +14,7 @@ export const MEGA_BUNDLE_BASE_TICKET_QTY = Math.floor(
 export const MEGA_BUNDLE_BONUS_TICKETS = 1
 export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_BASE_TICKET_QTY + MEGA_BUNDLE_BONUS_TICKETS
 
-/** £0.30 — Stripe UK minimum for most cards; for payment/quiz testing (?testbundle=1). */
-export const TEST_TICKET_BUNDLE_ID = 'test30p'
-
 export const TICKET_BUNDLES = [
-  {
-    id: TEST_TICKET_BUNDLE_ID,
-    qty: 1,
-    totalPence: 30,
-    title: 'Test ticket',
-    line1: '1 ticket = £0.30',
-    line2: 'Payment testing only (Stripe UK 30p minimum)',
-    bullets: ['Cheapest live Stripe test — UK 30p minimum'],
-    featured: false,
-    testOnly: true,
-  },
   {
     id: 'single',
     qty: 1,
@@ -98,9 +84,8 @@ export function getTicketBundleById(id) {
   return TICKET_BUNDLES.find((b) => b.id === s) ?? null
 }
 
-/** Bundles shown in the entry modal (hides test tier unless enabled). */
-export function getVisibleTicketBundles({ showTest = false } = {}) {
-  return TICKET_BUNDLES.filter((b) => !b.testOnly || showTest)
+export function getVisibleTicketBundles() {
+  return TICKET_BUNDLES
 }
 
 export function formatBundlePriceGBP(totalPence) {

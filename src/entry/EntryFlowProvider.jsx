@@ -8,7 +8,6 @@ import {
   getVisibleTicketBundles,
 } from '../competitionData'
 import { apiUrl } from '../lib/api'
-import { isTestBundleVisible, getInitialPaidBundleId } from '../lib/showTestBundle'
 import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
@@ -18,11 +17,11 @@ export function EntryFlowProvider({ children }) {
   const [entryModalType, setEntryModalType] = useState(null)
 
   const [searchParams] = useSearchParams()
-  const [paidBundleId, setPaidBundleId] = useState(() =>
-    typeof window !== 'undefined'
-      ? getInitialPaidBundleId(new URLSearchParams(window.location.search))
-      : DEFAULT_TICKET_BUNDLE_ID,
-  )
+  const [paidBundleId, setPaidBundleId] = useState(() => {
+    const forced = (import.meta.env.VITE_DEFAULT_BUNDLE_ID ?? '').trim()
+    if (forced && getTicketBundleById(forced)) return forced
+    return DEFAULT_TICKET_BUNDLE_ID
+  })
   /** 'tickets' = paid bundles; 'postal' = free postal (same draw), chosen inside Legacy modal */
   const [paidEntryRoute, setPaidEntryRoute] = useState('tickets')
   const [paidConsent, setPaidConsent] = useState(false)
@@ -86,11 +85,7 @@ export function EntryFlowProvider({ children }) {
   const hasPayPal = Boolean(payPalClientId)
   const payPalCurrency = (import.meta.env.VITE_PAYPAL_CURRENCY ?? 'GBP').trim().toUpperCase()
 
-  const showTestBundle = isTestBundleVisible(searchParams)
-  const visibleTicketBundles = useMemo(
-    () => getVisibleTicketBundles({ showTest: showTestBundle }),
-    [showTestBundle],
-  )
+  const visibleTicketBundles = useMemo(() => getVisibleTicketBundles(), [])
 
   const selectedTicketBundle = useMemo(() => {
     const fromVisible = visibleTicketBundles.find((b) => b.id === paidBundleId)
@@ -101,12 +96,6 @@ export function EntryFlowProvider({ children }) {
       getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
     )
   }, [paidBundleId, visibleTicketBundles])
-
-  useEffect(() => {
-    if (showTestBundle) return
-    const b = getTicketBundleById(paidBundleId)
-    if (b?.testOnly) setPaidBundleId(DEFAULT_TICKET_BUNDLE_ID)
-  }, [showTestBundle, paidBundleId])
 
   const paidTicketQty = selectedTicketBundle.qty
 
@@ -627,7 +616,6 @@ export function EntryFlowProvider({ children }) {
       paidQuizSubmitted,
       paidQuizSubmitting,
       visibleTicketBundles,
-      showTestBundle,
       paidFullName,
       setPaidFullName,
       paidEmail,
@@ -692,7 +680,6 @@ export function EntryFlowProvider({ children }) {
       paidQuizSubmitted,
       paidQuizSubmitting,
       visibleTicketBundles,
-      showTestBundle,
       paidFullName,
       paidEmail,
       handlePaidEntry,

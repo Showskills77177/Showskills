@@ -85,7 +85,7 @@ export function TicketBundlePicker({
               paidEntryRoute === 'tickets' && paidBundleId === b.id
                 ? 'border-teal-400/55 bg-teal-950/35 ring-1 ring-teal-500/25'
                 : 'border-white/10 bg-black/20 hover:border-white/18'
-            } ${b.featured ? 'shadow-[0_0_0_1px_rgba(251,191,36,0.12)]' : ''} ${b.testOnly ? 'border-amber-500/30' : ''}`}
+            } ${b.featured ? 'shadow-[0_0_0_1px_rgba(251,191,36,0.12)]' : ''}`}
           >
             <input
               type="radio"
@@ -102,11 +102,6 @@ export function TicketBundlePicker({
               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
                 <TicketBundleIcon bundleId={b.id} variant="modal" />
                 <span className="font-semibold leading-none text-stone-100">{b.title}</span>
-                {b.testOnly ? (
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200/90">
-                    Test
-                  </span>
-                ) : null}
                 {b.featured ? (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200/90">
                     Popular

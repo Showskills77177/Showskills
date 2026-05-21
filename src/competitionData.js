@@ -1,7 +1,6 @@
 export {
   TICKET_BUNDLES,
   DEFAULT_TICKET_BUNDLE_ID,
-  TEST_TICKET_BUNDLE_ID,
   getTicketBundleById,
   getVisibleTicketBundles,
   formatBundlePriceGBP,
@@ -20,4 +19,3 @@ export const GRAND_PRIZE_BUNDLE = {
 }
 
 export const COMPETITION_NAME_POSTAL = 'Ronaldo Legacy Bundle — ShowSkills Rewards'
-

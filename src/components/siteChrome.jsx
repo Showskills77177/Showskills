@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { BUNDLE_OFFER_ITEMS, formatBundlePriceGBP, getVisibleTicketBundles } from '../competitionData'
 
-const PUBLIC_TICKET_BUNDLES = getVisibleTicketBundles({ showTest: false })
+const PUBLIC_TICKET_BUNDLES = getVisibleTicketBundles()
 import { TicketBundleIcon } from './TicketBundleIcon'
 
 export function TicketBundlePrice({ className = '', compact = false }) {
