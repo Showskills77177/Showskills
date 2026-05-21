@@ -23,6 +23,14 @@ function readInitialQuizSession() {
   return loadPaidQuizSession()
 }
 
+function getInitialPaidBundleId(searchParams) {
+  const fromQuery = (searchParams?.get?.('bundle') || '').trim()
+  if (fromQuery && getTicketBundleById(fromQuery)) return fromQuery
+  const forced = (import.meta.env.VITE_DEFAULT_BUNDLE_ID ?? '').trim()
+  if (forced && getTicketBundleById(forced)) return forced
+  return DEFAULT_TICKET_BUNDLE_ID
+}
+
 export function EntryFlowProvider({ children }) {
   const initialQuizSession = readInitialQuizSession()
   const initialContact =

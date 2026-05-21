@@ -9,12 +9,12 @@ export function EntryTermsConsent({ checked, onChange, onOpenTerms, variant = 't
 
   return (
     <div className="ss-entry-consent-box rounded-xl border border-white/10 bg-black/30 px-3.5 py-3 sm:px-4 sm:py-3.5">
-      <label className="ss-entry-consent-label flex cursor-pointer items-start gap-2.5 sm:gap-3">
+      <label className="ss-entry-consent-label flex min-h-[44px] cursor-pointer items-start gap-2.5 py-0.5 sm:gap-3">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50 sm:h-5 sm:w-5"
+          className="mt-1 h-5 w-5 shrink-0 rounded border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50"
         />
         <span className="ss-entry-consent-text min-w-0 flex-1 text-[12px] leading-snug text-stone-300 sm:text-[13px]">
           I agree to the{' '}

@@ -39,21 +39,46 @@ function loadTrustpilotScript() {
 
 /** TrustBox Review Collector — footer only. */
 export function TrustpilotReviewCollector({ className = '', centered = false, compact = false }) {
-  const ref = useRef(null)
+  const wrapRef = useRef(null)
+  const widgetRef = useRef(null)
   const widgetHeight = compact ? '44px' : '52px'
 
   useEffect(() => {
-    if (!ref.current) return undefined
+    const root = wrapRef.current
+    const widget = widgetRef.current
+    if (!root || !widget) return undefined
 
     let cancelled = false
+    let observer
 
-    loadTrustpilotScript().then(() => {
-      if (cancelled || !ref.current || !window.Trustpilot) return
-      window.Trustpilot.loadFromElement(ref.current, true)
-    })
+    const mountWidget = () => {
+      loadTrustpilotScript().then(() => {
+        if (cancelled || !widgetRef.current || !window.Trustpilot) return
+        window.Trustpilot.loadFromElement(widgetRef.current, true)
+      })
+    }
+
+    if (typeof IntersectionObserver === 'undefined') {
+      mountWidget()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          mountWidget()
+          observer?.disconnect()
+        }
+      },
+      { rootMargin: '120px' },
+    )
+    observer.observe(root)
 
     return () => {
       cancelled = true
+      observer?.disconnect()
     }
   }, [])
 
@@ -66,9 +91,9 @@ export function TrustpilotReviewCollector({ className = '', centered = false, co
     .join(' ')
 
   return (
-    <div className={wrapClass}>
+    <div ref={wrapRef} className={wrapClass}>
       <div
-        ref={ref}
+        ref={widgetRef}
         className={`trustpilot-widget w-full ${compact ? 'min-h-[44px]' : 'min-h-[52px]'}`}
         data-locale={TRUSTPILOT_LOCALE}
         data-template-id={TRUSTPILOT_TEMPLATE_ID}

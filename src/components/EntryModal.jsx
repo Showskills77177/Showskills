@@ -646,7 +646,7 @@ export function EntryModal() {
           <button
             type="button"
             onClick={closeEntry}
-            className="w-full rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-stone-300 transition hover:bg-white/5"
+            className="min-h-[44px] w-full rounded-xl border border-white/10 py-2.5 text-base font-semibold text-stone-300 transition hover:bg-white/5"
           >
             Close
           </button>

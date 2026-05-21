@@ -1818,9 +1818,13 @@ body {
 .ss-payment-popup-panel input:not([type='checkbox']):not([type='radio']),
 .ss-payment-popup-panel textarea,
 .ss-payment-popup-panel select,
-.ss-bundle-select {
+.ss-bundle-select,
+.ss-contact-form input:not([type='checkbox']),
+.ss-contact-form textarea,
+.ss-contact-form select {
   position: relative;
   z-index: 1;
+  font-size: 16px;
   -webkit-user-select: text !important;
   user-select: text !important;
   touch-action: manipulation;
@@ -1828,11 +1832,23 @@ body {
   cursor: text;
 }
 
+.ss-entry-modal-panel button,
+.ss-payment-sheet-panel button,
+.ss-contact-form button {
+  touch-action: manipulation;
+}
+
 .ss-bundle-select {
   background-image: none;
 }
 
 @media (max-width: 767px) {
+  .ss-entry-modal-panel .ss-entry-checkout-actions button,
+  .ss-entry-modal-panel > div:last-child button,
+  .ss-payment-sheet-panel header button {
+    min-height: 44px;
+  }
+
   .ss-entry-modal-scroll {
     padding-bottom: 0.75rem;
   }

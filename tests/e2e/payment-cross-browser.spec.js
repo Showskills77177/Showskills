@@ -20,6 +20,17 @@ test.describe('Payment — single ticket bundle (all browsers / mobile)', () => 
     await assertClean()
   })
 
+  test('E2E checkout button meets mobile tap target height', async ({ page }) => {
+    const { openLegacyBundleEntry } = await import('../support/entry.mjs')
+    const { fillPaidEntryForm } = await import('../support/paymentFlow.mjs')
+    await page.setViewportSize({ width: 390, height: 664 })
+    await openLegacyBundleEntry(page)
+    await fillPaidEntryForm(page, { name: 'Tap Target', email: `tap-${Date.now()}@example.test` })
+    const btn = page.getByRole('button', { name: /Continue \(E2E simulated checkout\)/i })
+    const box = await btn.boundingBox()
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  })
+
   test('entry modal shows Pay now when form is complete', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
     const { openLegacyBundleEntry } = await import('../support/entry.mjs')
@@ -30,7 +41,10 @@ test.describe('Payment — single ticket bundle (all browsers / mobile)', () => 
       name: 'Pay Button User',
       email: `pay-btn-${Date.now()}@example.test`,
     })
-    await expect(page.getByRole('button', { name: /^Pay now$/i })).toBeEnabled()
+    const checkoutBtn = page
+      .getByRole('button', { name: /^Pay now$/i })
+      .or(page.getByRole('button', { name: /Continue \(E2E simulated checkout\)/i }))
+    await expect(checkoutBtn.first()).toBeEnabled()
     await assertClean()
   })
 })

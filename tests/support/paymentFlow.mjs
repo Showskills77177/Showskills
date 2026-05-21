@@ -15,7 +15,7 @@ export async function selectTicketBundle(page, bundleId) {
 export async function fillPaidEntryForm(page, { name, email }) {
   await page.locator('#modal-paid-fullname').fill(name)
   await page.locator('#modal-paid-email').fill(email)
-  await page.getByRole('checkbox', { name: /I agree to the/i }).check()
+  await page.locator('.ss-entry-consent-label input[type="checkbox"]').check()
 }
 
 /** E2E simulated checkout (no live Stripe) — uses the default single ticket bundle. */

@@ -5,7 +5,7 @@ import { CONTACT_TOPICS, SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteConta
 import { apiUrl } from '../lib/api'
 
 const inputClass =
-  'mt-2 w-full rounded-xl border border-white/10 bg-[#071512]/80 px-4 py-3 text-[15px] text-stone-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-stone-600 focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/25'
+  'mt-2 w-full rounded-xl border border-white/10 bg-[#071512]/80 px-4 py-3 text-base text-stone-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-stone-600 focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/25'
 
 const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500'
 
@@ -94,7 +94,7 @@ export default function ContactPage() {
         ) : (
           <div className="mt-10 overflow-hidden rounded-2xl border border-teal-500/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
             <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-teal-500/60 to-transparent" aria-hidden />
-            <form onSubmit={onSubmit} className="space-y-6 px-5 py-8 sm:px-8 sm:py-10">
+            <form onSubmit={onSubmit} className="ss-contact-form space-y-6 px-5 py-8 sm:px-8 sm:py-10">
               <input
                 type="text"
                 name="company"
@@ -178,7 +178,7 @@ export default function ContactPage() {
                 <button
                   type="submit"
                   disabled={status === 'sending'}
-                  className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3.5 text-sm font-bold tracking-wide text-emerald-950 shadow-lg shadow-emerald-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55 sm:text-base"
+                  className="min-h-[44px] w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3.5 text-base font-bold tracking-wide text-emerald-950 shadow-lg shadow-emerald-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   {status === 'sending' ? 'Sending…' : 'Send message'}
                 </button>

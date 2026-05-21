@@ -55,6 +55,31 @@ export default defineConfig({
       testMatch: /payment-cross-browser\.spec\.js/,
       use: { ...devices['iPhone 13'] },
     },
+    {
+      name: 'firefox-checkout-ux',
+      testMatch: /checkout-ux\.spec\.js/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit-checkout-ux',
+      testMatch: /checkout-ux\.spec\.js/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'mobile-chrome-checkout-ux',
+      testMatch: /checkout-ux\.spec\.js/,
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'mobile-safari-checkout-ux',
+      testMatch: /checkout-ux\.spec\.js/,
+      use: { ...devices['iPhone 13'] },
+    },
+    {
+      name: 'chromium-checkout-ux',
+      testMatch: /checkout-ux\.spec\.js/,
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
   webServer: {
     /** API on :3001 + Vite :5173 so tests do not clash with a normal dev:all on :3000/:5173. */
