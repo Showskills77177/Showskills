@@ -257,7 +257,7 @@ export function StripePaymentForm({
   return (
     <div className="ss-stripe-payment-shell">
       <Elements
-        key={clientSecret}
+        key={`${clientSecret}-pe-billing-never-v6`}
         stripe={stripePromise}
         options={elementsOptions}
       >

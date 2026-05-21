@@ -5,8 +5,8 @@ export const stripeElementsAppearance = {
   variables: {
     colorPrimary: '#14b8a6',
     colorBackground: '#0c0a09',
-    colorText: '#e7e5e4',
-    colorTextSecondary: '#a8a29e',
+    colorText: '#fafaf9',
+    colorTextSecondary: '#d6d3d1',
     colorDanger: '#f87171',
     fontFamily: '"DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     fontSizeBase: '16px',
@@ -22,27 +22,46 @@ export const stripeElementsAppearance = {
       boxShadow: 'none',
       padding: '12px 14px',
       lineHeight: '1.4',
+      color: '#fafaf9',
     },
     '.Input:focus': {
       border: '1px solid rgba(20, 184, 166, 0.65)',
       boxShadow: '0 0 0 2px rgba(20, 184, 166, 0.22)',
     },
     '.Label': {
-      color: '#a8a29e',
+      color: '#d6d3d1',
       fontWeight: '500',
       marginBottom: '6px',
     },
+    '.Text': {
+      color: '#e7e5e4',
+    },
     '.Tab': {
-      border: '1px solid rgba(255,255,255,0.1)',
-      backgroundColor: 'rgba(0,0,0,0.25)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      color: '#e7e5e4',
     },
     '.Tab--selected': {
-      border: '1px solid rgba(20, 184, 166, 0.45)',
-      backgroundColor: 'rgba(13, 148, 136, 0.12)',
+      border: '1px solid rgba(20, 184, 166, 0.55)',
+      backgroundColor: 'rgba(13, 148, 136, 0.18)',
+      color: '#fafaf9',
+    },
+    '.TabLabel': {
+      color: '#e7e5e4',
+    },
+    '.TabLabel--selected': {
+      color: '#fafaf9',
+    },
+    '.TabIcon': {
+      color: '#d6d3d1',
+    },
+    '.TabIcon--selected': {
+      color: '#fafaf9',
     },
     '.AccordionItem': {
       border: '1px solid rgba(255,255,255,0.1)',
       backgroundColor: 'rgba(0,0,0,0.2)',
+      color: '#e7e5e4',
     },
     '.TermsText': { display: 'none' },
     '.TermsLink': { display: 'none' },
@@ -62,8 +81,8 @@ export function buildStripeElementsOptions(clientSecret) {
 }
 
 /**
- * Billing details collected on the entry form — must match Payment Element `fields: never`
- * and confirmPayment billing_details (Stripe requires both when using `never`).
+ * Name + email come from the entry form. Other billing fields are satisfied in
+ * confirmPayment when billingDetails is `never` on the Payment Element.
  * @param {{ customerEmail?: string, customerFullName?: string }} recordPayload
  */
 export function buildBillingDetailsFromEntry(recordPayload) {
@@ -72,13 +91,21 @@ export function buildBillingDetailsFromEntry(recordPayload) {
   return {
     name,
     email,
-    address: { country: 'GB' },
+    phone: '+440000000000',
+    address: {
+      line1: 'United Kingdom',
+      line2: '',
+      city: 'United Kingdom',
+      state: '',
+      postal_code: 'W1A 1AA',
+      country: 'GB',
+    },
   }
 }
 
 /**
- * Only `name`, `email`, and `country` are hidden in the Element (collected above).
- * Do not set `phone: 'never'` (or other fields) unless you also pass them in confirmPayment.
+ * Hide all billing fields in the Element (collected on the entry step).
+ * Stripe requires the same data in confirmPayment — see buildBillingDetailsFromEntry.
  * @param {{ customerEmail?: string, customerFullName?: string }} recordPayload
  */
 export function buildPaymentElementOptions(recordPayload) {
@@ -98,13 +125,7 @@ export function buildPaymentElementOptions(recordPayload) {
       },
     },
     fields: {
-      billingDetails: {
-        name: 'never',
-        email: 'never',
-        address: {
-          country: 'never',
-        },
-      },
+      billingDetails: 'never',
     },
     business: { name: 'ShowSkills Rewards' },
   }
