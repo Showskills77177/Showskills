@@ -46,7 +46,7 @@ function PaymentElementMount({ recordPayload, onReadyChange, onLoadError, onChan
   useEffect(() => {
     onReadyChange(false)
     mountedRef.current = false
-  }, [recordPayload?.customerEmail, recordPayload?.customerFullName, onReadyChange])
+  }, [recordPayload?.customerEmail, recordPayload?.customerFullName])
 
   useEffect(() => {
     if (!elements || mountedRef.current) return

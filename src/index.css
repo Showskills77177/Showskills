@@ -1661,38 +1661,36 @@ body {
   pointer-events: auto !important;
 }
 
-/* Native <dialog> modals — Safari/Brave keyboard + Stripe iframe safe. */
-.ss-entry-modal-dialog,
-.ss-payment-dialog {
-  border: none;
-  padding: 0;
-  margin: auto;
-  max-height: min(92vh, 920px);
-  overflow: visible;
-  background: #0c0a09;
-  color: #e7e5e4;
-}
-
-.ss-entry-modal-dialog:not([open]),
-.ss-payment-dialog:not([open]) {
-  display: none;
-}
-
-.ss-entry-modal-dialog::backdrop,
-.ss-payment-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.8);
-}
-
-.ss-entry-modal-dialog--paid {
-  max-width: min(100% - 2rem, 48rem);
+/* Entry + payment overlays — fixed layers (no nested native <dialog>, Safari-safe). */
+.ss-entry-modal-overlay {
+  pointer-events: auto;
 }
 
 .ss-entry-modal-panel {
   pointer-events: auto;
-  max-height: min(92vh, 920px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.ss-entry-modal-panel--paid {
+  max-width: min(100% - 2rem, 48rem);
+}
+
+.ss-payment-sheet {
+  pointer-events: auto;
+  overflow: visible;
+}
+
+.ss-payment-sheet-panel {
+  pointer-events: auto;
+  overflow: visible;
+}
+
+.ss-payment-stripe-zone {
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 
 .ss-entry-modal-body {
@@ -1711,20 +1709,6 @@ body {
   flex: 1 1 auto;
 }
 
-.ss-payment-popup-panel {
-  pointer-events: auto;
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  overflow: visible;
-}
-
-.ss-payment-popup-messages:empty {
-  display: none;
-}
-
-.ss-payment-element-section {
-  overflow: visible;
-  flex: 1 1 auto;
-}
 
 .ss-entry-field,
 .ss-entry-modal-panel input:not([type='checkbox']):not([type='radio']),
@@ -1767,9 +1751,11 @@ body {
   .ss-stripe-payment-mount,
   .ss-stripe-payment-shell,
   .ss-stripe-payment-panel,
-  .ss-payment-element-section,
-  .ss-payment-dialog,
-  .ss-payment-popup-panel {
+  .ss-payment-stripe-zone,
+  .ss-payment-sheet,
+  .ss-payment-sheet-panel,
+  .ss-entry-modal-overlay,
+  .ss-entry-modal-panel {
     transform: none;
     -webkit-transform: none;
     filter: none;

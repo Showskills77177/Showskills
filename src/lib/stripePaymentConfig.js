@@ -70,12 +70,7 @@ export function buildPaymentElementOptions(recordPayload) {
   const name = (recordPayload?.customerFullName || '').trim()
 
   return {
-    layout: {
-      type: 'accordion',
-      defaultCollapsed: false,
-      radios: true,
-      spacedAccordionItems: true,
-    },
+    layout: 'tabs',
     paymentMethodOrder: ['apple_pay', 'google_pay', 'card'],
     wallets: {
       applePay: 'auto',

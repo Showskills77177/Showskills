@@ -86,7 +86,7 @@ export function EntryModal() {
     PAID_SKILL_QUESTIONS,
   } = useEntryFlow()
 
-  const entryDialogRef = useRef(null)
+  const panelRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
 
   const showPaymentSheet =
@@ -136,17 +136,20 @@ export function EntryModal() {
     return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
   }
 
-  // Native <dialog> for focus/keyboard (Safari, Brave). No body scroll lock.
-
   useEffect(() => {
-    const dlg = entryDialogRef.current
-    if (!dlg) return
-    if (entryModalType) {
-      if (!dlg.open) dlg.showModal()
-    } else if (dlg.open) {
-      dlg.close()
+    if (!entryModalType) return
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      if (termsOpen) return
+      if (paymentSheetOpen) {
+        handleClosePaymentSheet()
+        return
+      }
+      closeEntry()
     }
-  }, [entryModalType])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [entryModalType, closeEntry, termsOpen, paymentSheetOpen])
 
   useEffect(() => {
     if (!entryModalType) setPaymentSheetOpen(false)
@@ -172,30 +175,26 @@ export function EntryModal() {
       : 'sm:max-w-xl'
 
   return (
-    <>
-      <ModalPortal>
-        <dialog
-          ref={entryDialogRef}
-          className={`ss-entry-modal-dialog w-[calc(100%-2rem)] max-w-lg ${panelWidthClass} ${
-            entryModalType === 'paid' ? 'ss-entry-modal-dialog--paid' : ''
+    <ModalPortal>
+      <div
+        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="entry-modal-title"
+      >
+        <div
+          className="absolute inset-0 bg-black/80"
+          role="presentation"
+          onClick={() => (showPaymentSheet ? handleClosePaymentSheet() : closeEntry())}
+          onKeyDown={() => {}}
+        />
+        <div
+          ref={panelRef}
+          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(92vh,920px)] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${panelWidthClass} ${
+            entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
           }`}
-          aria-labelledby="entry-modal-title"
-          onClose={closeEntry}
-          onCancel={(e) => {
-            e.preventDefault()
-            if (termsOpen) return
-            if (paymentSheetOpen) {
-              handleClosePaymentSheet()
-              return
-            }
-            closeEntry()
-          }}
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          <div
-            className={`ss-entry-modal-panel w-full rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
-              entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
-            }`}
-          >
         <div
           className={`h-1 w-full ${
             entryModalType === 'kickups'
@@ -619,50 +618,49 @@ export function EntryModal() {
           </button>
         </div>
 
-          </div>
-        </dialog>
-      </ModalPortal>
-      <PaymentCheckoutSheet
-        open={showPaymentSheet}
-        onClose={handleClosePaymentSheet}
-        amountPence={selectedTicketBundle?.totalPence ?? 0}
-        bundleTitle={selectedTicketBundle?.title}
-        bundleLine={selectedTicketBundle?.line1}
-        preparing={paidStripePreparing}
-        paidError={paidError}
-        hasStripeElements={hasStripeElements}
-        stripePublishableKey={stripePublishableKey}
-        paidStripeClientSecret={paidStripeClientSecret}
-        paidStripePaymentIntentId={paidStripePaymentIntentId}
-        paidFormReadyForPayment={paidFormReadyForPayment}
-        recordPayload={{
-          customerEmail: paidEmail.trim(),
-          customerFullName: paidFullName.trim(),
-          bundleId: paidBundleId,
-        }}
-        onStripeSuccess={(info) => {
-          setPaymentSheetOpen(false)
-          markPaidCheckoutComplete(info)
-        }}
-        onStripeError={(msg) => setPaidError(msg)}
-        onRetryPayment={prepareStripePayment}
-        hasPayPal={hasPayPal}
-        payPalClientId={payPalClientId}
-        payPalCurrency={payPalCurrency}
-        paypalCreateOrderApi={paypalCreateOrderApi}
-        paypalCaptureOrderApi={paypalCaptureOrderApi}
-        paidBundleId={paidBundleId}
-        ticketQuantity={selectedTicketBundle?.qty ?? 1}
-        customerEmail={paidEmail}
-        customerFullName={paidFullName}
-        paidConsent={paidConsent}
-        onPayPalPaid={(info) => {
-          setPaymentSheetOpen(false)
-          markPaidCheckoutComplete(info)
-        }}
-        onPayPalError={(msg) => setPaidError(msg)}
-        onClearError={() => setPaidError('')}
-      />
-    </>
+          <PaymentCheckoutSheet
+            open={showPaymentSheet}
+            onClose={handleClosePaymentSheet}
+            amountPence={selectedTicketBundle?.totalPence ?? 0}
+            bundleTitle={selectedTicketBundle?.title}
+            bundleLine={selectedTicketBundle?.line1}
+            preparing={paidStripePreparing}
+            paidError={paidError}
+            hasStripeElements={hasStripeElements}
+            stripePublishableKey={stripePublishableKey}
+            paidStripeClientSecret={paidStripeClientSecret}
+            paidStripePaymentIntentId={paidStripePaymentIntentId}
+            paidFormReadyForPayment={paidFormReadyForPayment}
+            recordPayload={{
+              customerEmail: paidEmail.trim(),
+              customerFullName: paidFullName.trim(),
+              bundleId: paidBundleId,
+            }}
+            onStripeSuccess={(info) => {
+              setPaymentSheetOpen(false)
+              markPaidCheckoutComplete(info)
+            }}
+            onStripeError={(msg) => setPaidError(msg)}
+            onRetryPayment={prepareStripePayment}
+            hasPayPal={hasPayPal}
+            payPalClientId={payPalClientId}
+            payPalCurrency={payPalCurrency}
+            paypalCreateOrderApi={paypalCreateOrderApi}
+            paypalCaptureOrderApi={paypalCaptureOrderApi}
+            paidBundleId={paidBundleId}
+            ticketQuantity={selectedTicketBundle?.qty ?? 1}
+            customerEmail={paidEmail}
+            customerFullName={paidFullName}
+            paidConsent={paidConsent}
+            onPayPalPaid={(info) => {
+              setPaymentSheetOpen(false)
+              markPaidCheckoutComplete(info)
+            }}
+            onPayPalError={(msg) => setPaidError(msg)}
+            onClearError={() => setPaidError('')}
+          />
+        </div>
+      </div>
+    </ModalPortal>
   )
 }
