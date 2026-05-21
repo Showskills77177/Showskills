@@ -19,25 +19,18 @@ test.describe('Contact page', () => {
     await expect(page.getByRole('dialog')).toContainText('contact@showskills.co.uk')
   })
 
-  test('validates short message', async ({ page }) => {
+  test('validates short message before mailto', async ({ page }) => {
     await page.goto('/contact')
     await page.getByLabel(/Your name/i).fill('Test User')
-    await page.getByLabel(/^Email$/i).fill('contact-test@example.test')
+    await page.getByLabel(/Your email/i).fill('contact-test@example.test')
     await page.getByLabel(/^Message$/i).fill('Hi')
-    await page.getByRole('button', { name: /Send message/i }).click()
+    await page.getByRole('button', { name: /Open email app/i }).click()
     await expect(page.getByText(/at least 10 characters/i)).toBeVisible({ timeout: 10_000 })
   })
 
-  test('submit accepts request when API is up', async ({ page }) => {
+  test('shows open email app action', async ({ page }) => {
     await page.goto('/contact')
-    await page.getByLabel(/Topic/i).selectOption('feedback')
-    await page.getByLabel(/Your name/i).fill('E2E Contact')
-    await page.getByLabel(/^Email$/i).fill(`contact-${Date.now()}@example.test`)
-    await page.getByLabel(/^Message$/i).fill('This is an automated E2E contact form test message.')
-    await page.getByRole('button', { name: /Send message/i }).click()
-
-    const success = page.getByText(/Message sent/i)
-    const unavailable = page.getByText(/temporarily unavailable|email us directly/i)
-    await expect(success.or(unavailable)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: /Open email app to send/i })).toBeVisible()
+    await expect(page.getByText(/email forwarding/i)).toBeVisible()
   })
 })
