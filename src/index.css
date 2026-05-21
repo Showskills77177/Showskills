@@ -1651,12 +1651,18 @@ body {
 }
 
 /* Entry + payment modals — ensure inputs receive clicks/keyboard (Safari, Brave). */
-.ss-entry-modal-root {
+.ss-entry-modal-root,
+.ss-payment-popup,
+.ss-terms-modal-root {
+  pointer-events: auto;
+}
+
+.ss-entry-modal-backdrop,
+.ss-payment-popup-backdrop {
   pointer-events: auto;
 }
 
 .ss-entry-modal-panel,
-.ss-payment-popup,
 .ss-payment-popup-panel {
   pointer-events: auto;
 }
@@ -1668,6 +1674,10 @@ body {
 .ss-payment-popup-panel input:not([type='checkbox']):not([type='radio']),
 .ss-payment-popup-panel textarea,
 .ss-payment-popup-panel select {
+  position: relative;
+  z-index: 1;
+  -webkit-appearance: none;
+  appearance: none;
   -webkit-user-select: text !important;
   user-select: text !important;
   touch-action: manipulation;
@@ -1675,8 +1685,22 @@ body {
   cursor: text;
 }
 
+.ss-entry-modal-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
 .ss-payment-popup-panel {
   padding-bottom: env(safe-area-inset-bottom, 0);
+  overflow: visible;
+}
+
+/* Stripe iframes break when any ancestor uses overflow: hidden (Safari, Brave). */
+.ss-payment-stripe-host,
+.ss-payment-stripe-host .ss-stripe-payment-shell,
+.ss-payment-stripe-host .ss-stripe-payment-element {
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 
 @media (max-width: 767px) {
@@ -1709,6 +1733,7 @@ body {
   .ss-stripe-payment-element,
   .ss-entry-modal-stripe,
   .ss-stripe-payment-shell,
+  .ss-payment-stripe-host,
   .ss-payment-popup,
   .ss-payment-popup-panel,
   .ss-payment-popup-scroll {

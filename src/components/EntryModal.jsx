@@ -13,6 +13,7 @@ import {
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { ErrorBanner } from './ErrorBanner'
 import { preloadStripe } from '../lib/stripeLoader'
+import { ModalPortal } from './ModalPortal'
 import { PaymentCheckoutSheet } from './PaymentCheckoutSheet'
 import { PayPalPayButton } from './PayPalPayButton'
 import { TicketBundlePicker } from './TicketBundlePicker'
@@ -119,7 +120,7 @@ export function EntryModal() {
     paidQuizResult != null ? validatePaidSkillAnswers(paidA1, paidA2, paidA3) : null
   const paidAnswerInputClass = (questionIndex) => {
     const base =
-      'mt-2 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2'
+      'mt-2 w-full rounded-lg border px-3 py-2 text-base focus:outline-none focus:ring-2'
     if (!paidAnswerValidation) {
       return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
     }
@@ -169,6 +170,8 @@ export function EntryModal() {
   }
 
   return (
+    <>
+    <ModalPortal>
     <div
       className="ss-entry-modal-root fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:p-6"
       role="dialog"
@@ -176,19 +179,16 @@ export function EntryModal() {
       aria-labelledby="entry-modal-title"
     >
       <div
-        className="absolute inset-0 z-0 bg-black/80"
+        className="ss-entry-modal-backdrop absolute inset-0 z-0 bg-black/80"
         role="presentation"
         onClick={() => (showPaymentSheet ? handleClosePaymentSheet() : closeEntry())}
-        onKeyDown={() => {}}
       />
       <div
         ref={panelRef}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
         className={`ss-entry-modal-panel relative z-10 flex max-h-[min(92vh,920px)] w-full flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
           entryModalType === 'paid'
-            ? `ss-entry-modal-panel--paid overflow-hidden ${showPaymentSheet ? 'max-w-2xl sm:max-w-3xl' : 'max-w-lg sm:max-w-xl'}`
-            : 'max-w-lg overflow-hidden'
+            ? `ss-entry-modal-panel--paid ${showPaymentSheet ? 'max-w-2xl sm:max-w-3xl' : 'max-w-lg sm:max-w-xl'}`
+            : 'max-w-lg'
         }`}
       >
         <div
@@ -215,7 +215,7 @@ export function EntryModal() {
           </button>
         </div>
 
-        <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col">
           <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {entryModalType === 'paid' ? (
             <>
@@ -530,7 +530,7 @@ export function EntryModal() {
                     autoComplete="name"
                     value={kickFullName}
                     onChange={(e) => setKickFullName(e.target.value)}
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
+                    className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
                     placeholder="Your name"
                   />
                 </div>
@@ -548,7 +548,7 @@ export function EntryModal() {
                       setKickAnswer(e.target.value)
                       setKickError('')
                     }}
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
+                    className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
                     placeholder="Type the answer"
                   />
                 </div>
@@ -562,7 +562,7 @@ export function EntryModal() {
                     autoComplete="email"
                     value={kickEmail}
                     onChange={(e) => setKickEmail(e.target.value)}
-                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
+                    className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -614,7 +614,10 @@ export function EntryModal() {
           </button>
         </div>
 
-        <PaymentCheckoutSheet
+      </div>
+    </div>
+    </ModalPortal>
+    <PaymentCheckoutSheet
         open={showPaymentSheet}
         onClose={handleClosePaymentSheet}
         amountPence={selectedTicketBundle?.totalPence ?? 0}
@@ -655,7 +658,6 @@ export function EntryModal() {
         onPayPalError={(msg) => setPaidError(msg)}
         onClearError={() => setPaidError('')}
         />
-      </div>
-    </div>
+    </>
   )
 }

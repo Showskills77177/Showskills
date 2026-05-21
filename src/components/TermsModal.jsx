@@ -15,14 +15,7 @@ function PaidTicketNonRefundCallout({ qualifier }) {
 }
 
 export function TermsModal({ open, onClose }) {
-  useEffect(() => {
-    if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [open])
+  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + Stripe).
 
   useEffect(() => {
     if (!open) return
@@ -35,14 +28,14 @@ export function TermsModal({ open, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center sm:p-6"
+      className="ss-terms-modal-root fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="terms-title"
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/75"
         aria-label="Close terms"
         onClick={onClose}
       />

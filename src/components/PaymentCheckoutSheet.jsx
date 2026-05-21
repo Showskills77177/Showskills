@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { formatBundlePriceGBP } from '../competitionData'
 import { ErrorBanner } from './ErrorBanner'
+import { ModalPortal } from './ModalPortal'
 import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
 
@@ -48,24 +49,19 @@ export function PaymentCheckoutSheet({
   const stripeReady = hasStripeElements && Boolean(paidStripeClientSecret)
   const showStripeEmpty = hasStripeElements && !preparing && !paidStripeClientSecret
 
-  return (
+  const sheet = (
     <div
-      className="ss-payment-popup absolute inset-0 z-20 flex items-center justify-center p-1.5 sm:p-2"
+      className="ss-payment-popup fixed inset-0 z-[80] flex items-end justify-center p-3 sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-sheet-title"
     >
       <div
-        className="absolute inset-0 rounded-2xl bg-black/70"
+        className="ss-payment-popup-backdrop absolute inset-0 bg-black/75"
         role="presentation"
         onClick={onClose}
-        onKeyDown={() => {}}
       />
-      <div
-        className="ss-payment-popup-panel relative z-10 flex h-[min(88%,680px)] min-h-[min(72vh,520px)] w-full max-w-none flex-col overflow-hidden rounded-xl border border-teal-500/35 bg-stone-950 shadow-2xl shadow-black/60 sm:min-h-[min(68vh,560px)]"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="ss-payment-popup-panel relative z-10 flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col rounded-2xl border border-teal-500/35 bg-stone-950 shadow-2xl shadow-black/60 sm:max-w-xl">
         <div className="h-1 w-full shrink-0 bg-gradient-to-r from-teal-500/80 via-emerald-500/60 to-transparent" aria-hidden />
         <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
           <button
@@ -90,7 +86,7 @@ export function PaymentCheckoutSheet({
           </div>
         </header>
 
-        <div className="ss-payment-popup-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+        <div className="ss-payment-popup-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5">
           {paidError ? <ErrorBanner message={paidError} /> : null}
 
           {preparing ? (
@@ -122,17 +118,19 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {stripeReady ? (
-            <StripePaymentForm
-              publishableKey={stripePublishableKey}
-              clientSecret={paidStripeClientSecret}
-              paymentIntentId={paidStripePaymentIntentId}
-              amountLabel={amountLabel}
-              recordPayload={recordPayload}
-              disabled={!paidFormReadyForPayment}
-              onSuccess={onStripeSuccess}
-              onError={onStripeError}
-              compact
-            />
+            <div className="ss-payment-stripe-host">
+              <StripePaymentForm
+                publishableKey={stripePublishableKey}
+                clientSecret={paidStripeClientSecret}
+                paymentIntentId={paidStripePaymentIntentId}
+                amountLabel={amountLabel}
+                recordPayload={recordPayload}
+                disabled={!paidFormReadyForPayment}
+                onSuccess={onStripeSuccess}
+                onError={onStripeError}
+                compact
+              />
+            </div>
           ) : null}
 
           {hasPayPal ? (
@@ -169,4 +167,6 @@ export function PaymentCheckoutSheet({
       </div>
     </div>
   )
+
+  return <ModalPortal>{sheet}</ModalPortal>
 }
