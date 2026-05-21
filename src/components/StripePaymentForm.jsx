@@ -1,99 +1,150 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
-import { stripeElementsAppearance } from '../lib/stripeAppearance'
 import { getStripePromise } from '../lib/stripeLoader'
-import { useMediaQuery } from '../hooks/useMediaQuery'
+import {
+  buildConfirmParams,
+  buildPaymentElementOptions,
+  buildStripeElementsOptions,
+} from '../lib/stripePaymentConfig'
 import { apiUrl } from '../lib/api'
 
-/** Billing details for confirmPayment when Payment Element fields are disabled. */
-function buildConfirmParams(recordPayload) {
-  const email = (recordPayload?.customerEmail || '').trim()
-  const name = (recordPayload?.customerFullName || '').trim()
-  if (!name) {
-    throw new Error('Enter your full name before paying.')
-  }
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error('Enter a valid email before paying.')
-  }
-  return {
-    receipt_email: email,
-    payment_method_data: {
-      billing_details: {
-        name,
-        email,
-        address: { country: 'GB' },
-      },
-    },
-  }
+function PaymentStatusMessage({ status, message }) {
+  if (!message) return null
+  const tone =
+    status === 'error'
+      ? 'border-red-500/35 bg-red-950/40 text-red-200'
+      : 'border-teal-500/30 bg-teal-950/35 text-teal-100/90'
+  return (
+    <p
+      className={`rounded-lg border px-3 py-2 text-sm ${tone}`}
+      role={status === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+    >
+      {message}
+    </p>
+  )
 }
 
-function paymentElementOptions(recordPayload) {
-  const email = (recordPayload?.customerEmail || '').trim()
-  const name = (recordPayload?.customerFullName || '').trim()
-  return {
-    // Tabs layout is more reliable than accordion in Safari (avoids blank card panel).
-    layout: 'tabs',
-    wallets: {
-      applePay: 'auto',
-      googlePay: 'auto',
-      link: 'never',
-    },
-    defaultValues: {
-      billingDetails: {
-        name: name || undefined,
-        email: email || undefined,
-      },
-    },
-    // Only name/email are `never` (collected above and passed in confirmPayment). Do not set phone/address
-    // to `never` unless you also pass them in confirmParams — Stripe will reject the payment.
-    fields: { billingDetails: { email: 'never', name: 'never' } },
-    terms: { card: 'never', applePay: 'never', googlePay: 'never', link: 'never' },
-    business: { name: 'ShowSkills Rewards' },
-  }
+function PaySubmitButton({ disabled, paying, ready, amountLabel, onPay }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled || paying || !ready}
+      onClick={onPay}
+      className="ss-stripe-pay-button mt-4 min-h-[52px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {paying ? 'Processing…' : amountLabel ? `Pay ${amountLabel}` : 'Pay now'}
+    </button>
+  )
 }
 
-function PayButton({
+function PaymentElementMount({ recordPayload, onReadyChange, onLoadError, onChangeMessage }) {
+  const elements = useElements()
+  const elementOptions = useMemo(() => buildPaymentElementOptions(recordPayload), [recordPayload])
+  const mountedRef = useRef(false)
+
+  useEffect(() => {
+    onReadyChange(false)
+    mountedRef.current = false
+  }, [recordPayload?.customerEmail, recordPayload?.customerFullName, onReadyChange])
+
+  useEffect(() => {
+    if (!elements || mountedRef.current) return
+    let cancelled = false
+    elements.fetchUpdates?.().catch(() => {})
+    const t = requestAnimationFrame(() => {
+      if (!cancelled) mountedRef.current = true
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(t)
+    }
+  }, [elements, elementOptions])
+
+  return (
+    <div id="ss-stripe-payment-mount" className="ss-stripe-payment-mount">
+      <PaymentElement
+        id="ss-payment-element"
+        options={elementOptions}
+        onReady={() => onReadyChange(true)}
+        onLoadError={(event) => {
+          onReadyChange(false)
+          onLoadError(event?.error?.message || 'Could not load payment methods.')
+        }}
+        onChange={(event) => {
+          if (event.complete) onChangeMessage('')
+          else if (event.empty) onChangeMessage('')
+        }}
+      />
+    </div>
+  )
+}
+
+function PaymentFormInner({
+  amountLabel,
   disabled,
   onError,
   onSuccess,
   paymentIntentId,
   recordPayload,
-  elementReady,
-  compactMobile,
 }) {
   const stripe = useStripe()
   const elements = useElements()
+  const [elementReady, setElementReady] = useState(false)
   const [paying, setPaying] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [statusTone, setStatusTone] = useState('info')
+
+  const setError = useCallback(
+    (msg) => {
+      setStatusTone('error')
+      setStatusMessage(msg)
+      onError(msg)
+    },
+    [onError],
+  )
 
   const handlePay = useCallback(async () => {
-    if (!stripe || !elements) return
+    if (!stripe || !elements || !elementReady) return
     setPaying(true)
+    setStatusMessage('')
     onError('')
     try {
       let confirmParams
       try {
         confirmParams = buildConfirmParams(recordPayload)
       } catch (e) {
-        onError(e instanceof Error ? e.message : 'Missing customer details')
+        setError(e instanceof Error ? e.message : 'Missing customer details')
         setPaying(false)
         return
       }
+
+      const { error: submitError } = await elements.submit()
+      if (submitError) {
+        setError(submitError.message || 'Check your payment details')
+        setPaying(false)
+        return
+      }
+
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         redirect: 'if_required',
         confirmParams,
       })
+
       if (error) {
-        onError(error.message || 'Payment failed')
+        setError(error.message || 'Payment failed')
         setPaying(false)
         return
       }
+
       const piId = paymentIntent?.id || paymentIntentId
       if (!piId) {
-        onError('Payment status unclear. Contact support with your email.')
+        setError('Payment status unclear. Contact support with your email.')
         setPaying(false)
         return
       }
+
       const res = await fetch(apiUrl('/api/record-stripe-payment'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,82 +171,64 @@ function PayButton({
         emailSent: Boolean(data.emailSent),
       })
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Payment failed')
+      setError(e instanceof Error ? e.message : 'Payment failed')
     } finally {
       setPaying(false)
     }
-  }, [stripe, elements, onError, onSuccess, paymentIntentId, recordPayload])
-
-  return (
-    <button
-      type="button"
-      disabled={disabled || paying || !stripe || !elements || !elementReady}
-      onClick={handlePay}
-      className={`mt-3 w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${
-        compactMobile ? 'min-h-[48px] py-3.5 text-base' : 'py-3 text-sm'
-      }`}
-    >
-      {paying ? 'Processing…' : 'Pay now'}
-    </button>
-  )
-}
-
-function PaymentFields({ disabled, onError, onSuccess, paymentIntentId, recordPayload, compact }) {
-  const isMobile = useMediaQuery('(max-width: 767px)')
-  const [elementReady, setElementReady] = useState(false)
-  const elementOptions = useMemo(
-    () => paymentElementOptions(recordPayload),
-    [recordPayload],
-  )
-
-  useEffect(() => {
-    setElementReady(false)
-  }, [recordPayload?.customerEmail, recordPayload?.customerFullName])
+  }, [stripe, elements, elementReady, onError, onSuccess, paymentIntentId, recordPayload, setError])
 
   useEffect(() => {
     if (elementReady) return
     const t = setTimeout(() => {
-      onError(
-        'Payment form is taking too long to load. Disable content blockers for this site, or tap Back and try again.',
+      setError(
+        'Payment methods are taking too long to load. In Brave or Safari, allow cookies for this site and disable shields, then try again.',
       )
-    }, 18_000)
+    }, 20_000)
     return () => clearTimeout(t)
-  }, [elementReady, onError])
+  }, [elementReady, setError])
+
+  const stripeLoaded = Boolean(stripe && elements)
 
   return (
-    <>
-      {!compact ? (
-        <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">Card, Apple Pay, Google Pay</p>
-      ) : null}
+    <div className="ss-stripe-payment-panel">
+      <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">
+        Card, Apple Pay, Google Pay, PayPal
+      </p>
+      <p className="mt-1 text-xs text-stone-500">
+        Choose a method below. Your name and email from the previous step are used for this payment.
+      </p>
+
       {!elementReady ? (
-        <p className="ss-stripe-payment-loading mt-3 text-sm text-stone-500" aria-live="polite">
-          Loading payment options…
-        </p>
+        <div className="ss-stripe-payment-skeleton mt-4" aria-hidden>
+          <div className="h-11 animate-pulse rounded-lg bg-white/5" />
+          <div className="mt-3 h-11 animate-pulse rounded-lg bg-white/5" />
+          <div className="mt-3 h-11 animate-pulse rounded-lg bg-white/5" />
+        </div>
       ) : null}
-      <div className={`ss-stripe-payment-element mt-3 ${elementReady ? 'ss-stripe-payment-element--ready' : ''}`}>
-        <PaymentElement
-          onReady={() => setElementReady(true)}
-          onLoadError={(e) => {
-            onError(e?.error?.message || 'Could not load payment form. Try refreshing or another browser.')
-          }}
-          options={elementOptions}
-        />
-      </div>
-      <PayButton
-        disabled={disabled}
-        elementReady={elementReady}
-        onError={onError}
-        onSuccess={onSuccess}
-        paymentIntentId={paymentIntentId}
+
+      <PaymentElementMount
         recordPayload={recordPayload}
-        compactMobile={isMobile}
+        onReadyChange={setElementReady}
+        onLoadError={setError}
+        onChangeMessage={setStatusMessage}
       />
-    </>
+
+      <PaymentStatusMessage status={statusTone} message={statusMessage} />
+
+      <PaySubmitButton
+        amountLabel={amountLabel}
+        disabled={disabled}
+        paying={paying}
+        ready={stripeLoaded && elementReady}
+        onPay={handlePay}
+      />
+    </div>
   )
 }
 
 /**
- * Embedded Stripe Payment Element — Apple Pay on Safari/iOS when domain is registered in Stripe.
+ * Modern Stripe Payment Element (not legacy Card Element).
+ * Supports card, wallets, and PayPal when enabled in Stripe Dashboard + PaymentIntent.
  */
 export function StripePaymentForm({
   publishableKey,
@@ -206,36 +239,29 @@ export function StripePaymentForm({
   onSuccess,
   onError,
   disabled,
-  compact = false,
 }) {
   const stripePromise = useMemo(() => getStripePromise(publishableKey), [publishableKey])
-  const options = useMemo(
-    () => ({
-      clientSecret,
-      appearance: stripeElementsAppearance,
-      loader: 'auto',
-    }),
+  const elementsOptions = useMemo(
+    () => (clientSecret ? buildStripeElementsOptions(clientSecret) : null),
     [clientSecret],
   )
 
-  if (!clientSecret) return null
+  if (!clientSecret || !elementsOptions) return null
 
   return (
-    <div
-      className={
-        compact
-          ? 'ss-stripe-payment-shell'
-          : 'ss-stripe-payment-shell rounded-xl border border-teal-500/25 bg-black/25 p-4'
-      }
-    >
-      <Elements key={`${clientSecret}-billing-v3`} stripe={stripePromise} options={options}>
-        <PaymentFields
+    <div className="ss-stripe-payment-shell">
+      <Elements
+        key={clientSecret}
+        stripe={stripePromise}
+        options={elementsOptions}
+      >
+        <PaymentFormInner
+          amountLabel={amountLabel}
           disabled={disabled}
           onError={onError}
           onSuccess={onSuccess}
           paymentIntentId={paymentIntentId}
           recordPayload={recordPayload}
-          compact={compact}
         />
       </Elements>
     </div>

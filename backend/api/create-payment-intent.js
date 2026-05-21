@@ -83,7 +83,7 @@ export default async function handler(req, res) {
       receipt_email: customerEmail,
       automatic_payment_methods: {
         enabled: true,
-        allow_redirects: 'never',
+        allow_redirects: 'always',
       },
       metadata: buildStripePaymentMetadata({
         bundleId: bundle.id,

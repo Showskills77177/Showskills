@@ -6,7 +6,8 @@ import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
 
 /**
- * Payment step as a native <dialog> (Safari/Brave focus-safe; Stripe outside scroll traps).
+ * Payment step — native dialog + Stripe Payment Element (no legacy Card Element).
+ * PayPal via Stripe when configured; standalone PayPal SDK only if Stripe is absent.
  */
 export function PaymentCheckoutSheet({
   open,
@@ -60,12 +61,18 @@ export function PaymentCheckoutSheet({
   const amountLabel = formatBundlePriceGBP(amountPence ?? 0)
   const stripeReady = hasStripeElements && Boolean(paidStripeClientSecret)
   const showStripeEmpty = hasStripeElements && !preparing && !paidStripeClientSecret
+  const showStandalonePayPal = hasPayPal && !hasStripeElements
+
+  const payPalDisabled =
+    !paidConsent ||
+    !customerFullName?.trim() ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail?.trim() || '')
 
   return (
     <ModalPortal>
       <dialog
         ref={dialogRef}
-        className="ss-payment-dialog w-[calc(100%-1.5rem)] max-w-lg sm:max-w-xl"
+        className="ss-payment-dialog w-[calc(100%-1.5rem)] max-w-lg sm:max-w-2xl"
         aria-labelledby="payment-sheet-title"
         onClose={onClose}
         onCancel={(e) => {
@@ -73,7 +80,7 @@ export function PaymentCheckoutSheet({
           onClose()
         }}
       >
-        <div className="ss-payment-popup-panel flex max-h-[min(92vh,720px)] flex-col rounded-2xl border border-teal-500/35 bg-stone-950 shadow-2xl shadow-black/60">
+        <div className="ss-payment-popup-panel flex max-h-[min(92vh,780px)] flex-col rounded-2xl border border-teal-500/35 bg-stone-950 shadow-2xl shadow-black/60">
           <div
             className="h-1 w-full shrink-0 bg-gradient-to-r from-teal-500/80 via-emerald-500/60 to-transparent"
             aria-hidden
@@ -91,7 +98,7 @@ export function PaymentCheckoutSheet({
             </button>
             <div className="min-w-0 flex-1">
               <h2 id="payment-sheet-title" className="text-base font-semibold text-stone-100 sm:text-lg">
-                How would you like to pay?
+                Complete payment
               </h2>
               <p className="truncate text-sm text-teal-200/90">
                 {bundleTitle ? `${bundleTitle} · ` : ''}
@@ -101,64 +108,43 @@ export function PaymentCheckoutSheet({
             </div>
           </header>
 
-          <div className="ss-payment-popup-body min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5">
+          <div className="ss-payment-popup-messages shrink-0 px-4 pt-4 sm:px-5">
             {paidError ? <ErrorBanner message={paidError} /> : null}
-
-            {preparing ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-                <div
-                  className="h-9 w-9 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-400"
-                  aria-hidden
-                />
-                <p className="text-sm text-stone-400">Setting up payment…</p>
-              </div>
-            ) : null}
-
-            {showStripeEmpty ? (
-              <div className="flex flex-col items-center gap-4 py-10 text-center">
-                <p className="max-w-md text-sm text-stone-400">
-                  Card payment could not load. In Brave or Safari, turn off shields for this site and allow cookies, then
-                  try again.
-                </p>
-                {onRetryPayment ? (
-                  <button
-                    type="button"
-                    onClick={() => onRetryPayment()}
-                    className="rounded-xl border border-teal-500/40 bg-teal-950/50 px-5 py-2.5 text-sm font-semibold text-teal-100 hover:bg-teal-900/40"
-                  >
-                    Try again
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-
-            {!preparing && !stripeReady && !hasPayPal && !showStripeEmpty ? (
-              <p className="py-10 text-center text-sm text-stone-500">No payment methods are configured.</p>
-            ) : null}
-
-            {hasPayPal && !stripeReady && !preparing ? (
-              <PayPalPayButton
-                clientId={payPalClientId}
-                currency={payPalCurrency}
-                createOrderUrl={paypalCreateOrderApi}
-                captureOrderUrl={paypalCaptureOrderApi}
-                bundleId={paidBundleId}
-                ticketQuantity={ticketQuantity}
-                customerEmail={customerEmail}
-                customerFullName={customerFullName}
-                disabled={
-                  !paidConsent ||
-                  !customerFullName?.trim() ||
-                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail?.trim() || '')
-                }
-                onPaid={onPayPalPaid}
-                onError={onPayPalError}
-              />
-            ) : null}
           </div>
 
+          {preparing ? (
+            <div className="flex shrink-0 flex-col items-center justify-center gap-3 px-4 py-14 text-center sm:px-5">
+              <div
+                className="h-9 w-9 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-400"
+                aria-hidden
+              />
+              <p className="text-sm text-stone-400">Preparing secure checkout…</p>
+            </div>
+          ) : null}
+
+          {showStripeEmpty ? (
+            <div className="flex shrink-0 flex-col items-center gap-4 px-4 py-10 text-center sm:px-5">
+              <p className="max-w-md text-sm text-stone-400">
+                Secure checkout could not start. Check your connection, allow cookies for this site (Safari / Brave), and
+                try again.
+              </p>
+              {onRetryPayment ? (
+                <button
+                  type="button"
+                  onClick={() => onRetryPayment()}
+                  className="rounded-xl border border-teal-500/40 bg-teal-950/50 px-5 py-2.5 text-sm font-semibold text-teal-100 hover:bg-teal-900/40"
+                >
+                  Try again
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {stripeReady ? (
-            <div className="ss-payment-stripe-host shrink-0 border-t border-white/10 px-4 py-4 sm:px-5 sm:py-5">
+            <section
+              className="ss-payment-element-section min-h-0 flex-1 px-4 pb-5 pt-2 sm:px-5 sm:pb-6"
+              aria-label="Payment methods"
+            >
               <StripePaymentForm
                 publishableKey={stripePublishableKey}
                 clientSecret={paidStripeClientSecret}
@@ -168,16 +154,13 @@ export function PaymentCheckoutSheet({
                 disabled={!paidFormReadyForPayment}
                 onSuccess={onStripeSuccess}
                 onError={onStripeError}
-                compact
               />
-            </div>
+            </section>
           ) : null}
 
-          {stripeReady && hasPayPal ? (
-            <div className="shrink-0 border-t border-white/10 px-4 pb-5 pt-0 sm:px-5">
-              <p className="mb-3 pt-4 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
-                or
-              </p>
+          {showStandalonePayPal && !preparing ? (
+            <div className="shrink-0 border-t border-white/10 px-4 py-5 sm:px-5">
+              <p className="mb-3 text-center text-xs text-stone-500">Pay with PayPal</p>
               <PayPalPayButton
                 clientId={payPalClientId}
                 currency={payPalCurrency}
@@ -187,15 +170,15 @@ export function PaymentCheckoutSheet({
                 ticketQuantity={ticketQuantity}
                 customerEmail={customerEmail}
                 customerFullName={customerFullName}
-                disabled={
-                  !paidConsent ||
-                  !customerFullName?.trim() ||
-                  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail?.trim() || '')
-                }
+                disabled={payPalDisabled}
                 onPaid={onPayPalPaid}
                 onError={onPayPalError}
               />
             </div>
+          ) : null}
+
+          {!preparing && !stripeReady && !showStandalonePayPal && !showStripeEmpty ? (
+            <p className="px-4 py-10 text-center text-sm text-stone-500 sm:px-5">No payment methods are configured.</p>
           ) : null}
         </div>
       </dialog>

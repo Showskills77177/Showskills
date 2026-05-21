@@ -27,7 +27,7 @@ test.describe('Payment — £0.30 test bundle (all browsers / mobile)', () => {
     const assertClean = installPageErrorAsserter(page)
     await assertPayNowOpensPaymentSheet(page)
     await page.getByRole('button', { name: 'Back' }).click()
-    await expect(page.getByRole('heading', { name: /How would you like to pay/i })).toBeHidden()
+    await expect(page.getByRole('heading', { name: /Complete payment/i })).toBeHidden()
     await assertClean()
   })
 })

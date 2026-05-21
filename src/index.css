@@ -1633,21 +1633,32 @@ body {
   }
 }
 
-/* Stripe Payment Element — Safari-safe (avoid 3D transforms on iframe ancestors) */
-.ss-stripe-payment-shell {
+/* Stripe Payment Element — modern PE (not legacy Card Element); Safari/Brave safe stacking */
+.ss-stripe-payment-shell,
+.ss-stripe-payment-panel,
+.ss-payment-element-section {
   position: relative;
   z-index: 1;
+  overflow: visible;
+  isolation: isolate;
 }
 
-.ss-stripe-payment-loading {
-  min-height: 2.5rem;
-}
-
-.ss-stripe-payment-element {
+.ss-stripe-payment-mount {
   position: relative;
-  z-index: 1;
-  min-height: 11rem;
-  touch-action: manipulation;
+  z-index: 2;
+  width: 100%;
+  min-height: 13rem;
+  margin-top: 1rem;
+  overflow: visible;
+}
+
+.ss-stripe-payment-skeleton {
+  min-height: 8rem;
+}
+
+.ss-stripe-payment-panel .StripeElement,
+.ss-stripe-payment-mount iframe {
+  pointer-events: auto !important;
 }
 
 /* Native <dialog> modals — Safari/Brave keyboard + Stripe iframe safe. */
@@ -1701,10 +1712,13 @@ body {
   overflow: visible;
 }
 
-.ss-payment-popup-body {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+.ss-payment-popup-messages:empty {
+  display: none;
+}
+
+.ss-payment-element-section {
+  overflow: visible;
+  flex: 1 1 auto;
 }
 
 .ss-entry-field,
@@ -1724,33 +1738,18 @@ body {
   cursor: text;
 }
 
-/* Stripe iframes break when any ancestor uses overflow: hidden (Safari, Brave). */
-.ss-payment-stripe-host,
-.ss-payment-stripe-host .ss-stripe-payment-shell,
-.ss-payment-stripe-host .ss-stripe-payment-element {
-  overflow: visible;
-  position: relative;
-  z-index: 2;
-}
-
-@media (max-width: 767px) {
-  .ss-stripe-payment-element {
-    min-height: 13rem;
-  }
-}
-
 .ss-bundle-select {
   background-image: none;
 }
 
 @media (max-width: 767px) {
-  .ss-stripe-payment-element {
-    min-height: 10rem;
+  .ss-stripe-payment-mount {
+    min-height: 15rem;
   }
-}
 
-.ss-stripe-payment-element iframe {
-  pointer-events: auto !important;
+  .ss-payment-dialog {
+    width: calc(100% - 1rem);
+  }
 }
 
 .ss-entry-modal-stripe {
@@ -1760,13 +1759,12 @@ body {
 }
 
 @supports (-webkit-touch-callout: none) {
-  .ss-stripe-payment-element,
-  .ss-entry-modal-stripe,
+  .ss-stripe-payment-mount,
   .ss-stripe-payment-shell,
-  .ss-payment-stripe-host,
+  .ss-stripe-payment-panel,
+  .ss-payment-element-section,
   .ss-payment-dialog,
-  .ss-payment-popup-panel,
-  .ss-payment-popup-body {
+  .ss-payment-popup-panel {
     transform: none;
     -webkit-transform: none;
     filter: none;

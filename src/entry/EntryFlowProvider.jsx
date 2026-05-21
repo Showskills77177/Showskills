@@ -104,6 +104,47 @@ export function EntryFlowProvider({ children }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    if (params.get('stripe_return') === '1') {
+      const redirectStatus = params.get('redirect_status')
+      const paymentIntentId = params.get('payment_intent')?.trim() || ''
+      if (redirectStatus === 'succeeded' && paymentIntentId.startsWith('pi_')) {
+        fetch(apiUrl('/api/record-stripe-payment'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ paymentIntentId }),
+        })
+          .then((res) => res.json().catch(() => ({})))
+          .then((data) => {
+            if (data.skipped) return
+            if (!data.ok && data.error) {
+              setPaidError(typeof data.error === 'string' ? data.error : 'Could not confirm payment')
+              setEntryModalType('paid')
+              return
+            }
+            setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
+            if (typeof data.orderRef === 'string' && data.orderRef) setPaidOrderRef(data.orderRef)
+            if (data.emailSent) setPaidEmailConfirmationSent(true)
+            setPaidPostCheckout(true)
+            setPaidQuizResult(null)
+            setPaidQuizSubmitted(false)
+            setPaidQuizSubmitting(false)
+            setPaidA1('')
+            setPaidA2('')
+            setPaidA3('')
+            setPaidQuizError('')
+            setPaidError('')
+            setEntryModalType('paid')
+          })
+          .catch(() => {
+            setPaidError('Payment may have succeeded but could not be confirmed. Contact support with your email.')
+            setEntryModalType('paid')
+          })
+        window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+      }
+      return
+    }
+
     if (params.get('checkout') !== 'success') return
     const sessionId = params.get('session_id')
     if (sessionId) {

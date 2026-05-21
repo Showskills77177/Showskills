@@ -44,7 +44,7 @@ export async function assertPayNowOpensPaymentSheet(page) {
     email: `sheet-${Date.now()}@example.test`,
   })
   await page.getByRole('button', { name: /^Pay now$/i }).click()
-  const sheet = page.getByRole('dialog', { name: /How would you like to pay/i })
+  const sheet = page.getByRole('dialog', { name: /Complete payment/i })
   await expect(sheet).toBeVisible({ timeout: 15_000 })
   await expect(sheet.getByText('£0.30', { exact: true })).toBeVisible()
 }
