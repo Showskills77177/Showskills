@@ -2,9 +2,7 @@ import Stripe from 'stripe'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { recordStripeCheckoutCompleted, parseReservedTicketNumbersMetadata } from '../lib/recordSale.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
-import { maybeSendPendingQuizReminderEmail } from '../lib/sendPendingQuizEmail.mjs'
 import { ensureQuizResumeToken } from '../lib/quizResumeToken.mjs'
-import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -69,20 +67,7 @@ export default async function handler(req, res) {
 
     const resolvedEmail = (email || '').trim().toLowerCase()
     const resolvedName = (fullName || '').trim()
-    const bundle = md.bundle_id ? getTicketBundleById(md.bundle_id) : null
     const resumeToken = await ensureQuizResumeToken(recorded.ticketId)
-
-    await maybeSendPendingQuizReminderEmail({
-      ticketId: recorded.ticketId,
-      userId: recorded.userId,
-      to: resolvedEmail,
-      customerFullName: resolvedName,
-      orderRef: recorded.ticketPublicId,
-      ticketNumbers: recorded.ticketNumbers || [],
-      bundleId: md.bundle_id,
-      quantity: qty,
-      amountPence: session.amount_total || bundle?.totalPence,
-    })
 
     return json(res, 200, {
       ok: true,

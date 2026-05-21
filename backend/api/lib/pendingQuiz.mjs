@@ -2,14 +2,10 @@ import { query, dbIsPostgres } from './db.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { getTicketNumbersForPurchase } from './ticketNumbers.mjs'
 import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
-import {
-  buildPendingQuizHtml,
-  buildPendingQuizText,
-  pendingQuizSubject,
-  pendingQuizEmailProps,
-} from '../../../shared/pendingQuizEmail.mjs'
-import { resolveResendFrom, formatResendError, resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
+import { buildCompleteQuizUrl } from '../../../shared/quizLinks.mjs'
+import { resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
 import { ensureQuizResumeToken } from './quizResumeToken.mjs'
+import { sendPurchaseConfirmationEmail } from './sendPurchaseEmail.mjs'
 
 const COMPETITION = 'ronaldo_legacy_bundle'
 
@@ -90,6 +86,7 @@ export async function getPendingPaidQuizByResumeToken(resumeToken) {
     pending: true,
     alreadyAnswered: false,
     ticketId: row.id,
+    userId: row.user_id,
     orderRef: row.ticket_public_id,
     bundleId: row.bundle_id,
     quantity: row.quantity,
@@ -141,6 +138,7 @@ export async function getPendingPaidQuizForEmail(email) {
   return {
     pending: true,
     ticketId: row.id,
+    userId: row.user_id,
     orderRef: row.ticket_public_id,
     bundleId: row.bundle_id,
     quantity: row.quantity,
@@ -151,17 +149,23 @@ export async function getPendingPaidQuizForEmail(email) {
   }
 }
 
-async function pendingReminderAlreadySent(ticketId) {
-  const r = await query(`SELECT pending_quiz_reminder_sent_at FROM tickets WHERE id = $1`, [ticketId])
-  return Boolean(r.rows[0]?.pending_quiz_reminder_sent_at)
+async function unansweredTicketEmailAlreadySent(ticketId) {
+  const r = await query(
+    `SELECT pending_quiz_reminder_sent_at, confirmation_email_sent_at FROM tickets WHERE id = $1`,
+    [ticketId],
+  )
+  const row = r.rows[0]
+  if (!row) return false
+  return Boolean(row.pending_quiz_reminder_sent_at || row.confirmation_email_sent_at)
 }
 
-async function markPendingReminderSent(ticketId) {
+async function markUnansweredTicketEmailSent(ticketId) {
   const at = new Date().toISOString()
   await query(`UPDATE tickets SET pending_quiz_reminder_sent_at = $2 WHERE id = $1`, [ticketId, at])
 }
 
-export async function maybeSendPendingQuizReminderEmail({
+/** One ticket email with numbers + answer link — only if they left without submitting the quiz. */
+export async function maybeSendUnansweredQuizTicketEmail({
   ticketId,
   userId,
   to,
@@ -177,52 +181,36 @@ export async function maybeSendPendingQuizReminderEmail({
   if (userId && (await hasPaidQuizEntryForTicket(userId, ticketId))) {
     return { ok: false, skipped: true, reason: 'quiz_already_submitted' }
   }
-  if (await pendingReminderAlreadySent(ticketId)) {
+  if (await unansweredTicketEmailAlreadySent(ticketId)) {
     return { ok: false, skipped: true, reason: 'already_sent' }
   }
 
-  const apiKey = getResendApiKey()
-  if (!apiKey) {
-    console.warn('[email] RESEND_API_KEY not set — skipping pending quiz reminder')
+  if (!getResendApiKey()) {
+    console.warn('[email] RESEND_API_KEY not set — skipping unanswered quiz ticket email')
     return { ok: false, skipped: true, reason: 'no_resend_key' }
   }
 
   const resumeToken = await ensureQuizResumeToken(ticketId)
-  const bundle = bundleId ? getTicketBundleById(bundleId) : null
   const siteUrl = resolveSiteUrl()
-  const props = pendingQuizEmailProps({
+  const completeQuizUrl = buildCompleteQuizUrl(siteUrl, resumeToken)
+
+  const sent = await sendPurchaseConfirmationEmail({
+    to,
     customerFullName,
-    siteUrl,
-    orderRef,
-    bundleTitle: bundle?.title ?? bundleId,
-    quantity: quantity ?? bundle?.qty,
-    amountPence: amountPence ?? bundle?.totalPence,
+    bundleId,
+    quantity,
+    amountPence,
     ticketNumbers,
-    resumeToken,
+    purchaseRef: orderRef,
+    quizPending: true,
+    completeQuizUrl,
   })
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: resolveResendFrom(),
-      to: [to.trim()],
-      subject: pendingQuizSubject(orderRef),
-      html: buildPendingQuizHtml(props),
-      text: buildPendingQuizText(props),
-    }),
-  })
+  if (!sent?.ok) return sent
 
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    const msg = formatResendError(data, res.status)
-    console.error('[email] Pending quiz reminder failed:', msg)
-    return { ok: false, error: msg }
-  }
-
-  await markPendingReminderSent(ticketId)
-  return { ok: true, id: data.id }
+  await markUnansweredTicketEmailSent(ticketId)
+  return { ok: true, emailSent: true, id: sent.id }
 }
+
+/** @deprecated Use maybeSendUnansweredQuizTicketEmail — kept for import compatibility. */
+export const maybeSendPendingQuizReminderEmail = maybeSendUnansweredQuizTicketEmail

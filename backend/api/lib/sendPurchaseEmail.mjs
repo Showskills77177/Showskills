@@ -3,6 +3,7 @@ import {
   buildPurchaseConfirmationHtml,
   buildPurchaseConfirmationText,
   purchaseConfirmationSubject,
+  purchaseConfirmationSubjectQuizPending,
 } from '../../../shared/purchaseConfirmationEmail.mjs'
 import { resolveResendFrom, formatResendError, resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
 
@@ -18,6 +19,8 @@ export async function sendPurchaseConfirmationEmail({
   amountPence,
   ticketNumbers,
   purchaseRef,
+  quizPending = false,
+  completeQuizUrl = '',
 }) {
   const apiKey = getResendApiKey()
   if (!apiKey) {
@@ -33,6 +36,7 @@ export async function sendPurchaseConfirmationEmail({
   const bundle = getTicketBundleById(bundleId)
   const bundleTitle = bundle?.title ?? bundleId ?? 'Ticket bundle'
   const qty = quantity || bundle?.qty || ticketNumbers.length || 1
+  const siteUrl = resolveSiteUrl()
   const emailProps = {
     customerFullName,
     bundleTitle,
@@ -40,13 +44,17 @@ export async function sendPurchaseConfirmationEmail({
     amountPence: amountPence ?? bundle?.totalPence ?? 0,
     ticketNumbers,
     purchaseRef,
-    siteUrl: resolveSiteUrl(),
+    siteUrl,
+    quizPending: Boolean(quizPending),
+    completeQuizUrl: typeof completeQuizUrl === 'string' ? completeQuizUrl : '',
   }
 
   const payload = {
     from: resolveResendFrom(),
     to: [email],
-    subject: purchaseConfirmationSubject(purchaseRef),
+    subject: quizPending
+      ? purchaseConfirmationSubjectQuizPending(purchaseRef)
+      : purchaseConfirmationSubject(purchaseRef),
     html: buildPurchaseConfirmationHtml(emailProps),
     text: buildPurchaseConfirmationText(emailProps),
   }

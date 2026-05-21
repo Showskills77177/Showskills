@@ -64,6 +64,8 @@ const VALUE_MONO_STYLE = 'font-family:ui-monospace,Menlo,monospace;color:#ecfdf5
  *   ticketNumbers: string[]
  *   purchaseRef: string
  *   siteUrl: string
+ *   quizPending?: boolean
+ *   completeQuizUrl?: string
  * }} props
  */
 export function buildPurchaseConfirmationHtml(props) {
@@ -75,12 +77,82 @@ export function buildPurchaseConfirmationHtml(props) {
     ticketNumbers,
     purchaseRef,
     siteUrl,
+    quizPending = false,
+    completeQuizUrl = '',
   } = props
   const price = formatBundlePriceGBP(amountPence)
   const logoSrc = emailLogoUrl(siteUrl)
   const showTickets = ticketNumbers.length > 0
   const ticketLabel = ticketNumbers.length === 1 ? 'Ticket number' : 'Ticket numbers'
   const ticketsHtml = showTickets ? buildTicketGridHtml(ticketNumbers) : ''
+  const ctaUrl = completeQuizUrl ? escapeHtml(completeQuizUrl) : ''
+
+  if (quizPending) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Answer your skill questions — ${escapeHtml(purchaseRef)}</title>
+</head>
+<body style="margin:0;padding:0;background:#0c1a16;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0c1a16;padding:32px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
+          <tr>
+            <td style="padding:0 0 20px;text-align:center">
+              <img src="${escapeHtml(logoSrc)}" alt="ShowSkills Rewards" width="156" height="auto" style="display:block;margin:0 auto 12px;max-width:156px;height:auto;border:0" />
+              <div style="font-size:22px;font-weight:700;color:#fef3c7;line-height:1.25">Your questions are not answered</div>
+              <div style="margin-top:6px;font-size:14px;color:#a8a29e">Ronaldo Legacy Bundle</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:linear-gradient(180deg,#0f2922 0%,#0a1f19 100%);border:1px solid rgba(251,191,36,0.5);border-radius:16px;padding:28px 24px">
+              <p style="margin:0 0 14px;font-size:16px;color:#e7e5e4">Hi ${escapeHtml(customerFullName || 'there')},</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#d6d3d1">Thank you for your purchase. Your payment was successful and your ticket numbers are below.</p>
+              <p style="margin:0 0 18px;font-size:15px;line-height:1.55;color:#fde68a"><strong style="color:#fef3c7">You still need to answer your three skill questions</strong> to complete your entry. You only qualify for the draw if all three answers are correct.</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:rgba(0,0,0,0.25);border-radius:12px;border:1px solid rgba(255,255,255,0.08)">
+                <tr>
+                  <td style="padding:14px 16px">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr><td style="padding:5px 0;${LABEL_STYLE}">Order</td><td align="right" style="padding:5px 0;${VALUE_MONO_STYLE}">${escapeHtml(purchaseRef)}</td></tr>
+                      <tr><td style="padding:5px 0;${LABEL_STYLE}">Bundle</td><td align="right" style="padding:5px 0;${VALUE_STYLE}">${escapeHtml(bundleTitle)} · ${quantity} ticket${quantity === 1 ? '' : 's'}</td></tr>
+                      <tr><td style="padding:5px 0;${LABEL_STYLE}">Paid</td><td align="right" style="padding:5px 0;font-weight:700;color:#6ee7b7;font-size:14px">${escapeHtml(price)}</td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              ${
+                showTickets
+                  ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table>`
+                  : ''
+              }
+              ${
+                ctaUrl
+                  ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 16px">
+                <tr><td style="border-radius:12px;background:linear-gradient(90deg,#0d9488,#059669)">
+                  <a href="${ctaUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Answer your questions now</a>
+                </td></tr>
+              </table>
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#78716c">Use this link on any phone or computer until you submit your answers:<br /><a href="${ctaUrl}" style="color:#6ee7b7;word-break:break-all">${ctaUrl}</a></p>`
+                  : ''
+              }
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 12px 0;text-align:center;font-size:11px;line-height:1.5;color:#57534e">
+              ShowSkills Rewards — skill-based promotion (UK).
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -152,8 +224,32 @@ export function buildPurchaseConfirmationText(props) {
     ticketNumbers,
     purchaseRef,
     siteUrl,
+    quizPending = false,
+    completeQuizUrl = '',
   } = props
   const price = formatBundlePriceGBP(amountPence)
+
+  if (quizPending) {
+    return [
+      `Hi ${customerFullName || 'there'},`,
+      '',
+      'Your payment was successful. Your ticket numbers are below.',
+      '',
+      'YOUR QUESTIONS ARE NOT ANSWERED — you still need to submit your three skill answers to complete your entry.',
+      'You only qualify for the draw if all three answers are correct.',
+      '',
+      `Order reference: ${purchaseRef}`,
+      `Bundle: ${bundleTitle} (${quantity} ticket${quantity === 1 ? '' : 's'})`,
+      `Amount paid: ${price}`,
+      '',
+      ...(ticketNumbers.length ? ['Ticket numbers:', ...ticketNumbers.map((n) => `  • ${n}`), ''] : []),
+      ...(completeQuizUrl
+        ? ['Answer your questions here (any device):', completeQuizUrl, '']
+        : []),
+      siteUrl,
+    ].join('\n')
+  }
+
   return [
     `Hi ${customerFullName || 'there'},`,
     '',
@@ -183,4 +279,8 @@ export function buildPurchaseConfirmationText(props) {
 
 export function purchaseConfirmationSubject(purchaseRef) {
   return `Your ShowSkills ticket confirmation — ${purchaseRef}`
+}
+
+export function purchaseConfirmationSubjectQuizPending(purchaseRef) {
+  return `Your ShowSkills tickets — please answer your skill questions — ${purchaseRef}`
 }

@@ -8,7 +8,6 @@ import { isDbConfigured } from './lib/db.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 import { assertPaymentIntentMatchesBundle } from './lib/paymentSecurity.mjs'
 import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
-import { maybeSendPendingQuizReminderEmail } from './lib/sendPendingQuizEmail.mjs'
 import { ensureQuizResumeToken } from './lib/quizResumeToken.mjs'
 
 export default async function handler(req, res) {
@@ -100,18 +99,6 @@ export default async function handler(req, res) {
     const resolvedEmail = (email || receiptEmail || '').trim().toLowerCase()
 
     const resumeToken = await ensureQuizResumeToken(recorded.ticketId)
-
-    await maybeSendPendingQuizReminderEmail({
-      ticketId: recorded.ticketId,
-      userId: recorded.userId,
-      to: resolvedEmail,
-      customerFullName: (fullName || '').trim(),
-      orderRef: recorded.ticketPublicId,
-      ticketNumbers: recorded.ticketNumbers || [],
-      bundleId: bundle.id,
-      quantity: bundle.qty,
-      amountPence: intent.amount_received || intent.amount,
-    })
 
     return json(res, 200, {
       ok: true,

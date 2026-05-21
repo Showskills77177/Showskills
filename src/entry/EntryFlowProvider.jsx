@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   PAID_SKILL_QUESTIONS,
@@ -75,6 +75,8 @@ export function EntryFlowProvider({ children }) {
   const [kickSuccess, setKickSuccess] = useState(false)
   /** null | 'confirming' | 'failed' — Stripe redirect return handling */
   const [stripeReturnStatus, setStripeReturnStatus] = useState(null)
+  /** Avoid sending the unanswered ticket email more than once per checkout. */
+  const unansweredTicketEmailRequestedRef = useRef(false)
 
   const stripePublishableKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '').trim()
   const stripePaymentIntentApiOverride = (import.meta.env.VITE_STRIPE_PAYMENT_INTENT_API_URL ?? '').trim()
@@ -199,6 +201,7 @@ export function EntryFlowProvider({ children }) {
       fullName: fn,
       quizResult: null,
     })
+    unansweredTicketEmailRequestedRef.current = false
   }, [])
 
   const applyResumeFromApi = useCallback(
@@ -529,10 +532,36 @@ export function EntryFlowProvider({ children }) {
     setPaidError('')
   }, [])
 
+  const notifyUnansweredQuizTicketEmail = useCallback(() => {
+    if (unansweredTicketEmailRequestedRef.current) return
+    if (!paidPostCheckout || paidQuizSubmitted) return
+    const em = paidEmail.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return
+    unansweredTicketEmailRequestedRef.current = true
+    void fetch(apiUrl('/api/entries/send-unanswered-quiz-email'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: em,
+        orderRef: paidOrderRef.trim() || undefined,
+      }),
+    }).catch(() => {
+      unansweredTicketEmailRequestedRef.current = false
+    })
+  }, [paidPostCheckout, paidQuizSubmitted, paidEmail, paidOrderRef])
+
   const closeEntry = useCallback(() => {
+    notifyUnansweredQuizTicketEmail()
     setEntryModalType(null)
     closeStripePayment()
-  }, [closeStripePayment])
+  }, [closeStripePayment, notifyUnansweredQuizTicketEmail])
+
+  useEffect(() => {
+    if (!paidPostCheckout || paidQuizSubmitted) return
+    const onPageHide = () => notifyUnansweredQuizTicketEmail()
+    window.addEventListener('pagehide', onPageHide)
+    return () => window.removeEventListener('pagehide', onPageHide)
+  }, [paidPostCheckout, paidQuizSubmitted, notifyUnansweredQuizTicketEmail])
 
   const openTerms = useCallback(() => setTermsOpen(true), [])
 
@@ -822,6 +851,7 @@ export function EntryFlowProvider({ children }) {
         setPaidQuizResult(result)
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
         setPaidQuizSubmitted(true)
+        unansweredTicketEmailRequestedRef.current = true
         savePaidQuizSession({
           status: 'answered',
           orderRef: paidOrderRef,
