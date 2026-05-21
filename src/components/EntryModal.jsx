@@ -106,12 +106,13 @@ export function EntryModal() {
       return
     }
     setPaidError('')
-    setPaymentSheetOpen(true)
     if (hasStripeElements && !paidStripeClientSecret) {
-      await prepareStripePayment()
-    } else if (hasStripeElements && stripePublishableKey) {
-      preloadStripe(stripePublishableKey)
+      const ready = await prepareStripePayment()
+      if (!ready) return
     }
+    if (hasStripeElements && !paidStripeClientSecret) return
+    if (hasStripeElements && stripePublishableKey) preloadStripe(stripePublishableKey)
+    setPaymentSheetOpen(true)
   }
 
   const paidAnswerValidation =
@@ -658,6 +659,7 @@ export function EntryModal() {
           markPaidCheckoutComplete(info)
         }}
         onStripeError={(msg) => setPaidError(msg)}
+        onRetryPayment={prepareStripePayment}
         hasPayPal={hasPayPal}
         payPalClientId={payPalClientId}
         payPalCurrency={payPalCurrency}

@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { formatBundlePriceGBP } from '../competitionData'
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
 
 /**
- * Full-screen payment step (card, Apple Pay, PayPal) — sits above the entry modal.
+ * Full-screen payment step (card, Apple Pay, PayPal) — portaled to document.body for Safari.
  */
 export function PaymentCheckoutSheet({
   open,
@@ -23,6 +24,7 @@ export function PaymentCheckoutSheet({
   recordPayload,
   onStripeSuccess,
   onStripeError,
+  onRetryPayment,
   hasPayPal,
   payPalClientId,
   payPalCurrency,
@@ -41,13 +43,24 @@ export function PaymentCheckoutSheet({
     if (open && onClearError) onClearError()
   }, [open, onClearError])
 
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
   if (!open) return null
 
   const amountLabel = formatBundlePriceGBP(amountPence ?? 0)
+  const stripeReady = hasStripeElements && Boolean(paidStripeClientSecret)
+  const showStripeEmpty = hasStripeElements && !preparing && !paidStripeClientSecret
 
-  return (
+  const sheet = (
     <div
-      className="ss-payment-sheet fixed inset-0 z-[70] flex flex-col bg-stone-950"
+      className="ss-payment-sheet fixed inset-0 z-[100] flex flex-col bg-stone-950"
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-sheet-title"
@@ -79,7 +92,7 @@ export function PaymentCheckoutSheet({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
         {paidError ? <ErrorBanner message={paidError} /> : null}
 
-        {preparing && !paidStripeClientSecret ? (
+        {preparing ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <div
               className="h-9 w-9 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-400"
@@ -89,7 +102,25 @@ export function PaymentCheckoutSheet({
           </div>
         ) : null}
 
-        {hasStripeElements && paidStripeClientSecret ? (
+        {showStripeEmpty ? (
+          <div className="flex flex-col items-center gap-4 py-12 text-center">
+            <p className="max-w-sm text-sm text-stone-400">
+              Card payment could not be loaded. Check your connection, disable content blockers for this site, or try
+              again.
+            </p>
+            {onRetryPayment ? (
+              <button
+                type="button"
+                onClick={() => onRetryPayment()}
+                className="rounded-xl border border-teal-500/40 bg-teal-950/50 px-5 py-2.5 text-sm font-semibold text-teal-100 hover:bg-teal-900/40"
+              >
+                Try again
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {stripeReady ? (
           <StripePaymentForm
             publishableKey={stripePublishableKey}
             clientSecret={paidStripeClientSecret}
@@ -104,8 +135,8 @@ export function PaymentCheckoutSheet({
         ) : null}
 
         {hasPayPal ? (
-          <div className={hasStripeElements && paidStripeClientSecret ? 'mt-6' : ''}>
-            {hasStripeElements && paidStripeClientSecret ? (
+          <div className={stripeReady ? 'mt-6' : ''}>
+            {stripeReady ? (
               <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                 or
               </p>
@@ -129,7 +160,14 @@ export function PaymentCheckoutSheet({
             />
           </div>
         ) : null}
+
+        {!preparing && !stripeReady && !hasPayPal && !showStripeEmpty ? (
+          <p className="py-12 text-center text-sm text-stone-500">No payment methods are configured.</p>
+        ) : null}
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return sheet
+  return createPortal(sheet, document.body)
 }

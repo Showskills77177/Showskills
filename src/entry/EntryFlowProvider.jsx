@@ -220,6 +220,7 @@ export function EntryFlowProvider({ children }) {
       if (Array.isArray(data.ticketNumbers) && data.ticketNumbers.length) {
         setPaidTicketNumbers(data.ticketNumbers)
       }
+      return secret
     },
     [paidBundleId, paidEmail, paidFullName, stripePaymentIntentApi],
   )
@@ -251,15 +252,16 @@ export function EntryFlowProvider({ children }) {
     setPaidError('')
     if (!paidFormReadyForPayment) {
       setPaidError('Enter your full name, email, and agree to the terms before paying.')
-      return
+      return false
     }
-    if (paidStripeClientSecret) return
+    if (paidStripeClientSecret) return true
     setPaidStripePreparing(true)
     const controller = new AbortController()
     let prepareTimeout
     try {
       prepareTimeout = setTimeout(() => controller.abort(), 20_000)
-      await fetchPaymentIntent({ signal: controller.signal })
+      const secret = await fetchPaymentIntent({ signal: controller.signal })
+      return Boolean(secret)
     } catch (e) {
       const aborted = e instanceof Error && e.name === 'AbortError'
       setPaidError(
@@ -269,6 +271,7 @@ export function EntryFlowProvider({ children }) {
             ? e.message
             : 'Could not start card payment',
       )
+      return false
     } finally {
       clearTimeout(prepareTimeout)
       setPaidStripePreparing(false)

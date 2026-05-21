@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { stripeElementsAppearance } from '../lib/stripeAppearance'
 import { getStripePromise } from '../lib/stripeLoader'
@@ -27,11 +27,12 @@ function buildConfirmParams(recordPayload) {
   }
 }
 
-function paymentElementOptions(recordPayload, isMobile) {
+function paymentElementOptions(recordPayload) {
   const email = (recordPayload?.customerEmail || '').trim()
   const name = (recordPayload?.customerFullName || '').trim()
   return {
-    layout: isMobile ? 'accordion' : 'tabs',
+    // Tabs layout is more reliable than accordion in Safari (avoids blank card panel).
+    layout: 'tabs',
     wallets: {
       applePay: 'auto',
       googlePay: 'auto',
@@ -143,9 +144,23 @@ function PaymentFields({ disabled, onError, onSuccess, paymentIntentId, recordPa
   const isMobile = useMediaQuery('(max-width: 767px)')
   const [elementReady, setElementReady] = useState(false)
   const elementOptions = useMemo(
-    () => paymentElementOptions(recordPayload, isMobile),
-    [recordPayload, isMobile],
+    () => paymentElementOptions(recordPayload),
+    [recordPayload],
   )
+
+  useEffect(() => {
+    setElementReady(false)
+  }, [recordPayload?.customerEmail, recordPayload?.customerFullName])
+
+  useEffect(() => {
+    if (elementReady) return
+    const t = setTimeout(() => {
+      onError(
+        'Payment form is taking too long to load. Disable content blockers for this site, or tap Back and try again.',
+      )
+    }, 18_000)
+    return () => clearTimeout(t)
+  }, [elementReady, onError])
 
   return (
     <>
