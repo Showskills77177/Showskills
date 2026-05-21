@@ -16,6 +16,7 @@ import { preloadStripe } from '../lib/stripeLoader'
 import { ModalPortal } from './ModalPortal'
 import { PaymentCheckoutSheet } from './PaymentCheckoutSheet'
 import { PayPalPayButton } from './PayPalPayButton'
+import { EntryTermsConsent } from './EntryTermsConsent'
 import { TicketBundlePicker } from './TicketBundlePicker'
 
 export function EntryModal() {
@@ -187,7 +188,7 @@ export function EntryModal() {
   return (
     <ModalPortal>
       <div
-        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:p-6"
+        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:items-center sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="entry-modal-title"
@@ -201,7 +202,7 @@ export function EntryModal() {
         <div
           ref={panelRef}
           inert={showPaymentSheet}
-          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(92vh,920px)] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${panelWidthClass} ${
+          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(90dvh,920px)] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(92vh,920px)] ${panelWidthClass} ${
             entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
           } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''}`}
         >
@@ -230,7 +231,7 @@ export function EntryModal() {
         </div>
 
         <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col">
-          <div className="ss-entry-modal-scroll min-h-0 flex-1 px-5 py-4">
+          <div className="ss-entry-modal-scroll min-h-0 flex-1 px-4 py-4 sm:px-5">
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">
@@ -416,7 +417,7 @@ export function EntryModal() {
                   </button>
                 </form>
               ) : (
-                <div className="mt-4 flex flex-col gap-4">
+                <div className="mt-4 flex flex-col gap-5">
                   <TicketBundlePicker
                     paidBundleId={paidBundleId}
                     setPaidBundleId={setPaidBundleId}
@@ -462,25 +463,12 @@ export function EntryModal() {
                       </div>
                     </div>
                   ) : null}
-                  <label className="flex cursor-pointer items-start gap-3 text-sm text-stone-300">
-                    <input
-                      type="checkbox"
-                      checked={paidConsent}
-                      onChange={(e) => setPaidConsent(e.target.checked)}
-                      className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50"
-                    />
-                    <span>
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        className="font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300"
-                        onClick={openTerms}
-                      >
-                        Terms &amp; Conditions and Privacy Policy
-                      </button>
-                      .
-                    </span>
-                  </label>
+                  <EntryTermsConsent
+                    checked={paidConsent}
+                    onChange={setPaidConsent}
+                    onOpenTerms={openTerms}
+                    variant="teal"
+                  />
                   {paidError ? <ErrorBanner message={paidError} /> : null}
                   {paidEntryRoute === 'postal' ? (
                     <div className="rounded-xl border border-stone-500/25 bg-stone-900/35 px-3 py-3 text-sm leading-relaxed text-stone-400">
@@ -503,69 +491,71 @@ export function EntryModal() {
                   {!hasStripeCheckout && !hasPayPal && paidEntryRoute === 'tickets' && !E2E_SIMULATE_CHECKOUT ? (
                     <ErrorBanner message="Payments are not configured. Add Stripe and/or PayPal (see .env.example)." />
                   ) : null}
-                  {paidEntryRoute === 'tickets' && (hasStripeCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) ? (
-                    <p className="rounded-lg border border-amber-800/35 bg-amber-950/25 px-3 py-2 text-center text-[11px] font-medium leading-snug text-amber-100/90">
-                      {TICKET_PURCHASE_NON_REFUND_NOTICE}
-                    </p>
-                  ) : null}
-                  {paidEntryRoute === 'tickets' && E2E_SIMULATE_CHECKOUT ? (
-                    <button
-                      type="button"
-                      onClick={handlePaidEntry}
-                      disabled={paidLoading}
-                      className="w-full rounded-xl border border-amber-500/40 bg-amber-950/50 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
-                    </button>
-                  ) : null}
-                  {paidEntryRoute === 'tickets' && (hasStripeCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) ? (
-                    <button
-                      type="button"
-                      onClick={handlePayNow}
-                      disabled={paidLoading || paidStripePreparing || !paidFormReadyForPayment}
-                      className="min-h-[52px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-lg font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {paidLoading || paidStripePreparing
-                        ? 'Redirecting to secure checkout…'
-                        : 'Pay now'}
-                    </button>
-                  ) : null}
-                  {paidEntryRoute === 'tickets' && hasStripeHostedCheckout && !showPaymentSheet ? (
-                    <p className="text-center text-xs text-stone-500">
-                      Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — you&apos;ll pay on
-                      Stripe&apos;s secure page (card &amp; Apple Pay), then return here for the quiz.
-                    </p>
-                  ) : null}
-                  {paidEntryRoute === 'tickets' && hasStripeElements && hasPayPal && !showPaymentSheet ? (
-                    <p className="text-center text-xs text-stone-500">
-                      Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card, Apple Pay, or PayPal
-                      on the next screen.
-                    </p>
-                  ) : null}
-                  {paidEntryRoute === 'tickets' && hasPayPal && !showPaymentSheet ? (
-                    <div className="mt-3">
-                      {hasStripeHostedCheckout || hasStripeElements ? (
-                        <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
-                          or pay with PayPal
+                  {paidEntryRoute === 'tickets' &&
+                  (hasStripeCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&
+                  !showPaymentSheet ? (
+                    <div className="ss-entry-checkout-actions flex flex-col gap-3 border-t border-white/10 pt-4">
+                      <p className="rounded-lg border border-amber-800/35 bg-amber-950/25 px-3 py-2.5 text-center text-[11px] font-medium leading-snug text-amber-100/90">
+                        {TICKET_PURCHASE_NON_REFUND_NOTICE}
+                      </p>
+                      {E2E_SIMULATE_CHECKOUT ? (
+                        <button
+                          type="button"
+                          onClick={handlePaidEntry}
+                          disabled={paidLoading}
+                          className="min-h-[48px] w-full rounded-xl border border-amber-500/40 bg-amber-950/50 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={handlePayNow}
+                        disabled={paidLoading || paidStripePreparing || !paidFormReadyForPayment}
+                        className="min-h-[48px] w-full shrink-0 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:text-lg"
+                      >
+                        {paidLoading || paidStripePreparing
+                          ? 'Redirecting to secure checkout…'
+                          : 'Pay now'}
+                      </button>
+                      {hasStripeHostedCheckout ? (
+                        <p className="text-center text-xs leading-relaxed text-stone-500">
+                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — you&apos;ll pay on
+                          Stripe&apos;s secure page (card &amp; Apple Pay), then return here for the quiz.
                         </p>
                       ) : null}
-                      <PayPalPayButton
-                        clientId={payPalClientId}
-                        currency={payPalCurrency}
-                        createOrderUrl={paypalCreateOrderApi}
-                        captureOrderUrl={paypalCaptureOrderApi}
-                        bundleId={paidBundleId}
-                        ticketQuantity={selectedTicketBundle?.qty ?? 1}
-                        customerEmail={paidEmail}
-                        customerFullName={paidFullName}
-                        disabled={
-                          !paidConsent ||
-                          !paidFullName.trim() ||
-                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())
-                        }
-                        onPaid={markPaidCheckoutComplete}
-                        onError={(msg) => setPaidError(msg)}
-                      />
+                      {hasStripeElements && hasPayPal ? (
+                        <p className="text-center text-xs leading-relaxed text-stone-500">
+                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card, Apple Pay, or
+                          PayPal on the next screen.
+                        </p>
+                      ) : null}
+                      {hasPayPal ? (
+                        <div className="pt-1">
+                          {hasStripeHostedCheckout || hasStripeElements ? (
+                            <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                              or pay with PayPal
+                            </p>
+                          ) : null}
+                          <PayPalPayButton
+                            clientId={payPalClientId}
+                            currency={payPalCurrency}
+                            createOrderUrl={paypalCreateOrderApi}
+                            captureOrderUrl={paypalCaptureOrderApi}
+                            bundleId={paidBundleId}
+                            ticketQuantity={selectedTicketBundle?.qty ?? 1}
+                            customerEmail={paidEmail}
+                            customerFullName={paidFullName}
+                            disabled={
+                              !paidConsent ||
+                              !paidFullName.trim() ||
+                              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())
+                            }
+                            onPaid={markPaidCheckoutComplete}
+                            onError={(msg) => setPaidError(msg)}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -627,25 +617,12 @@ export function EntryModal() {
                     placeholder="you@example.com"
                   />
                 </div>
-                <label className="flex cursor-pointer items-start gap-3 text-sm text-stone-300">
-                  <input
-                    type="checkbox"
-                    checked={kickConsent}
-                    onChange={(e) => setKickConsent(e.target.checked)}
-                    className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-black/40 text-emerald-500 focus:ring-emerald-600/50"
-                  />
-                  <span>
-                    I agree to the{' '}
-                    <button
-                      type="button"
-                      className="font-medium text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
-                      onClick={openTerms}
-                    >
-                      Terms &amp; Conditions and Privacy Policy
-                    </button>
-                    .
-                  </span>
-                </label>
+                <EntryTermsConsent
+                  checked={kickConsent}
+                  onChange={setKickConsent}
+                  onOpenTerms={openTerms}
+                  variant="emerald"
+                />
                 {kickError ? <ErrorBanner message={kickError} /> : null}
                 {kickSuccess ? (
                   <p className="rounded-lg border border-emerald-800/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200/90">
@@ -665,7 +642,7 @@ export function EntryModal() {
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-white/10 px-5 py-3">
+        <div className="shrink-0 border-t border-white/10 px-4 py-3 sm:px-5">
           <button
             type="button"
             onClick={closeEntry}

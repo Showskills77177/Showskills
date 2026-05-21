@@ -37,7 +37,7 @@ function PaySubmitButton({ disabled, paying, ready, amountLabel, onPay }) {
       disabled={disabled || paying || !ready}
       onClick={onPay}
       data-ss-stripe-ignore-focus
-      className="ss-stripe-pay-button mt-4 min-h-[52px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+      className="ss-stripe-pay-button min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {paying ? 'Processing…' : amountLabel ? `Pay ${amountLabel}` : 'Pay now'}
     </button>
@@ -287,13 +287,15 @@ function PaymentFormInner({
 
       <PaymentStatusMessage status={statusTone} message={statusMessage} />
 
-      <PaySubmitButton
-        amountLabel={amountLabel}
-        disabled={disabled}
-        paying={paying}
-        ready={stripeLoaded && elementReady}
-        onPay={handlePay}
-      />
+      <div className="ss-stripe-pay-actions mt-4 border-t border-white/10 pt-4">
+        <PaySubmitButton
+          amountLabel={amountLabel}
+          disabled={disabled}
+          paying={paying}
+          ready={stripeLoaded && elementReady}
+          onPay={handlePay}
+        />
+      </div>
     </div>
   )
 }
