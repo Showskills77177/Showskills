@@ -106,13 +106,13 @@ export function EntryModal() {
       return
     }
     setPaidError('')
-    if (hasStripeElements && !paidStripeClientSecret) {
-      const ready = await prepareStripePayment()
-      if (!ready) return
-    }
-    if (hasStripeElements && !paidStripeClientSecret) return
     if (hasStripeElements && stripePublishableKey) preloadStripe(stripePublishableKey)
+    // Open payment popup first — do not wait on prepare (state updates async; a stale
+    // paidStripeClientSecret check was blocking the first click).
     setPaymentSheetOpen(true)
+    if (hasStripeElements && !paidStripeClientSecret) {
+      await prepareStripePayment()
+    }
   }
 
   const paidAnswerValidation =
