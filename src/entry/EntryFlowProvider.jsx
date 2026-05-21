@@ -17,7 +17,12 @@ export function EntryFlowProvider({ children }) {
   const [termsOpen, setTermsOpen] = useState(false)
   const [entryModalType, setEntryModalType] = useState(null)
 
-  const [paidBundleId, setPaidBundleId] = useState(() => getInitialPaidBundleId())
+  const [searchParams] = useSearchParams()
+  const [paidBundleId, setPaidBundleId] = useState(() =>
+    typeof window !== 'undefined'
+      ? getInitialPaidBundleId(new URLSearchParams(window.location.search))
+      : DEFAULT_TICKET_BUNDLE_ID,
+  )
   /** 'tickets' = paid bundles; 'postal' = free postal (same draw), chosen inside Legacy modal */
   const [paidEntryRoute, setPaidEntryRoute] = useState('tickets')
   const [paidConsent, setPaidConsent] = useState(false)
@@ -34,7 +39,6 @@ export function EntryFlowProvider({ children }) {
   const [paidQuizResult, setPaidQuizResult] = useState(null)
   const [paidQuizSubmitted, setPaidQuizSubmitted] = useState(false)
   const [paidQuizSubmitting, setPaidQuizSubmitting] = useState(false)
-  const [searchParams] = useSearchParams()
   const [paidFullName, setPaidFullName] = useState('')
   const [paidEmail, setPaidEmail] = useState('')
 

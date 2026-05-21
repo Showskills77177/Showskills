@@ -86,7 +86,7 @@ export function EntryModal() {
     PAID_SKILL_QUESTIONS,
   } = useEntryFlow()
 
-  const panelRef = useRef(null)
+  const entryDialogRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
 
   const showPaymentSheet =
@@ -136,22 +136,17 @@ export function EntryModal() {
     return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
   }
 
-  // No body/html scroll lock — it breaks typing in Safari, Brave, and Stripe iframes.
+  // Native <dialog> for focus/keyboard (Safari, Brave). No body scroll lock.
 
   useEffect(() => {
-    if (!entryModalType) return
-    const onKey = (e) => {
-      if (e.key !== 'Escape') return
-      if (termsOpen) return
-      if (paymentSheetOpen) {
-        handleClosePaymentSheet()
-        return
-      }
-      closeEntry()
+    const dlg = entryDialogRef.current
+    if (!dlg) return
+    if (entryModalType) {
+      if (!dlg.open) dlg.showModal()
+    } else if (dlg.open) {
+      dlg.close()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [entryModalType, closeEntry, termsOpen, paymentSheetOpen])
+  }, [entryModalType])
 
   useEffect(() => {
     if (!entryModalType) setPaymentSheetOpen(false)
@@ -169,28 +164,38 @@ export function EntryModal() {
     kickups: 'Enter — Ronaldo shirt giveaway',
   }
 
+  const panelWidthClass =
+    entryModalType === 'paid'
+      ? showPaymentSheet
+        ? 'sm:max-w-3xl'
+        : 'sm:max-w-xl'
+      : 'sm:max-w-xl'
+
   return (
     <>
-    <ModalPortal>
-    <div
-      className="ss-entry-modal-root fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="entry-modal-title"
-    >
-      <div
-        className="ss-entry-modal-backdrop absolute inset-0 z-0 bg-black/80"
-        role="presentation"
-        onClick={() => (showPaymentSheet ? handleClosePaymentSheet() : closeEntry())}
-      />
-      <div
-        ref={panelRef}
-        className={`ss-entry-modal-panel relative z-10 flex max-h-[min(92vh,920px)] w-full flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
-          entryModalType === 'paid'
-            ? `ss-entry-modal-panel--paid ${showPaymentSheet ? 'max-w-2xl sm:max-w-3xl' : 'max-w-lg sm:max-w-xl'}`
-            : 'max-w-lg'
-        }`}
-      >
+      <ModalPortal>
+        <dialog
+          ref={entryDialogRef}
+          className={`ss-entry-modal-dialog w-[calc(100%-2rem)] max-w-lg ${panelWidthClass} ${
+            entryModalType === 'paid' ? 'ss-entry-modal-dialog--paid' : ''
+          }`}
+          aria-labelledby="entry-modal-title"
+          onClose={closeEntry}
+          onCancel={(e) => {
+            e.preventDefault()
+            if (termsOpen) return
+            if (paymentSheetOpen) {
+              handleClosePaymentSheet()
+              return
+            }
+            closeEntry()
+          }}
+        >
+          <div
+            className={`ss-entry-modal-panel w-full rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
+              entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
+            }`}
+          >
         <div
           className={`h-1 w-full ${
             entryModalType === 'kickups'
@@ -216,7 +221,7 @@ export function EntryModal() {
         </div>
 
         <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col">
-          <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="ss-entry-modal-scroll min-h-0 flex-1 px-5 py-4">
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">
@@ -614,10 +619,10 @@ export function EntryModal() {
           </button>
         </div>
 
-      </div>
-    </div>
-    </ModalPortal>
-    <PaymentCheckoutSheet
+          </div>
+        </dialog>
+      </ModalPortal>
+      <PaymentCheckoutSheet
         open={showPaymentSheet}
         onClose={handleClosePaymentSheet}
         amountPence={selectedTicketBundle?.totalPence ?? 0}
@@ -657,7 +662,7 @@ export function EntryModal() {
         }}
         onPayPalError={(msg) => setPaidError(msg)}
         onClearError={() => setPaidError('')}
-        />
+      />
     </>
   )
 }

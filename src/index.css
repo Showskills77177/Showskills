@@ -1650,21 +1650,61 @@ body {
   touch-action: manipulation;
 }
 
-/* Entry + payment modals — ensure inputs receive clicks/keyboard (Safari, Brave). */
-.ss-entry-modal-root,
-.ss-payment-popup,
-.ss-terms-modal-root {
-  pointer-events: auto;
+/* Native <dialog> modals — Safari/Brave keyboard + Stripe iframe safe. */
+.ss-entry-modal-dialog,
+.ss-payment-dialog {
+  border: none;
+  padding: 0;
+  margin: auto;
+  max-height: min(92vh, 920px);
+  overflow: visible;
+  background: transparent;
+  color: inherit;
 }
 
-.ss-entry-modal-backdrop,
-.ss-payment-popup-backdrop {
-  pointer-events: auto;
+.ss-entry-modal-dialog::backdrop,
+.ss-payment-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.8);
 }
 
-.ss-entry-modal-panel,
+.ss-entry-modal-dialog--paid {
+  max-width: min(100% - 2rem, 48rem);
+}
+
+.ss-entry-modal-panel {
+  pointer-events: auto;
+  max-height: min(92vh, 920px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ss-entry-modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.ss-entry-modal-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
 .ss-payment-popup-panel {
   pointer-events: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  overflow: visible;
+}
+
+.ss-payment-popup-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .ss-entry-field,
@@ -1673,25 +1713,15 @@ body {
 .ss-entry-modal-panel select,
 .ss-payment-popup-panel input:not([type='checkbox']):not([type='radio']),
 .ss-payment-popup-panel textarea,
-.ss-payment-popup-panel select {
+.ss-payment-popup-panel select,
+.ss-bundle-select {
   position: relative;
   z-index: 1;
-  -webkit-appearance: none;
-  appearance: none;
   -webkit-user-select: text !important;
   user-select: text !important;
   touch-action: manipulation;
   pointer-events: auto !important;
   cursor: text;
-}
-
-.ss-entry-modal-scroll {
-  -webkit-overflow-scrolling: touch;
-}
-
-.ss-payment-popup-panel {
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  overflow: visible;
 }
 
 /* Stripe iframes break when any ancestor uses overflow: hidden (Safari, Brave). */
@@ -1734,9 +1764,9 @@ body {
   .ss-entry-modal-stripe,
   .ss-stripe-payment-shell,
   .ss-payment-stripe-host,
-  .ss-payment-popup,
+  .ss-payment-dialog,
   .ss-payment-popup-panel,
-  .ss-payment-popup-scroll {
+  .ss-payment-popup-body {
     transform: none;
     -webkit-transform: none;
     filter: none;

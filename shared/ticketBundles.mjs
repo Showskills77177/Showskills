@@ -24,7 +24,7 @@ export const TICKET_BUNDLES = [
     totalPence: 30,
     title: 'Test ticket',
     line1: '1 ticket = £0.30',
-    line2: 'Payment testing only (Stripe minimum) — ?testbundle=1 on the URL',
+    line2: 'Payment testing only (Stripe UK 30p minimum)',
     bullets: ['Cheapest live Stripe test — UK 30p minimum'],
     featured: false,
     testOnly: true,
