@@ -8,6 +8,7 @@ import { isDbConfigured } from './lib/db.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 import { assertPaymentIntentMatchesBundle } from './lib/paymentSecurity.mjs'
 import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
+import { maybeSendPendingQuizReminderEmail } from './lib/sendPendingQuizEmail.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -95,12 +96,28 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, skipped: true, reason: 'not_recorded' })
     }
 
+    const resolvedEmail = (email || receiptEmail || '').trim().toLowerCase()
+
+    await maybeSendPendingQuizReminderEmail({
+      ticketId: recorded.ticketId,
+      userId: recorded.userId,
+      to: resolvedEmail,
+      customerFullName: (fullName || '').trim(),
+      orderRef: recorded.ticketPublicId,
+      ticketNumbers: recorded.ticketNumbers || [],
+      bundleId: bundle.id,
+      quantity: bundle.qty,
+      amountPence: intent.amount_received || intent.amount,
+    })
+
     return json(res, 200, {
       ok: true,
       deduped: Boolean(recorded.deduped),
       orderRef: recorded.ticketPublicId,
       ticketNumbers: recorded.ticketNumbers || [],
       emailSent: Boolean(recorded.emailSent),
+      customerEmail: resolvedEmail,
+      customerFullName: (fullName || '').trim(),
     })
   } catch (e) {
     console.error(e)

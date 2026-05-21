@@ -8,15 +8,30 @@ import {
   getVisibleTicketBundles,
 } from '../competitionData'
 import { apiUrl } from '../lib/api'
+import {
+  clearPaidEntryContact,
+  loadPaidEntryContact,
+  savePaidEntryContact,
+} from '../lib/paidEntryContact'
+import { loadPaidQuizSession, savePaidQuizSession } from '../lib/paidQuizSession'
 import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 
+function readInitialQuizSession() {
+  if (typeof window === 'undefined') return null
+  return loadPaidQuizSession()
+}
+
 export function EntryFlowProvider({ children }) {
+  const initialQuizSession = readInitialQuizSession()
+  const initialContact =
+    typeof window !== 'undefined' ? loadPaidEntryContact() : null
+
   const [termsOpen, setTermsOpen] = useState(false)
   const [entryModalType, setEntryModalType] = useState(null)
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [paidBundleId, setPaidBundleId] = useState(() => {
     const forced = (import.meta.env.VITE_DEFAULT_BUNDLE_ID ?? '').trim()
     if (forced && getTicketBundleById(forced)) return forced
@@ -27,19 +42,30 @@ export function EntryFlowProvider({ children }) {
   const [paidConsent, setPaidConsent] = useState(false)
   const [paidError, setPaidError] = useState('')
   const [paidLoading, setPaidLoading] = useState(false)
-  const [paidPostCheckout, setPaidPostCheckout] = useState(false)
-  const [paidOrderRef, setPaidOrderRef] = useState('')
-  const [paidTicketNumbers, setPaidTicketNumbers] = useState([])
+  const [paidPostCheckout, setPaidPostCheckout] = useState(
+    () =>
+      initialQuizSession?.status === 'pending' || initialQuizSession?.status === 'answered',
+  )
+  const [paidOrderRef, setPaidOrderRef] = useState(() => initialQuizSession?.orderRef || '')
+  const [paidTicketNumbers, setPaidTicketNumbers] = useState(
+    () => initialQuizSession?.ticketNumbers || [],
+  )
   const [paidEmailConfirmationSent, setPaidEmailConfirmationSent] = useState(false)
   const [paidA1, setPaidA1] = useState('')
   const [paidA2, setPaidA2] = useState('')
   const [paidA3, setPaidA3] = useState('')
   const [paidQuizError, setPaidQuizError] = useState('')
-  const [paidQuizResult, setPaidQuizResult] = useState(null)
-  const [paidQuizSubmitted, setPaidQuizSubmitted] = useState(false)
+  const [paidQuizResult, setPaidQuizResult] = useState(() => initialQuizSession?.quizResult || null)
+  const [paidQuizSubmitted, setPaidQuizSubmitted] = useState(
+    () => initialQuizSession?.status === 'answered',
+  )
   const [paidQuizSubmitting, setPaidQuizSubmitting] = useState(false)
-  const [paidFullName, setPaidFullName] = useState('')
-  const [paidEmail, setPaidEmail] = useState('')
+  const [paidFullName, setPaidFullName] = useState(
+    () => initialQuizSession?.fullName || initialContact?.fullName || '',
+  )
+  const [paidEmail, setPaidEmail] = useState(
+    () => initialQuizSession?.email || initialContact?.email || '',
+  )
 
   const [kickFullName, setKickFullName] = useState('')
   const [kickAnswer, setKickAnswer] = useState('')
@@ -99,6 +125,200 @@ export function EntryFlowProvider({ children }) {
 
   const paidTicketQty = selectedTicketBundle.qty
 
+  const applyPaidEntryContact = useCallback((contact) => {
+    const stored = loadPaidEntryContact()
+    const em = (contact?.email || stored?.email || '').trim()
+    const fn = (contact?.fullName || stored?.fullName || '').trim()
+    if (em) setPaidEmail(em)
+    if (fn) setPaidFullName(fn)
+    if (em || fn) clearPaidEntryContact()
+  }, [])
+
+  const persistPaidQuizSession = useCallback(
+    (overrides = {}) => {
+      const status =
+        overrides.status ?? (paidQuizSubmitted ? 'answered' : paidPostCheckout ? 'pending' : null)
+      if (status !== 'pending' && status !== 'answered') return
+      savePaidQuizSession({
+        status,
+        orderRef: overrides.orderRef ?? paidOrderRef,
+        ticketNumbers: overrides.ticketNumbers ?? paidTicketNumbers,
+        email: (overrides.email ?? paidEmail).trim(),
+        fullName: (overrides.fullName ?? paidFullName).trim(),
+        quizResult: overrides.quizResult ?? paidQuizResult,
+      })
+    },
+    [paidPostCheckout, paidQuizSubmitted, paidOrderRef, paidTicketNumbers, paidEmail, paidFullName, paidQuizResult],
+  )
+
+  const restorePaidQuizFromSession = useCallback(
+    (session) => {
+      if (!session) return
+      setPaidPostCheckout(true)
+      if (session.orderRef) setPaidOrderRef(session.orderRef)
+      if (session.ticketNumbers?.length) setPaidTicketNumbers(session.ticketNumbers)
+      if (session.email) setPaidEmail(session.email)
+      if (session.fullName) setPaidFullName(session.fullName)
+      if (session.status === 'answered') {
+        setPaidQuizSubmitted(true)
+        if (session.quizResult) setPaidQuizResult(session.quizResult)
+      } else {
+        setPaidQuizSubmitted(false)
+        setPaidQuizResult(null)
+      }
+    },
+    [],
+  )
+
+  const beginPaidQuizPending = useCallback((info = {}) => {
+    const stored = loadPaidEntryContact()
+    const em = (info.email ?? info.customerEmail ?? stored?.email ?? '').trim()
+    const fn = (info.fullName ?? info.customerFullName ?? stored?.fullName ?? '').trim()
+    const tickets = Array.isArray(info.ticketNumbers) ? info.ticketNumbers : []
+    const orderRef = info.orderRef || ''
+
+    setPaidPostCheckout(true)
+    setPaidQuizSubmitted(false)
+    setPaidQuizResult(null)
+    setPaidQuizSubmitting(false)
+    setPaidA1('')
+    setPaidA2('')
+    setPaidA3('')
+    setPaidQuizError('')
+    if (orderRef) setPaidOrderRef(orderRef)
+    if (tickets.length) setPaidTicketNumbers(tickets)
+    if (em) setPaidEmail(em)
+    if (fn) setPaidFullName(fn)
+    if (em || fn) clearPaidEntryContact()
+
+    savePaidQuizSession({
+      status: 'pending',
+      orderRef,
+      ticketNumbers: tickets,
+      email: em,
+      fullName: fn,
+      quizResult: null,
+    })
+  }, [])
+
+  const fetchResumePaidQuizByEmail = useCallback(async (email) => {
+    const em = email.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return false
+    try {
+      const res = await fetch(apiUrl('/api/entries/resume-paid-quiz'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: em }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.pending) return false
+      beginPaidQuizPending({
+        orderRef: data.orderRef,
+        ticketNumbers: data.ticketNumbers,
+        customerEmail: data.customerEmail,
+        customerFullName: data.customerFullName,
+      })
+      return true
+    } catch {
+      return false
+    }
+  }, [beginPaidQuizPending])
+
+  const openResumePaidQuiz = useCallback(() => {
+    const session = loadPaidQuizSession()
+    if (session) restorePaidQuizFromSession(session)
+    else if (paidPostCheckout) {
+      /* state already hydrated */
+    } else {
+      const contact = loadPaidEntryContact()
+      if (contact?.email) {
+        void fetchResumePaidQuizByEmail(contact.email)
+      }
+    }
+    setPaidError('')
+    setEntryModalType('paid')
+  }, [paidPostCheckout, restorePaidQuizFromSession, fetchResumePaidQuizByEmail])
+
+  const paidQuizNavStatus = useMemo(() => {
+    if (paidQuizSubmitted) return 'answered'
+    if (paidPostCheckout) return 'pending'
+    const session = loadPaidQuizSession()
+    if (session?.status === 'answered') return 'answered'
+    if (session?.status === 'pending') return 'pending'
+    return 'none'
+  }, [paidPostCheckout, paidQuizSubmitted])
+
+  useEffect(() => {
+    if (paidPostCheckout || paidQuizSubmitted) {
+      persistPaidQuizSession()
+    }
+  }, [
+    paidPostCheckout,
+    paidQuizSubmitted,
+    paidOrderRef,
+    paidTicketNumbers,
+    paidEmail,
+    paidFullName,
+    paidQuizResult,
+    persistPaidQuizSession,
+  ])
+
+  /** Re-sync React state from sessionStorage after refresh / new tab restore. */
+  useEffect(() => {
+    const session = loadPaidQuizSession()
+    if (session) restorePaidQuizFromSession(session)
+  }, [restorePaidQuizFromSession])
+
+  useEffect(() => {
+    if (searchParams.get('complete-quiz') === '1') {
+      openResumePaidQuiz()
+      const next = new URLSearchParams(searchParams)
+      next.delete('complete-quiz')
+      setSearchParams(next, { replace: true })
+      const email = paidEmail.trim() || loadPaidEntryContact()?.email || ''
+      if (email && !paidOrderRef) {
+        void fetchResumePaidQuizByEmail(email)
+      }
+      return
+    }
+
+    if (!import.meta.env.DEV) return
+    const preview = searchParams.get('preview-quiz')
+    if (preview !== 'pending' && preview !== 'answered') return
+
+    if (preview === 'pending') {
+      beginPaidQuizPending({
+        orderRef: 'ORD-PREVIEW',
+        ticketNumbers: ['SS-PREVIEW-001'],
+        customerEmail: 'preview@showskills.test',
+        customerFullName: 'Preview User',
+      })
+    } else {
+      savePaidQuizSession({
+        status: 'answered',
+        orderRef: 'ORD-PREVIEW',
+        ticketNumbers: ['SS-PREVIEW-001'],
+        email: 'preview@showskills.test',
+        fullName: 'Preview User',
+        quizResult: 'qualified',
+      })
+      restorePaidQuizFromSession(loadPaidQuizSession())
+    }
+
+    const next = new URLSearchParams(searchParams)
+    next.delete('preview-quiz')
+    setSearchParams(next, { replace: true })
+  }, [
+    searchParams,
+    setSearchParams,
+    openResumePaidQuiz,
+    beginPaidQuizPending,
+    restorePaidQuizFromSession,
+    paidEmail,
+    paidOrderRef,
+    fetchResumePaidQuizByEmail,
+  ])
+
   useEffect(() => {
     if (hasStripeElements && stripePublishableKey) preloadStripe(stripePublishableKey)
   }, [hasStripeElements, stripePublishableKey])
@@ -144,17 +364,13 @@ export function EntryFlowProvider({ children }) {
           if (!data.ok) {
             throw new Error(typeof data.error === 'string' ? data.error : 'Could not confirm payment')
           }
-          setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
-          if (typeof data.orderRef === 'string' && data.orderRef) setPaidOrderRef(data.orderRef)
           if (data.emailSent) setPaidEmailConfirmationSent(true)
-          setPaidPostCheckout(true)
-          setPaidQuizResult(null)
-          setPaidQuizSubmitted(false)
-          setPaidQuizSubmitting(false)
-          setPaidA1('')
-          setPaidA2('')
-          setPaidA3('')
-          setPaidQuizError('')
+          beginPaidQuizPending({
+            orderRef: data.orderRef,
+            ticketNumbers: data.ticketNumbers,
+            customerEmail: data.customerEmail,
+            customerFullName: data.customerFullName,
+          })
           setPaidError('')
           setStripeReturnStatus(null)
         })
@@ -191,20 +407,28 @@ export function EntryFlowProvider({ children }) {
             setPaidOrderRef(data.orderRef)
           }
           if (data.emailSent) setPaidEmailConfirmationSent(true)
+          beginPaidQuizPending({
+            orderRef: data.orderRef,
+            ticketNumbers: data.ticketNumbers,
+            customerEmail: data.customerEmail,
+            customerFullName: data.customerFullName,
+          })
+          setEntryModalType('paid')
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
         })
-        .catch(() => {})
+        .catch(() => {
+          applyPaidEntryContact()
+          beginPaidQuizPending()
+          setEntryModalType('paid')
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+        })
+      return
     }
-    setPaidPostCheckout(true)
-    setPaidQuizResult(null)
-    setPaidQuizSubmitted(false)
-    setPaidQuizSubmitting(false)
-    setPaidA1('')
-    setPaidA2('')
-    setPaidA3('')
-    setPaidQuizError('')
+    applyPaidEntryContact()
+    beginPaidQuizPending()
     setEntryModalType('paid')
     window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
-  }, [])
+  }, [applyPaidEntryContact, beginPaidQuizPending])
 
   const openEntry = useCallback((type) => {
     setEntryModalType(type)
@@ -216,13 +440,18 @@ export function EntryFlowProvider({ children }) {
     }
     if (type === 'paid') {
       setPaidError('')
-      setPaidBundleId(getInitialPaidBundleId(searchParams))
-      setPaidEntryRoute('tickets')
-      setPaidStripeClientSecret('')
-      setPaidStripePaymentIntentId('')
+      const session = loadPaidQuizSession()
+      if (session?.status === 'pending' || session?.status === 'answered') {
+        restorePaidQuizFromSession(session)
+      } else {
+        setPaidBundleId(getInitialPaidBundleId(searchParams))
+        setPaidEntryRoute('tickets')
+        setPaidStripeClientSecret('')
+        setPaidStripePaymentIntentId('')
+      }
       preloadStripe(stripePublishableKey)
     }
-  }, [stripePublishableKey, searchParams])
+  }, [stripePublishableKey, searchParams, restorePaidQuizFromSession])
 
   const closeStripePayment = useCallback(() => {
     setPaidStripeClientSecret('')
@@ -233,31 +462,26 @@ export function EntryFlowProvider({ children }) {
 
   const closeEntry = useCallback(() => {
     setEntryModalType(null)
-    setPaidPostCheckout(false)
-    setPaidQuizSubmitted(false)
-    setPaidQuizSubmitting(false)
-    setPaidQuizResult(null)
     closeStripePayment()
   }, [closeStripePayment])
 
   const openTerms = useCallback(() => setTermsOpen(true), [])
 
-  const markPaidCheckoutComplete = useCallback((purchaseInfo) => {
-    setPaidError('')
-    setPaidPostCheckout(true)
-    setPaidQuizResult(null)
-    setPaidQuizSubmitted(false)
-    setPaidQuizSubmitting(false)
-    setPaidA1('')
-    setPaidA2('')
-    setPaidA3('')
-    setPaidQuizError('')
-    setPaidStripeClientSecret('')
-    setPaidStripePaymentIntentId('')
-    if (purchaseInfo?.orderRef) setPaidOrderRef(purchaseInfo.orderRef)
-    if (Array.isArray(purchaseInfo?.ticketNumbers)) setPaidTicketNumbers(purchaseInfo.ticketNumbers)
-    if (purchaseInfo?.emailSent) setPaidEmailConfirmationSent(true)
-  }, [])
+  const markPaidCheckoutComplete = useCallback(
+    (purchaseInfo) => {
+      setPaidError('')
+      setPaidStripeClientSecret('')
+      setPaidStripePaymentIntentId('')
+      if (purchaseInfo?.emailSent) setPaidEmailConfirmationSent(true)
+      beginPaidQuizPending({
+        orderRef: purchaseInfo?.orderRef,
+        ticketNumbers: purchaseInfo?.ticketNumbers,
+        customerEmail: purchaseInfo?.customerEmail,
+        customerFullName: purchaseInfo?.customerFullName,
+      })
+    },
+    [beginPaidQuizPending],
+  )
 
   const paidFormReadyForPayment =
     paidConsent &&
@@ -358,6 +582,10 @@ export function EntryFlowProvider({ children }) {
       }
       const url = typeof data.url === 'string' ? data.url : ''
       if (!url) throw new Error('Stripe did not return a checkout URL')
+      savePaidEntryContact({
+        email: paidEmail.trim(),
+        fullName: paidFullName.trim(),
+      })
       window.location.assign(url)
     } catch (e) {
       setPaidError(e instanceof Error ? e.message : 'Could not start checkout')
@@ -521,16 +749,25 @@ export function EntryFlowProvider({ children }) {
           )
           return
         }
-        setPaidQuizResult(allCorrect ? 'qualified' : 'not_qualified')
+        const result = allCorrect ? 'qualified' : 'not_qualified'
+        setPaidQuizResult(result)
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
         setPaidQuizSubmitted(true)
+        savePaidQuizSession({
+          status: 'answered',
+          orderRef: paidOrderRef,
+          ticketNumbers: paidTicketNumbers,
+          email: em,
+          fullName: fn,
+          quizResult: result,
+        })
       } catch {
         setPaidQuizError('Could not save your entry. Check your connection and try again.')
       } finally {
         setPaidQuizSubmitting(false)
       }
     },
-    [paidA1, paidA2, paidA3, paidEmail, paidFullName],
+    [paidA1, paidA2, paidA3, paidEmail, paidFullName, paidOrderRef, paidTicketNumbers],
   )
 
   const handleKickupsGiveawaySubmit = useCallback(
@@ -654,6 +891,8 @@ export function EntryFlowProvider({ children }) {
       handleKickupsGiveawaySubmit,
       PAID_SKILL_QUESTIONS,
       stripeReturnStatus,
+      paidQuizNavStatus,
+      openResumePaidQuiz,
     }),
     [
       termsOpen,
@@ -711,6 +950,8 @@ export function EntryFlowProvider({ children }) {
       kickSuccess,
       handleKickupsGiveawaySubmit,
       stripeReturnStatus,
+      paidQuizNavStatus,
+      openResumePaidQuiz,
     ],
   )
 

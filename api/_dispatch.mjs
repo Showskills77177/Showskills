@@ -13,6 +13,7 @@ import adminSubmissions from '../backend/api/admin/submissions.js'
 import adminKickupFile from '../backend/api/admin/kickup-file.js'
 
 import paidQuiz from '../backend/api/entries/paid-quiz.js'
+import resumePaidQuiz from '../backend/api/entries/resume-paid-quiz.js'
 import kickups from '../backend/api/submissions/kickups.js'
 import kickupsUpload from '../backend/api/submissions/kickups-upload.mjs'
 
@@ -40,6 +41,7 @@ export const routes = {
   '/api/admin/kickup-file': adminKickupFile,
 
   '/api/entries/paid-quiz': paidQuiz,
+  '/api/entries/resume-paid-quiz': resumePaidQuiz,
   '/api/submissions/kickups': kickups,
   '/api/submissions/kickups/upload': kickupsUpload,
 

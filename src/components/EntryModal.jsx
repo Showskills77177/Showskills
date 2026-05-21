@@ -312,14 +312,43 @@ export function EntryModal() {
                     <p className="mt-3 rounded-lg border border-stone-600/35 bg-stone-900/45 px-3 py-2.5 text-sm text-stone-200">
                       Please take your time and think carefully about the answers.
                     </p>
-                    {paidQuizResult ? (
-                      <p className="mt-2 text-xs text-teal-200/80">
-                        {paidQuizResult === 'qualified'
-                          ? 'Confirmation email sent (if email is configured).'
-                          : 'Confirmation email sent with your result (if email is configured).'}
-                      </p>
-                    ) : null}
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label htmlFor="modal-paid-quiz-fullname" className="block text-sm font-medium text-stone-300">
+                        Full name (for your entry)
+                      </label>
+                      <input
+                        id="modal-paid-quiz-fullname"
+                        type="text"
+                        autoComplete="name"
+                        value={paidFullName}
+                        onChange={(e) => setPaidFullName(e.target.value)}
+                        className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                        placeholder="As on ID / bank card"
+                        spellCheck={false}
+                        autoCapitalize="words"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label htmlFor="modal-paid-quiz-email" className="block text-sm font-medium text-stone-300">
+                        Email
+                      </label>
+                      <input
+                        id="modal-paid-quiz-email"
+                        type="email"
+                        autoComplete="email"
+                        value={paidEmail}
+                        onChange={(e) => setPaidEmail(e.target.value)}
+                        className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-stone-500">
+                    Confirm the name and email you used to pay so we can link your entry (especially after returning from
+                    Stripe on Safari).
+                  </p>
                   {PAID_SKILL_QUESTIONS.map((q, i) => {
                     const qCorrect = paidAnswerValidation
                       ? i === 0
@@ -361,6 +390,13 @@ export function EntryModal() {
                     )
                   })}
                   {paidQuizError ? <ErrorBanner message={paidQuizError} /> : null}
+                  {paidQuizResult ? (
+                    <p className="text-xs text-teal-200/80">
+                      {paidQuizResult === 'qualified'
+                        ? 'Confirmation email sent (if email is configured).'
+                        : 'Confirmation email sent with your result (if email is configured).'}
+                    </p>
+                  ) : null}
                   {paidQuizResult === 'qualified' ? (
                     <p className="rounded-lg border border-emerald-700/40 bg-emerald-950/50 px-3 py-2 text-sm text-emerald-100/95">
                       All correct — you qualify for the draw.

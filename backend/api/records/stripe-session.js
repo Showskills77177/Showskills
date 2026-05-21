@@ -2,6 +2,8 @@ import Stripe from 'stripe'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { recordStripeCheckoutCompleted, parseReservedTicketNumbersMetadata } from '../lib/recordSale.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
+import { maybeSendPendingQuizReminderEmail } from '../lib/sendPendingQuizEmail.mjs'
+import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -64,12 +66,30 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, skipped: true, reason: 'not_recorded' })
     }
 
+    const resolvedEmail = (email || '').trim().toLowerCase()
+    const resolvedName = (fullName || '').trim()
+    const bundle = md.bundle_id ? getTicketBundleById(md.bundle_id) : null
+
+    await maybeSendPendingQuizReminderEmail({
+      ticketId: recorded.ticketId,
+      userId: recorded.userId,
+      to: resolvedEmail,
+      customerFullName: resolvedName,
+      orderRef: recorded.ticketPublicId,
+      ticketNumbers: recorded.ticketNumbers || [],
+      bundleId: md.bundle_id,
+      quantity: qty,
+      amountPence: session.amount_total || bundle?.totalPence,
+    })
+
     return json(res, 200, {
       ok: true,
       deduped: Boolean(recorded.deduped),
       orderRef: recorded.ticketPublicId,
       ticketNumbers: recorded.ticketNumbers || [],
       emailSent: Boolean(recorded.emailSent),
+      customerEmail: resolvedEmail,
+      customerFullName: resolvedName,
     })
   } catch (e) {
     console.error(e)

@@ -4,6 +4,7 @@ import { EntryModal } from './EntryModal'
 import { StripeReturnOverlay } from './StripeReturnOverlay'
 import { TermsModal } from './TermsModal'
 import { MobileNavDock } from './MobileNavDock'
+import { QuizPromptNav } from './QuizPromptNav'
 import { useEntryFlow } from '../entry/entryContext'
 
 function desktopNavClass({ isActive }) {
@@ -33,7 +34,9 @@ function LogoMark({ className = 'h-10 sm:h-12' }) {
 }
 
 export function Layout() {
-  const { termsOpen, setTermsOpen, openTerms, stripeReturnStatus, paidError } = useEntryFlow()
+  const { termsOpen, setTermsOpen, openTerms, stripeReturnStatus, paidError, paidQuizNavStatus } =
+    useEntryFlow()
+  const showQuizPrompt = paidQuizNavStatus !== 'none'
 
   return (
     <div className="ss-page-bg min-h-svh font-sans text-stone-300 antialiased">
@@ -53,6 +56,11 @@ export function Layout() {
               <LogoMark className="ss-mobile-header-logo h-11" />
             </Link>
           </div>
+          {showQuizPrompt ? (
+            <div className="flex justify-center px-4 pb-2 sm:hidden">
+              <QuizPromptNav className="w-full max-w-xs" />
+            </div>
+          ) : null}
           <MobileNavDock />
         </div>
 
@@ -81,6 +89,14 @@ export function Layout() {
             >
               T&amp;C
             </button>
+            {showQuizPrompt ? (
+              <>
+                <span className="select-none text-stone-600" aria-hidden>
+                  —
+                </span>
+                <QuizPromptNav />
+              </>
+            ) : null}
           </nav>
 
           <Link

@@ -1,5 +1,6 @@
 import { getPayPalCredentials, paypalAccessToken } from './lib/paypal.js'
 import { recordPayPalCapture } from './lib/recordSale.mjs'
+import { maybeSendPendingQuizReminderEmail } from './lib/sendPendingQuizEmail.mjs'
 import { isDbConfigured } from './lib/db.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 import { assertPayPalCaptureMatchesBundle } from './lib/paymentSecurity.mjs'
@@ -90,6 +91,17 @@ export default async function handler(req, res) {
             currency: bundleCheck.currency,
           })
           if (recorded) {
+            await maybeSendPendingQuizReminderEmail({
+              ticketId: recorded.ticketId,
+              userId: recorded.userId,
+              to: customerEmail,
+              customerFullName,
+              orderRef: recorded.ticketPublicId,
+              ticketNumbers: recorded.ticketNumbers || [],
+              bundleId: bundleCheck.bundle.id,
+              quantity: bundleCheck.bundle.qty,
+              amountPence: bundleCheck.amountPence,
+            })
             return res.status(200).json({
               status: 'COMPLETED',
               orderID: data.id,
