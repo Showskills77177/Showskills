@@ -138,7 +138,13 @@ function PaymentFormInner({
         return
       }
 
-      const piId = paymentIntent?.id || paymentIntentId
+      // Redirect-based flows (e.g. 3DS) navigate away — page reload handles completion.
+      if (!paymentIntent) {
+        setPaying(false)
+        return
+      }
+
+      const piId = paymentIntent.id || paymentIntentId
       if (!piId) {
         setError('Payment status unclear. Contact support with your email.')
         setPaying(false)
@@ -192,7 +198,7 @@ function PaymentFormInner({
   return (
     <div className="ss-stripe-payment-panel">
       <p className="text-xs font-medium uppercase tracking-wide text-teal-300/90">
-        Card, Apple Pay, Google Pay, PayPal
+        Card, Apple Pay, Google Pay
       </p>
       <p className="mt-1 text-xs text-stone-500">
         Choose a method below. Your name and email from the previous step are used for this payment.

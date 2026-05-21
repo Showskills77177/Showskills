@@ -1669,8 +1669,13 @@ body {
   margin: auto;
   max-height: min(92vh, 920px);
   overflow: visible;
-  background: transparent;
-  color: inherit;
+  background: #0c0a09;
+  color: #e7e5e4;
+}
+
+.ss-entry-modal-dialog:not([open]),
+.ss-payment-dialog:not([open]) {
+  display: none;
 }
 
 .ss-entry-modal-dialog::backdrop,

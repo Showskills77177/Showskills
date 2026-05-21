@@ -48,6 +48,8 @@ export function EntryFlowProvider({ children }) {
   const [kickConsent, setKickConsent] = useState(false)
   const [kickError, setKickError] = useState('')
   const [kickSuccess, setKickSuccess] = useState(false)
+  /** null | 'confirming' | 'failed' — Stripe redirect return handling */
+  const [stripeReturnStatus, setStripeReturnStatus] = useState(null)
 
   const stripePublishableKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '').trim()
   const stripePaymentIntentApiOverride = (import.meta.env.VITE_STRIPE_PAYMENT_INTENT_API_URL ?? '').trim()
@@ -104,44 +106,64 @@ export function EntryFlowProvider({ children }) {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('stripe_return') === '1') {
+    const isStripeReturn =
+      params.get('stripe_return') === '1' ||
+      (params.get('payment_intent')?.startsWith('pi_') && params.get('redirect_status'))
+
+    if (isStripeReturn) {
       const redirectStatus = params.get('redirect_status')
       const paymentIntentId = params.get('payment_intent')?.trim() || ''
-      if (redirectStatus === 'succeeded' && paymentIntentId.startsWith('pi_')) {
-        fetch(apiUrl('/api/record-stripe-payment'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paymentIntentId }),
-        })
-          .then((res) => res.json().catch(() => ({})))
-          .then((data) => {
-            if (data.skipped) return
-            if (!data.ok && data.error) {
-              setPaidError(typeof data.error === 'string' ? data.error : 'Could not confirm payment')
-              setEntryModalType('paid')
-              return
-            }
-            setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
-            if (typeof data.orderRef === 'string' && data.orderRef) setPaidOrderRef(data.orderRef)
-            if (data.emailSent) setPaidEmailConfirmationSent(true)
-            setPaidPostCheckout(true)
-            setPaidQuizResult(null)
-            setPaidQuizSubmitted(false)
-            setPaidQuizSubmitting(false)
-            setPaidA1('')
-            setPaidA2('')
-            setPaidA3('')
-            setPaidQuizError('')
-            setPaidError('')
-            setEntryModalType('paid')
-          })
-          .catch(() => {
-            setPaidError('Payment may have succeeded but could not be confirmed. Contact support with your email.')
-            setEntryModalType('paid')
-          })
-        window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+      const failMessage =
+        redirectStatus === 'failed'
+          ? 'Payment failed or was cancelled.'
+          : 'Payment could not be confirmed. Please try again.'
+
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+
+      if (redirectStatus !== 'succeeded' || !paymentIntentId.startsWith('pi_')) {
+        setStripeReturnStatus('failed')
+        setPaidError(failMessage)
+        setEntryModalType('paid')
+        return
       }
+
+      setStripeReturnStatus('confirming')
+      setEntryModalType('paid')
+      setPaidError('')
+
+      fetch(apiUrl('/api/record-stripe-payment'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentIntentId }),
+      })
+        .then((res) => res.json().catch(() => ({})))
+        .then((data) => {
+          if (data.skipped) {
+            throw new Error('Payment received but tickets could not be saved. Contact support with your email.')
+          }
+          if (!data.ok) {
+            throw new Error(typeof data.error === 'string' ? data.error : 'Could not confirm payment')
+          }
+          setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
+          if (typeof data.orderRef === 'string' && data.orderRef) setPaidOrderRef(data.orderRef)
+          if (data.emailSent) setPaidEmailConfirmationSent(true)
+          setPaidPostCheckout(true)
+          setPaidQuizResult(null)
+          setPaidQuizSubmitted(false)
+          setPaidQuizSubmitting(false)
+          setPaidA1('')
+          setPaidA2('')
+          setPaidA3('')
+          setPaidQuizError('')
+          setPaidError('')
+          setStripeReturnStatus(null)
+        })
+        .catch((err) => {
+          setStripeReturnStatus('failed')
+          setPaidError(err instanceof Error ? err.message : 'Could not confirm payment')
+          setPaidPostCheckout(false)
+        })
       return
     }
 
@@ -572,6 +594,7 @@ export function EntryFlowProvider({ children }) {
       kickSuccess,
       handleKickupsGiveawaySubmit,
       PAID_SKILL_QUESTIONS,
+      stripeReturnStatus,
     }),
     [
       termsOpen,
@@ -626,6 +649,7 @@ export function EntryFlowProvider({ children }) {
       setKickError,
       kickSuccess,
       handleKickupsGiveawaySubmit,
+      stripeReturnStatus,
     ],
   )
 

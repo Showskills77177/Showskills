@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
 import { EntryModal } from './EntryModal'
+import { StripeReturnOverlay } from './StripeReturnOverlay'
 import { TermsModal } from './TermsModal'
 import { MobileNavDock } from './MobileNavDock'
 import { useEntryFlow } from '../entry/entryContext'
@@ -32,10 +33,11 @@ function LogoMark({ className = 'h-10 sm:h-12' }) {
 }
 
 export function Layout() {
-  const { termsOpen, setTermsOpen, openTerms } = useEntryFlow()
+  const { termsOpen, setTermsOpen, openTerms, stripeReturnStatus, paidError } = useEntryFlow()
 
   return (
     <div className="ss-page-bg min-h-svh font-sans text-stone-300 antialiased">
+      <StripeReturnOverlay status={stripeReturnStatus} message={paidError} />
       <EntryModal />
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 

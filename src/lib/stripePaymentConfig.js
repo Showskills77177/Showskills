@@ -76,7 +76,7 @@ export function buildPaymentElementOptions(recordPayload) {
       radios: true,
       spacedAccordionItems: true,
     },
-    paymentMethodOrder: ['apple_pay', 'google_pay', 'card', 'paypal'],
+    paymentMethodOrder: ['apple_pay', 'google_pay', 'card'],
     wallets: {
       applePay: 'auto',
       googlePay: 'auto',
@@ -99,13 +99,10 @@ export function buildPaymentElementOptions(recordPayload) {
   }
 }
 
-export function getStripeReturnUrl() {
-  if (typeof window === 'undefined') return ''
-  const path = window.location.pathname || '/'
-  return `${window.location.origin}${path}?stripe_return=1`
-}
-
-/** @param {{ customerEmail?: string, customerFullName?: string }} recordPayload */
+/**
+ * Confirm in-page (no return_url) — avoids full-page redirect to a blank modal backdrop.
+ * PayPal uses the standalone PayPal button when configured alongside Stripe.
+ */
 export function buildConfirmParams(recordPayload) {
   const email = (recordPayload?.customerEmail || '').trim()
   const name = (recordPayload?.customerFullName || '').trim()
@@ -114,7 +111,6 @@ export function buildConfirmParams(recordPayload) {
     throw new Error('Enter a valid email before paying.')
   }
   return {
-    return_url: getStripeReturnUrl(),
     receipt_email: email,
     payment_method_data: {
       billing_details: {

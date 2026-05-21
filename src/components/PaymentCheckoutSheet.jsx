@@ -142,8 +142,8 @@ export function PaymentCheckoutSheet({
 
           {stripeReady ? (
             <section
-              className="ss-payment-element-section min-h-0 flex-1 px-4 pb-5 pt-2 sm:px-5 sm:pb-6"
-              aria-label="Payment methods"
+              className="ss-payment-element-section min-h-0 flex-1 px-4 pb-2 pt-2 sm:px-5"
+              aria-label="Card and wallet payment"
             >
               <StripePaymentForm
                 publishableKey={stripePublishableKey}
@@ -156,6 +156,27 @@ export function PaymentCheckoutSheet({
                 onError={onStripeError}
               />
             </section>
+          ) : null}
+
+          {stripeReady && hasPayPal ? (
+            <div className="shrink-0 border-t border-white/10 px-4 pb-5 pt-2 sm:px-5">
+              <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                or pay with PayPal
+              </p>
+              <PayPalPayButton
+                clientId={payPalClientId}
+                currency={payPalCurrency}
+                createOrderUrl={paypalCreateOrderApi}
+                captureOrderUrl={paypalCaptureOrderApi}
+                bundleId={paidBundleId}
+                ticketQuantity={ticketQuantity}
+                customerEmail={customerEmail}
+                customerFullName={customerFullName}
+                disabled={payPalDisabled}
+                onPaid={onPayPalPaid}
+                onError={onPayPalError}
+              />
+            </div>
           ) : null}
 
           {showStandalonePayPal && !preparing ? (
