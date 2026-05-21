@@ -201,28 +201,85 @@ export function EntryFlowProvider({ children }) {
     })
   }, [])
 
-  const fetchResumePaidQuizByEmail = useCallback(async (email) => {
-    const em = email.trim().toLowerCase()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return false
-    try {
-      const res = await fetch(apiUrl('/api/entries/resume-paid-quiz'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: em }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.pending) return false
-      beginPaidQuizPending({
-        orderRef: data.orderRef,
-        ticketNumbers: data.ticketNumbers,
-        customerEmail: data.customerEmail,
-        customerFullName: data.customerFullName,
-      })
-      return true
-    } catch {
+  const applyResumeFromApi = useCallback(
+    (data) => {
+      if (!data?.ok) return false
+      if (data.pending) {
+        beginPaidQuizPending({
+          orderRef: data.orderRef,
+          ticketNumbers: data.ticketNumbers,
+          customerEmail: data.customerEmail,
+          customerFullName: data.customerFullName,
+        })
+        return true
+      }
+      if (data.alreadyAnswered) {
+        const result =
+          data.quizResult === 'qualified' || data.quizResult === 'not_qualified'
+            ? data.quizResult
+            : 'not_qualified'
+        savePaidQuizSession({
+          status: 'answered',
+          orderRef: data.orderRef || '',
+          ticketNumbers: Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [],
+          email: (data.customerEmail || '').trim(),
+          fullName: (data.customerFullName || '').trim(),
+          quizResult: result,
+        })
+        restorePaidQuizFromSession(loadPaidQuizSession())
+        setPaidQuizSubmitted(true)
+        setPaidQuizResult(result)
+        setPaidPostCheckout(true)
+        return true
+      }
       return false
-    }
-  }, [beginPaidQuizPending])
+    },
+    [beginPaidQuizPending, restorePaidQuizFromSession],
+  )
+
+  const fetchResumePaidQuizByToken = useCallback(
+    async (resumeToken) => {
+      const token = resumeToken.trim()
+      if (token.length < 20) return false
+      try {
+        const res = await fetch(apiUrl('/api/entries/resume-paid-quiz'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resumeToken: token }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setPaidError(typeof data.error === 'string' ? data.error : 'Could not open your entry link.')
+          return false
+        }
+        return applyResumeFromApi(data)
+      } catch {
+        setPaidError('Could not open your entry link. Check your connection and try again.')
+        return false
+      }
+    },
+    [applyResumeFromApi],
+  )
+
+  const fetchResumePaidQuizByEmail = useCallback(
+    async (email) => {
+      const em = email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return false
+      try {
+        const res = await fetch(apiUrl('/api/entries/resume-paid-quiz'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: em }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) return false
+        return applyResumeFromApi(data)
+      } catch {
+        return false
+      }
+    },
+    [applyResumeFromApi],
+  )
 
   const openResumePaidQuiz = useCallback(() => {
     const session = loadPaidQuizSession()
@@ -270,18 +327,34 @@ export function EntryFlowProvider({ children }) {
   }, [restorePaidQuizFromSession])
 
   useEffect(() => {
-    if (searchParams.get('complete-quiz') === '1') {
+    if (searchParams.get('complete-quiz') !== '1') return
+
+    const resumeToken = (searchParams.get('resume') || '').trim()
+    const next = new URLSearchParams(searchParams)
+    next.delete('complete-quiz')
+    next.delete('resume')
+    setSearchParams(next, { replace: true })
+    setEntryModalType('paid')
+    setPaidError('')
+
+    void (async () => {
+      if (resumeToken.length >= 20) {
+        const ok = await fetchResumePaidQuizByToken(resumeToken)
+        if (!ok && !loadPaidQuizSession()) {
+          setPaidError((prev) => prev || 'This link is invalid or your answers were already submitted.')
+        }
+        return
+      }
       openResumePaidQuiz()
-      const next = new URLSearchParams(searchParams)
-      next.delete('complete-quiz')
-      setSearchParams(next, { replace: true })
       const email = paidEmail.trim() || loadPaidEntryContact()?.email || ''
       if (email && !paidOrderRef) {
-        void fetchResumePaidQuizByEmail(email)
+        await fetchResumePaidQuizByEmail(email)
       }
-      return
-    }
+    })()
 
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- email link landing once
+
+  useEffect(() => {
     if (!import.meta.env.DEV) return
     const preview = searchParams.get('preview-quiz')
     if (preview !== 'pending' && preview !== 'answered') return
@@ -311,12 +384,8 @@ export function EntryFlowProvider({ children }) {
   }, [
     searchParams,
     setSearchParams,
-    openResumePaidQuiz,
     beginPaidQuizPending,
     restorePaidQuizFromSession,
-    paidEmail,
-    paidOrderRef,
-    fetchResumePaidQuizByEmail,
   ])
 
   useEffect(() => {

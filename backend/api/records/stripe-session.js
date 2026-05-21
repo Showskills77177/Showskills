@@ -3,6 +3,7 @@ import { parseJsonBody, json } from '../lib/http.mjs'
 import { recordStripeCheckoutCompleted, parseReservedTicketNumbersMetadata } from '../lib/recordSale.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 import { maybeSendPendingQuizReminderEmail } from '../lib/sendPendingQuizEmail.mjs'
+import { ensureQuizResumeToken } from '../lib/quizResumeToken.mjs'
 import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
 
 export default async function handler(req, res) {
@@ -69,6 +70,7 @@ export default async function handler(req, res) {
     const resolvedEmail = (email || '').trim().toLowerCase()
     const resolvedName = (fullName || '').trim()
     const bundle = md.bundle_id ? getTicketBundleById(md.bundle_id) : null
+    const resumeToken = await ensureQuizResumeToken(recorded.ticketId)
 
     await maybeSendPendingQuizReminderEmail({
       ticketId: recorded.ticketId,
@@ -90,6 +92,7 @@ export default async function handler(req, res) {
       emailSent: Boolean(recorded.emailSent),
       customerEmail: resolvedEmail,
       customerFullName: resolvedName,
+      resumeToken,
     })
   } catch (e) {
     console.error(e)

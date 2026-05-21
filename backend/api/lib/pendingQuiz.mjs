@@ -9,6 +9,7 @@ import {
   pendingQuizEmailProps,
 } from '../../../shared/pendingQuizEmail.mjs'
 import { resolveResendFrom, formatResendError, resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
+import { ensureQuizResumeToken } from './quizResumeToken.mjs'
 
 const COMPETITION = 'ronaldo_legacy_bundle'
 
@@ -32,6 +33,73 @@ export async function hasPaidQuizEntryForTicket(userId, ticketId) {
   return Boolean(e.rows[0])
 }
 
+async function getLatestPaidQuizOutcomeForTicket(userId, ticketId) {
+  if (!userId || !ticketId) return null
+  const t = await query(
+    `SELECT COALESCE(purchased_at, created_at) AS since_at FROM tickets WHERE id = $1 AND user_id = $2`,
+    [ticketId, userId],
+  )
+  const since = t.rows[0]?.since_at
+  if (!since) return null
+
+  const e = await query(
+    `SELECT all_correct FROM competition_entries
+     WHERE user_id = $1 AND entry_type = 'paid' AND competition = $2 AND created_at >= $3
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId, COMPETITION, since],
+  )
+  const row = e.rows[0]
+  if (!row) return null
+  const allCorrect = row.all_correct === true || row.all_correct === 1
+  return { allCorrect, quizResult: allCorrect ? 'qualified' : 'not_qualified' }
+}
+
+/** Resume link target: one ticket, any device, until answers submitted. */
+export async function getPendingPaidQuizByResumeToken(resumeToken) {
+  const token = typeof resumeToken === 'string' ? resumeToken.trim() : ''
+  if (token.length < 20) return null
+
+  await ensureTicketSchema()
+  const t = await query(
+    `SELECT t.id, t.ticket_public_id, t.bundle_id, t.quantity, t.user_id, u.email, u.full_name
+     FROM tickets t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.quiz_resume_token = $1 AND t.payment_status = 'paid'`,
+    [token],
+  )
+  const row = t.rows[0]
+  if (!row) return null
+
+  const ticketNumbers = await getTicketNumbersForPurchase(row.id)
+  const outcome = await getLatestPaidQuizOutcomeForTicket(row.user_id, row.id)
+  if (outcome) {
+    return {
+      pending: false,
+      alreadyAnswered: true,
+      quizResult: outcome.quizResult,
+      orderRef: row.ticket_public_id,
+      ticketNumbers,
+      customerEmail: row.email,
+      customerFullName: row.full_name || '',
+      bundleId: row.bundle_id,
+      resumeToken: token,
+    }
+  }
+
+  return {
+    pending: true,
+    alreadyAnswered: false,
+    ticketId: row.id,
+    orderRef: row.ticket_public_id,
+    bundleId: row.bundle_id,
+    quantity: row.quantity,
+    ticketNumbers,
+    customerEmail: row.email,
+    customerFullName: row.full_name || '',
+    resumeToken: token,
+  }
+}
+
 /** Latest paid ticket with no skill quiz submitted yet. */
 export async function getPendingPaidQuizForEmail(email) {
   const e = email?.trim().toLowerCase()
@@ -52,10 +120,24 @@ export async function getPendingPaidQuizForEmail(email) {
   const row = t.rows[0]
   if (!row) return null
 
-  const already = await hasPaidQuizEntryForTicket(row.user_id, row.id)
-  if (already) return { pending: false }
-
   const ticketNumbers = await getTicketNumbersForPurchase(row.id)
+  const resumeToken = await ensureQuizResumeToken(row.id)
+  const already = await hasPaidQuizEntryForTicket(row.user_id, row.id)
+  if (already) {
+    const outcome = await getLatestPaidQuizOutcomeForTicket(row.user_id, row.id)
+    return {
+      pending: false,
+      alreadyAnswered: true,
+      quizResult: outcome?.quizResult ?? 'not_qualified',
+      orderRef: row.ticket_public_id,
+      ticketNumbers,
+      customerEmail: u.rows[0].email,
+      customerFullName: u.rows[0].full_name || '',
+      bundleId: row.bundle_id,
+      resumeToken,
+    }
+  }
+
   return {
     pending: true,
     ticketId: row.id,
@@ -65,6 +147,7 @@ export async function getPendingPaidQuizForEmail(email) {
     ticketNumbers,
     customerEmail: u.rows[0].email,
     customerFullName: u.rows[0].full_name || '',
+    resumeToken,
   }
 }
 
@@ -104,6 +187,7 @@ export async function maybeSendPendingQuizReminderEmail({
     return { ok: false, skipped: true, reason: 'no_resend_key' }
   }
 
+  const resumeToken = await ensureQuizResumeToken(ticketId)
   const bundle = bundleId ? getTicketBundleById(bundleId) : null
   const siteUrl = resolveSiteUrl()
   const props = pendingQuizEmailProps({
@@ -113,6 +197,8 @@ export async function maybeSendPendingQuizReminderEmail({
     bundleTitle: bundle?.title ?? bundleId,
     quantity: quantity ?? bundle?.qty,
     amountPence: amountPence ?? bundle?.totalPence,
+    ticketNumbers,
+    resumeToken,
   })
 
   const res = await fetch('https://api.resend.com/emails', {

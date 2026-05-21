@@ -9,6 +9,7 @@ import { applyRateLimit } from './lib/rateLimit.mjs'
 import { assertPaymentIntentMatchesBundle } from './lib/paymentSecurity.mjs'
 import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 import { maybeSendPendingQuizReminderEmail } from './lib/sendPendingQuizEmail.mjs'
+import { ensureQuizResumeToken } from './lib/quizResumeToken.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -98,6 +99,8 @@ export default async function handler(req, res) {
 
     const resolvedEmail = (email || receiptEmail || '').trim().toLowerCase()
 
+    const resumeToken = await ensureQuizResumeToken(recorded.ticketId)
+
     await maybeSendPendingQuizReminderEmail({
       ticketId: recorded.ticketId,
       userId: recorded.userId,
@@ -118,6 +121,7 @@ export default async function handler(req, res) {
       emailSent: Boolean(recorded.emailSent),
       customerEmail: resolvedEmail,
       customerFullName: (fullName || '').trim(),
+      resumeToken,
     })
   } catch (e) {
     console.error(e)

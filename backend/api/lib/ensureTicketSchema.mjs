@@ -32,6 +32,11 @@ export async function ensureTicketSchema() {
     } catch {
       /* already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS quiz_resume_token TEXT UNIQUE`)
+    } catch {
+      /* already exists */
+    }
   } else {
     await query(`
       CREATE TABLE IF NOT EXISTS ticket_numbers (
@@ -55,6 +60,11 @@ export async function ensureTicketSchema() {
     }
     try {
       await query(`ALTER TABLE tickets ADD COLUMN pending_quiz_reminder_sent_at TEXT`)
+    } catch {
+      /* column already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN quiz_resume_token TEXT UNIQUE`)
     } catch {
       /* column already exists */
     }

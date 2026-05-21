@@ -1,4 +1,4 @@
-import { escapeHtml, emailLogoUrl } from './purchaseConfirmationEmail.mjs'
+import { escapeHtml, emailLogoUrl, buildTicketGridHtml } from './purchaseConfirmationEmail.mjs'
 import { buildCompleteQuizUrl } from './quizLinks.mjs'
 import { formatBundlePriceGBP } from './ticketBundles.mjs'
 
@@ -12,13 +12,27 @@ import { formatBundlePriceGBP } from './ticketBundles.mjs'
  *   bundleTitle?: string
  *   quantity?: number
  *   amountPence?: number
+ *   ticketNumbers?: string[]
  * }} props
  */
 export function buildPendingQuizHtml(props) {
-  const { customerFullName, siteUrl, completeQuizUrl, orderRef, bundleTitle, quantity, amountPence } = props
+  const {
+    customerFullName,
+    siteUrl,
+    completeQuizUrl,
+    orderRef,
+    bundleTitle,
+    quantity,
+    amountPence,
+    ticketNumbers = [],
+  } = props
   const logoSrc = emailLogoUrl(siteUrl)
   const price = amountPence != null ? formatBundlePriceGBP(amountPence) : ''
   const ctaUrl = escapeHtml(completeQuizUrl)
+  const ticketsHtml =
+    ticketNumbers.length > 0
+      ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">Your ticket number${ticketNumbers.length === 1 ? '' : 's'}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${buildTicketGridHtml(ticketNumbers)}</table><p style="margin:14px 0 16px;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — use the link below whenever you are ready to answer (same link on any phone or computer until you submit).</p>`
+      : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -45,6 +59,7 @@ export function buildPendingQuizHtml(props) {
               ? `<p style="margin:0 0 16px;font-size:13px;color:#a8a29e">${escapeHtml(bundleTitle)}${quantity ? ` · ${quantity} ticket${quantity === 1 ? '' : 's'}` : ''}${price ? ` · ${escapeHtml(price)}` : ''}</p>`
               : ''
           }
+          ${ticketsHtml}
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">
             <tr><td style="border-radius:12px;background:linear-gradient(90deg,#0d9488,#059669)">
               <a href="${ctaUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Answer the questions now</a>
@@ -60,7 +75,15 @@ export function buildPendingQuizHtml(props) {
 }
 
 export function buildPendingQuizText(props) {
-  const { customerFullName, completeQuizUrl, orderRef, bundleTitle, quantity, amountPence } = props
+  const {
+    customerFullName,
+    completeQuizUrl,
+    orderRef,
+    bundleTitle,
+    quantity,
+    amountPence,
+    ticketNumbers = [],
+  } = props
   const price = amountPence != null ? formatBundlePriceGBP(amountPence) : ''
   const lines = [
     `Hi ${customerFullName || 'there'},`,
@@ -72,7 +95,15 @@ export function buildPendingQuizText(props) {
   if (orderRef) lines.push(`Order: ${orderRef}`)
   if (bundleTitle) lines.push(`Bundle: ${bundleTitle}${quantity ? ` (${quantity} tickets)` : ''}`)
   if (price) lines.push(`Paid: ${price}`)
-  lines.push('', 'Open this link to answer the questions:', completeQuizUrl, '')
+  if (ticketNumbers.length) {
+    lines.push('', 'Your ticket numbers:', ...ticketNumbers.map((n) => `  • ${n}`))
+  }
+  lines.push(
+    '',
+    'Use this link on any device until you submit your answers (pass or fail):',
+    completeQuizUrl,
+    '',
+  )
   return lines.join('\n')
 }
 
@@ -88,8 +119,10 @@ export function pendingQuizEmailProps({
   bundleTitle,
   quantity,
   amountPence,
+  ticketNumbers,
+  resumeToken,
 }) {
-  const completeQuizUrl = buildCompleteQuizUrl(siteUrl)
+  const completeQuizUrl = buildCompleteQuizUrl(siteUrl, resumeToken)
   return {
     customerFullName,
     siteUrl,
@@ -98,5 +131,6 @@ export function pendingQuizEmailProps({
     bundleTitle,
     quantity,
     amountPence,
+    ticketNumbers: Array.isArray(ticketNumbers) ? ticketNumbers : [],
   }
 }
