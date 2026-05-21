@@ -1645,23 +1645,20 @@ body {
   touch-action: manipulation;
 }
 
-.ss-payment-sheet {
-  padding-bottom: env(safe-area-inset-bottom, 0);
-}
-
-/* Safari/iOS: keep inputs and Stripe iframes typeable (no fixed-body + no GPU layer on ancestors). */
-html.ss-entry-modal-open,
-html.ss-payment-sheet-open {
-  overflow: hidden;
-}
-
+/* Entry + payment popups — typeable inputs (Safari, Brave, iOS). */
+.ss-entry-field,
 .ss-entry-modal-scroll input,
 .ss-entry-modal-scroll textarea,
-.ss-payment-sheet-scroll input,
-.ss-payment-sheet-scroll textarea {
-  -webkit-user-select: text;
-  user-select: text;
+.ss-payment-popup-scroll input,
+.ss-payment-popup-scroll textarea {
+  -webkit-user-select: text !important;
+  user-select: text !important;
   touch-action: manipulation;
+  pointer-events: auto !important;
+}
+
+.ss-payment-popup-panel {
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 .ss-bundle-select {
@@ -1688,8 +1685,9 @@ html.ss-payment-sheet-open {
   .ss-stripe-payment-element,
   .ss-entry-modal-stripe,
   .ss-stripe-payment-shell,
-  .ss-payment-sheet,
-  .ss-payment-sheet-scroll {
+  .ss-payment-popup,
+  .ss-payment-popup-panel,
+  .ss-payment-popup-scroll {
     transform: none;
     -webkit-transform: none;
     filter: none;

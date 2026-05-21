@@ -135,20 +135,7 @@ export function EntryModal() {
     return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
   }
 
-  useEffect(() => {
-    if (!entryModalType) return
-    const scrollY = window.scrollY
-    const { style } = document.body
-    const prevOverflow = style.overflow
-    // overflow only — position:fixed breaks keyboard input in Safari (modal + Stripe iframes).
-    style.overflow = 'hidden'
-    document.documentElement.classList.add('ss-entry-modal-open')
-    return () => {
-      style.overflow = prevOverflow
-      document.documentElement.classList.remove('ss-entry-modal-open')
-      window.scrollTo(0, scrollY)
-    }
-  }, [entryModalType])
+  // No body/html scroll lock — it breaks typing in Safari, Brave, and Stripe iframes.
 
   useEffect(() => {
     if (!entryModalType) return
@@ -190,7 +177,7 @@ export function EntryModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:p-6"
+      className="ss-entry-modal-root fixed inset-0 z-[60] flex items-end justify-center overscroll-contain p-4 sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="entry-modal-title"
@@ -199,7 +186,7 @@ export function EntryModal() {
         type="button"
         className="absolute inset-0 z-0 bg-black/80"
         aria-label="Close entry"
-        onClick={closeEntry}
+        onClick={() => (showPaymentSheet ? handleClosePaymentSheet() : closeEntry())}
       />
       <div
         ref={panelRef}
@@ -349,9 +336,11 @@ export function EntryModal() {
                             else if (i === 1) setPaidA2(v)
                             else setPaidA3(v)
                           }}
-                          className={paidAnswerInputClass(i)}
+                          className={`ss-entry-field ${paidAnswerInputClass(i)}`}
                           placeholder="Type your answer"
                           aria-invalid={showIncorrect || undefined}
+                          autoCapitalize="off"
+                          autoCorrect="off"
                         />
                         {showIncorrect ? (
                           <p className="mt-1 text-xs font-medium text-red-400">Incorrect</p>
@@ -405,9 +394,10 @@ export function EntryModal() {
                           autoComplete="name"
                           value={paidFullName}
                           onChange={(e) => setPaidFullName(e.target.value)}
-                          className="mt-2 w-full select-text rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
                           placeholder="As on ID / bank card"
                           spellCheck={false}
+                          autoCapitalize="words"
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -420,9 +410,11 @@ export function EntryModal() {
                           autoComplete="email"
                           value={paidEmail}
                           onChange={(e) => setPaidEmail(e.target.value)}
-                          className="mt-2 w-full select-text rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
                           placeholder="you@example.com"
                           spellCheck={false}
+                          autoCapitalize="none"
+                          autoCorrect="off"
                         />
                       </div>
                     </div>
@@ -626,9 +618,8 @@ export function EntryModal() {
             Close
           </button>
         </div>
-      </div>
 
-      <PaymentCheckoutSheet
+        <PaymentCheckoutSheet
         open={showPaymentSheet}
         onClose={handleClosePaymentSheet}
         amountPence={selectedTicketBundle?.totalPence ?? 0}
@@ -668,7 +659,8 @@ export function EntryModal() {
         }}
         onPayPalError={(msg) => setPaidError(msg)}
         onClearError={() => setPaidError('')}
-      />
+        />
+      </div>
     </div>
   )
 }
