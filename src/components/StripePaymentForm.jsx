@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
-import { getStripePromise } from '../lib/stripeLoader'
+import { Elements, useElements, useStripe } from '@stripe/react-stripe-js'
+import { assertStripeJsLoaded, getStripePromise } from '../lib/stripeLoader'
+import {
+  enablePaymentElementPointerEvents,
+  focusStripeMountForIos,
+  PAYMENT_ELEMENT_CONTAINER_ID,
+} from '../lib/stripeFocusCompat'
 import {
   buildConfirmParams,
   buildPaymentElementOptions,
@@ -31,6 +36,7 @@ function PaySubmitButton({ disabled, paying, ready, amountLabel, onPay }) {
       type="button"
       disabled={disabled || paying || !ready}
       onClick={onPay}
+      data-ss-stripe-ignore-focus
       className="ss-stripe-pay-button mt-4 min-h-[52px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {paying ? 'Processing…' : amountLabel ? `Pay ${amountLabel}` : 'Pay now'}
@@ -38,46 +44,106 @@ function PaySubmitButton({ disabled, paying, ready, amountLabel, onPay }) {
   )
 }
 
-function PaymentElementMount({ recordPayload, onReadyChange, onLoadError, onChangeMessage }) {
+/**
+ * Step 1–3: plain div#payment-element-container + elements.create('payment').mount('#…')
+ */
+function PaymentElementMount({ recordPayload, onReadyChange, onLoadError }) {
   const elements = useElements()
   const elementOptions = useMemo(() => buildPaymentElementOptions(recordPayload), [recordPayload])
-  const mountedRef = useRef(false)
+  const paymentElementRef = useRef(null)
+  const pointerFixTimerRef = useRef(null)
+
+  const applyPointerFix = useCallback(() => {
+    enablePaymentElementPointerEvents()
+    requestAnimationFrame(() => enablePaymentElementPointerEvents())
+  }, [])
+
+  const handleReady = useCallback(() => {
+    applyPointerFix()
+    pointerFixTimerRef.current = window.setInterval(applyPointerFix, 400)
+    window.setTimeout(() => {
+      if (pointerFixTimerRef.current) {
+        clearInterval(pointerFixTimerRef.current)
+        pointerFixTimerRef.current = null
+      }
+    }, 4000)
+    onReadyChange(true)
+    focusStripeMountForIos()
+  }, [applyPointerFix, onReadyChange])
 
   useEffect(() => {
     onReadyChange(false)
-    mountedRef.current = false
-  }, [recordPayload?.customerEmail, recordPayload?.customerFullName])
-
-  useEffect(() => {
-    if (!elements || mountedRef.current) return
-    let cancelled = false
-    elements.fetchUpdates?.().catch(() => {})
-    const t = requestAnimationFrame(() => {
-      if (!cancelled) mountedRef.current = true
-    })
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(t)
+    if (pointerFixTimerRef.current) {
+      clearInterval(pointerFixTimerRef.current)
+      pointerFixTimerRef.current = null
     }
-  }, [elements, elementOptions])
 
-  return (
-    <div id="ss-stripe-payment-mount" className="ss-stripe-payment-mount">
-      <PaymentElement
-        id="ss-payment-element"
-        options={elementOptions}
-        onReady={() => onReadyChange(true)}
-        onLoadError={(event) => {
+    if (!elements) return undefined
+
+    const container = document.getElementById(PAYMENT_ELEMENT_CONTAINER_ID)
+    if (!container) return undefined
+
+    let cancelled = false
+    let paymentElement = null
+
+    try {
+      paymentElement = elements.create('payment', elementOptions)
+      paymentElementRef.current = paymentElement
+
+      paymentElement.on('ready', () => {
+        if (!cancelled) handleReady()
+      })
+      paymentElement.on('loaderror', (event) => {
+        if (!cancelled) {
           onReadyChange(false)
           onLoadError(event?.error?.message || 'Could not load payment methods.')
-        }}
-        onChange={(event) => {
-          if (event.complete) onChangeMessage('')
-          else if (event.empty) onChangeMessage('')
-        }}
-      />
-    </div>
+        }
+      })
+      paymentElement.on('focus', () => {
+        applyPointerFix()
+        focusStripeMountForIos()
+      })
+
+      paymentElement.mount(`#${PAYMENT_ELEMENT_CONTAINER_ID}`)
+      applyPointerFix()
+    } catch (err) {
+      onReadyChange(false)
+      onLoadError(err instanceof Error ? err.message : 'Could not mount payment form.')
+      return undefined
+    }
+
+    return () => {
+      cancelled = true
+      if (pointerFixTimerRef.current) {
+        clearInterval(pointerFixTimerRef.current)
+        pointerFixTimerRef.current = null
+      }
+      try {
+        paymentElement?.unmount?.()
+      } catch {
+        /* ignore */
+      }
+      paymentElementRef.current = null
+    }
+  }, [
+    elements,
+    elementOptions,
+    recordPayload?.customerEmail,
+    recordPayload?.customerFullName,
+    handleReady,
+    onReadyChange,
+    onLoadError,
+    applyPointerFix,
+  ])
+
+  useEffect(
+    () => () => {
+      if (pointerFixTimerRef.current) clearInterval(pointerFixTimerRef.current)
+    },
+    [],
   )
+
+  return <div id={PAYMENT_ELEMENT_CONTAINER_ID} />
 }
 
 function PaymentFormInner({
@@ -138,7 +204,6 @@ function PaymentFormInner({
         return
       }
 
-      // Redirect-based flows (e.g. 3DS) navigate away — page reload handles completion.
       if (!paymentIntent) {
         setPaying(false)
         return
@@ -187,7 +252,7 @@ function PaymentFormInner({
     if (elementReady) return
     const t = setTimeout(() => {
       setError(
-        'Payment methods are taking too long to load. In Brave or Safari, allow cookies for this site and disable shields, then try again.',
+        'Payment methods are taking too long to load. Allow cookies (Safari / Brave / DuckDuckGo), confirm Stripe.js loaded in the console, then hard-refresh (Ctrl+Shift+R or Cmd+Shift+R).',
       )
     }, 20_000)
     return () => clearTimeout(t)
@@ -204,20 +269,21 @@ function PaymentFormInner({
         Choose a method below. Your name and email from the previous step are used for this payment.
       </p>
 
-      {!elementReady ? (
-        <div className="ss-stripe-payment-skeleton mt-4" aria-hidden>
-          <div className="h-11 animate-pulse rounded-lg bg-white/5" />
-          <div className="mt-3 h-11 animate-pulse rounded-lg bg-white/5" />
-          <div className="mt-3 h-11 animate-pulse rounded-lg bg-white/5" />
-        </div>
-      ) : null}
+      <div className="ss-stripe-payment-mount-wrap mt-4">
+        {!elementReady ? (
+          <div className="ss-stripe-payment-skeleton" aria-hidden>
+            <div className="h-11 animate-pulse rounded-lg bg-white/5" />
+            <div className="mt-3 h-11 animate-pulse rounded-lg bg-white/5" />
+            <div className="mt-3 h-11 animate-pulse rounded-lg bg-white/5" />
+          </div>
+        ) : null}
 
-      <PaymentElementMount
-        recordPayload={recordPayload}
-        onReadyChange={setElementReady}
-        onLoadError={setError}
-        onChangeMessage={setStatusMessage}
-      />
+        <PaymentElementMount
+          recordPayload={recordPayload}
+          onReadyChange={setElementReady}
+          onLoadError={setError}
+        />
+      </div>
 
       <PaymentStatusMessage status={statusTone} message={statusMessage} />
 
@@ -233,8 +299,7 @@ function PaymentFormInner({
 }
 
 /**
- * Modern Stripe Payment Element (not legacy Card Element).
- * Supports card, wallets, and PayPal when enabled in Stripe Dashboard + PaymentIntent.
+ * Stripe Payment Element — Elements provider + manual mount into #payment-element-container.
  */
 export function StripePaymentForm({
   publishableKey,
@@ -251,13 +316,27 @@ export function StripePaymentForm({
     () => (clientSecret ? buildStripeElementsOptions(clientSecret) : null),
     [clientSecret],
   )
+  const [stripeJsOk, setStripeJsOk] = useState(false)
 
-  if (!clientSecret || !elementsOptions) return null
+  useEffect(() => {
+    let cancelled = false
+    assertStripeJsLoaded(publishableKey).then((ok) => {
+      if (!cancelled) {
+        setStripeJsOk(ok)
+        if (!ok) onError('Stripe.js failed to load. Disable ad blockers and refresh the page.')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [publishableKey, onError])
+
+  if (!clientSecret || !elementsOptions || !stripeJsOk) return null
 
   return (
     <div className="ss-stripe-payment-shell">
       <Elements
-        key={`${clientSecret}-pe-billing-never-v6`}
+        key={`${clientSecret}-pe-container-v10`}
         stripe={stripePromise}
         options={elementsOptions}
       >

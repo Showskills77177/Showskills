@@ -5,7 +5,8 @@ let cachedKey = ''
 let stripePromise = null
 
 /**
- * Single shared Stripe.js load — avoids reloading when the payment form mounts.
+ * Loads Stripe.js v3 via @stripe/stripe-js (injects https://js.stripe.com/v3).
+ * Resolves to the Stripe constructor or null if the key is missing / load fails.
  * @param {string} publishableKey
  */
 export function getStripePromise(publishableKey) {
@@ -17,7 +18,22 @@ export function getStripePromise(publishableKey) {
   return stripePromise
 }
 
-/** Warm Stripe.js as soon as the user may pay (modal open / page load). */
+/** Warm Stripe.js before the Payment Element mounts. */
 export function preloadStripe(publishableKey) {
   return getStripePromise(publishableKey)
+}
+
+/**
+ * Step 7 — confirm Stripe.js loaded before mounting Payment Element.
+ * @param {string} publishableKey
+ * @returns {Promise<boolean>}
+ */
+export async function assertStripeJsLoaded(publishableKey) {
+  const stripe = await getStripePromise(publishableKey)
+  if (!stripe) return false
+  if (typeof window !== 'undefined' && typeof window.Stripe !== 'function') {
+    console.error('[stripe] Stripe.js did not load — check ad blockers and network.')
+    return false
+  }
+  return true
 }

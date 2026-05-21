@@ -81,31 +81,20 @@ export function buildStripeElementsOptions(clientSecret) {
 }
 
 /**
- * Name + email come from the entry form. Other billing fields are satisfied in
- * confirmPayment when billingDetails is `never` on the Payment Element.
+ * Name + email from the entry step only — do not pass phone/address unless
+ * those fields are explicitly set to `never` on the Payment Element.
  * @param {{ customerEmail?: string, customerFullName?: string }} recordPayload
  */
 export function buildBillingDetailsFromEntry(recordPayload) {
   const email = (recordPayload?.customerEmail || '').trim()
   const name = (recordPayload?.customerFullName || '').trim()
-  return {
-    name,
-    email,
-    phone: '+440000000000',
-    address: {
-      line1: 'United Kingdom',
-      line2: '',
-      city: 'United Kingdom',
-      state: '',
-      postal_code: 'W1A 1AA',
-      country: 'GB',
-    },
-  }
+  return { name, email }
 }
 
 /**
- * Hide all billing fields in the Element (collected on the entry step).
- * Stripe requires the same data in confirmPayment — see buildBillingDetailsFromEntry.
+ * Hide name/email in Stripe (already on the entry form). Do not use
+ * billingDetails: 'never' — that opts out of phone/address too and triggers
+ * confirmPayment mismatches in Chromium browsers.
  * @param {{ customerEmail?: string, customerFullName?: string }} recordPayload
  */
 export function buildPaymentElementOptions(recordPayload) {
@@ -125,7 +114,10 @@ export function buildPaymentElementOptions(recordPayload) {
       },
     },
     fields: {
-      billingDetails: 'never',
+      billingDetails: {
+        name: 'never',
+        email: 'never',
+      },
     },
     business: { name: 'ShowSkills Rewards' },
   }

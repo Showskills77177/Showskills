@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { formatBundlePriceGBP } from '../competitionData'
+import { attachStripeFocusCompat } from '../lib/stripeFocusCompat'
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
@@ -38,9 +39,16 @@ export function PaymentCheckoutSheet({
   onPayPalError,
   onClearError,
 }) {
+  const panelRef = useRef(null)
+
   useEffect(() => {
     if (open && onClearError) onClearError()
   }, [open, onClearError])
+
+  useEffect(() => {
+    if (!open) return undefined
+    return attachStripeFocusCompat(panelRef.current)
+  }, [open])
 
   if (!open) return null
 
@@ -56,20 +64,20 @@ export function PaymentCheckoutSheet({
 
   return (
     <div
-      className="ss-payment-sheet absolute inset-0 z-20 flex items-center justify-center rounded-2xl p-2 sm:p-3"
+      className="ss-payment-sheet fixed inset-0 z-[61] flex items-end justify-center p-4 sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-sheet-title"
     >
-      <div
-        className="absolute inset-0 rounded-2xl bg-black/75"
-        role="presentation"
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/80"
+        aria-label="Close payment"
         onClick={onClose}
-        onKeyDown={() => {}}
       />
       <div
-        className="ss-payment-sheet-panel relative z-10 flex max-h-[min(88%,720px)] w-full max-w-lg flex-col overflow-visible rounded-xl border border-teal-500/35 bg-stone-950 shadow-2xl sm:max-w-xl"
-        onPointerDown={(e) => e.stopPropagation()}
+        ref={panelRef}
+        className="ss-payment-sheet-panel relative z-10 flex w-full max-w-lg flex-col rounded-xl border border-teal-500/35 bg-stone-950 shadow-2xl sm:max-w-xl"
       >
         <div
           className="h-1 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-teal-500/80 via-emerald-500/60 to-transparent"
@@ -79,6 +87,7 @@ export function PaymentCheckoutSheet({
           <button
             type="button"
             onClick={onClose}
+            data-ss-stripe-ignore-focus
             className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 text-stone-300 hover:bg-white/5"
             aria-label="Back"
           >
@@ -132,7 +141,7 @@ export function PaymentCheckoutSheet({
         ) : null}
 
         {stripeReady ? (
-          <div className="ss-payment-stripe-zone shrink-0 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="ss-payment-stripe-zone flex-1 overflow-visible px-4 py-4 sm:px-5 sm:py-5">
             <StripePaymentForm
               publishableKey={stripePublishableKey}
               clientSecret={paidStripeClientSecret}

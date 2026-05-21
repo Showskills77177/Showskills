@@ -18,6 +18,7 @@
     "test:e2e": "playwright test",
     "test:admin": "playwright test tests/e2e/admin.spec.js",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
+    "test:quiz": "node --test shared/paidSkillQuestions.test.mjs",
     "test:ui": "playwright test --ui",
     "test:install": "playwright install chromium",
     "test:install:browsers": "playwright install chromium firefox webkit",

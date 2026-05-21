@@ -63,12 +63,18 @@ function hasFourNilScore(answer) {
   const n = normalizeAnswer(answer)
   const c = compact(answer)
   return (
+    /\b4\s*[-:]\s*0\b/.test(n) ||
     /\b4\s*0\b/.test(n) ||
-    /\b4\s*(nil|nill|nell|zero)\b/.test(n) ||
-    /\b(four|for)\s*(nil|nill|nell|zero)\b/.test(n) ||
+    /\b4\s*(nil|nill|nell|zero|nothing)\b/.test(n) ||
+    /\b(four|for)\s*[-:]?\s*(nil|nill|nell|zero|nothing)\b/.test(n) ||
+    /\b4\s*to\s*0\b/.test(n) ||
     c.includes('4nil') ||
+    c.includes('4nill') ||
+    c.includes('4nell') ||
     c.includes('fournil') ||
-    c.includes('40')
+    c.includes('fournill') ||
+    c.includes('40') ||
+    c.includes('4to0')
   )
 }
 
@@ -76,10 +82,31 @@ function isBoltonAnswer(answer) {
   const n = normalizeAnswer(answer)
   return (
     n.includes('bolton') ||
-    n.includes('bolton wanderers') ||
     hasCloseWord(answer, 'bolton', 2) ||
-    closeTo(n, 'bolton wanderers', 4)
+    closeTo(n, 'bolton wanderers', 4) ||
+    closeTo(compact(answer), 'boltonwanderers', 4)
   )
+}
+
+function isManchesterUnitedDebutContext(answer) {
+  const n = normalizeAnswer(answer)
+  const c = compact(answer)
+  return (
+    n.includes('manchester united') ||
+    n.includes('man utd') ||
+    n.includes('manu') ||
+    c.includes('manchesterunited') ||
+    c.includes('manutd')
+  )
+}
+
+/** Q1: Bolton and/or 4–0 — either part alone is accepted. */
+function isDebutMatchAnswer(answer) {
+  const hasBolton = isBoltonAnswer(answer)
+  const hasScore = hasFourNilScore(answer)
+  if (hasBolton || hasScore) return true
+  if (isManchesterUnitedDebutContext(answer) && (hasBolton || hasScore)) return true
+  return false
 }
 
 function isNickyButtAnswer(answer) {
@@ -89,37 +116,72 @@ function isNickyButtAnswer(answer) {
     n.includes('nicky') ||
     n.includes('nicki') ||
     n.includes('nikki') ||
+    n.includes('nick') ||
     n.includes('nicholas') ||
+    n.includes('nicolas') ||
     hasCloseWord(answer, 'nicky', 2) ||
-    hasCloseWord(answer, 'nicholas', 2)
+    hasCloseWord(answer, 'nick', 1) ||
+    hasCloseWord(answer, 'nicholas', 3)
   const hasLast =
     n.includes('butt') ||
     /\bbut\b/.test(n) ||
     hasCloseWord(answer, 'butt', 1)
 
-  return (hasFirst && hasLast) || closeTo(c, 'nickybutt', 3) || closeTo(c, 'nicholasbutt', 3)
+  if ((hasFirst && hasLast) || closeTo(c, 'nickybutt', 3) || closeTo(c, 'nickbutt', 2) || closeTo(c, 'nicholasbutt', 3)) {
+    return true
+  }
+  if (hasLast && !n.includes('ronaldo') && !n.includes('cristiano')) {
+    const words = n.split(/\s+/).filter(Boolean)
+    if (words.length <= 4) return true
+  }
+  return false
 }
 
+/**
+ * Q3: minute 47 only is enough (no need to mention Newcastle).
+ * Accepts 47, 47th, forty-seven, 047, etc.
+ */
 function isFortySeventhMinuteAnswer(answer) {
+  const raw = String(answer || '').trim()
+  if (!raw) return false
+
+  const digitsOnly = raw.replace(/\D/g, '')
+  if (digitsOnly === '47' || digitsOnly === '047' || Number.parseInt(digitsOnly, 10) === 47) {
+    return true
+  }
+
   const n = normalizeAnswer(answer)
   const c = compact(answer)
-  return (
-    /\b47\b/.test(n) ||
+
+  if (
+    /\b0*47\b/.test(n) ||
+    c === '47' ||
+    c.startsWith('47th') ||
     c.includes('47th') ||
     c.includes('47min') ||
+    c.includes('47mins') ||
     c.includes('47minute') ||
+    c.includes('47minutes') ||
     n.includes('forty seven') ||
     n.includes('fortyseven') ||
     n.includes('forty seventh') ||
-    closeTo(c, '47thminute', 2)
-  )
+    n.includes('fortyseventh') ||
+    closeTo(c, '47thminute', 3) ||
+    closeTo(c, 'fortyseventh', 3) ||
+    closeTo(c, 'fortyseven', 2)
+  ) {
+    return true
+  }
+
+  if (n.includes('newcastle') && /\b0*47\b/.test(n)) return true
+
+  return false
 }
 
 export function validatePaidSkillAnswers(a1, a2, a3) {
-  const q1 = isBoltonAnswer(a1) && hasFourNilScore(a1)
+  const q1 = isDebutMatchAnswer(a1)
   const q2 = isNickyButtAnswer(a2)
   const q3 = isFortySeventhMinuteAnswer(a3)
 
   return { allCorrect: q1 && q2 && q3, q1, q2, q3 }
 }
-

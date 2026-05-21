@@ -13,6 +13,18 @@ test.describe('Edge cases & errors', () => {
     await expect(page.getByText(/not correct/i)).toBeVisible({ timeout: 10_000 })
   })
 
+  test('paid quiz accepts lenient correct answers (Bolton, Butt, 47)', async ({ page }) => {
+    const email = `lenient-${Date.now()}@example.test`
+    await completeTest30pMockCheckout(page, { name: 'Lenient Answers', email })
+
+    const qInputs = page.locator('input[placeholder="Type your answer"]')
+    await qInputs.nth(0).fill('Bolton')
+    await qInputs.nth(1).fill('Butt')
+    await qInputs.nth(2).fill('47')
+    await page.getByRole('button', { name: 'Submit answers' }).click()
+    await expect(page.getByText(/All three answers were correct/i)).toBeVisible({ timeout: 15_000 })
+  })
+
   test('paid quiz shows not qualified for wrong answers', async ({ page }) => {
     const email = `wrong-${Date.now()}@example.test`
     await completeTest30pMockCheckout(page, { name: 'Wrong Answers', email })

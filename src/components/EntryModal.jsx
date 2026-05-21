@@ -190,10 +190,10 @@ export function EntryModal() {
         />
         <div
           ref={panelRef}
+          inert={showPaymentSheet}
           className={`ss-entry-modal-panel relative z-10 flex max-h-[min(92vh,920px)] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${panelWidthClass} ${
             entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
-          }`}
-          onPointerDown={(e) => e.stopPropagation()}
+          } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''}`}
         >
         <div
           className={`h-1 w-full ${
@@ -298,6 +298,9 @@ export function EntryModal() {
                       <strong className="text-teal-50">You only qualify for the draw if all answers are correct.</strong>{' '}
                       One confirmation email (receipt, ticket numbers, and result) is sent after you submit.
                       Stripe or PayPal may also send their own payment receipt.
+                    </p>
+                    <p className="mt-3 rounded-lg border border-stone-600/35 bg-stone-900/45 px-3 py-2.5 text-sm text-stone-200">
+                      Please take your time and think carefully about the answers.
                     </p>
                     {paidQuizResult ? (
                       <p className="mt-2 text-xs text-teal-200/80">
@@ -618,49 +621,50 @@ export function EntryModal() {
           </button>
         </div>
 
-          <PaymentCheckoutSheet
-            open={showPaymentSheet}
-            onClose={handleClosePaymentSheet}
-            amountPence={selectedTicketBundle?.totalPence ?? 0}
-            bundleTitle={selectedTicketBundle?.title}
-            bundleLine={selectedTicketBundle?.line1}
-            preparing={paidStripePreparing}
-            paidError={paidError}
-            hasStripeElements={hasStripeElements}
-            stripePublishableKey={stripePublishableKey}
-            paidStripeClientSecret={paidStripeClientSecret}
-            paidStripePaymentIntentId={paidStripePaymentIntentId}
-            paidFormReadyForPayment={paidFormReadyForPayment}
-            recordPayload={{
-              customerEmail: paidEmail.trim(),
-              customerFullName: paidFullName.trim(),
-              bundleId: paidBundleId,
-            }}
-            onStripeSuccess={(info) => {
-              setPaymentSheetOpen(false)
-              markPaidCheckoutComplete(info)
-            }}
-            onStripeError={(msg) => setPaidError(msg)}
-            onRetryPayment={prepareStripePayment}
-            hasPayPal={hasPayPal}
-            payPalClientId={payPalClientId}
-            payPalCurrency={payPalCurrency}
-            paypalCreateOrderApi={paypalCreateOrderApi}
-            paypalCaptureOrderApi={paypalCaptureOrderApi}
-            paidBundleId={paidBundleId}
-            ticketQuantity={selectedTicketBundle?.qty ?? 1}
-            customerEmail={paidEmail}
-            customerFullName={paidFullName}
-            paidConsent={paidConsent}
-            onPayPalPaid={(info) => {
-              setPaymentSheetOpen(false)
-              markPaidCheckoutComplete(info)
-            }}
-            onPayPalError={(msg) => setPaidError(msg)}
-            onClearError={() => setPaidError('')}
-          />
         </div>
       </div>
+
+      <PaymentCheckoutSheet
+        open={showPaymentSheet}
+        onClose={handleClosePaymentSheet}
+        amountPence={selectedTicketBundle?.totalPence ?? 0}
+        bundleTitle={selectedTicketBundle?.title}
+        bundleLine={selectedTicketBundle?.line1}
+        preparing={paidStripePreparing}
+        paidError={paidError}
+        hasStripeElements={hasStripeElements}
+        stripePublishableKey={stripePublishableKey}
+        paidStripeClientSecret={paidStripeClientSecret}
+        paidStripePaymentIntentId={paidStripePaymentIntentId}
+        paidFormReadyForPayment={paidFormReadyForPayment}
+        recordPayload={{
+          customerEmail: paidEmail.trim(),
+          customerFullName: paidFullName.trim(),
+          bundleId: paidBundleId,
+        }}
+        onStripeSuccess={(info) => {
+          setPaymentSheetOpen(false)
+          markPaidCheckoutComplete(info)
+        }}
+        onStripeError={(msg) => setPaidError(msg)}
+        onRetryPayment={prepareStripePayment}
+        hasPayPal={hasPayPal}
+        payPalClientId={payPalClientId}
+        payPalCurrency={payPalCurrency}
+        paypalCreateOrderApi={paypalCreateOrderApi}
+        paypalCaptureOrderApi={paypalCaptureOrderApi}
+        paidBundleId={paidBundleId}
+        ticketQuantity={selectedTicketBundle?.qty ?? 1}
+        customerEmail={paidEmail}
+        customerFullName={paidFullName}
+        paidConsent={paidConsent}
+        onPayPalPaid={(info) => {
+          setPaymentSheetOpen(false)
+          markPaidCheckoutComplete(info)
+        }}
+        onPayPalError={(msg) => setPaidError(msg)}
+        onClearError={() => setPaidError('')}
+      />
     </ModalPortal>
   )
 }
