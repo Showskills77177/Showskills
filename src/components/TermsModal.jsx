@@ -4,14 +4,11 @@ import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNo
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 
-function PaidTicketNonRefundCallout({ qualifier }) {
+function PaidTicketNonRefundCallout() {
   return (
-    <div className="mb-3">
-      {qualifier ? <p className="mb-2 text-zinc-400">{qualifier}</p> : null}
-      <p className="rounded-lg border border-amber-900/40 bg-amber-950/30 px-3 py-2 text-zinc-200">
-        <strong>{TICKET_PURCHASE_NON_REFUND_NOTICE}</strong>
-      </p>
-    </div>
+    <p className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/30 px-3 py-2.5 text-zinc-200">
+      <strong>{TICKET_PURCHASE_NON_REFUND_NOTICE}</strong>
+    </p>
   )
 }
 
@@ -206,7 +203,6 @@ export function TermsModal({ open, onClose }) {
             Employees of the promoter, their immediate families, and anyone otherwise connected with administration may be
             excluded. We may require proof of age, identity, and residency before awarding any prize.
           </p>
-          <PaidTicketNonRefundCallout qualifier="If you purchase paid ticket bundles on this site:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">2. Paid competition — skill-based (not a lottery)</h3>
           <p className="mb-3">
@@ -217,7 +213,6 @@ export function TermsModal({ open, onClose }) {
             solutions. <strong>Incorrect or incomplete answers do not win</strong> and do not receive a prize. Multiple
             ticket purchases are allowed where shown on the entry page; each qualifying route is described there.
           </p>
-          <PaidTicketNonRefundCallout />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">3. Winner selection (paid)</h3>
           <p className="mb-3">
@@ -226,7 +221,6 @@ export function TermsModal({ open, onClose }) {
             incorrect, incomplete, or unsuccessful entries. We may verify answers and eligibility before confirming a
             winner.
           </p>
-          <PaidTicketNonRefundCallout />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Ronaldo Legacy Bundle)</h3>
           <p className="mb-3">
@@ -238,7 +232,6 @@ export function TermsModal({ open, onClose }) {
             requirement (you must submit correct answers to the three questions by the method we specify for postal
             entrants — e.g. included in your postal entry or as directed on the site).
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid online ticket bundles only (not free postal entry):" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">5. Free Ronaldo shirt giveaway (separate)</h3>
           <p className="mb-3">
@@ -251,7 +244,6 @@ export function TermsModal({ open, onClose }) {
             The qualification question is: <strong>{SHIRT_GIVEAWAY_QUESTION}</strong>. Correct eligible entries qualify
             for the giveaway draw. We may disqualify entries that cannot be verified or breach these rules.
           </p>
-          <PaidTicketNonRefundCallout qualifier="If you purchase Legacy Bundle tickets on this site (this giveaway entry itself is free):" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">6. Promotional rights and publicity</h3>
           <p className="mb-3">
@@ -259,14 +251,12 @@ export function TermsModal({ open, onClose }) {
             your entry (including name, voice, image, and likeness as in your submission) to run the promotions,
             announce results, and reasonable related marketing, unless you withdraw consent in writing where applicable.
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">7. Winner verification</h3>
           <p className="mb-3">
             Winners must cooperate with <strong>reasonable verification</strong> (including ID / proof of eligibility).
             Refusal may result in forfeiture.
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">8. Prizes</h3>
           <p className="mb-3">
@@ -274,7 +264,6 @@ export function TermsModal({ open, onClose }) {
             shirt (Manchester United era), signed football with COA, and premium case. Prizes are non-transferable unless
             we agree otherwise; no cash alternative is guaranteed; we may substitute items of similar value if needed.
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles for this draw:" />
 
           <h3 className="mb-2 mt-6 scroll-mt-4 font-semibold text-stone-200" id="ss-terms-ticket-payments">
             9. Payments (paid tickets)
@@ -303,28 +292,24 @@ export function TermsModal({ open, onClose }) {
             </a>
             .
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">11. Limitation of liability</h3>
           <p className="mb-3">
             To the maximum extent permitted by law, we exclude liability except where caused by our negligence or fraud.
             Nothing limits statutory consumer rights in the UK.
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">12. Disclaimer / third parties</h3>
           <p className="mb-3">
             Promotions are <strong>not affiliated with, endorsed by, or sponsored by</strong> Cristiano Ronaldo,
             Manchester United FC, Apple Inc., or other third parties referenced. Trademarks belong to their owners.
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">13. General</h3>
           <p className="mb-3">
             We may amend or cancel promotions if required. Our decisions on procedure are final where the law allows.
             Governing law: <strong>England and Wales</strong> (or mandatory UK consumer rules where applicable).
           </p>
-          <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">14. Contact</h3>
           <p className="mb-3">
