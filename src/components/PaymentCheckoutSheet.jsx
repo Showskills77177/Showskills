@@ -45,10 +45,9 @@ export function PaymentCheckoutSheet({
 
   useEffect(() => {
     if (!open) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    document.documentElement.classList.add('ss-payment-sheet-open')
     return () => {
-      document.body.style.overflow = prev
+      document.documentElement.classList.remove('ss-payment-sheet-open')
     }
   }, [open])
 
@@ -89,7 +88,7 @@ export function PaymentCheckoutSheet({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+      <div className="ss-payment-sheet-scroll min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
         {paidError ? <ErrorBanner message={paidError} /> : null}
 
         {preparing ? (

@@ -14,18 +14,18 @@ export const MEGA_BUNDLE_BASE_TICKET_QTY = Math.floor(
 export const MEGA_BUNDLE_BONUS_TICKETS = 1
 export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_BASE_TICKET_QTY + MEGA_BUNDLE_BONUS_TICKETS
 
-/** £0.01 — for payment/quiz testing (enable in UI via ?testbundle=1 or VITE_SHOW_TEST_BUNDLE). */
-export const TEST_TICKET_BUNDLE_ID = 'test1p'
+/** £0.30 — Stripe UK minimum for most cards; for payment/quiz testing (?testbundle=1). */
+export const TEST_TICKET_BUNDLE_ID = 'test30p'
 
 export const TICKET_BUNDLES = [
   {
     id: TEST_TICKET_BUNDLE_ID,
     qty: 1,
-    totalPence: 1,
+    totalPence: 30,
     title: 'Test ticket',
-    line1: '1 ticket = £0.01',
-    line2: 'Payment testing only — add ?testbundle=1 to the URL or set VITE_SHOW_TEST_BUNDLE=1',
-    bullets: ['Use for repeated checkout tests'],
+    line1: '1 ticket = £0.30',
+    line2: 'Payment testing only (Stripe minimum) — ?testbundle=1 on the URL',
+    bullets: ['Cheapest live test — use instead of £0.01'],
     featured: false,
     testOnly: true,
   },

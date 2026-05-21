@@ -1647,9 +1647,21 @@ body {
 
 .ss-payment-sheet {
   padding-bottom: env(safe-area-inset-bottom, 0);
-  isolation: isolate;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+}
+
+/* Safari/iOS: keep inputs and Stripe iframes typeable (no fixed-body + no GPU layer on ancestors). */
+html.ss-entry-modal-open,
+html.ss-payment-sheet-open {
+  overflow: hidden;
+}
+
+.ss-entry-modal-scroll input,
+.ss-entry-modal-scroll textarea,
+.ss-payment-sheet-scroll input,
+.ss-payment-sheet-scroll textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
 }
 
 .ss-bundle-select {
@@ -1675,13 +1687,11 @@ body {
 @supports (-webkit-touch-callout: none) {
   .ss-stripe-payment-element,
   .ss-entry-modal-stripe,
-  .ss-stripe-payment-shell {
+  .ss-stripe-payment-shell,
+  .ss-payment-sheet,
+  .ss-payment-sheet-scroll {
     transform: none;
     -webkit-transform: none;
     filter: none;
-  }
-
-  .ss-entry-modal-scroll {
-    transform: translateZ(0);
   }
 }

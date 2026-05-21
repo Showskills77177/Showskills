@@ -139,21 +139,13 @@ export function EntryModal() {
     if (!entryModalType) return
     const scrollY = window.scrollY
     const { style } = document.body
-    const prev = {
-      position: style.position,
-      top: style.top,
-      width: style.width,
-      overflow: style.overflow,
-    }
-    style.position = 'fixed'
-    style.top = `-${scrollY}px`
-    style.width = '100%'
+    const prevOverflow = style.overflow
+    // overflow only — position:fixed breaks keyboard input in Safari (modal + Stripe iframes).
     style.overflow = 'hidden'
+    document.documentElement.classList.add('ss-entry-modal-open')
     return () => {
-      style.position = prev.position
-      style.top = prev.top
-      style.width = prev.width
-      style.overflow = prev.overflow
+      style.overflow = prevOverflow
+      document.documentElement.classList.remove('ss-entry-modal-open')
       window.scrollTo(0, scrollY)
     }
   }, [entryModalType])
@@ -390,7 +382,7 @@ export function EntryModal() {
                 <div className="mt-4 flex flex-col gap-4">
                   {showTestBundle ? (
                     <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-xs text-amber-100/85">
-                      Test ticket (£0.01) is available in the bundle list for checkout testing.
+                      Test ticket (£0.30, Stripe minimum) is in the bundle list for checkout testing.
                     </p>
                   ) : null}
                   <TicketBundlePicker

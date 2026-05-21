@@ -5,6 +5,7 @@
 import { Flame, Layers, Rocket, Sparkles, Ticket, Trophy } from 'lucide-react'
 
 const BUNDLE_ICONS = {
+  test30p: Ticket,
   test1p: Ticket,
   single: Ticket,
   small5: Flame,
@@ -16,6 +17,7 @@ const BUNDLE_ICONS = {
 
 /** Tier colours — icons only, not CTA buttons */
 const BUNDLE_TONE = {
+  test30p: 'text-teal-400/80',
   test1p: 'text-teal-400/80',
   single: 'text-zinc-300',
   small5: 'text-amber-400',
