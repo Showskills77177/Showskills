@@ -62,12 +62,27 @@ export function buildStripeElementsOptions(clientSecret) {
 }
 
 /**
- * Payment Element — card, Apple Pay, Google Pay, PayPal (via Stripe), Link when enabled in Dashboard.
+ * Billing details collected on the entry form — must match Payment Element `fields: never`
+ * and confirmPayment billing_details (Stripe requires both when using `never`).
+ * @param {{ customerEmail?: string, customerFullName?: string }} recordPayload
+ */
+export function buildBillingDetailsFromEntry(recordPayload) {
+  const email = (recordPayload?.customerEmail || '').trim()
+  const name = (recordPayload?.customerFullName || '').trim()
+  return {
+    name,
+    email,
+    address: { country: 'GB' },
+  }
+}
+
+/**
+ * Only `name`, `email`, and `country` are hidden in the Element (collected above).
+ * Do not set `phone: 'never'` (or other fields) unless you also pass them in confirmPayment.
  * @param {{ customerEmail?: string, customerFullName?: string }} recordPayload
  */
 export function buildPaymentElementOptions(recordPayload) {
-  const email = (recordPayload?.customerEmail || '').trim()
-  const name = (recordPayload?.customerFullName || '').trim()
+  const billing = buildBillingDetailsFromEntry(recordPayload)
 
   return {
     layout: 'tabs',
@@ -78,41 +93,34 @@ export function buildPaymentElementOptions(recordPayload) {
     },
     defaultValues: {
       billingDetails: {
-        name: name || undefined,
-        email: email || undefined,
+        name: billing.name || undefined,
+        email: billing.email || undefined,
       },
     },
     fields: {
       billingDetails: {
         name: 'never',
         email: 'never',
-        phone: 'never',
-        address: 'never',
+        address: {
+          country: 'never',
+        },
       },
     },
     business: { name: 'ShowSkills Rewards' },
   }
 }
 
-/**
- * Confirm in-page (no return_url) — avoids full-page redirect to a blank modal backdrop.
- * PayPal uses the standalone PayPal button when configured alongside Stripe.
- */
+/** @param {{ customerEmail?: string, customerFullName?: string }} recordPayload */
 export function buildConfirmParams(recordPayload) {
-  const email = (recordPayload?.customerEmail || '').trim()
-  const name = (recordPayload?.customerFullName || '').trim()
-  if (!name) throw new Error('Enter your full name before paying.')
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  const billing = buildBillingDetailsFromEntry(recordPayload)
+  if (!billing.name) throw new Error('Enter your full name before paying.')
+  if (!billing.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billing.email)) {
     throw new Error('Enter a valid email before paying.')
   }
   return {
-    receipt_email: email,
+    receipt_email: billing.email,
     payment_method_data: {
-      billing_details: {
-        name,
-        email,
-        address: { country: 'GB' },
-      },
+      billing_details: billing,
     },
   }
 }
