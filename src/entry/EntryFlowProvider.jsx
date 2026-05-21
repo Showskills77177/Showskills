@@ -8,7 +8,7 @@ import {
   getVisibleTicketBundles,
 } from '../competitionData'
 import { apiUrl } from '../lib/api'
-import { isTestBundleVisible } from '../lib/showTestBundle'
+import { isTestBundleVisible, getInitialPaidBundleId } from '../lib/showTestBundle'
 import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
@@ -17,7 +17,7 @@ export function EntryFlowProvider({ children }) {
   const [termsOpen, setTermsOpen] = useState(false)
   const [entryModalType, setEntryModalType] = useState(null)
 
-  const [paidBundleId, setPaidBundleId] = useState(DEFAULT_TICKET_BUNDLE_ID)
+  const [paidBundleId, setPaidBundleId] = useState(() => getInitialPaidBundleId())
   /** 'tickets' = paid bundles; 'postal' = free postal (same draw), chosen inside Legacy modal */
   const [paidEntryRoute, setPaidEntryRoute] = useState('tickets')
   const [paidConsent, setPaidConsent] = useState(false)
@@ -143,13 +143,13 @@ export function EntryFlowProvider({ children }) {
     }
     if (type === 'paid') {
       setPaidError('')
-      setPaidBundleId(DEFAULT_TICKET_BUNDLE_ID)
+      setPaidBundleId(getInitialPaidBundleId(searchParams))
       setPaidEntryRoute('tickets')
       setPaidStripeClientSecret('')
       setPaidStripePaymentIntentId('')
       preloadStripe(stripePublishableKey)
     }
-  }, [stripePublishableKey])
+  }, [stripePublishableKey, searchParams])
 
   const closeStripePayment = useCallback(() => {
     setPaidStripeClientSecret('')

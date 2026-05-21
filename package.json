@@ -20,6 +20,8 @@
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
     "test:ui": "playwright test --ui",
     "test:install": "playwright install chromium",
+    "test:install:browsers": "playwright install chromium firefox webkit",
+    "test:payment:cross-browser": "playwright test tests/e2e/payment-cross-browser.spec.js",
     "test:purchase-email": "node scripts/test-purchase-email.mjs",
     "test:admin-email": "node scripts/test-admin-otp-email.mjs"
   },

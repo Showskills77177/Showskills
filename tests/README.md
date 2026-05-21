@@ -5,7 +5,7 @@ This suite exercises public flows, mocked payment recording, kick-up submissions
 ## Prerequisites
 
 - Node 18+
-- Chromium: `npm run test:install` (once per machine / CI image)
+- Browsers: `npm run test:install` (Chromium). Cross-browser payment tests: `npm run test:install:browsers`
 
 ## Run
 
@@ -14,6 +14,7 @@ npm run test              # all E2E specs
 npm run test:e2e          # same
 npm run test:admin        # admin specs only
 npm run test:payment      # mocked payment spec only
+npm run test:payment:cross-browser  # £0.30 flow on Chrome, Firefox, Safari, iOS, Android
 npm run test:ui           # Playwright UI mode
 ```
 
@@ -30,7 +31,8 @@ Optional overrides: copy **`.env.e2e.example`** → **`.env.e2e`** (see example 
 | Spec | Area |
 |------|------|
 | `user-flow.spec.js` | Home → Competitions → paid modal → simulated checkout → quiz → qualified message |
-| `payment-mocked.spec.js` | Mock API ticket row + UI quiz + `competition_entries` |
+| `payment-mocked.spec.js` | £0.30 test bundle mock checkout + quiz + `competition_entries` |
+| `payment-cross-browser.spec.js` | Same £0.30 flow on Firefox, WebKit, Mobile Chrome, Mobile Safari |
 | `kickup.spec.js` | HTTPS kick-up + multipart upload API |
 | `admin.spec.js` | Login, dashboard, users/entries, submissions; unauth redirect |
 | `db-integrity.spec.js` | SQLite invariants on `users` / `kickup_submissions` |

@@ -147,9 +147,9 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
     const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim() : ''
     const customerFullName =
       typeof body.customerFullName === 'string' ? body.customerFullName.trim() : 'E2E User'
-    const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'single'
+    const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'test30p'
     const quantity = Number(body.quantity) > 0 ? Number(body.quantity) : 1
-    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 75
+    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 30
     const stripeSessionId =
       typeof body.stripeSessionId === 'string' && body.stripeSessionId.trim()
         ? body.stripeSessionId.trim()
@@ -186,9 +186,9 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
     const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim() : ''
     const customerFullName =
       typeof body.customerFullName === 'string' ? body.customerFullName.trim() : 'E2E User'
-    const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'medium10'
-    const quantity = Number(body.quantity) > 0 ? Number(body.quantity) : 10
-    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 600
+    const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'test30p'
+    const quantity = Number(body.quantity) > 0 ? Number(body.quantity) : 1
+    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 30
     const paymentIntentId =
       typeof body.paymentIntentId === 'string' && body.paymentIntentId.trim()
         ? body.paymentIntentId.trim()

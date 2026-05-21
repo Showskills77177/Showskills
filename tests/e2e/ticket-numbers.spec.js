@@ -26,15 +26,15 @@ test.describe('Ticket numbers on confirmed checkout', () => {
 
   test('mock payment-intent path creates one number per bundle slot', async ({ request }) => {
     const email = `e2e-tkt-pi-${Date.now()}@example.test`
-    const qty = 5
+    const qty = 1
     const res = await request.post('/api/e2e/mock-stripe-payment-intent', {
       headers: { 'x-e2e-secret': e2eSecret, 'Content-Type': 'application/json' },
       data: {
         customerEmail: email,
         customerFullName: 'E2E PI User',
-        bundleId: 'small5',
+        bundleId: 'test30p',
         quantity: qty,
-        amountPence: 350,
+        amountPence: 30,
       },
     })
     expect(res.ok()).toBeTruthy()

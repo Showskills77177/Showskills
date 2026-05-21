@@ -33,7 +33,29 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'firefox-payment',
+      testMatch: /payment-cross-browser\.spec\.js/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit-payment',
+      testMatch: /payment-cross-browser\.spec\.js/,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'mobile-chrome-payment',
+      testMatch: /payment-cross-browser\.spec\.js/,
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'mobile-safari-payment',
+      testMatch: /payment-cross-browser\.spec\.js/,
+      use: { ...devices['iPhone 13'] },
+    },
+  ],
   webServer: {
     /** API on :3001 + Vite :5173 so tests do not clash with a normal dev:all on :3000/:5173. */
     command: 'npm run dev:e2e',
@@ -53,6 +75,8 @@ export default defineConfig({
       ADMIN_JWT_SECRET: jwtSecret,
       VITE_E2E_SIMULATE_CHECKOUT: '1',
       VITE_E2E_SECRET: e2eSecret,
+      VITE_SHOW_TEST_BUNDLE: '1',
+      VITE_DEFAULT_BUNDLE_ID: 'test30p',
       VITE_STRIPE_PUBLISHABLE_KEY: '',
       VITE_STRIPE_PAYMENT_LINK: '',
       VITE_PAYPAL_CLIENT_ID: '',

@@ -32,7 +32,7 @@ test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
     await qInputs.nth(1).fill(CORRECT.q2)
     await qInputs.nth(2).fill(CORRECT.q3)
     await page.getByRole('button', { name: 'Submit answers' }).click()
-    await expect(page.getByText(/All correct — you qualify/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/All three answers were correct/i)).toBeVisible({ timeout: 15_000 })
 
     await assertClean()
   })

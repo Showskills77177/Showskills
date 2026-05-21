@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { openLegacyBundleEntry, openShirtGiveawayEntry } from '../support/entry.mjs'
+import { openShirtGiveawayEntry } from '../support/entry.mjs'
+import { completeTest30pMockCheckout } from '../support/paymentFlow.mjs'
 
 test.describe('Edge cases & errors', () => {
   test('shirt giveaway rejects incorrect qualification answer', async ({ page }) => {
@@ -13,19 +14,15 @@ test.describe('Edge cases & errors', () => {
   })
 
   test('paid quiz shows not qualified for wrong answers', async ({ page }) => {
-    await openLegacyBundleEntry(page)
-    await page.locator('#modal-paid-fullname').fill('Wrong Answers')
-    await page.locator('#modal-paid-email').fill(`wrong-${Date.now()}@example.test`)
-    await page.getByRole('checkbox', { name: /I agree to the/i }).check()
-    await page.getByRole('button', { name: /E2E simulated checkout/i }).click()
-    await expect(page.getByText(/Payment received/i)).toBeVisible({ timeout: 20_000 })
+    const email = `wrong-${Date.now()}@example.test`
+    await completeTest30pMockCheckout(page, { name: 'Wrong Answers', email })
 
     const qInputs = page.locator('input[placeholder="Type your answer"]')
     await qInputs.nth(0).fill('wrong')
     await qInputs.nth(1).fill('wrong')
     await qInputs.nth(2).fill('wrong')
     await page.getByRole('button', { name: 'Submit answers' }).click()
-    await expect(page.getByText(/One or more answers incorrect/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/do not qualify for the prize/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('unknown path falls back to home route', async ({ page }) => {
