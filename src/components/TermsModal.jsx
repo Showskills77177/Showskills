@@ -15,6 +15,142 @@ function PaidTicketNonRefundCallout({ qualifier }) {
   )
 }
 
+function PrivacyPolicySection() {
+  const mail = SHOWSKILLS_CONTACT_EMAIL
+  return (
+    <>
+      <div
+        className="my-8 border-t border-emerald-900/40 pt-8"
+        id="privacy-policy-heading"
+        aria-labelledby="privacy-policy-title"
+      >
+        <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
+          Privacy Policy
+        </h2>
+        <p className="mt-2 text-xs text-zinc-500">Last updated: 21 May 2026</p>
+        <p className="mt-4 text-zinc-300">
+          At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
+          data. This Privacy Policy explains how we collect, use, and protect your information when you use our
+          website. It supplements the competition rules above and applies to all promotions on this site.
+        </p>
+      </div>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.1 Information we collect</h3>
+      <p className="mb-2">We only collect the minimum information necessary to run our competitions:</p>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>Name and email address (when you enter a competition or buy tickets)</li>
+        <li>
+          Payment information (processed securely by <strong>Stripe</strong> and/or <strong>PayPal</strong> — we do not
+          store your full card details)
+        </li>
+        <li>Answers to skill-based questions (paid entries after purchase and free postal or giveaway routes)</li>
+        <li>Postal address (only if you submit a free postal entry)</li>
+        <li>IP address and basic technical data (for security and anonymous analytics)</li>
+      </ul>
+      <p className="mb-2">We do not collect:</p>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>Passwords or account logins (entries do not require a user account)</li>
+        <li>Government ID numbers through the website (we may ask winners to verify identity separately)</li>
+        <li>Date of birth on the entry form (eligibility is based on you confirming you meet the age requirement)</li>
+        <li>Any special category / sensitive personal data</li>
+      </ul>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.2 How we use your information</h3>
+      <p className="mb-2">We use your personal data only for:</p>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>Administering competitions and contacting winners</li>
+        <li>Processing ticket payments and sending purchase or entry confirmations</li>
+        <li>Verifying skill answers and qualifying entries</li>
+        <li>Responding to enquiries via our contact form or email</li>
+        <li>Improving our website (anonymous analytics, e.g. Vercel Analytics)</li>
+      </ul>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.3 Legal basis for processing</h3>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>
+          <strong>Contract</strong> — to fulfil your competition entry and payments
+        </li>
+        <li>
+          <strong>Legitimate interests</strong> — to run, secure, and improve our service
+        </li>
+        <li>
+          <strong>Legal obligation</strong> — where required by law (e.g. prize winner verification or tax records)
+        </li>
+      </ul>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.4 Sharing your information</h3>
+      <p className="mb-2">We share your data only with:</p>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>
+          <strong>Stripe</strong> and/or <strong>PayPal</strong> — secure payment processing
+        </li>
+        <li>
+          <strong>Email providers</strong> (e.g. Resend) — competition-related emails such as confirmations and results
+        </li>
+        <li>
+          <strong>Legal authorities</strong> — if required by law
+        </li>
+      </ul>
+      <p className="mb-3">
+        We <strong>do not sell</strong> your personal data to third parties for their marketing.
+      </p>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.5 How long we keep your data</h3>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>
+          <strong>Competition entries:</strong> up to <strong>90 days</strong> after the relevant competition ends,
+          unless a longer period is needed to resolve disputes or meet legal duties
+        </li>
+        <li>
+          <strong>Winner data:</strong> basic details may be kept longer for legal, tax, and record-keeping purposes
+        </li>
+        <li>
+          <strong>Payment data:</strong> handled by Stripe and PayPal under their own retention policies
+        </li>
+      </ul>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.6 Your rights</h3>
+      <p className="mb-2">Under UK data protection law, you have the right to:</p>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>Access the personal data we hold about you</li>
+        <li>Request correction or deletion of your data</li>
+        <li>Object to or restrict certain processing</li>
+        <li>Withdraw consent where processing is based on consent</li>
+        <li>Lodge a complaint with the ICO (Information Commissioner&apos;s Office)</li>
+      </ul>
+      <p className="mb-3">
+        To exercise any of these rights, email{' '}
+        <a
+          href={`mailto:${mail}`}
+          className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+        >
+          {mail}
+        </a>{' '}
+        or use the <strong>contact form</strong> on this website.
+      </p>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.7 Cookies</h3>
+      <p className="mb-3">
+        We use <strong>essential</strong> cookies and similar technologies so the site works (e.g. admin sessions where
+        applicable, and payment checkout). We use <strong>anonymous analytics</strong> to understand how the site is
+        used. We do <strong>not</strong> use advertising or cross-site tracking cookies.
+      </p>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.8 International transfers</h3>
+      <p className="mb-3">
+        Some service providers (e.g. payment or email) may process data outside the UK. Where this happens, we rely on
+        appropriate safeguards such as UK adequacy regulations or contractual protections offered by those providers.
+      </p>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.9 Changes to this policy</h3>
+      <p className="mb-3">
+        We may update this Privacy Policy from time to time. The &quot;Last updated&quot; date above will change when we
+        do. Significant changes may also be noted on the website where appropriate.
+      </p>
+    </>
+  )
+}
+
 export function TermsModal({ open, onClose }) {
   // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + Stripe).
 
@@ -154,19 +290,18 @@ export function TermsModal({ open, onClose }) {
             your <strong>mandatory statutory rights</strong> under UK law where they apply.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200" id="privacy-policy-heading">
-            10. Privacy policy & data retention
-          </h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">10. Personal data</h3>
           <p className="mb-3">
-            We collect <strong>name and email</strong> (and other details you provide, such as address for postal
-            entries) <strong>for competition administration only</strong>. We <strong>do not sell</strong> your data and{' '}
-            <strong>do not share it with third parties</strong> for their marketing. Data is used to run the competition,
-            verify entries, contact winners, and meet legal obligations.
-          </p>
-          <p className="mb-3">
-            Personal data is <strong>deleted within 30 days after the competition closes</strong> (or as soon as
-            practicable afterwards), except where we must retain certain records to meet legal or accounting
-            requirements.
+            We process personal data to run these promotions. The rules above (eligibility, entries, payments, and
+            winners) describe <strong>what</strong> we need from you to enter. <strong>How</strong> we collect, use,
+            share, retain, and protect that data — and your privacy rights — are set out in the{' '}
+            <a
+              href="#privacy-policy-heading"
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              Privacy Policy below
+            </a>
+            .
           </p>
           <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
@@ -203,6 +338,8 @@ export function TermsModal({ open, onClose }) {
             </a>
             . We aim to respond within a reasonable time.
           </p>
+
+          <PrivacyPolicySection />
 
           <p className="mt-6 text-xs text-zinc-500">
             Promoter: ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY. Contact:{' '}
