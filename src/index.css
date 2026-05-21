@@ -1863,3 +1863,9 @@ body {
     filter: none;
   }
 }
+
+/* Footer Trustpilot — slightly smaller, no extra frame */
+.ss-footer-trustpilot-compact .trustpilot-widget {
+  transform: scale(0.95);
+  transform-origin: center top;
+}

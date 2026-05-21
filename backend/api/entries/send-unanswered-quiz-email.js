@@ -75,9 +75,9 @@ export default async function handler(req, res) {
     })
 
     return json(res, 200, {
-      ok: Boolean(result?.ok),
-      emailSent: Boolean(result?.ok && result?.emailSent),
-      skipped: Boolean(result?.skipped),
+      ok: true,
+      emailSent: Boolean(result?.emailSent),
+      skipped: Boolean(result?.skipped || !result?.emailSent),
       reason: result?.reason || result?.error || null,
     })
   } catch (e) {

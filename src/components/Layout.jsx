@@ -5,6 +5,7 @@ import { StripeReturnOverlay } from './StripeReturnOverlay'
 import { TermsModal } from './TermsModal'
 import { MobileNavDock } from './MobileNavDock'
 import { QuizPromptNav } from './QuizPromptNav'
+import { TrustpilotReviewCollector } from './TrustpilotFeedback'
 import { useEntryFlow } from '../entry/entryContext'
 
 function desktopNavClass({ isActive }) {
@@ -128,6 +129,12 @@ export function Layout() {
               >
                 Competitions
               </Link>
+              <Link
+                to="/contact"
+                className="text-sm font-medium text-stone-400 underline decoration-stone-600 underline-offset-4 hover:text-stone-200"
+              >
+                Contact
+              </Link>
               <button
                 type="button"
                 onClick={() => openTerms()}
@@ -153,6 +160,12 @@ export function Layout() {
             Paid draw: skill answers then random winner from correct entries. Free postal entry is in the same Legacy
             Bundle panel as paid tickets. UK-focused.
           </p>
+          <div className="mx-auto mt-6 w-full max-w-[12.75rem]">
+            <p className="mb-2 text-center text-[11px] font-medium text-stone-500">
+              Leave feedback on Trustpilot
+            </p>
+            <TrustpilotReviewCollector centered compact />
+          </div>
           <p className="mt-8 border-t border-white/[0.06] pt-8 text-center text-xs leading-relaxed text-stone-600">
             Paid promotion is skill-based (not a lottery); winner chosen at random from entrants who answered all
             questions correctly. Not affiliated with any athlete, club, or brand shown in illustrative prize imagery.

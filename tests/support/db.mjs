@@ -26,7 +26,7 @@ export function latestCompetitionEntryByEmail(db, email) {
     .get(email)
 }
 
-export { paidTicketNumbersForEmail } from './tickets.mjs'
+export { paidTicketNumbersForEmail, paidTicketMetaForEmail } from './tickets.mjs'
 
 export function latestKickupByEmail(db, email) {
   return db

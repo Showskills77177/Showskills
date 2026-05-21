@@ -25,6 +25,7 @@ import recordStripePayment from '../backend/api/record-stripe-payment.js'
 import createPayPalOrder from '../backend/api/create-paypal-order.js'
 import capturePayPalOrder from '../backend/api/capture-paypal-order.js'
 import stripeWebhook from '../backend/api/stripe-webhook.js'
+import contact from '../backend/api/contact.js'
 
 export const routes = {
   '/api/admin/login': adminLogin,
@@ -54,6 +55,7 @@ export const routes = {
   '/api/create-paypal-order': createPayPalOrder,
   '/api/capture-paypal-order': capturePayPalOrder,
   '/api/stripe-webhook': stripeWebhook,
+  '/api/contact': contact,
 }
 
 export function pathFromSlugParam(prefix, slug) {

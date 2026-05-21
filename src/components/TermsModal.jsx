@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { COMPETITION_NAME_POSTAL } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 
 function PaidTicketNonRefundCallout({ qualifier }) {
   return (
@@ -190,8 +191,25 @@ export function TermsModal({ open, onClose }) {
           </p>
           <PaidTicketNonRefundCallout qualifier="Paid ticket bundles:" />
 
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">14. Contact</h3>
+          <p className="mb-3">
+            For general enquiries, complaints, cooperation requests, or feedback, use the{' '}
+            <strong>contact form on this website</strong> or email{' '}
+            <a
+              href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`}
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              {SHOWSKILLS_CONTACT_EMAIL}
+            </a>
+            . We aim to respond within a reasonable time.
+          </p>
+
           <p className="mt-6 text-xs text-zinc-500">
-            Promoter: ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY.
+            Promoter: ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY. Contact:{' '}
+            <a href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`} className="text-zinc-400 underline hover:text-zinc-300">
+              {SHOWSKILLS_CONTACT_EMAIL}
+            </a>
+            .
           </p>
         </div>
         <div className="border-t border-white/10 px-6 py-4">

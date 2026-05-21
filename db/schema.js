@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS tickets (
   stripe_payment_intent_id TEXT UNIQUE,
   paypal_order_id TEXT UNIQUE,
   purchased_at TEXT,
+  confirmation_email_sent_at TEXT,
+  pending_quiz_reminder_sent_at TEXT,
+  quiz_resume_token TEXT UNIQUE,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_user ON tickets (user_id);

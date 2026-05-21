@@ -14,6 +14,8 @@ import AdminTicketsPage from './pages/admin/TicketsPage'
 import AdminPaymentsPage from './pages/admin/PaymentsPage'
 import AdminSubmissionsPage from './pages/admin/SubmissionsPage'
 import AdminTestEmailPage from './pages/admin/TestEmailPage'
+import ContactPage from './pages/ContactPage'
+import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -26,6 +28,22 @@ export default function App() {
       <BrowserRouter basename={routerBasename}>
       <EntryFlowProvider>
         <Routes>
+          {import.meta.env.DEV ? (
+            <Route
+              path="/dev/email-preview"
+              element={
+                <div className="min-h-svh bg-[#071512] px-4 py-8 text-stone-300 sm:px-8">
+                  <div className="mx-auto max-w-6xl">
+                    <p className="mb-6 text-sm text-amber-200/90">
+                      Local dev only — same previews as{' '}
+                      <span className="font-mono text-stone-400">/admin/test-email</span> (no login).
+                    </p>
+                    <PurchaseEmailPreview />
+                  </div>
+                </div>
+              }
+            />
+          ) : null}
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin" element={<RequireAdmin />}>
             <Route element={<AdminLayout />}>
@@ -42,6 +60,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
+            <Route path="contact" element={<ContactPage />} />
             <Route path="archive/ronaldo-shirt-giveaway" element={<KickupsArchivePage />} />
             <Route path="archive/35-kickups" element={<Navigate to="/archive/ronaldo-shirt-giveaway" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

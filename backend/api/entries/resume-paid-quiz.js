@@ -21,6 +21,7 @@ function formatResumeResponse(info) {
     bundleId: info.bundleId,
     bundleTitle: bundle?.title ?? info.bundleId,
     resumeToken: info.resumeToken || null,
+    ticketId: info.ticketId || null,
   }
 }
 

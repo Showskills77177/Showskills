@@ -206,7 +206,13 @@ export async function maybeSendUnansweredQuizTicketEmail({
     completeQuizUrl,
   })
 
-  if (!sent?.ok) return sent
+  if (!sent?.ok) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: sent?.reason || sent?.error || 'send_failed',
+    }
+  }
 
   await markUnansweredTicketEmailSent(ticketId)
   return { ok: true, emailSent: true, id: sent.id }
