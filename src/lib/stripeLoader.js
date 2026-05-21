@@ -1,4 +1,11 @@
+/**
+ * Stripe.js v3 via @stripe/stripe-js (see package.json for pinned versions).
+ * Hosted Checkout does not need this; Payment Element does.
+ */
 import { loadStripe } from '@stripe/stripe-js'
+
+export const STRIPE_JS_PACKAGE_VERSION = '9.6.0'
+export const STRIPE_REACT_PACKAGE_VERSION = '6.4.0'
 
 let cachedKey = ''
 /** @type {ReturnType<typeof loadStripe> | null} */

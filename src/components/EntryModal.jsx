@@ -58,6 +58,9 @@ export function EntryModal() {
     handlePaidQuizSubmit,
     markPaidCheckoutComplete,
     hasStripeCheckout,
+    hasStripeHostedCheckout,
+    useStripePaymentElement,
+    startHostedCheckout,
     hasStripeElements,
     stripePublishableKey,
     paidStripeClientSecret,
@@ -90,6 +93,7 @@ export function EntryModal() {
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
 
   const showPaymentSheet =
+    useStripePaymentElement &&
     paymentSheetOpen &&
     entryModalType === 'paid' &&
     !paidPostCheckout &&
@@ -107,13 +111,20 @@ export function EntryModal() {
       return
     }
     setPaidError('')
-    if (hasStripeElements && stripePublishableKey) preloadStripe(stripePublishableKey)
-    // Open payment popup first — do not wait on prepare (state updates async; a stale
-    // paidStripeClientSecret check was blocking the first click).
-    setPaymentSheetOpen(true)
-    if (hasStripeElements && !paidStripeClientSecret) {
-      await prepareStripePayment()
+
+    if (hasStripeHostedCheckout) {
+      await startHostedCheckout()
+      return
     }
+
+    if (hasStripeElements && stripePublishableKey) {
+      preloadStripe(stripePublishableKey)
+      setPaymentSheetOpen(true)
+      if (!paidStripeClientSecret) await prepareStripePayment()
+      return
+    }
+
+    setPaidError('Card payment is not configured. Use PayPal below or contact support.')
   }
 
   const paidAnswerValidation =
@@ -477,24 +488,37 @@ export function EntryModal() {
                       {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
                     </button>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && (hasStripeElements || hasPayPal || E2E_SIMULATE_CHECKOUT) ? (
+                  {paidEntryRoute === 'tickets' && (hasStripeCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) ? (
                     <button
                       type="button"
                       onClick={handlePayNow}
-                      disabled={paidStripePreparing || !paidFormReadyForPayment}
+                      disabled={paidLoading || paidStripePreparing || !paidFormReadyForPayment}
                       className="min-h-[52px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-lg font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {paidStripePreparing ? 'Loading…' : 'Pay now'}
+                      {paidLoading || paidStripePreparing
+                        ? 'Redirecting to secure checkout…'
+                        : 'Pay now'}
                     </button>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && (hasStripeElements || hasPayPal) && !showPaymentSheet ? (
+                  {paidEntryRoute === 'tickets' && hasStripeHostedCheckout && !showPaymentSheet ? (
                     <p className="text-center text-xs text-stone-500">
-                      Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — choose card, Apple Pay, or
-                      PayPal on the next screen.
+                      Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — you&apos;ll pay on
+                      Stripe&apos;s secure page (card &amp; Apple Pay), then return here for the quiz.
                     </p>
                   ) : null}
-                  {paidEntryRoute === 'tickets' && hasPayPal && !hasStripeElements ? (
+                  {paidEntryRoute === 'tickets' && hasStripeElements && hasPayPal && !showPaymentSheet ? (
+                    <p className="text-center text-xs text-stone-500">
+                      Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card, Apple Pay, or PayPal
+                      on the next screen.
+                    </p>
+                  ) : null}
+                  {paidEntryRoute === 'tickets' && hasPayPal && !showPaymentSheet ? (
                     <div className="mt-3">
+                      {hasStripeHostedCheckout || hasStripeElements ? (
+                        <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                          or pay with PayPal
+                        </p>
+                      ) : null}
                       <PayPalPayButton
                         clientId={payPalClientId}
                         currency={payPalCurrency}
@@ -624,8 +648,9 @@ export function EntryModal() {
         </div>
       </div>
 
-      <PaymentCheckoutSheet
-        open={showPaymentSheet}
+          {useStripePaymentElement ? (
+          <PaymentCheckoutSheet
+            open={showPaymentSheet}
         onClose={handleClosePaymentSheet}
         amountPence={selectedTicketBundle?.totalPence ?? 0}
         bundleTitle={selectedTicketBundle?.title}
@@ -665,6 +690,7 @@ export function EntryModal() {
         onPayPalError={(msg) => setPaidError(msg)}
         onClearError={() => setPaidError('')}
       />
+          ) : null}
     </ModalPortal>
   )
 }

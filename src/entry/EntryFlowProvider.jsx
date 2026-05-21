@@ -53,12 +53,22 @@ export function EntryFlowProvider({ children }) {
 
   const stripePublishableKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '').trim()
   const stripePaymentIntentApiOverride = (import.meta.env.VITE_STRIPE_PAYMENT_INTENT_API_URL ?? '').trim()
+  const stripeCheckoutApiOverride = (import.meta.env.VITE_STRIPE_CHECKOUT_API_URL ?? '').trim()
   const stripePaymentLink = (import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? '').trim()
   const baseUrl = import.meta.env.BASE_URL.replace(/\/?$/, '')
   const defaultPaymentIntentApi = stripePublishableKey ? `${baseUrl}/api/create-payment-intent` : ''
+  const defaultCheckoutApi = stripePublishableKey ? `${baseUrl}/api/create-checkout-session` : ''
   const stripePaymentIntentApi = stripePaymentIntentApiOverride || defaultPaymentIntentApi
-  const hasStripeElements = Boolean(stripePaymentIntentApi && stripePublishableKey)
-  const hasStripeCheckout = hasStripeElements || Boolean(stripePaymentLink)
+  const stripeCheckoutApi = stripeCheckoutApiOverride || defaultCheckoutApi
+  /** In-modal PE is opt-in only — hosted Checkout is default (avoids iframe typing bugs). */
+  const useStripePaymentElement =
+    import.meta.env.VITE_STRIPE_USE_PAYMENT_ELEMENT === '1' ||
+    import.meta.env.VITE_STRIPE_USE_PAYMENT_ELEMENT === 'true'
+  const hasStripeElements =
+    useStripePaymentElement && Boolean(stripePaymentIntentApi && stripePublishableKey)
+  const hasStripeHostedCheckout =
+    !useStripePaymentElement && Boolean(stripeCheckoutApi && stripePublishableKey)
+  const hasStripeCheckout = hasStripeHostedCheckout || hasStripeElements || Boolean(stripePaymentLink)
 
   const [paidStripeClientSecret, setPaidStripeClientSecret] = useState('')
   const [paidStripePaymentIntentId, setPaidStripePaymentIntentId] = useState('')
@@ -101,8 +111,8 @@ export function EntryFlowProvider({ children }) {
   const paidTicketQty = selectedTicketBundle.qty
 
   useEffect(() => {
-    if (stripePublishableKey) preloadStripe(stripePublishableKey)
-  }, [stripePublishableKey])
+    if (hasStripeElements && stripePublishableKey) preloadStripe(stripePublishableKey)
+  }, [hasStripeElements, stripePublishableKey])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -164,6 +174,13 @@ export function EntryFlowProvider({ children }) {
           setPaidError(err instanceof Error ? err.message : 'Could not confirm payment')
           setPaidPostCheckout(false)
         })
+      return
+    }
+
+    if (params.get('checkout') === 'cancelled') {
+      setPaidError('Payment was cancelled. You can try again when ready.')
+      setEntryModalType('paid')
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
       return
     }
 
@@ -313,6 +330,57 @@ export function EntryFlowProvider({ children }) {
     paidEmail,
     paidFullName,
     fetchPaymentIntent,
+  ])
+
+  const startHostedCheckout = useCallback(async () => {
+    setPaidError('')
+    if (!paidFormReadyForPayment) {
+      setPaidError('Enter your full name, email, and agree to the terms before paying.')
+      return
+    }
+    const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
+    if (!bundle) {
+      setPaidError('Choose a ticket bundle.')
+      return
+    }
+
+    const origin = window.location.origin
+    const pathname = window.location.pathname || `${baseUrl}/competitions`
+    const successUrl = `${origin}${pathname}?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+    const cancelUrl = `${origin}${pathname}?checkout=cancelled`
+
+    setPaidLoading(true)
+    try {
+      const res = await fetch(apiUrl(stripeCheckoutApi), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          bundleId: bundle.id,
+          customerEmail: paidEmail.trim(),
+          customerFullName: paidFullName.trim(),
+          successUrl,
+          cancelUrl,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Could not start checkout')
+      }
+      const url = typeof data.url === 'string' ? data.url : ''
+      if (!url) throw new Error('Stripe did not return a checkout URL')
+      window.location.assign(url)
+    } catch (e) {
+      setPaidError(e instanceof Error ? e.message : 'Could not start checkout')
+      setPaidLoading(false)
+    }
+  }, [
+    paidFormReadyForPayment,
+    paidBundleId,
+    paidEmail,
+    paidFullName,
+    stripeCheckoutApi,
+    baseUrl,
   ])
 
   const prepareStripePayment = useCallback(async () => {
@@ -568,6 +636,9 @@ export function EntryFlowProvider({ children }) {
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
       hasStripeCheckout,
+      hasStripeHostedCheckout,
+      useStripePaymentElement,
+      startHostedCheckout,
       hasStripeElements,
       stripePublishableKey,
       paidStripeClientSecret,
@@ -628,6 +699,9 @@ export function EntryFlowProvider({ children }) {
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
       hasStripeCheckout,
+      hasStripeHostedCheckout,
+      useStripePaymentElement,
+      startHostedCheckout,
       hasStripeElements,
       stripePublishableKey,
       paidStripeClientSecret,
