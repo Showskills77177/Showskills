@@ -5,7 +5,7 @@ import { PayPalPayButton } from './PayPalPayButton'
 import { StripePaymentForm } from './StripePaymentForm'
 
 /**
- * Payment popup over the entry modal (not full browser window).
+ * Large payment popup over the entry modal (not full browser window).
  */
 export function PaymentCheckoutSheet({
   open,
@@ -50,24 +50,28 @@ export function PaymentCheckoutSheet({
 
   return (
     <div
-      className="ss-payment-popup absolute inset-0 z-20 flex items-center justify-center p-3 sm:p-4"
+      className="ss-payment-popup absolute inset-0 z-20 flex items-center justify-center p-1.5 sm:p-2"
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-sheet-title"
     >
-      <button
-        type="button"
-        className="absolute inset-0 rounded-2xl bg-black/75"
-        aria-label="Back to entry form"
+      <div
+        className="absolute inset-0 rounded-2xl bg-black/70"
+        role="presentation"
         onClick={onClose}
+        onKeyDown={() => {}}
       />
-      <div className="ss-payment-popup-panel relative z-10 flex max-h-[min(92%,540px)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-teal-500/30 bg-stone-950 shadow-2xl shadow-black/50">
+      <div
+        className="ss-payment-popup-panel relative z-10 flex h-[min(88%,680px)] min-h-[min(72vh,520px)] w-full max-w-none flex-col overflow-hidden rounded-xl border border-teal-500/35 bg-stone-950 shadow-2xl shadow-black/60 sm:min-h-[min(68vh,560px)]"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="h-1 w-full shrink-0 bg-gradient-to-r from-teal-500/80 via-emerald-500/60 to-transparent" aria-hidden />
-        <header className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2.5 sm:px-4">
+        <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg border border-white/10 text-stone-300 hover:bg-white/5"
+            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 text-stone-300 hover:bg-white/5"
             aria-label="Back"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -75,24 +79,24 @@ export function PaymentCheckoutSheet({
             </svg>
           </button>
           <div className="min-w-0 flex-1">
-            <h2 id="payment-sheet-title" className="text-sm font-semibold text-stone-100 sm:text-base">
+            <h2 id="payment-sheet-title" className="text-base font-semibold text-stone-100 sm:text-lg">
               How would you like to pay?
             </h2>
-            <p className="truncate text-xs text-teal-200/90 sm:text-sm">
+            <p className="truncate text-sm text-teal-200/90">
               {bundleTitle ? `${bundleTitle} · ` : ''}
               <span className="font-display tabular-nums text-white">{amountLabel}</span>
             </p>
-            {bundleLine ? <p className="truncate text-[11px] text-stone-500">{bundleLine}</p> : null}
+            {bundleLine ? <p className="truncate text-xs text-stone-500">{bundleLine}</p> : null}
           </div>
         </header>
 
-        <div className="ss-payment-popup-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4">
+        <div className="ss-payment-popup-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
           {paidError ? <ErrorBanner message={paidError} /> : null}
 
           {preparing ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
               <div
-                className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-400"
+                className="h-9 w-9 animate-spin rounded-full border-2 border-teal-500/30 border-t-teal-400"
                 aria-hidden
               />
               <p className="text-sm text-stone-400">Setting up payment…</p>
@@ -100,16 +104,16 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {showStripeEmpty ? (
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <p className="text-sm text-stone-400">
-                Card payment could not load. In Brave/Safari, allow cookies for this site and disable shields for
-                showskills.co.uk, then try again.
+            <div className="flex flex-col items-center gap-4 py-10 text-center">
+              <p className="max-w-md text-sm text-stone-400">
+                Card payment could not load. In Brave or Safari, turn off shields for this site and allow cookies, then
+                try again.
               </p>
               {onRetryPayment ? (
                 <button
                   type="button"
                   onClick={() => onRetryPayment()}
-                  className="rounded-xl border border-teal-500/40 bg-teal-950/50 px-4 py-2 text-sm font-semibold text-teal-100 hover:bg-teal-900/40"
+                  className="rounded-xl border border-teal-500/40 bg-teal-950/50 px-5 py-2.5 text-sm font-semibold text-teal-100 hover:bg-teal-900/40"
                 >
                   Try again
                 </button>
@@ -132,9 +136,9 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {hasPayPal ? (
-            <div className={stripeReady ? 'mt-4' : ''}>
+            <div className={stripeReady ? 'mt-5' : ''}>
               {stripeReady ? (
-                <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                   or
                 </p>
               ) : null}
@@ -159,7 +163,7 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {!preparing && !stripeReady && !hasPayPal && !showStripeEmpty ? (
-            <p className="py-8 text-center text-sm text-stone-500">No payment methods are configured.</p>
+            <p className="py-10 text-center text-sm text-stone-500">No payment methods are configured.</p>
           ) : null}
         </div>
       </div>

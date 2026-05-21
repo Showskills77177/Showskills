@@ -160,13 +160,6 @@ export function EntryModal() {
     setPaymentSheetOpen(false)
   }, [paidBundleId, paidEntryRoute])
 
-  useEffect(() => {
-    if (entryModalType === 'paid' && paidPostCheckout) {
-      requestAnimationFrame(() => {
-        panelRef.current?.querySelector('input')?.focus()
-      })
-    }
-  }, [entryModalType, paidPostCheckout])
 
   if (!entryModalType) return null
 
@@ -177,22 +170,24 @@ export function EntryModal() {
 
   return (
     <div
-      className="ss-entry-modal-root fixed inset-0 z-[60] flex items-end justify-center overscroll-contain p-4 sm:items-center sm:p-6"
+      className="ss-entry-modal-root fixed inset-0 z-[60] flex items-end justify-center p-4 sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="entry-modal-title"
     >
-      <button
-        type="button"
+      <div
         className="absolute inset-0 z-0 bg-black/80"
-        aria-label="Close entry"
+        role="presentation"
         onClick={() => (showPaymentSheet ? handleClosePaymentSheet() : closeEntry())}
+        onKeyDown={() => {}}
       />
       <div
         ref={panelRef}
-        className={`relative z-10 flex max-h-[min(92vh,920px)] w-full flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        className={`ss-entry-modal-panel relative z-10 flex max-h-[min(92vh,920px)] w-full flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl ${
           entryModalType === 'paid'
-            ? 'ss-entry-modal-panel ss-entry-modal-panel--paid max-w-lg overflow-hidden sm:max-w-xl'
+            ? `ss-entry-modal-panel--paid overflow-hidden ${showPaymentSheet ? 'max-w-2xl sm:max-w-3xl' : 'max-w-lg sm:max-w-xl'}`
             : 'max-w-lg overflow-hidden'
         }`}
       >
@@ -221,7 +216,7 @@ export function EntryModal() {
         </div>
 
         <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          <div className="ss-entry-modal-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">

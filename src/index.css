@@ -1617,6 +1617,11 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+.ss-entry-modal-panel--paid .ss-entry-modal-scroll,
+.ss-payment-popup-scroll {
+  overscroll-behavior: contain;
+}
+
 @media (min-width: 1024px) {
   .ss-entry-modal-panel--paid .ss-entry-modal-body {
     min-height: min(70vh, 640px);
@@ -1645,20 +1650,39 @@ body {
   touch-action: manipulation;
 }
 
-/* Entry + payment popups — typeable inputs (Safari, Brave, iOS). */
+/* Entry + payment modals — ensure inputs receive clicks/keyboard (Safari, Brave). */
+.ss-entry-modal-root {
+  pointer-events: auto;
+}
+
+.ss-entry-modal-panel,
+.ss-payment-popup,
+.ss-payment-popup-panel {
+  pointer-events: auto;
+}
+
 .ss-entry-field,
-.ss-entry-modal-scroll input,
-.ss-entry-modal-scroll textarea,
-.ss-payment-popup-scroll input,
-.ss-payment-popup-scroll textarea {
+.ss-entry-modal-panel input:not([type='checkbox']):not([type='radio']),
+.ss-entry-modal-panel textarea,
+.ss-entry-modal-panel select,
+.ss-payment-popup-panel input:not([type='checkbox']):not([type='radio']),
+.ss-payment-popup-panel textarea,
+.ss-payment-popup-panel select {
   -webkit-user-select: text !important;
   user-select: text !important;
   touch-action: manipulation;
   pointer-events: auto !important;
+  cursor: text;
 }
 
 .ss-payment-popup-panel {
   padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+@media (max-width: 767px) {
+  .ss-stripe-payment-element {
+    min-height: 13rem;
+  }
 }
 
 .ss-bundle-select {
