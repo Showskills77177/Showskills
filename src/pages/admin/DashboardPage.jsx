@@ -64,6 +64,11 @@ export default function DashboardPage() {
           </Link>
         </li>
         <li>
+          <Link className="text-teal-400 hover:underline" to="/admin/draw">
+            Draw winner
+          </Link>
+        </li>
+        <li>
           <Link className="text-teal-400 hover:underline" to="/admin/payments">
             Payments
           </Link>

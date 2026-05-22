@@ -17,6 +17,10 @@ test.describe('D) Admin panel', () => {
     await page.getByRole('navigation').getByRole('link', { name: /Users & entries/i }).click()
     await expect(page.getByRole('heading', { name: /Users & entries/i })).toBeVisible({ timeout: 15_000 })
 
+    await page.getByRole('navigation').getByRole('link', { name: /Draw winner/i }).click()
+    await expect(page.getByRole('heading', { name: /Draw winner/i })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: /Draw winner now/i })).toBeVisible()
+
     await page.getByRole('navigation').getByRole('link', { name: /Kick-up videos/i }).click()
     await expect(page.getByRole('heading', { name: /Free shirt giveaway/i })).toBeVisible()
   })

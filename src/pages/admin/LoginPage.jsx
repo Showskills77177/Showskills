@@ -284,10 +284,9 @@ export default function AdminLoginPage() {
               <>
                 <p className="mt-2 text-center text-xs text-stone-500">Local admin — not linked from the public site.</p>
                 <p className="mt-2 text-center text-[11px] leading-snug text-stone-600">
-                  Requires API on port 3000 (<code className="text-stone-500">npm run dev:all</code>). If sign-in
-                  fails with a Resend error, check the terminal for{' '}
-                  <code className="text-stone-500">EADDRINUSE</code> — kill port 3000 and restart. Local codes go to{' '}
-                  <code className="text-stone-500">RESEND_ACCOUNT_EMAIL</code> until the domain is verified.
+                  Requires API on port 3000 (<code className="text-stone-500">npm run dev:all</code>). Local sign-in is{' '}
+                  <strong className="text-stone-500">username + password only</strong> (no email code). Production still
+                  uses email verification.
                 </p>
               </>
             ) : (

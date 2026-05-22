@@ -6,6 +6,9 @@ import {
   isCorrectShirtGiveawayAnswer,
 } from '../../../shared/shirtGiveaway.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
+import { checkShirtGiveawayLimits, logEntryAttempt } from '../lib/freeEntryAbuse.mjs'
+import { checkVpnForRequest } from '../lib/vpnDetection.mjs'
+import { COMPETITION_SHIRT_GIVEAWAY } from '../../../shared/freeEntryLimits.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -48,6 +51,24 @@ export default async function handler(req, res) {
     return json(res, 400, { error: 'qualificationAnswer required' })
   }
 
+  const vpn = await checkVpnForRequest(req)
+  if (!vpn.ok) {
+    await logEntryAttempt(req, {
+      competition: COMPETITION_SHIRT_GIVEAWAY,
+      flow: 'shirt_giveaway',
+      fullName,
+      email,
+      outcome: 'blocked',
+      blockReason: 'vpn_not_allowed',
+    })
+    return json(res, 403, { error: vpn.error, code: vpn.code })
+  }
+
+  const shirtLimits = await checkShirtGiveawayLimits(req, { fullName, email })
+  if (!shirtLimits.ok) {
+    return json(res, 403, { error: shirtLimits.error, code: shirtLimits.code })
+  }
+
   try {
     const id = randomUUID()
     const storedRef = qualificationAnswer ? 'answer:ronaldo-shirt-giveaway' : videoRef
@@ -60,9 +81,26 @@ export default async function handler(req, res) {
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
       [id, fullName, email, storedRef || null, storedFilename, adminNotes],
     )
+    await logEntryAttempt(req, {
+      competition: COMPETITION_SHIRT_GIVEAWAY,
+      flow: 'shirt_giveaway',
+      fullName,
+      email,
+      addressKey: shirtLimits.identityKey,
+      outcome: 'success',
+      metadata: { submission_id: r.rows[0].id },
+    })
     return json(res, 201, { ok: true, id: r.rows[0].id })
   } catch (e) {
     console.error(e)
+    await logEntryAttempt(req, {
+      competition: COMPETITION_SHIRT_GIVEAWAY,
+      flow: 'shirt_giveaway',
+      fullName,
+      email,
+      outcome: 'failed',
+      blockReason: 'db_error',
+    })
     return json(res, 500, { error: 'Could not save submission' })
   }
 }

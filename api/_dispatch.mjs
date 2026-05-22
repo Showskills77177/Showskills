@@ -11,10 +11,12 @@ import adminTickets from '../backend/api/admin/tickets.js'
 import adminPayments from '../backend/api/admin/payments.js'
 import adminSubmissions from '../backend/api/admin/submissions.js'
 import adminKickupFile from '../backend/api/admin/kickup-file.js'
+import adminDrawWinner from '../backend/api/admin/draw-winner.js'
 
 import paidQuiz from '../backend/api/entries/paid-quiz.js'
 import resumePaidQuiz from '../backend/api/entries/resume-paid-quiz.js'
 import sendUnansweredQuizEmail from '../backend/api/entries/send-unanswered-quiz-email.js'
+import vpnCheck from '../backend/api/vpn-check.js'
 import kickups from '../backend/api/submissions/kickups.js'
 import kickupsUpload from '../backend/api/submissions/kickups-upload.mjs'
 
@@ -26,6 +28,10 @@ import createPayPalOrder from '../backend/api/create-paypal-order.js'
 import capturePayPalOrder from '../backend/api/capture-paypal-order.js'
 import stripeWebhook from '../backend/api/stripe-webhook.js'
 import contact from '../backend/api/contact.js'
+import createFreeSetupIntent from '../backend/api/create-free-setup-intent.js'
+import confirmFreeVerification from '../backend/api/confirm-free-verification.js'
+import completeFreeEntry from '../backend/api/complete-free-entry.js'
+import adminEntryAttempts from '../backend/api/admin/entry-attempts.js'
 
 export const routes = {
   '/api/admin/login': adminLogin,
@@ -41,10 +47,16 @@ export const routes = {
   '/api/admin/payments': adminPayments,
   '/api/admin/submissions': adminSubmissions,
   '/api/admin/kickup-file': adminKickupFile,
+  '/api/admin/draw-winner': adminDrawWinner,
+  '/api/admin/entry-attempts': adminEntryAttempts,
 
+  '/api/create-free-setup-intent': createFreeSetupIntent,
+  '/api/confirm-free-verification': confirmFreeVerification,
+  '/api/complete-free-entry': completeFreeEntry,
   '/api/entries/paid-quiz': paidQuiz,
   '/api/entries/resume-paid-quiz': resumePaidQuiz,
   '/api/entries/send-unanswered-quiz-email': sendUnansweredQuizEmail,
+  '/api/vpn-check': vpnCheck,
   '/api/submissions/kickups': kickups,
   '/api/submissions/kickups/upload': kickupsUpload,
 

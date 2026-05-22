@@ -37,6 +37,12 @@ export function AdminLayout() {
             <NavLink to="/admin/tickets" className={linkClass}>
               Tickets
             </NavLink>
+            <NavLink to="/admin/draw" className={linkClass}>
+              Draw winner
+            </NavLink>
+            <NavLink to="/admin/entry-attempts" className={linkClass}>
+              Entry log
+            </NavLink>
             <NavLink to="/admin/payments" className={linkClass}>
               Payments
             </NavLink>

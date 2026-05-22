@@ -14,6 +14,8 @@ import AdminTicketsPage from './pages/admin/TicketsPage'
 import AdminPaymentsPage from './pages/admin/PaymentsPage'
 import AdminSubmissionsPage from './pages/admin/SubmissionsPage'
 import AdminTestEmailPage from './pages/admin/TestEmailPage'
+import AdminDrawWinnerPage from './pages/admin/DrawWinnerPage'
+import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import ContactPage from './pages/ContactPage'
 import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
 
@@ -51,6 +53,8 @@ export default function App() {
               <Route path="dashboard" element={<AdminDashboardPage />} />
               <Route path="users" element={<AdminUsersPage />} />
               <Route path="tickets" element={<AdminTicketsPage />} />
+              <Route path="draw" element={<AdminDrawWinnerPage />} />
+              <Route path="entry-attempts" element={<AdminEntryAttemptsPage />} />
               <Route path="payments" element={<AdminPaymentsPage />} />
               <Route path="submissions" element={<AdminSubmissionsPage />} />
               <Route path="test-email" element={<AdminTestEmailPage />} />

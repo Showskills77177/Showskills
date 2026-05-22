@@ -17,6 +17,7 @@ import { loadPaidQuizSession, savePaidQuizSession } from '../lib/paidQuizSession
 import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
+import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -81,6 +82,20 @@ export function EntryFlowProvider({ children }) {
   const [kickConsent, setKickConsent] = useState(false)
   const [kickError, setKickError] = useState('')
   const [kickSuccess, setKickSuccess] = useState(false)
+  const [kickVpnBlocked, setKickVpnBlocked] = useState(false)
+  const [kickCheckingVpn, setKickCheckingVpn] = useState(false)
+
+  const [freeAddressLine1, setFreeAddressLine1] = useState('')
+  const [freeAddressLine2, setFreeAddressLine2] = useState('')
+  const [freeCity, setFreeCity] = useState('')
+  const [freePostcode, setFreePostcode] = useState('')
+  const [freeSetupClientSecret, setFreeSetupClientSecret] = useState('')
+  const [freeSetupIntentId, setFreeSetupIntentId] = useState('')
+  const [freePreparing, setFreePreparing] = useState(false)
+  const [freeSuccess, setFreeSuccess] = useState(false)
+  const [freeCardVerified, setFreeCardVerified] = useState(false)
+  const [freeQuizResult, setFreeQuizResult] = useState(null)
+  const [freeQuizSubmitting, setFreeQuizSubmitting] = useState(false)
   /** null | 'confirming' | 'failed' — Stripe redirect return handling */
   const [stripeReturnStatus, setStripeReturnStatus] = useState(null)
   /** Avoid sending the unanswered ticket email more than once per checkout. */
@@ -104,6 +119,7 @@ export function EntryFlowProvider({ children }) {
   const hasStripeHostedCheckout =
     !useStripePaymentElement && Boolean(stripeCheckoutApi && stripePublishableKey)
   const hasStripeCheckout = hasStripeHostedCheckout || hasStripeElements || Boolean(stripePaymentLink)
+  const hasStripeFreeVerify = Boolean(stripePublishableKey)
 
   const [paidStripeClientSecret, setPaidStripeClientSecret] = useState('')
   const [paidStripePaymentIntentId, setPaidStripePaymentIntentId] = useState('')
@@ -515,11 +531,33 @@ export function EntryFlowProvider({ children }) {
     if (type === 'kickups') {
       setKickError('')
       setKickSuccess(false)
+      setKickVpnBlocked(false)
       setKickFullName('')
       setKickAnswer('')
+      setKickEmail('')
+      setKickCheckingVpn(true)
+      void fetch(apiUrl('/api/vpn-check'), { credentials: 'include' })
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok && data.code === 'vpn_not_allowed') {
+            setKickVpnBlocked(true)
+            setKickError(
+              typeof data.error === 'string' ? data.error : FREE_ENTRY_ERRORS.vpnNotAllowed,
+            )
+          }
+        })
+        .catch(() => {
+          /* allow submit; server enforces VPN on POST */
+        })
+        .finally(() => setKickCheckingVpn(false))
     }
     if (type === 'paid') {
       setPaidError('')
+      setFreeSuccess(false)
+      setFreeCardVerified(false)
+      setFreeQuizResult(null)
+      setFreeSetupClientSecret('')
+      setFreeSetupIntentId('')
       const session = loadPaidQuizSession()
       if (session?.status === 'pending' || session?.status === 'answered') {
         restorePaidQuizFromSession(session)
@@ -877,11 +915,141 @@ export function EntryFlowProvider({ children }) {
     [paidA1, paidA2, paidA3, paidEmail, paidFullName, paidOrderRef, paidTicketNumbers],
   )
 
+  const freeVerifyPayload = useMemo(
+    () => ({
+      fullName: paidFullName.trim(),
+      email: paidEmail.trim(),
+      addressLine1: freeAddressLine1.trim(),
+      addressLine2: freeAddressLine2.trim(),
+      city: freeCity.trim(),
+      postcode: freePostcode.trim(),
+    }),
+    [paidFullName, paidEmail, freeAddressLine1, freeAddressLine2, freeCity, freePostcode],
+  )
+
+  const handleStartFreeVerification = useCallback(async () => {
+    setPaidError('')
+    setFreeSuccess(false)
+    setFreeCardVerified(false)
+    setFreeQuizResult(null)
+    setPaidQuizSubmitted(false)
+    setPaidQuizResult(null)
+    if (!paidConsent) {
+      setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
+      return
+    }
+    if (!paidFullName.trim()) {
+      setPaidError('Please enter your full name.')
+      return
+    }
+    if (!paidEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())) {
+      setPaidError('Please enter a valid email address.')
+      return
+    }
+    if (!freeAddressLine1.trim() || !freeCity.trim() || freePostcode.trim().length < 4) {
+      setPaidError('Please enter your full postal address (line 1, town/city, and postcode).')
+      return
+    }
+    if (!hasStripeFreeVerify) {
+      setPaidError('Card verification is not configured. Please try again later.')
+      return
+    }
+    setFreePreparing(true)
+    setFreeSetupClientSecret('')
+    try {
+      const res = await fetch(apiUrl('/api/create-free-setup-intent'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(freeVerifyPayload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPaidError(data.error || `Could not start verification (HTTP ${res.status}).`)
+        return
+      }
+      setFreeSetupClientSecret(data.clientSecret || '')
+      setFreeSetupIntentId(data.setupIntentId || '')
+    } catch {
+      setPaidError('Network error. Check your connection and try again.')
+    } finally {
+      setFreePreparing(false)
+    }
+  }, [paidConsent, paidFullName, paidEmail, freeAddressLine1, freeCity, freePostcode, hasStripeFreeVerify, freeVerifyPayload])
+
+  const handleFreeCardVerified = useCallback((data) => {
+    setFreeSetupClientSecret('')
+    setFreeCardVerified(true)
+    if (data.setupIntentId) setFreeSetupIntentId(data.setupIntentId)
+    setPaidError('')
+  }, [])
+
+  const handleFreeQuizSubmit = useCallback(
+    async (e) => {
+      e.preventDefault()
+      setPaidError('')
+      if (!paidConsent) {
+        setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
+        return
+      }
+      if (!freeCardVerified || !freeSetupIntentId) {
+        setPaidError('Please verify your card first, then answer the skill questions.')
+        return
+      }
+      if (!paidA1.trim() || !paidA2.trim() || !paidA3.trim()) {
+        setPaidError('Please answer all three skill questions.')
+        return
+      }
+      setFreeQuizSubmitting(true)
+      try {
+        const res = await fetch(apiUrl('/api/complete-free-entry'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            ...freeVerifyPayload,
+            setupIntentId: freeSetupIntentId,
+            answers: { q1: paidA1.trim(), q2: paidA2.trim(), q3: paidA3.trim() },
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setPaidError(typeof data.error === 'string' ? data.error : 'Could not submit your free entry.')
+          return
+        }
+        setFreeSuccess(true)
+        setFreeQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
+        setPaidOrderRef(data.orderRef || '')
+        setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
+        setPaidQuizSubmitted(true)
+        setPaidQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
+        if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
+      } catch {
+        setPaidError('Network error. Check your connection and try again.')
+      } finally {
+        setFreeQuizSubmitting(false)
+      }
+    },
+    [
+      paidConsent,
+      freeCardVerified,
+      freeSetupIntentId,
+      freeVerifyPayload,
+      paidA1,
+      paidA2,
+      paidA3,
+    ],
+  )
+
   const handleKickupsGiveawaySubmit = useCallback(
     async (e) => {
       e.preventDefault()
       setKickError('')
       setKickSuccess(false)
+      if (kickVpnBlocked) {
+        setKickError(FREE_ENTRY_ERRORS.vpnNotAllowed)
+        return
+      }
       if (!kickConsent) {
         setKickError('Please agree to the Terms & Conditions and Privacy Policy.')
         return
@@ -923,7 +1091,7 @@ export function EntryFlowProvider({ children }) {
         setKickError(err instanceof Error ? err.message : 'Submission failed')
       }
     },
-    [kickAnswer, kickConsent, kickEmail, kickFullName],
+    [kickAnswer, kickConsent, kickEmail, kickFullName, kickVpnBlocked],
   )
 
   const value = useMemo(
@@ -995,7 +1163,29 @@ export function EntryFlowProvider({ children }) {
       kickError,
       setKickError,
       kickSuccess,
+      kickVpnBlocked,
+      kickCheckingVpn,
       handleKickupsGiveawaySubmit,
+      freeAddressLine1,
+      setFreeAddressLine1,
+      freeAddressLine2,
+      setFreeAddressLine2,
+      freeCity,
+      setFreeCity,
+      freePostcode,
+      setFreePostcode,
+      freeSetupClientSecret,
+      freeSetupIntentId,
+      freePreparing,
+      freeSuccess,
+      freeCardVerified,
+      freeQuizResult,
+      freeQuizSubmitting,
+      hasStripeFreeVerify,
+      handleStartFreeVerification,
+      handleFreeCardVerified,
+      handleFreeQuizSubmit,
+      freeVerifyPayload,
       PAID_SKILL_QUESTIONS,
       stripeReturnStatus,
       paidQuizNavStatus,
@@ -1055,7 +1245,25 @@ export function EntryFlowProvider({ children }) {
       kickError,
       setKickError,
       kickSuccess,
+      kickVpnBlocked,
+      kickCheckingVpn,
       handleKickupsGiveawaySubmit,
+      freeAddressLine1,
+      freeAddressLine2,
+      freeCity,
+      freePostcode,
+      freeSetupClientSecret,
+      freeSetupIntentId,
+      freePreparing,
+      freeSuccess,
+      freeCardVerified,
+      freeQuizResult,
+      freeQuizSubmitting,
+      hasStripeFreeVerify,
+      handleStartFreeVerification,
+      handleFreeCardVerified,
+      handleFreeQuizSubmit,
+      freeVerifyPayload,
       stripeReturnStatus,
       paidQuizNavStatus,
       openResumePaidQuiz,

@@ -10,6 +10,7 @@ import { verifyAdminPassword } from '../lib/password.mjs'
 import {
   sendAdminLoginOtpEmail,
   isAdminEmailOtpConfigured,
+  isAdminEmailOtpBypassed,
   getAdminEmailSetupHint,
   adminOtpVerificationPayload,
 } from '../lib/adminEmailOtp.mjs'
@@ -57,6 +58,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (isAdminEmailOtpBypassed()) {
+      const token = await signAdminSession()
+      res.setHeader('Set-Cookie', setAdminCookieHeader(token))
+      return json(res, 200, { ok: true, verificationRequired: false })
+    }
+
     if (isAdminEmailOtpConfigured()) {
       const hint = getAdminEmailSetupHint()
       if (hint) {

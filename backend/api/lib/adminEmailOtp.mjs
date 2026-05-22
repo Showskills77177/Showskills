@@ -20,6 +20,26 @@ export function isAdminEmailOtpConfigured() {
   return Boolean(getResendApiKey() && adminEmail().includes('@'))
 }
 
+/**
+ * Password-only admin sign-in (no 6-digit email code).
+ * Enabled on local Express (`npm run dev:all`) and E2E; never on Vercel Production.
+ * Set ADMIN_REQUIRE_EMAIL_OTP=1 to force codes locally. Set ADMIN_SKIP_EMAIL_OTP=1 on Vercel preview if needed.
+ */
+export function isAdminEmailOtpBypassed() {
+  if (process.env.VERCEL_ENV === 'production') return false
+  if (
+    process.env.ADMIN_REQUIRE_EMAIL_OTP === '1' ||
+    process.env.ADMIN_REQUIRE_EMAIL_OTP === 'true'
+  ) {
+    return false
+  }
+  if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') return true
+  if (process.env.ADMIN_SKIP_EMAIL_OTP === '1' || process.env.ADMIN_SKIP_EMAIL_OTP === 'true') {
+    return true
+  }
+  return !process.env.VERCEL
+}
+
 export function adminEmail() {
   return (process.env.ADMIN_EMAIL || process.env.ADMIN_OTP_EMAIL || '').trim().toLowerCase()
 }

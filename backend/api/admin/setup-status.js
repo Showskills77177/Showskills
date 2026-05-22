@@ -1,6 +1,7 @@
 import { adminAuthConfigStatus, isAdminAuthConfigured } from '../lib/adminAuth.mjs'
 import {
   isAdminEmailOtpConfigured,
+  isAdminEmailOtpBypassed,
   getAdminEmailSetupHint,
   adminEmail,
   maskAdminEmail,
@@ -23,8 +24,9 @@ export default async function handler(req, res) {
   const auth = adminAuthConfigStatus()
   const hasResendKey = Boolean(getResendApiKey())
   const hasAdminEmail = Boolean(adminEmail().includes('@'))
-  const emailOtp = isAdminEmailOtpConfigured()
-  const hint = getAdminEmailSetupHint()
+  const otpBypassed = isAdminEmailOtpBypassed()
+  const emailOtp = isAdminEmailOtpConfigured() && !otpBypassed
+  const hint = otpBypassed ? null : getAdminEmailSetupHint()
   const missingEmail = []
   if (!hasResendKey) missingEmail.push('RESEND_API_KEY')
   if (!hasAdminEmail) missingEmail.push('ADMIN_EMAIL')
@@ -34,6 +36,7 @@ export default async function handler(req, res) {
     adminAuthConfigured: isAdminAuthConfigured(),
     adminAuthMissing: auth.missing,
     emailOtpEnabled: emailOtp,
+    emailOtpBypassed: otpBypassed,
     emailOtpHint: hint,
     emailOtpMissing: missingEmail,
     hasResendKey,

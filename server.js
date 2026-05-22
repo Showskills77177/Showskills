@@ -21,10 +21,11 @@ if (dbUrl?.startsWith('postgres')) {
 
 const resendKey = process.env.RESEND_API_KEY?.trim()
 if (resendKey?.startsWith('re_')) {
-  const { getAdminEmailSetupHint, isAdminEmailOtpConfigured } = await import(
-    './backend/api/lib/adminEmailOtp.mjs'
-  )
-  if (isAdminEmailOtpConfigured()) {
+  const { getAdminEmailSetupHint, isAdminEmailOtpConfigured, isAdminEmailOtpBypassed } =
+    await import('./backend/api/lib/adminEmailOtp.mjs')
+  if (isAdminEmailOtpBypassed()) {
+    console.log('[admin] Local sign-in: password only (email OTP skipped)')
+  } else if (isAdminEmailOtpConfigured()) {
     const hint = getAdminEmailSetupHint()
     if (hint) console.warn('[email]', hint)
     else console.log('[email] Resend configured (admin OTP + quiz confirmations)')

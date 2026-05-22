@@ -244,6 +244,11 @@ export function TermsModal({ open, onClose }) {
             The qualification question is: <strong>{SHIRT_GIVEAWAY_QUESTION}</strong>. Correct eligible entries qualify
             for the giveaway draw. We may disqualify entries that cannot be verified or breach these rules.
           </p>
+          <p className="mb-3">
+            <strong>One entry per device:</strong> only one shirt giveaway entry is allowed per connection/device (IP),
+            including if you try again with a different email. <strong>VPNs and proxies are not allowed</strong> — turn
+            off your VPN before entering.
+          </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">6. Promotional rights and publicity</h3>
           <p className="mb-3">
