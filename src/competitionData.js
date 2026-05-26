@@ -15,7 +15,7 @@ export {
   formatBundlePriceGBP,
 }
 
-/** Hides £0.50 test bundle in production unless VITE_LIVE_TEST_BUNDLE=1. */
+/** Hides £0.05 test bundle in production unless VITE_LIVE_TEST_BUNDLE=1. */
 export function getVisibleTicketBundles() {
   return getVisibleTicketBundlesShared(import.meta.env)
 }

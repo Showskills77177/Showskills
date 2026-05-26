@@ -14,16 +14,16 @@ export const MEGA_BUNDLE_BASE_TICKET_QTY = Math.floor(
 export const MEGA_BUNDLE_BONUS_TICKETS = 1
 export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_BASE_TICKET_QTY + MEGA_BUNDLE_BONUS_TICKETS
 
-/** £0.50 — live payment smoke test (hidden unless dev or VITE_LIVE_TEST_BUNDLE=1). */
-export const LIVE_TEST_BUNDLE_ID = 'liveTest50'
+/** £0.05 — live payment smoke test (hidden unless dev or VITE_LIVE_TEST_BUNDLE=1). */
+export const LIVE_TEST_BUNDLE_ID = 'liveTest5'
 
 export const TICKET_BUNDLES = [
   {
     id: LIVE_TEST_BUNDLE_ID,
     qty: 1,
-    totalPence: 50,
+    totalPence: 5,
     title: 'Live test',
-    line1: '1 ticket = £0.50',
+    line1: '1 ticket = £0.05',
     line2: 'Payment testing only',
     bullets: [],
     featured: false,
