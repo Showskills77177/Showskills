@@ -58,13 +58,25 @@ function PaymentStatusMessage({ status, message }) {
   )
 }
 
-function CardField({ label, htmlFor, hostRef }) {
+/**
+ * Covers Cashflows demo placeholders (0000… / MM/YY / 000) until the shopper focuses the field.
+ * pointer-events: none so clicks reach the iframe; masks sit above the inverted field UI.
+ */
+function MaskedCardField({ label, htmlFor, hostRef, mask, ready, revealed, onReveal }) {
   return (
     <div className="ss-cf-row">
       <label htmlFor={htmlFor} className="ss-cf-label">
         {label}
       </label>
-      <div ref={hostRef} className="ss-cf-field-host" />
+      <div
+        className={`ss-cf-field-host${revealed ? ' ss-cf-field-host--active' : ''}`}
+        onPointerDown={() => onReveal()}
+      >
+        <div ref={hostRef} className="ss-cf-field-host__slot" />
+        {mask && ready && !revealed ? (
+          <div className={`ss-cf-placeholder-mask ss-cf-placeholder-mask--${mask}`} aria-hidden="true" />
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -89,6 +101,7 @@ export function CashflowsPaymentForm({
   const cvcHostRef = useRef(null)
   const initGenerationRef = useRef(0)
   const pointerFixCleanupRef = useRef(null)
+  const prepIdToFieldRef = useRef({})
 
   const applePaySupported = isApplePayEmbeddedAvailable()
 
@@ -96,6 +109,31 @@ export function CashflowsPaymentForm({
   const [paying, setPaying] = useState(false)
   const [applePayVisible, setApplePayVisible] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
+  const [placeholderRevealed, setPlaceholderRevealed] = useState({
+    number: false,
+    expiry: false,
+    cvc: false,
+  })
+
+  const revealPlaceholder = useCallback((key) => {
+    setPlaceholderRevealed((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
+  }, [])
+
+  const mapPreparationIds = useCallback(() => {
+    const map = {}
+    const pairs = [
+      [numberHostRef, 'number'],
+      [nameHostRef, 'name'],
+      [expiryHostRef, 'expiry'],
+      [cvcHostRef, 'cvc'],
+    ]
+    for (const [ref, key] of pairs) {
+      const iframe = ref.current?.querySelector('iframe[data-uuid]')
+      const uuid = iframe?.getAttribute('data-uuid')
+      if (uuid) map[uuid] = key
+    }
+    prepIdToFieldRef.current = map
+  }, [])
 
   const reportError = useCallback(
     (message) => {
@@ -134,6 +172,18 @@ export function CashflowsPaymentForm({
   }, [paymentJobReference, recordPayload, onSuccess])
 
   useEffect(() => {
+    const onValidate = (event) => {
+      if (event?.data?.event !== 'validate') return
+      const key = prepIdToFieldRef.current[event.data.preparationId]
+      if (key === 'number' || key === 'expiry' || key === 'cvc') {
+        revealPlaceholder(key)
+      }
+    }
+    window.addEventListener('message', onValidate)
+    return () => window.removeEventListener('message', onValidate)
+  }, [revealPlaceholder])
+
+  useEffect(() => {
     if (!intentToken) return undefined
 
     const generation = ++initGenerationRef.current
@@ -141,6 +191,8 @@ export function CashflowsPaymentForm({
     setReady(false)
     setApplePayVisible(false)
     setStatus({ type: '', message: '' })
+    setPlaceholderRevealed({ number: false, expiry: false, cvc: false })
+    prepIdToFieldRef.current = {}
     pointerFixCleanupRef.current?.()
     pointerFixCleanupRef.current = null
 
@@ -195,6 +247,7 @@ export function CashflowsPaymentForm({
         const cf = new Cashflows(intentToken, Boolean(isIntegration))
         await cf.initCard(numberEl, nameEl, expiryEl, cvcEl, `#${FIELD_IDS.pay}`)
         enableCashflowsIframePointerEvents(mountRef.current)
+        mapPreparationIds()
 
         if (applePaySupported && document.getElementById(FIELD_IDS.applePay)) {
           await cf.initApplePay(`#${FIELD_IDS.applePay}`)
@@ -256,7 +309,15 @@ export function CashflowsPaymentForm({
       pointerFixCleanupRef.current = null
       clearHosts()
     }
-  }, [intentToken, isIntegration, confirmOnServer, reportError, applePaySupported, disabled])
+  }, [
+    intentToken,
+    isIntegration,
+    confirmOnServer,
+    reportError,
+    applePaySupported,
+    disabled,
+    mapPreparationIds,
+  ])
 
   return (
     <div ref={mountRef} className="ss-cashflows-pay">
@@ -303,11 +364,43 @@ export function CashflowsPaymentForm({
         ) : null}
 
         <div className="ss-checkout-fields space-y-3">
-          <CardField label="Card number" htmlFor={FIELD_IDS.number} hostRef={numberHostRef} />
-          <CardField label="Name on card" htmlFor={FIELD_IDS.name} hostRef={nameHostRef} />
+          <MaskedCardField
+            label="Card number"
+            htmlFor={FIELD_IDS.number}
+            hostRef={numberHostRef}
+            mask="card"
+            ready={ready}
+            revealed={placeholderRevealed.number}
+            onReveal={() => revealPlaceholder('number')}
+          />
+          <MaskedCardField
+            label="Name on card"
+            htmlFor={FIELD_IDS.name}
+            hostRef={nameHostRef}
+            mask={null}
+            ready={ready}
+            revealed
+            onReveal={() => {}}
+          />
           <div className="grid grid-cols-2 gap-3">
-            <CardField label="Expiry (MM/YY)" htmlFor={FIELD_IDS.expiry} hostRef={expiryHostRef} />
-            <CardField label="Security code" htmlFor={FIELD_IDS.cvc} hostRef={cvcHostRef} />
+            <MaskedCardField
+              label="Expiry"
+              htmlFor={FIELD_IDS.expiry}
+              hostRef={expiryHostRef}
+              mask="expiry"
+              ready={ready}
+              revealed={placeholderRevealed.expiry}
+              onReveal={() => revealPlaceholder('expiry')}
+            />
+            <MaskedCardField
+              label="Security code"
+              htmlFor={FIELD_IDS.cvc}
+              hostRef={cvcHostRef}
+              mask="cvc"
+              ready={ready}
+              revealed={placeholderRevealed.cvc}
+              onReveal={() => revealPlaceholder('cvc')}
+            />
           </div>
         </div>
 

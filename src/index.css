@@ -1979,6 +1979,7 @@ body {
 }
 
 .ss-cf-field-host {
+  position: relative;
   display: flex;
   align-items: stretch;
   min-height: 48px;
@@ -1987,13 +1988,63 @@ body {
   border: 1px solid rgb(255 255 255 / 0.14);
   background: rgb(7 21 18);
   overflow: hidden;
-  position: static;
   pointer-events: auto;
   transform: none;
   -webkit-transform: none;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
+}
+
+.ss-cf-field-host__slot {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-height: 48px;
+  min-width: 0;
+}
+
+/* Hides Cashflows demo placeholders (0000… / MM/YY / 000) until the field is used */
+.ss-cf-placeholder-mask {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  background: rgb(7 21 18);
+  transition: opacity 0.15s ease;
+}
+
+.ss-cf-field-host--active .ss-cf-placeholder-mask {
+  opacity: 0;
+}
+
+.ss-cf-placeholder-mask--card {
+  left: 0;
+  right: 0;
+}
+
+.ss-cf-placeholder-mask--expiry {
+  left: 14px;
+  width: 5.25rem;
+  background: linear-gradient(
+    90deg,
+    rgb(7 21 18) 0%,
+    rgb(7 21 18) 88%,
+    rgb(7 21 18 / 0) 100%
+  );
+}
+
+.ss-cf-placeholder-mask--cvc {
+  left: 14px;
+  width: 3.25rem;
+  background: linear-gradient(
+    90deg,
+    rgb(7 21 18) 0%,
+    rgb(7 21 18) 85%,
+    rgb(7 21 18 / 0) 100%
+  );
 }
 
 .ss-cf-field-host:focus-within {

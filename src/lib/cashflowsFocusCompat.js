@@ -11,7 +11,7 @@ export const CASHFLOWS_IFRAME_COPY_STYLE = {
   fontFamily:
     'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   caretColor: 'rgb(245, 245, 244)',
-  padding: '12px 16px',
+  padding: '11px 14px',
   border: 'none',
   boxShadow: 'none',
   margin: '0',
