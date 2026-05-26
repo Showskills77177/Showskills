@@ -12,6 +12,26 @@ const FIELD_IDS = {
   applePay: 'ss-cf-apple-pay',
 }
 
+/** Cashflows replaces these inputs with iframes — create outside React to avoid re-render conflicts. */
+function createCardInput(id, { inputMode, autoComplete, type = 'tel' }) {
+  const input = document.createElement('input')
+  input.id = id
+  input.type = type
+  input.inputMode = inputMode
+  input.autocomplete = autoComplete
+  input.className = 'ss-cf-field'
+  input.setAttribute('aria-required', 'true')
+  return input
+}
+
+function mountCardField(host, id, options) {
+  if (!host) return null
+  host.replaceChildren()
+  const input = createCardInput(id, options)
+  host.appendChild(input)
+  return input
+}
+
 function PaymentStatusMessage({ status, message }) {
   if (!message) return null
   const tone =
@@ -42,7 +62,15 @@ export function CashflowsPaymentForm({
   onSuccess,
   onError,
 }) {
+  const numberHostRef = useRef(null)
+  const nameHostRef = useRef(null)
+  const expiryHostRef = useRef(null)
+  const cvcHostRef = useRef(null)
+  const payButtonRef = useRef(null)
+  const applePayRef = useRef(null)
+  const initGenerationRef = useRef(0)
   const checkoutStartedRef = useRef(false)
+
   const [ready, setReady] = useState(false)
   const [paying, setPaying] = useState(false)
   const [applePayVisible, setApplePayVisible] = useState(false)
@@ -87,36 +115,74 @@ export function CashflowsPaymentForm({
   useEffect(() => {
     if (!intentToken) return undefined
 
+    const generation = ++initGenerationRef.current
     let cancelled = false
     setReady(false)
     setApplePayVisible(false)
     setStatus({ type: '', message: '' })
     checkoutStartedRef.current = false
 
+    const clearHosts = () => {
+      numberHostRef.current?.replaceChildren()
+      nameHostRef.current?.replaceChildren()
+      expiryHostRef.current?.replaceChildren()
+      cvcHostRef.current?.replaceChildren()
+    }
+
     ;(async () => {
       try {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        if (cancelled || generation !== initGenerationRef.current) return
+
+        const payBtn = payButtonRef.current
+        const appleBtn = applePayRef.current
+        if (!payBtn) {
+          throw new Error('Payment button is not ready. Please try again.')
+        }
+
+        const numberEl = mountCardField(numberHostRef.current, FIELD_IDS.number, {
+          inputMode: 'numeric',
+          autoComplete: 'cc-number',
+        })
+        const nameEl = mountCardField(nameHostRef.current, FIELD_IDS.name, {
+          inputMode: 'text',
+          autoComplete: 'cc-name',
+          type: 'text',
+        })
+        const expiryEl = mountCardField(expiryHostRef.current, FIELD_IDS.expiry, {
+          inputMode: 'numeric',
+          autoComplete: 'cc-exp',
+        })
+        const cvcEl = mountCardField(cvcHostRef.current, FIELD_IDS.cvc, {
+          inputMode: 'numeric',
+          autoComplete: 'cc-csc',
+        })
+
+        if (!numberEl || !nameEl || !expiryEl || !cvcEl) {
+          throw new Error('Secure card fields could not be mounted. Please try again.')
+        }
+
+        if (disabled) {
+          numberEl.disabled = true
+          nameEl.disabled = true
+          expiryEl.disabled = true
+          cvcEl.disabled = true
+        }
+
         const Cashflows = await loadCashflowsConstructor()
-        if (cancelled) return
+        if (cancelled || generation !== initGenerationRef.current) return
 
         const cf = new Cashflows(intentToken, Boolean(isIntegration))
-        const inits = [
-          cf.initCard(
-            `#${FIELD_IDS.number}`,
-            `#${FIELD_IDS.name}`,
-            `#${FIELD_IDS.expiry}`,
-            `#${FIELD_IDS.cvc}`,
-            `#${FIELD_IDS.pay}`,
-          ),
-          cf.initApplePay(`#${FIELD_IDS.applePay}`),
-        ]
+        await cf.initCard(numberEl, nameEl, expiryEl, cvcEl, payBtn)
+        if (appleBtn) {
+          await cf.initApplePay(appleBtn)
+        }
 
-        await Promise.all(inits)
-        if (cancelled) return
+        if (cancelled || generation !== initGenerationRef.current) return
 
         const checkoutPromise = cf.checkout()
         checkoutStartedRef.current = true
 
-        const appleBtn = document.getElementById(FIELD_IDS.applePay)
         if (appleBtn) {
           const syncAppleVisibility = () => {
             if (!appleBtn.hidden) setApplePayVisible(true)
@@ -130,23 +196,24 @@ export function CashflowsPaymentForm({
 
         checkoutPromise
           .then(async () => {
-            if (cancelled) return
+            if (cancelled || generation !== initGenerationRef.current) return
             setPaying(true)
             setStatus({ type: 'info', message: 'Confirming your payment…' })
             await confirmOnServer()
           })
           .catch((e) => {
-            if (cancelled) return
+            if (cancelled || generation !== initGenerationRef.current) return
             setPaying(false)
             reportError(e instanceof Error ? e.message : String(e))
           })
           .finally(() => {
-            if (!cancelled) setPaying(false)
+            if (!cancelled && generation === initGenerationRef.current) setPaying(false)
           })
 
-        if (!cancelled) setReady(true)
+        if (!cancelled && generation === initGenerationRef.current) setReady(true)
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled && generation === initGenerationRef.current) {
+          clearHosts()
           reportError(
             e instanceof Error
               ? e.message
@@ -158,6 +225,7 @@ export function CashflowsPaymentForm({
 
     return () => {
       cancelled = true
+      clearHosts()
     }
   }, [intentToken, isIntegration, confirmOnServer, reportError])
 
@@ -166,6 +234,7 @@ export function CashflowsPaymentForm({
       <CardBrandLogos className="pb-1" />
 
       <button
+        ref={applePayRef}
         id={FIELD_IDS.applePay}
         type="button"
         hidden={!applePayVisible}
@@ -190,57 +259,26 @@ export function CashflowsPaymentForm({
           <label htmlFor={FIELD_IDS.number} className="ss-cf-label">
             Card number
           </label>
-          <input
-            id={FIELD_IDS.number}
-            type="tel"
-            inputMode="numeric"
-            autoComplete="cc-number"
-            className="ss-cf-field"
-            disabled={disabled || paying}
-            aria-required
-          />
+          <div ref={numberHostRef} />
         </div>
         <div>
           <label htmlFor={FIELD_IDS.name} className="ss-cf-label">
             Name on card
           </label>
-          <input
-            id={FIELD_IDS.name}
-            type="text"
-            autoComplete="cc-name"
-            className="ss-cf-field"
-            disabled={disabled || paying}
-            aria-required
-          />
+          <div ref={nameHostRef} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor={FIELD_IDS.expiry} className="ss-cf-label">
               Expiry
             </label>
-            <input
-              id={FIELD_IDS.expiry}
-              type="tel"
-              inputMode="numeric"
-              autoComplete="cc-exp"
-              className="ss-cf-field"
-              disabled={disabled || paying}
-              aria-required
-            />
+            <div ref={expiryHostRef} />
           </div>
           <div>
             <label htmlFor={FIELD_IDS.cvc} className="ss-cf-label">
               CVC
             </label>
-            <input
-              id={FIELD_IDS.cvc}
-              type="tel"
-              inputMode="numeric"
-              autoComplete="cc-csc"
-              className="ss-cf-field"
-              disabled={disabled || paying}
-              aria-required
-            />
+            <div ref={cvcHostRef} />
           </div>
         </div>
       </div>
@@ -248,6 +286,7 @@ export function CashflowsPaymentForm({
       <PaymentStatusMessage status={status.type} message={status.message} />
 
       <button
+        ref={payButtonRef}
         id={FIELD_IDS.pay}
         type="button"
         disabled={disabled || paying || !ready}
