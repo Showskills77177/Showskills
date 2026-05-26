@@ -149,6 +149,9 @@ export async function ensureLocalDevEntryPeriod(competition = DRAW_COMPETITION_S
   return getCompetitionPeriodById(LOCAL_DEV_PERIOD_ID)
 }
 
+const ENTRIES_CLOSED_MESSAGE =
+  'No competition is currently open for entries. Please try again later or contact us at contact@showskills.co.uk.'
+
 /** Period that new ticket purchases and online entries are assigned to. */
 export async function getOpenCompetitionPeriodForEntry(competition = DRAW_COMPETITION_SLUG) {
   let period = await getOpenCompetitionPeriod(competition)
@@ -156,11 +159,11 @@ export async function getOpenCompetitionPeriodForEntry(competition = DRAW_COMPET
     period = await ensureLocalDevEntryPeriod(competition)
   }
   if (!period) {
-    return {
-      ok: false,
-      error:
-        'No competition is currently open for entries. Please try again later or contact us at contact@showskills.co.uk.',
-    }
+    await ensureDefaultCompetitionPeriod(competition)
+    period = await getOpenCompetitionPeriod(competition)
+  }
+  if (!period) {
+    return { ok: false, error: ENTRIES_CLOSED_MESSAGE }
   }
   return { ok: true, period }
 }

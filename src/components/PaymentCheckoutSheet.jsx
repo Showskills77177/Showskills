@@ -37,13 +37,8 @@ export function PaymentCheckoutSheet({
   paidConsent,
   onPayPalPaid,
   onPayPalError,
-  onClearError,
 }) {
   const panelRef = useRef(null)
-
-  useEffect(() => {
-    if (open && onClearError) onClearError()
-  }, [open, onClearError])
 
   if (!open) return null
 
@@ -121,8 +116,8 @@ export function PaymentCheckoutSheet({
           {showCardEmpty ? (
             <div className="flex shrink-0 flex-col items-center gap-4 px-4 py-10 text-center">
               <p className="max-w-md text-sm text-stone-400">
-                Secure checkout could not start. Check the API is running (<code className="text-teal-300/90">npm run dev:all</code>
-                ), then try again. On Safari or Brave, allow cookies for this site.
+                Secure checkout could not start. Try again in a moment. If this keeps happening, check your
+                connection or contact support.
               </p>
               {onRetryPayment ? (
                 <button

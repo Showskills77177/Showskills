@@ -1,4 +1,5 @@
 import { getCashflowsConfig } from './lib/cashflows.mjs'
+import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
 import { json } from './lib/http.mjs'
 
 /** GET — tells the frontend which payment backends are configured (no secrets). */
@@ -15,9 +16,12 @@ export default async function handler(req, res) {
   }
 
   const cfg = getCashflowsConfig()
+  const entry = await getOpenCompetitionPeriodForEntry()
   return json(res, 200, {
     cashflows: cfg.configured,
     cashflowsIntegration: cfg.isIntegration,
     paypal: Boolean((process.env.PAYPAL_CLIENT_ID || '').trim()),
+    entriesOpen: entry.ok,
+    ...(entry.ok ? {} : { entriesClosedMessage: entry.error }),
   })
 }

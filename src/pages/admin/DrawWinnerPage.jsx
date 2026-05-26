@@ -212,6 +212,16 @@ export default function DrawWinnerPage() {
               Open period for entries
             </button>
           ) : null}
+          {period?.status === PERIOD_STATUS.closed ? (
+            <button
+              type="button"
+              disabled={periodBusy || drawing}
+              onClick={() => patchPeriodStatus(PERIOD_STATUS.open)}
+              className="rounded-lg border border-teal-500/35 bg-teal-950/40 px-4 py-2 text-sm font-semibold text-teal-100 hover:bg-teal-950/60 disabled:opacity-50"
+            >
+              Reopen period for entries
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={periodBusy}

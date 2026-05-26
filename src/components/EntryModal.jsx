@@ -498,6 +498,7 @@ export function EntryModal() {
                     <ErrorBanner message={paymentNotConfiguredMessage} />
                   ) : null}
                   {paidEntryRoute === 'tickets' &&
+                  !paymentNotConfiguredMessage &&
                   (hasCardCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&
                   !showPaymentSheet ? (
                     <div className="ss-entry-checkout-actions flex flex-col gap-3 border-t border-white/10 pt-4">
@@ -704,7 +705,6 @@ export function EntryModal() {
           markPaidCheckoutComplete(info)
         }}
         onPayPalError={(msg) => setPaidError(msg)}
-        onClearError={() => setPaidError('')}
       />
           ) : null}
     </ModalPortal>

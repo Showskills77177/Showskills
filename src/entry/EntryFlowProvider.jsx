@@ -569,7 +569,11 @@ export function EntryFlowProvider({ children }) {
     if (paidCashflowsToken) return
     const ac = new AbortController()
     const t = setTimeout(() => {
-      fetchCashflowsIntent({ signal: ac.signal }).catch(() => {})
+      fetchCashflowsIntent({ signal: ac.signal }).catch((e) => {
+        if (e instanceof Error && e.name === 'AbortError') return
+        const msg = e instanceof Error ? e.message : ''
+        if (msg) setPaidError(msg)
+      })
     }, 600)
     return () => {
       clearTimeout(t)
@@ -816,7 +820,13 @@ export function EntryFlowProvider({ children }) {
     [kickAnswer, kickConsent, kickEmail, kickFullName, kickPhone, kickVpnBlocked],
   )
 
+  const entriesClosedMessage =
+    serverPaymentConfig?.entriesOpen === false && typeof serverPaymentConfig.entriesClosedMessage === 'string'
+      ? serverPaymentConfig.entriesClosedMessage
+      : ''
+
   const paymentNotConfiguredMessage = useMemo(() => {
+    if (entriesClosedMessage) return entriesClosedMessage
     if (hasPayPal || hasCardCheckout) return ''
     if (serverPaymentConfig?.cashflows === false) {
       return 'Card payments are not set up on the server. In Vercel → Environment Variables, add CASHFLOWS_CONFIGURATION_ID, CASHFLOWS_API_KEY, and CASHFLOWS_INTEGRATION=0 for Production, then redeploy.'
@@ -825,7 +835,7 @@ export function EntryFlowProvider({ children }) {
       return 'Payments are loading or not configured. If this stays, check Cashflows env vars in Vercel and redeploy.'
     }
     return 'Payments are not configured. Add Cashflows (CASHFLOWS_* + VITE_CASHFLOWS_ENABLED=1) or PayPal — see .env.example.'
-  }, [hasPayPal, hasCardCheckout, serverPaymentConfig])
+  }, [hasPayPal, hasCardCheckout, serverPaymentConfig, entriesClosedMessage])
 
   const value = useMemo(
     () => ({
