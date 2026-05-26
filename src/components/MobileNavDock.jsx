@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
 
 const NAV_BTN_BASE =
-  'ss-mobile-nav-btn flex min-h-[2.75rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-center text-xs font-bold leading-tight transition'
+  'ss-mobile-nav-btn flex min-h-[2.75rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-2 text-center text-xs font-bold leading-tight transition'
 
 function navBtnClass({ isActive }) {
   return isActive
@@ -15,12 +15,12 @@ export function MobileNavDock() {
 
   return (
     <div className="ss-mobile-nav-dock sm:hidden" aria-label="Site menu">
-      <nav className="ss-mobile-nav-dock__grid grid grid-cols-4 gap-1.5 p-2.5 pt-2">
+      <nav className="ss-mobile-nav-dock__grid grid gap-1.5 p-2.5 pt-2">
         <NavLink to="/" end className={navBtnClass}>
           Home
         </NavLink>
         <NavLink to="/competitions" className={navBtnClass}>
-          Compete
+          <span className="ss-mobile-nav-label">Competitions</span>
         </NavLink>
         <NavLink to="/faq" className={navBtnClass}>
           FAQ

@@ -71,6 +71,7 @@ body {
 .ss-header {
   position: relative;
   isolation: isolate;
+  overflow: visible;
   background-color: rgba(8, 22, 18, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -93,7 +94,7 @@ body {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(167, 243, 208, 0.07) 0%, transparent 55%);
+  background: linear-gradient(180deg, rgba(167, 243, 208, 0.12) 0%, transparent 55%);
 }
 
 .ss-header::after {
@@ -121,10 +122,11 @@ body {
 .ss-footer-bg {
   background-color: var(--ss-bg-deep);
   background-image:
-    radial-gradient(ellipse 120% 55% at 50% -15%, rgba(200, 240, 232, 0.14), transparent 52%),
-    radial-gradient(ellipse 50% 40% at 85% 20%, rgba(45, 212, 191, 0.08), transparent 50%),
-    radial-gradient(ellipse 45% 35% at 10% 35%, rgba(52, 211, 153, 0.06), transparent 48%),
-    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(6, 45, 38, 0.5), transparent 55%),
+    radial-gradient(ellipse 130% 60% at 50% -12%, rgba(167, 243, 208, 0.24), transparent 54%),
+    radial-gradient(ellipse 55% 48% at 88% 18%, rgba(45, 212, 191, 0.14), transparent 52%),
+    radial-gradient(ellipse 50% 42% at 8% 32%, rgba(52, 211, 153, 0.12), transparent 50%),
+    radial-gradient(ellipse 75% 55% at 50% 42%, rgba(16, 185, 129, 0.08), transparent 62%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(6, 78, 59, 0.55), transparent 58%),
     repeating-linear-gradient(
       0deg,
       transparent,
@@ -139,7 +141,7 @@ body {
       rgba(167, 243, 208, 0.025) 120px,
       rgba(167, 243, 208, 0.025) 121px
     ),
-    linear-gradient(168deg, #0f2922 0%, #0a1f19 38%, #071512 100%);
+    linear-gradient(168deg, #123d32 0%, #0c2820 32%, #0a1f19 58%, #071512 100%);
   background-attachment: fixed;
   background-size: auto;
 }
@@ -188,6 +190,30 @@ body {
   isolation: isolate;
 }
 
+/* Soft green bloom behind content (glowy pitch atmosphere) */
+.ss-page-bg::after {
+  content: '';
+  position: fixed;
+  inset: -10% 0 auto;
+  z-index: 0;
+  height: 70%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 90% 55% at 50% 0%,
+    rgba(52, 211, 153, 0.14) 0%,
+    rgba(45, 212, 191, 0.06) 38%,
+    transparent 72%
+  );
+  filter: blur(2px);
+}
+
+@supports (-webkit-touch-callout: none) {
+  .ss-page-bg::after {
+    filter: none;
+    opacity: 0.85;
+  }
+}
+
 /*
  * Decorative ::before uses z-index: 0 + position: fixed, which stacks above in-flow
  * content (paint order step 6 vs step 3). Keep real page chrome above that layer so
@@ -208,14 +234,15 @@ body {
   pointer-events: none;
   opacity: 1;
   background-image:
-    radial-gradient(ellipse 8px 10px at 15% 25%, rgba(255, 255, 255, 0.12), transparent 70%),
-    radial-gradient(ellipse 10px 12px at 78% 18%, rgba(167, 243, 208, 0.1), transparent 68%),
-    radial-gradient(ellipse 6px 8px at 42% 62%, rgba(255, 255, 255, 0.08), transparent 65%),
-    radial-gradient(ellipse 12px 14px at 88% 72%, rgba(110, 231, 183, 0.08), transparent 72%),
-    radial-gradient(ellipse 7px 9px at 22% 88%, rgba(255, 255, 255, 0.09), transparent 62%),
-    radial-gradient(ellipse 9px 11px at 55% 38%, rgba(167, 243, 208, 0.07), transparent 70%),
-    radial-gradient(ellipse 6px 7px at 92% 42%, rgba(255, 255, 255, 0.07), transparent 60%),
-    radial-gradient(ellipse 11px 13px at 8% 55%, rgba(110, 231, 183, 0.06), transparent 72%);
+    radial-gradient(ellipse 120% 80% at 50% 20%, rgba(52, 211, 153, 0.12), transparent 68%),
+    radial-gradient(ellipse 8px 10px at 15% 25%, rgba(255, 255, 255, 0.14), transparent 70%),
+    radial-gradient(ellipse 10px 12px at 78% 18%, rgba(167, 243, 208, 0.14), transparent 68%),
+    radial-gradient(ellipse 6px 8px at 42% 62%, rgba(110, 231, 183, 0.1), transparent 65%),
+    radial-gradient(ellipse 12px 14px at 88% 72%, rgba(110, 231, 183, 0.12), transparent 72%),
+    radial-gradient(ellipse 7px 9px at 22% 88%, rgba(167, 243, 208, 0.1), transparent 62%),
+    radial-gradient(ellipse 9px 11px at 55% 38%, rgba(167, 243, 208, 0.11), transparent 70%),
+    radial-gradient(ellipse 6px 7px at 92% 42%, rgba(255, 255, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse 11px 13px at 8% 55%, rgba(110, 231, 183, 0.1), transparent 72%);
   background-size:
     380px 420px,
     520px 480px,
@@ -1065,12 +1092,29 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: linear-gradient(180deg, rgba(8, 22, 18, 0.98) 0%, rgba(5, 15, 13, 1) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: visible;
+}
+
+.ss-mobile-nav-dock__grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .ss-mobile-nav-btn {
   min-height: 2.75rem;
+  min-width: 0;
+  max-width: 100%;
   font-size: 0.8125rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  overflow: visible;
+}
+
+.ss-mobile-nav-label {
+  display: block;
+  max-width: 100%;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .ss-mobile-nav-btn:focus-visible {
@@ -1248,9 +1292,14 @@ body {
   .ss-mobile-nav-btn {
     min-height: 2.55rem;
     border-radius: 0.65rem;
-    padding: 0.45rem 0.35rem;
-    font-size: 0.74rem;
+    padding: 0.45rem 0.25rem;
+    font-size: 0.72rem;
     letter-spacing: 0;
+  }
+
+  .ss-mobile-nav-label {
+    font-size: 0.68rem;
+    line-height: 1.12;
   }
 }
 
@@ -1283,6 +1332,10 @@ body {
   .ss-mobile-nav-btn {
     font-size: 0.7rem;
   }
+
+  .ss-mobile-nav-label {
+    font-size: 0.65rem;
+  }
 }
 
 @media (max-width: 320px) {
@@ -1293,6 +1346,12 @@ body {
   .ss-mobile-nav-btn {
     font-size: 0.6875rem;
     min-height: 2.35rem;
+    padding-inline: 0.2rem;
+  }
+
+  .ss-mobile-nav-label {
+    font-size: 0.625rem;
+    line-height: 1.1;
   }
 }
 

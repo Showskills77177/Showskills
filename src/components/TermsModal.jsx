@@ -25,7 +25,7 @@ function PrivacyPolicySection() {
         <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
           Privacy Policy
         </h2>
-        <p className="mt-2 text-xs text-zinc-500">Last updated: 21 May 2026</p>
+        <p className="mt-2 text-xs text-zinc-500">Last updated: 26 May 2026</p>
         <p className="mt-4 text-zinc-300">
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
@@ -39,8 +39,16 @@ function PrivacyPolicySection() {
         <li>Name, email address, and mobile phone number (when you enter a competition or buy tickets online)</li>
         <li>
           Payment information (processed securely by our payment providers, e.g. <strong>Cashflows</strong> and/or{' '}
-          <strong>PayPal</strong> — we do not
-          store your full card details)
+          <strong>PayPal</strong> — we do <strong>not</strong> store your full card number, CVV, or other card credentials
+          on our servers)
+        </li>
+        <li>
+          For <strong>free online entry</strong> to the Ronaldo Legacy Bundle, we may ask you to complete a{' '}
+          <strong>£0.00 card authorisation</strong> (verification only — you are not charged). Your card details are
+          entered only into <strong>Cashflows&apos; secure payment fields</strong>.{' '}
+          <strong>ShowSkills Rewards does not receive, store, or retain your card details</strong> from that £0
+          authorisation; Cashflows processes it under their own terms and security standards. We may keep a payment
+          reference or verification identifier to prevent duplicate or fraudulent entries.
         </li>
         <li>Answers to skill-based questions (paid entries after purchase and free postal or giveaway routes)</li>
         <li>Postal address (only if you submit a free postal entry)</li>
@@ -64,6 +72,10 @@ function PrivacyPolicySection() {
       <ul className="mb-3 list-inside list-disc space-y-1">
         <li>Administering competitions and contacting winners (by email and telephone where provided)</li>
         <li>Processing ticket payments and sending purchase or entry confirmations</li>
+        <li>
+          Running <strong>£0.00 card verification</strong> for eligible free online entries (anti-fraud and duplicate
+          prevention — we do not store card details from this step)
+        </li>
         <li>Verifying skill answers and qualifying entries</li>
         <li>Responding to enquiries via our contact form or email</li>
         <li>Improving our website (anonymous analytics, e.g. Vercel Analytics)</li>
@@ -109,7 +121,12 @@ function PrivacyPolicySection() {
           <strong>Winner data:</strong> basic details may be kept longer for legal, tax, and record-keeping purposes
         </li>
         <li>
-          <strong>Payment data:</strong> handled by our payment providers under their own retention policies
+          <strong>Payment data:</strong> handled by our payment providers under their own retention policies — we do not
+          hold your card details from paid checkout or from a £0 authorisation
+        </li>
+        <li>
+          <strong>Free online verification references:</strong> we may retain a Cashflows payment or verification
+          reference (not card numbers) for a limited time to enforce entry limits and resolve disputes
         </li>
       </ul>
 
@@ -251,7 +268,28 @@ export function TermsModal({ open, onClose }) {
             entrants — e.g. included in your postal entry or as directed on the site).
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">5. Free Ronaldo shirt giveaway (separate)</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">
+            5. Free online entry — £0 card verification (Ronaldo Legacy Bundle)
+          </h3>
+          <p className="mb-3">
+            Where offered on the site, you may enter the Ronaldo Legacy Bundle draw <strong>online without paying</strong>{' '}
+            subject to entry limits shown at checkout. Before you submit your skill answers, we may require{' '}
+            <strong>card verification at £0.00</strong> — a <strong>zero-pound authorisation only</strong> (you are{' '}
+            <strong>not charged</strong> for the ticket). This helps reduce abuse and duplicate entries.
+          </p>
+          <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
+            <strong>Card details are not stored by ShowSkills Rewards.</strong> You enter card details only in{' '}
+            <strong>Cashflows&apos; secure hosted fields</strong>. We do <strong>not</strong> receive, store, or keep
+            your full card number, expiry, CVV, or other card credentials from the £0 authorisation on our systems.
+            Cashflows processes the verification; we may receive only a confirmation, status, and a payment or job
+            reference to link your entry — not your card data.
+          </p>
+          <p className="mb-3">
+            After successful verification, you complete the same three skill questions as other entrants. The same
+            qualification rules apply. Free online entry limits (e.g. per name and address) are shown on the entry form.
+          </p>
+
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">6. Free Ronaldo shirt giveaway (separate)</h3>
           <p className="mb-3">
             The Ronaldo shirt giveaway is a <strong>separate, free engagement giveaway</strong> for promotion only. Entry
             is <strong>free</strong> (no payment). You answer one simple qualification question; the prize is a{' '}
@@ -268,20 +306,20 @@ export function TermsModal({ open, onClose }) {
             off your VPN before entering.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">6. Promotional rights and publicity</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">7. Promotional rights and publicity</h3>
           <p className="mb-3">
             By entering, you grant the promoter a <strong>non-exclusive, royalty-free, worldwide licence</strong> to use
             your entry (including name, voice, image, and likeness as in your submission) to run the promotions,
             announce results, and reasonable related marketing, unless you withdraw consent in writing where applicable.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">7. Winner verification</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">8. Winner verification</h3>
           <p className="mb-3">
             Winners must cooperate with <strong>reasonable verification</strong> (including ID / proof of eligibility).
             Refusal may result in forfeiture.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">8. Prizes</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">9. Prizes</h3>
           <p className="mb-3">
             Prizes are as described on this site. The bundle includes (illustratively) iPhone Pro Max, Ronaldo signed
             shirt (Manchester United era), signed football with COA, and premium case. Prizes are non-transferable unless
@@ -289,12 +327,13 @@ export function TermsModal({ open, onClose }) {
           </p>
 
           <h3 className="mb-2 mt-6 scroll-mt-4 font-semibold text-stone-200" id="ss-terms-ticket-payments">
-            9. Payments (paid tickets)
+            10. Payments (paid tickets)
           </h3>
           <p className="mb-3">
             Payments for <strong>ticket bundles</strong> are processed by our payment providers (e.g. Cashflows, PayPal).
-            This section applies to <strong>paid ticket purchases only</strong> (not free postal entries or free
-            giveaways).
+            This section applies to <strong>paid ticket purchases only</strong> (not free postal entries, £0 card
+            verification, or free giveaways). For paid tickets, card details are entered into our providers&apos;
+            secure fields — <strong>we do not store your full card details</strong> on our servers.
           </p>
           <PaidTicketNonRefundCallout />
           <p className="mb-3">
@@ -302,7 +341,7 @@ export function TermsModal({ open, onClose }) {
             your <strong>mandatory statutory rights</strong> under UK law where they apply.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">10. Personal data</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">11. Personal data</h3>
           <p className="mb-3">
             We process personal data to run these promotions. The rules above (eligibility, entries, payments, and
             winners) describe <strong>what</strong> we need from you to enter. <strong>How</strong> we collect, use,
@@ -316,25 +355,25 @@ export function TermsModal({ open, onClose }) {
             .
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">11. Limitation of liability</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">12. Limitation of liability</h3>
           <p className="mb-3">
             To the maximum extent permitted by law, we exclude liability except where caused by our negligence or fraud.
             Nothing limits statutory consumer rights in the UK.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">12. Disclaimer / third parties</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">13. Disclaimer / third parties</h3>
           <p className="mb-3">
             Promotions are <strong>not affiliated with, endorsed by, or sponsored by</strong> Cristiano Ronaldo,
             Manchester United FC, Apple Inc., or other third parties referenced. Trademarks belong to their owners.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">13. General</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">14. General</h3>
           <p className="mb-3">
             We may amend or cancel promotions if required. Our decisions on procedure are final where the law allows.
             Governing law: <strong>England and Wales</strong> (or mandatory UK consumer rules where applicable).
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">14. Contact</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">15. Contact</h3>
           <p className="mb-3">
             For general enquiries, complaints, cooperation requests, or feedback, use the{' '}
             <strong>contact form on this website</strong> or email{' '}
