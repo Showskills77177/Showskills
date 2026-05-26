@@ -13,6 +13,7 @@ export const CASHFLOWS_IFRAME_COPY_STYLE = {
   caretColor: 'rgb(245, 245, 244)',
   padding: '11px 14px',
   border: 'none',
+  borderRadius: '0',
   boxShadow: 'none',
   margin: '0',
 }

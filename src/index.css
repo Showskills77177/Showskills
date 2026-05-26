@@ -1984,7 +1984,7 @@ body {
   align-items: stretch;
   min-height: 48px;
   margin-top: 0.375rem;
-  border-radius: 0.75rem;
+  border-radius: 0;
   border: 1px solid rgb(255 255 255 / 0.14);
   background: rgb(7 21 18);
   overflow: hidden;
@@ -2019,7 +2019,7 @@ body {
   bottom: 0;
   z-index: 2;
   pointer-events: none !important;
-  border-radius: inherit;
+  border-radius: 0;
   background: rgb(12 28 24 / 0.94);
   transition: opacity 0.12s ease, visibility 0.12s ease;
 }
