@@ -59,8 +59,7 @@ function PaymentStatusMessage({ status, message }) {
 }
 
 /**
- * Covers Cashflows demo placeholders (0000… / MM/YY / 000) until the shopper focuses the field.
- * pointer-events: none so clicks reach the iframe; masks sit above the inverted field UI.
+ * Soft tint over Cashflows demo placeholders — pointer-events: none; host shell does not capture clicks.
  */
 function MaskedCardField({ label, htmlFor, hostRef, mask, ready, revealed, onReveal }) {
   return (
@@ -69,8 +68,8 @@ function MaskedCardField({ label, htmlFor, hostRef, mask, ready, revealed, onRev
         {label}
       </label>
       <div
-        className={`ss-cf-field-host${revealed ? ' ss-cf-field-host--active' : ''}`}
-        onPointerDown={() => onReveal()}
+        className={`ss-cf-field-host${revealed ? ' ss-cf-field-host--touched' : ''}`}
+        onPointerDownCapture={() => onReveal()}
       >
         <div ref={hostRef} className="ss-cf-field-host__slot" />
         {mask && ready && !revealed ? (

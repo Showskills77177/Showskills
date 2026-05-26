@@ -1988,7 +1988,8 @@ body {
   border: 1px solid rgb(255 255 255 / 0.14);
   background: rgb(7 21 18);
   overflow: hidden;
-  pointer-events: auto;
+  /* Let clicks pass through the shell to the Cashflows iframe (not the host background). */
+  pointer-events: none;
   transform: none;
   -webkit-transform: none;
   transition:
@@ -1997,52 +1998,67 @@ body {
 }
 
 .ss-cf-field-host__slot {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1 1 auto;
   align-items: stretch;
   min-height: 48px;
   min-width: 0;
+  pointer-events: auto;
 }
 
-/* Hides Cashflows demo placeholders (0000… / MM/YY / 000) until the field is used */
+.ss-cf-field-host__slot iframe {
+  pointer-events: auto !important;
+}
+
+/* Soft tint over demo placeholders — never blocks typing (pointer-events: none). */
 .ss-cf-placeholder-mask {
   position: absolute;
   top: 0;
   bottom: 0;
   z-index: 2;
-  pointer-events: none;
+  pointer-events: none !important;
   border-radius: inherit;
-  background: rgb(7 21 18);
-  transition: opacity 0.15s ease;
+  background: rgb(12 28 24 / 0.94);
+  transition: opacity 0.12s ease, visibility 0.12s ease;
 }
 
-.ss-cf-field-host--active .ss-cf-placeholder-mask {
+.ss-cf-field-host:focus-within .ss-cf-placeholder-mask,
+.ss-cf-field-host.ss-cf-field-host--touched .ss-cf-placeholder-mask {
   opacity: 0;
+  visibility: hidden;
 }
 
 .ss-cf-placeholder-mask--card {
   left: 0;
   right: 0;
+  background: linear-gradient(
+    105deg,
+    rgb(10 26 22 / 0.97) 0%,
+    rgb(8 22 19 / 0.92) 55%,
+    rgb(7 21 18 / 0.75) 100%
+  );
 }
 
 .ss-cf-placeholder-mask--expiry {
-  left: 14px;
-  width: 5.25rem;
+  left: 12px;
+  width: 4.75rem;
   background: linear-gradient(
     90deg,
-    rgb(7 21 18) 0%,
-    rgb(7 21 18) 88%,
+    rgb(10 26 22 / 0.96) 0%,
+    rgb(8 22 19 / 0.88) 70%,
     rgb(7 21 18 / 0) 100%
   );
 }
 
 .ss-cf-placeholder-mask--cvc {
-  left: 14px;
-  width: 3.25rem;
+  left: 12px;
+  width: 3rem;
   background: linear-gradient(
     90deg,
-    rgb(7 21 18) 0%,
-    rgb(7 21 18) 85%,
+    rgb(10 26 22 / 0.96) 0%,
+    rgb(8 22 19 / 0.88) 65%,
     rgb(7 21 18 / 0) 100%
   );
 }
