@@ -3,8 +3,10 @@ import { loadCashflowsConstructor } from '../lib/loadCashflows'
 import { apiUrl } from '../lib/api'
 import { CardBrandLogos } from './CardBrandLogos'
 import {
+  applyCashflowsHostFieldTheme,
   focusCashflowsMountForIos,
   isApplePayEmbeddedAvailable,
+  enableCashflowsIframePointerEvents,
   scheduleCashflowsPointerFix,
 } from '../lib/cashflowsFocusCompat'
 
@@ -34,6 +36,7 @@ function mountCardField(host, id, options) {
   if (!host) return null
   host.replaceChildren()
   const input = createCardInput(id, options)
+  applyCashflowsHostFieldTheme(input)
   host.appendChild(input)
   return input
 }
@@ -191,6 +194,7 @@ export function CashflowsPaymentForm({
 
         const cf = new Cashflows(intentToken, Boolean(isIntegration))
         await cf.initCard(numberEl, nameEl, expiryEl, cvcEl, `#${FIELD_IDS.pay}`)
+        enableCashflowsIframePointerEvents(mountRef.current)
 
         if (applePaySupported && document.getElementById(FIELD_IDS.applePay)) {
           await cf.initApplePay(`#${FIELD_IDS.applePay}`)

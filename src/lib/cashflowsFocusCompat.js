@@ -2,6 +2,33 @@
 
 export const CASHFLOWS_MOUNT_SELECTOR = '.ss-cashflows-pay'
 
+/** Copied from host inputs into Cashflows iframes at init — keep text light on dark fields. */
+export const CASHFLOWS_FIELD_THEME = {
+  color: '#ffffff',
+  backgroundColor: 'rgb(7, 21, 18)',
+  fontSize: '16px',
+  lineHeight: '1.25',
+  fontFamily:
+    'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  caretColor: '#ffffff',
+  borderRadius: '0.75rem',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  boxSizing: 'border-box',
+}
+
+export function applyCashflowsHostFieldTheme(input) {
+  if (!(input instanceof HTMLInputElement)) return
+  Object.assign(input.style, CASHFLOWS_FIELD_THEME)
+  input.style.setProperty('-webkit-text-fill-color', '#ffffff')
+}
+
+export function applyCashflowsIframeTheme(iframe) {
+  if (!(iframe instanceof HTMLIFrameElement)) return
+  Object.assign(iframe.style, CASHFLOWS_FIELD_THEME)
+  iframe.style.setProperty('-webkit-text-fill-color', '#ffffff')
+  iframe.style.colorScheme = 'dark'
+}
+
 export function isIosSafari() {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent
@@ -58,6 +85,7 @@ export function enableCashflowsIframePointerEvents(root) {
     iframe.style.zIndex = '1'
     iframe.style.transform = 'none'
     iframe.style.webkitTransform = 'none'
+    applyCashflowsIframeTheme(iframe)
   })
 }
 

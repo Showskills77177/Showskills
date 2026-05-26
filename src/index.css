@@ -1996,6 +1996,7 @@ body {
   transform: none;
   -webkit-transform: none;
   overflow: visible;
+  color-scheme: dark;
 }
 
 .ss-cf-field {
@@ -2009,7 +2010,9 @@ body {
   padding: 0.75rem 1rem;
   font-size: 16px;
   line-height: 1.25;
-  color: rgb(231 229 228);
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
 }
 
@@ -2025,6 +2028,12 @@ body {
   border-radius: 0.75rem !important;
   border: 1px solid rgb(255 255 255 / 0.12) !important;
   background: rgb(7 21 18 / 0.92) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff !important;
+  font-size: 16px !important;
+  line-height: 1.25 !important;
+  color-scheme: dark !important;
   pointer-events: auto !important;
   position: relative !important;
   z-index: 1 !important;
