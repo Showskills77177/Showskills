@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { formatBundlePriceGBP } from '../competitionData'
+import { attachCashflowsFocusCompat } from '../lib/cashflowsFocusCompat'
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
 import { CashflowsPaymentForm } from './CashflowsPaymentForm'
@@ -39,6 +40,11 @@ export function PaymentCheckoutSheet({
   onPayPalError,
 }) {
   const panelRef = useRef(null)
+
+  useEffect(() => {
+    if (!open || !panelRef.current) return undefined
+    return attachCashflowsFocusCompat(panelRef.current)
+  }, [open])
 
   if (!open) return null
 
@@ -108,7 +114,7 @@ export function PaymentCheckoutSheet({
           ) : null}
         </header>
 
-        <div className="ss-payment-sheet-body min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="ss-payment-sheet-body flex min-h-0 flex-1 flex-col overflow-hidden">
           {paidError ? (
             <div className="shrink-0 px-4 pt-3 sm:px-5">
               <ErrorBanner message={paidError} />
@@ -126,7 +132,7 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {showCardEmpty ? (
-            <div className="flex shrink-0 flex-col items-center gap-4 px-4 py-10 text-center">
+            <div className="flex shrink-0 flex-col items-center gap-4 overflow-y-auto px-4 py-10 text-center">
               <p className="max-w-md text-sm text-stone-400">
                 Secure checkout could not start. Try again in a moment. If this keeps happening, check your
                 connection or contact support.
@@ -144,7 +150,7 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {cashflowsReady ? (
-            <div className="ss-payment-cashflows-zone overflow-visible px-4 py-4 sm:px-5 sm:py-5">
+            <div className="ss-payment-cashflows-zone min-h-0 flex-1 overflow-visible px-4 py-4 sm:px-5 sm:py-5">
               <CashflowsPaymentForm
                 intentToken={paidCashflowsToken}
                 isIntegration={paidCashflowsIntegration}
