@@ -63,6 +63,7 @@ export function EntryModal() {
     handlePaidQuizSubmit,
     markPaidCheckoutComplete,
     hasCardCheckout,
+    paymentNotConfiguredMessage,
     hasCashflowsEmbedded,
     hasEmbeddedCardCheckout,
     paidCashflowsToken,
@@ -493,11 +494,8 @@ export function EntryModal() {
                       </p>
                     </div>
                   ) : null}
-                  {!hasCardCheckout &&
-                  !hasPayPal &&
-                  paidEntryRoute === 'tickets' &&
-                  !E2E_SIMULATE_CHECKOUT ? (
-                    <ErrorBanner message="Payments are not configured. Add Cashflows and/or PayPal (see .env.example)." />
+                  {paymentNotConfiguredMessage && paidEntryRoute === 'tickets' ? (
+                    <ErrorBanner message={paymentNotConfiguredMessage} />
                   ) : null}
                   {paidEntryRoute === 'tickets' &&
                   (hasCardCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&

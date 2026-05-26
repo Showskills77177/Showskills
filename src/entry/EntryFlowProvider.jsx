@@ -18,6 +18,7 @@ import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
+import { isCashflowsFrontendEnabled } from '../../shared/paymentFrontendConfig.mjs'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -105,14 +106,26 @@ export function EntryFlowProvider({ children }) {
   const hasPayPal = Boolean(payPalClientId)
   const payPalCurrency = (import.meta.env.VITE_PAYPAL_CURRENCY ?? 'GBP').trim().toUpperCase()
 
-  const cashflowsEnabled =
-    import.meta.env.VITE_CASHFLOWS_ENABLED === '1' ||
-    import.meta.env.VITE_CASHFLOWS_ENABLED === 'true'
+  const cashflowsFrontendOn = isCashflowsFrontendEnabled()
   const cashflowsCreateOverride = (import.meta.env.VITE_CASHFLOWS_CREATE_INTENT_URL ?? '').trim()
-  const cashflowsCreateApi = cashflowsEnabled
+  const cashflowsCreateApi = cashflowsFrontendOn
     ? cashflowsCreateOverride || `${baseUrl}/api/create-cashflows-payment-intent`
     : ''
-  const hasCashflowsEmbedded = Boolean(cashflowsCreateApi)
+  const [serverPaymentConfig, setServerPaymentConfig] = useState(null)
+
+  useEffect(() => {
+    if (!cashflowsFrontendOn) return
+    void fetch(apiUrl('/api/payment-config'), { credentials: 'include' })
+      .then((res) => res.json().catch(() => ({})))
+      .then((data) => {
+        if (typeof data === 'object' && data !== null) setServerPaymentConfig(data)
+      })
+      .catch(() => {})
+  }, [cashflowsFrontendOn])
+
+  const hasCashflowsEmbedded = Boolean(
+    cashflowsCreateApi && (serverPaymentConfig === null || serverPaymentConfig.cashflows === true),
+  )
   const hasEmbeddedCardCheckout = hasCashflowsEmbedded
   const hasCardCheckout = hasCashflowsEmbedded
 
@@ -803,6 +816,17 @@ export function EntryFlowProvider({ children }) {
     [kickAnswer, kickConsent, kickEmail, kickFullName, kickPhone, kickVpnBlocked],
   )
 
+  const paymentNotConfiguredMessage = useMemo(() => {
+    if (hasPayPal || hasCardCheckout) return ''
+    if (serverPaymentConfig?.cashflows === false) {
+      return 'Card payments are not set up on the server. In Vercel → Environment Variables, add CASHFLOWS_CONFIGURATION_ID, CASHFLOWS_API_KEY, and CASHFLOWS_INTEGRATION=0 for Production, then redeploy.'
+    }
+    if (import.meta.env.PROD) {
+      return 'Payments are loading or not configured. If this stays, check Cashflows env vars in Vercel and redeploy.'
+    }
+    return 'Payments are not configured. Add Cashflows (CASHFLOWS_* + VITE_CASHFLOWS_ENABLED=1) or PayPal — see .env.example.'
+  }, [hasPayPal, hasCardCheckout, serverPaymentConfig])
+
   const value = useMemo(
     () => ({
       termsOpen,
@@ -847,6 +871,7 @@ export function EntryFlowProvider({ children }) {
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
       hasCardCheckout,
+      paymentNotConfiguredMessage,
       hasCashflowsEmbedded,
       hasEmbeddedCardCheckout,
       paidCashflowsToken,
@@ -883,6 +908,7 @@ export function EntryFlowProvider({ children }) {
       openResumePaidQuiz,
     }),
     [
+      serverPaymentConfig,
       termsOpen,
       openTerms,
       entryModalType,
@@ -914,6 +940,7 @@ export function EntryFlowProvider({ children }) {
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
       hasCardCheckout,
+      paymentNotConfiguredMessage,
       hasCashflowsEmbedded,
       hasEmbeddedCardCheckout,
       paidCashflowsToken,
