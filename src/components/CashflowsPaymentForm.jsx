@@ -181,9 +181,8 @@ export function CashflowsPaymentForm({
         await new Promise((resolve) => requestAnimationFrame(resolve))
         if (cancelled || generation !== initGenerationRef.current) return
 
-        const payBtn = payButtonRef.current
         const appleBtn = applePayRef.current
-        if (!payBtn) {
+        if (!document.getElementById(FIELD_IDS.pay)) {
           throw new Error('Payment button is not ready. Please try again.')
         }
 
@@ -224,7 +223,8 @@ export function CashflowsPaymentForm({
         if (cancelled || generation !== initGenerationRef.current) return
 
         const cf = new Cashflows(intentToken, Boolean(isIntegration))
-        await cf.initCard(numberEl, nameEl, expiryEl, cvcEl, payBtn)
+        // Cashflows only accepts an <input> or a CSS selector for the pay control — not HTMLButtonElement.
+        await cf.initCard(numberEl, nameEl, expiryEl, cvcEl, `#${FIELD_IDS.pay}`)
         if (appleBtn) {
           await cf.initApplePay(appleBtn)
         }
