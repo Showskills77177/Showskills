@@ -1935,7 +1935,7 @@ body {
 }
 
 .ss-checkout-card-panel {
-  border-radius: 1rem;
+  border-radius: 0;
   border: 1px solid rgb(255 255 255 / 0.1);
   background: linear-gradient(165deg, rgb(12 18 16 / 0.95), rgb(7 12 11 / 0.98));
   padding: 1rem 1rem 0.875rem;
@@ -1978,11 +1978,19 @@ body {
   color: rgb(168 162 158);
 }
 
+.ss-cf-inline-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
 .ss-cf-field-host {
   position: relative;
   display: flex;
   align-items: stretch;
-  min-height: 48px;
+  width: 100%;
+  min-height: 40px;
   margin-top: 0.375rem;
   border-radius: 0;
   border: 1px solid rgb(255 255 255 / 0.14);
@@ -1997,70 +2005,28 @@ body {
     box-shadow 0.15s ease;
 }
 
+/* Card + name: full panel width. Expiry/CVC: only as wide as needed, but not cramped. */
+.ss-cf-field-host--expiry {
+  max-width: 9rem;
+}
+
+.ss-cf-field-host--cvc {
+  max-width: 7rem;
+}
+
 .ss-cf-field-host__slot {
   position: relative;
   z-index: 1;
   display: flex;
   flex: 1 1 auto;
   align-items: stretch;
-  min-height: 48px;
+  min-height: 40px;
   min-width: 0;
   pointer-events: auto;
 }
 
 .ss-cf-field-host__slot iframe {
   pointer-events: auto !important;
-}
-
-/* Soft tint over demo placeholders — never blocks typing (pointer-events: none). */
-.ss-cf-placeholder-mask {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 2;
-  pointer-events: none !important;
-  border-radius: 0;
-  background: rgb(12 28 24 / 0.94);
-  transition: opacity 0.12s ease, visibility 0.12s ease;
-}
-
-.ss-cf-field-host:focus-within .ss-cf-placeholder-mask,
-.ss-cf-field-host.ss-cf-field-host--touched .ss-cf-placeholder-mask {
-  opacity: 0;
-  visibility: hidden;
-}
-
-.ss-cf-placeholder-mask--card {
-  left: 0;
-  right: 0;
-  background: linear-gradient(
-    105deg,
-    rgb(10 26 22 / 0.97) 0%,
-    rgb(8 22 19 / 0.92) 55%,
-    rgb(7 21 18 / 0.75) 100%
-  );
-}
-
-.ss-cf-placeholder-mask--expiry {
-  left: 12px;
-  width: 4.75rem;
-  background: linear-gradient(
-    90deg,
-    rgb(10 26 22 / 0.96) 0%,
-    rgb(8 22 19 / 0.88) 70%,
-    rgb(7 21 18 / 0) 100%
-  );
-}
-
-.ss-cf-placeholder-mask--cvc {
-  left: 12px;
-  width: 3rem;
-  background: linear-gradient(
-    90deg,
-    rgb(10 26 22 / 0.96) 0%,
-    rgb(8 22 19 / 0.88) 65%,
-    rgb(7 21 18 / 0) 100%
-  );
 }
 
 .ss-cf-field-host:focus-within {
@@ -2091,10 +2057,10 @@ body {
 .ss-cf-field {
   display: block;
   width: 100%;
-  min-height: 48px;
+  min-height: 40px;
   border: none;
   background: transparent;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;
   font-size: 16px;
   line-height: 1.25;
   color: rgb(245 245 244);
@@ -2107,8 +2073,8 @@ body {
 .ss-cashflows-pay .ss-cf-field-host iframe.cf-cardcvc {
   flex: 1 1 auto;
   width: 100% !important;
-  min-height: 48px !important;
-  height: 48px !important;
+  min-height: 40px !important;
+  height: 40px !important;
   margin: 0 !important;
   padding: 0 !important;
   border: none !important;
@@ -2144,7 +2110,7 @@ body {
   .ss-cashflows-pay iframe.cf-cardholdername,
   .ss-cashflows-pay iframe.cf-cardexpiry,
   .ss-cashflows-pay iframe.cf-cardcvc {
-    min-height: 48px;
+    min-height: 40px;
   }
 }
 

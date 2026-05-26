@@ -5,15 +5,31 @@
  *   CASHFLOWS_INTEGRATION=1 node scripts/test-cashflows-gateway.mjs
  */
 import { config as loadEnv } from 'dotenv'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createCashflowsPaymentIntent, getCashflowsConfig } from '../backend/api/lib/cashflows.mjs'
 
-loadEnv({ path: resolve(process.cwd(), '.env.local') })
-loadEnv({ path: resolve(process.cwd(), '.env') })
+const root = process.cwd()
+const integrationPath = resolve(root, '.env.integration.local')
+
+loadEnv({ path: resolve(root, '.env.local') })
+loadEnv({ path: resolve(root, '.env') })
+
+const useIntegration =
+  process.env.CASHFLOWS_INTEGRATION === '1' ||
+  process.env.CASHFLOWS_INTEGRATION === 'true' ||
+  process.env.SS_CASHFLOWS_USE_INTEGRATION === '1'
+
+if (useIntegration && existsSync(integrationPath)) {
+  loadEnv({ path: integrationPath, override: true })
+}
 
 const cfg = getCashflowsConfig()
 if (!cfg.configured) {
-  console.error('Missing CASHFLOWS_CONFIGURATION_ID or CASHFLOWS_API_KEY in .env.local')
+  const envHint = useIntegration
+    ? '.env.integration.local (sandbox keys from https://secure-int.cashflows.com/)'
+    : '.env.local (live keys; use CASHFLOWS_INTEGRATION=0)'
+  console.error(`Missing CASHFLOWS_CONFIGURATION_ID or CASHFLOWS_API_KEY in ${envHint}`)
   process.exit(1)
 }
 

@@ -18,6 +18,7 @@ import { PaymentCheckoutSheet } from './PaymentCheckoutSheet'
 import { PayPalPayButton } from './PayPalPayButton'
 import { EntryTermsConsent } from './EntryTermsConsent'
 import { TicketBundlePicker } from './TicketBundlePicker'
+import { CashflowsPaymentForm } from './CashflowsPaymentForm'
 import { PHONE_COLLECTION_NOTICE } from '../../shared/contactPhone.mjs'
 
 export function EntryModal() {
@@ -93,6 +94,22 @@ export function EntryModal() {
     kickCheckingVpn,
     handleKickupsGiveawaySubmit,
     PAID_SKILL_QUESTIONS,
+    freeAddressLine1,
+    setFreeAddressLine1,
+    freeAddressLine2,
+    setFreeAddressLine2,
+    freeCity,
+    setFreeCity,
+    freePostcode,
+    setFreePostcode,
+    freePreparing,
+    freeCardVerified,
+    freeQuizSubmitting,
+    hasCashflowsFreeVerify,
+    freeVerifyPayload,
+    handleStartFreeVerification,
+    handleFreeCardVerified,
+    handleFreeQuizSubmit,
   } = useEntryFlow()
 
   const panelRef = useRef(null)
@@ -236,7 +253,7 @@ export function EntryModal() {
             <>
               <p className="text-sm text-stone-500">
                 <strong className="text-stone-300">Ronaldo Legacy Bundle draw.</strong> Pick a ticket bundle to pay online,
-                or choose free postal entry for the same prize pool. Then type three Ronaldo skill answers (no multiple
+                free online entry (£0 card verify), or free postal entry for the same prize pool. Then type three Ronaldo skill answers (no multiple
                 choice). All must be correct to qualify; winner picked at random from correct entries.
               </p>
               {paidPostCheckout && paidQuizSubmitted ? (
@@ -426,6 +443,163 @@ export function EntryModal() {
                     selectedTicketBundle={selectedTicketBundle}
                     visibleTicketBundles={visibleTicketBundles}
                   />
+                  {paidEntryRoute === 'free_online' ? (
+                    <>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <label htmlFor="modal-free-fullname" className="block text-sm font-medium text-stone-300">
+                            Full name
+                          </label>
+                          <input
+                            id="modal-free-fullname"
+                            type="text"
+                            autoComplete="name"
+                            value={paidFullName}
+                            onChange={(e) => setPaidFullName(e.target.value)}
+                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label htmlFor="modal-free-email" className="block text-sm font-medium text-stone-300">
+                            Email
+                          </label>
+                          <input
+                            id="modal-free-email"
+                            type="email"
+                            autoComplete="email"
+                            value={paidEmail}
+                            onChange={(e) => setPaidEmail(e.target.value)}
+                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          />
+                        </div>
+                        <EntryPhoneField
+                          id="modal-free-phone"
+                          value={paidPhone}
+                          onChange={setPaidPhone}
+                        />
+                        <div className="sm:col-span-2">
+                          <label htmlFor="modal-free-addr1" className="block text-sm font-medium text-stone-300">
+                            Address line 1
+                          </label>
+                          <input
+                            id="modal-free-addr1"
+                            type="text"
+                            autoComplete="street-address"
+                            value={freeAddressLine1}
+                            onChange={(e) => setFreeAddressLine1(e.target.value)}
+                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label htmlFor="modal-free-addr2" className="block text-sm font-medium text-stone-300">
+                            Address line 2 (optional)
+                          </label>
+                          <input
+                            id="modal-free-addr2"
+                            type="text"
+                            autoComplete="address-line2"
+                            value={freeAddressLine2}
+                            onChange={(e) => setFreeAddressLine2(e.target.value)}
+                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="modal-free-city" className="block text-sm font-medium text-stone-300">
+                            Town / city
+                          </label>
+                          <input
+                            id="modal-free-city"
+                            type="text"
+                            autoComplete="address-level2"
+                            value={freeCity}
+                            onChange={(e) => setFreeCity(e.target.value)}
+                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="modal-free-postcode" className="block text-sm font-medium text-stone-300">
+                            Postcode
+                          </label>
+                          <input
+                            id="modal-free-postcode"
+                            type="text"
+                            autoComplete="postal-code"
+                            value={freePostcode}
+                            onChange={(e) => setFreePostcode(e.target.value)}
+                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs leading-relaxed text-stone-500">
+                        Max 3 free online entries per name and address. Verify your card first (£0.00 authorisation, no
+                        charge), then answer three skill questions.
+                      </p>
+                      {freeCardVerified ? (
+                        <form className="flex flex-col gap-4" onSubmit={handleFreeQuizSubmit}>
+                          <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
+                            <p className="font-medium text-teal-50">Card verified</p>
+                            <p className="mt-1 text-teal-100/90">
+                              Answer all three skill questions below. You only qualify for the draw if every answer is
+                              correct.
+                            </p>
+                          </div>
+                          {PAID_SKILL_QUESTIONS.map((q, i) => (
+                            <div key={q.id}>
+                              <label
+                                htmlFor={`modal-free-q-${q.id}`}
+                                className="block text-sm font-medium text-stone-300"
+                              >
+                                {i + 1}. {q.prompt}
+                              </label>
+                              <input
+                                id={`modal-free-q-${q.id}`}
+                                type="text"
+                                value={i === 0 ? paidA1 : i === 1 ? paidA2 : paidA3}
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                  if (i === 0) setPaidA1(v)
+                                  else if (i === 1) setPaidA2(v)
+                                  else setPaidA3(v)
+                                }}
+                                className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                                placeholder="Type your answer"
+                              />
+                            </div>
+                          ))}
+                          <button
+                            type="submit"
+                            disabled={freeQuizSubmitting}
+                            className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {freeQuizSubmitting ? 'Submitting…' : 'Submit free entry'}
+                          </button>
+                        </form>
+                      ) : !paidCashflowsToken ? (
+                        <button
+                          type="button"
+                          onClick={handleStartFreeVerification}
+                          disabled={freePreparing || !hasCashflowsFreeVerify}
+                          className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {freePreparing ? 'Preparing verification…' : 'Continue to card verification (£0)'}
+                        </button>
+                      ) : (
+                        <CashflowsPaymentForm
+                          intentToken={paidCashflowsToken}
+                          isIntegration={paidCashflowsIntegration}
+                          paymentJobReference={paidCashflowsJobRef}
+                          amountLabel="£0.00"
+                          recordPayload={freeVerifyPayload}
+                          flow="free_verify"
+                          panelTitle="Card verification (£0)"
+                          payButtonLabel="Verify card (£0)"
+                          onSuccess={handleFreeCardVerified}
+                          onError={(msg) => setPaidError(msg)}
+                          disabled={!paidConsent}
+                        />
+                      )}
+                    </>
+                  ) : null}
                   {paidEntryRoute === 'tickets' ? (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="sm:col-span-2">

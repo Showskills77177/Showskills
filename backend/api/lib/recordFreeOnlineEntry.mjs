@@ -9,9 +9,11 @@ import { upsertUserContact } from './userContact.mjs'
 import { getOpenCompetitionPeriodForEntry } from './competitionPeriods.mjs'
 
 /**
- * After SetupIntent succeeds: one free draw slot (ticket number), quiz entry, audit row.
+ * After £0 card verification succeeds: one free draw slot (ticket number), quiz entry, audit row.
+ * @param {string} verificationId — Stripe setup intent id or Cashflows paymentJobReference
  */
 export async function recordFreeOnlineEntry({
+  verificationId,
   setupIntentId,
   customerEmail,
   customerFullName,
@@ -23,18 +25,30 @@ export async function recordFreeOnlineEntry({
 }) {
   if (!isDbConfigured()) return { ok: false, error: 'Database not configured' }
 
+  const sessionId = (verificationId || setupIntentId || '').trim()
+  if (!sessionId) return { ok: false, error: 'Missing verification session' }
+
   await ensureTicketSchema()
   await ensureFreeEntrySchema()
+
+  const periodResult = await getOpenCompetitionPeriodForEntry()
+  if (!periodResult.ok) {
+    return { ok: false, error: periodResult.error || 'No open competition period' }
+  }
 
   const validation = validatePaidSkillAnswers(answers?.q1, answers?.q2, answers?.q3)
   const allCorrect = validation.allCorrect
 
-  const dup = await query(`SELECT id FROM free_online_entries WHERE setup_intent_id = $1`, [setupIntentId])
+  const dup = await query(`SELECT id FROM free_online_entries WHERE setup_intent_id = $1`, [sessionId])
   if (dup.rows[0]) {
     return { ok: true, duplicate: true, allCorrect, validation }
   }
 
-  const userId = await upsertUserSimple(customerEmail, customerFullName)
+  const userId = await upsertUserContact({
+    email: customerEmail,
+    fullName: customerFullName,
+    phone: customerPhone,
+  })
   const ticketNumbers = await reserveTicketNumbers(1)
   const ticketId = randomUUID()
   const ticketPublicId = `ORD-${randomBytes(4).toString('hex').toUpperCase()}`
@@ -46,7 +60,7 @@ export async function recordFreeOnlineEntry({
       id, ticket_public_id, user_id, bundle_id, quantity, payment_status,
       stripe_payment_intent_id, purchased_at, period_id
     ) VALUES ($1, $2, $3, 'free_online', 1, 'free_verified', $4, $5, $6)`,
-    [ticketId, ticketPublicId, userId, setupIntentId, purchasedAt, periodResult.period.id],
+    [ticketId, ticketPublicId, userId, sessionId, purchasedAt, periodResult.period.id],
   )
 
   const tnId = randomUUID()
@@ -57,13 +71,18 @@ export async function recordFreeOnlineEntry({
 
   await query(
     `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
-     VALUES ($1, $2, $3, $4, 0, 'gbp', 'stripe_setup', 'successful', $5)`,
+     VALUES ($1, $2, $3, $4, 0, 'gbp', $5, 'successful', $6)`,
     [
       payId,
-      `setup_${setupIntentId}`,
+      sessionId.startsWith('seti_') ? `setup_${sessionId}` : `cf_free_${sessionId}`,
       userId,
       ticketId,
-      JSON.stringify({ setup_intent_id: setupIntentId, free_entry: true }),
+      sessionId.startsWith('seti_') ? 'stripe_setup' : 'cashflows',
+      JSON.stringify({
+        verification_id: sessionId,
+        free_entry: true,
+        ...(sessionId.startsWith('seti_') ? { setup_intent_id: sessionId } : { payment_job_reference: sessionId }),
+      }),
     ],
   )
 
@@ -93,7 +112,7 @@ export async function recordFreeOnlineEntry({
       address.addressLine2 || null,
       address.city,
       address.postcode,
-      setupIntentId,
+      sessionId,
       ticketId,
       entryId,
       ipAddress || null,

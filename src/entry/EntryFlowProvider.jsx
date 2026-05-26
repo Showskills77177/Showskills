@@ -78,6 +78,15 @@ export function EntryFlowProvider({ children }) {
   )
   const [paidPhone, setPaidPhone] = useState(() => initialContact?.phone || '')
 
+  const [freeAddressLine1, setFreeAddressLine1] = useState('')
+  const [freeAddressLine2, setFreeAddressLine2] = useState('')
+  const [freeCity, setFreeCity] = useState('')
+  const [freePostcode, setFreePostcode] = useState('')
+  const [freePreparing, setFreePreparing] = useState(false)
+  const [freeCardVerified, setFreeCardVerified] = useState(false)
+  const [freeVerificationJobRef, setFreeVerificationJobRef] = useState('')
+  const [freeQuizSubmitting, setFreeQuizSubmitting] = useState(false)
+
   const [kickFullName, setKickFullName] = useState('')
   const [kickAnswer, setKickAnswer] = useState('')
   const [kickEmail, setKickEmail] = useState('')
@@ -127,6 +136,7 @@ export function EntryFlowProvider({ children }) {
   const hasCashflowsEmbedded = Boolean(
     cashflowsCreateApi && (serverPaymentConfig === null || serverPaymentConfig.cashflows === true),
   )
+  const hasCashflowsFreeVerify = hasCashflowsEmbedded
   const hasEmbeddedCardCheckout = hasCashflowsEmbedded
   const hasCardCheckout = hasCashflowsEmbedded
 
@@ -629,7 +639,153 @@ export function EntryFlowProvider({ children }) {
   useEffect(() => {
     setPaidCashflowsToken('')
     setPaidCashflowsJobRef('')
-  }, [paidBundleId, paidEmail, paidFullName, paidEntryRoute])
+    if (paidEntryRoute !== 'free_online') {
+      setFreeCardVerified(false)
+      setFreeVerificationJobRef('')
+    }
+  }, [paidBundleId, paidEmail, paidFullName, paidEntryRoute, freeAddressLine1, freeCity, freePostcode])
+
+  const freeVerifyPayload = useMemo(
+    () => ({
+      fullName: paidFullName.trim(),
+      email: paidEmail.trim(),
+      phone: paidPhone.trim(),
+      customerPhone: paidPhone.trim(),
+      addressLine1: freeAddressLine1.trim(),
+      addressLine2: freeAddressLine2.trim(),
+      city: freeCity.trim(),
+      postcode: freePostcode.trim(),
+    }),
+    [paidFullName, paidEmail, paidPhone, freeAddressLine1, freeAddressLine2, freeCity, freePostcode],
+  )
+
+  const handleStartFreeVerification = useCallback(async () => {
+    setPaidError('')
+    setFreeCardVerified(false)
+    setFreeVerificationJobRef('')
+    setPaidQuizSubmitted(false)
+    setPaidQuizResult(null)
+    if (!paidConsent) {
+      setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
+      return
+    }
+    if (!paidFullName.trim()) {
+      setPaidError('Please enter your full name.')
+      return
+    }
+    if (!paidEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())) {
+      setPaidError('Please enter a valid email address.')
+      return
+    }
+    const phoneCheck = validateContactPhone(paidPhone)
+    if (!phoneCheck.ok) {
+      setPaidError(phoneCheck.error)
+      return
+    }
+    if (!freeAddressLine1.trim() || !freeCity.trim() || freePostcode.trim().length < 4) {
+      setPaidError('Please enter your full postal address (line 1, town/city, and postcode).')
+      return
+    }
+    if (!hasCashflowsFreeVerify) {
+      setPaidError('Card verification is not configured. Please try again later.')
+      return
+    }
+    setFreePreparing(true)
+    setPaidCashflowsToken('')
+    setPaidCashflowsJobRef('')
+    try {
+      const res = await fetch(apiUrl('/api/create-cashflows-free-verification'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(freeVerifyPayload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPaidError(typeof data.error === 'string' ? data.error : 'Could not start card verification.')
+        return
+      }
+      const token = typeof data.token === 'string' ? data.token : ''
+      const jobRef = typeof data.paymentJobReference === 'string' ? data.paymentJobReference : ''
+      if (!token || !jobRef) {
+        setPaidError('Invalid verification response from payment provider.')
+        return
+      }
+      setPaidCashflowsToken(token)
+      setPaidCashflowsJobRef(jobRef)
+      setPaidCashflowsIntegration(Boolean(data.isIntegration))
+    } catch {
+      setPaidError('Network error. Check your connection and try again.')
+    } finally {
+      setFreePreparing(false)
+    }
+  }, [paidConsent, paidFullName, paidEmail, paidPhone, freeAddressLine1, freeCity, freePostcode, hasCashflowsFreeVerify, freeVerifyPayload])
+
+  const handleFreeCardVerified = useCallback((data) => {
+    setPaidCashflowsToken('')
+    setPaidCashflowsJobRef('')
+    setFreeCardVerified(true)
+    if (typeof data.paymentJobReference === 'string' && data.paymentJobReference) {
+      setFreeVerificationJobRef(data.paymentJobReference)
+    }
+    setPaidError('')
+  }, [])
+
+  const handleFreeQuizSubmit = useCallback(
+    async (e) => {
+      e.preventDefault()
+      setPaidError('')
+      if (!paidConsent) {
+        setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
+        return
+      }
+      if (!freeCardVerified || !freeVerificationJobRef) {
+        setPaidError('Please verify your card first, then answer the skill questions.')
+        return
+      }
+      if (!paidA1.trim() || !paidA2.trim() || !paidA3.trim()) {
+        setPaidError('Please answer all three skill questions.')
+        return
+      }
+      setFreeQuizSubmitting(true)
+      try {
+        const res = await fetch(apiUrl('/api/complete-free-entry'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            ...freeVerifyPayload,
+            paymentJobReference: freeVerificationJobRef,
+            answers: { q1: paidA1.trim(), q2: paidA2.trim(), q3: paidA3.trim() },
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setPaidError(typeof data.error === 'string' ? data.error : 'Could not submit your free entry.')
+          return
+        }
+        setPaidOrderRef(data.orderRef || '')
+        setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
+        setPaidPostCheckout(true)
+        setPaidQuizSubmitted(true)
+        setPaidQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
+        if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
+      } catch {
+        setPaidError('Network error. Check your connection and try again.')
+      } finally {
+        setFreeQuizSubmitting(false)
+      }
+    },
+    [
+      paidConsent,
+      freeCardVerified,
+      freeVerificationJobRef,
+      freeVerifyPayload,
+      paidA1,
+      paidA2,
+      paidA3,
+    ],
+  )
 
   const handlePaidEntry = useCallback(async () => {
     setPaidError('')
@@ -917,6 +1073,23 @@ export function EntryFlowProvider({ children }) {
       PAID_SKILL_QUESTIONS,
       paidQuizNavStatus,
       openResumePaidQuiz,
+      freeAddressLine1,
+      setFreeAddressLine1,
+      freeAddressLine2,
+      setFreeAddressLine2,
+      freeCity,
+      setFreeCity,
+      freePostcode,
+      setFreePostcode,
+      freePreparing,
+      freeCardVerified,
+      freeVerificationJobRef,
+      freeQuizSubmitting,
+      hasCashflowsFreeVerify,
+      freeVerifyPayload,
+      handleStartFreeVerification,
+      handleFreeCardVerified,
+      handleFreeQuizSubmit,
     }),
     [
       serverPaymentConfig,
@@ -979,6 +1152,19 @@ export function EntryFlowProvider({ children }) {
       handleKickupsGiveawaySubmit,
       paidQuizNavStatus,
       openResumePaidQuiz,
+      freeAddressLine1,
+      freeAddressLine2,
+      freeCity,
+      freePostcode,
+      freePreparing,
+      freeCardVerified,
+      freeVerificationJobRef,
+      freeQuizSubmitting,
+      hasCashflowsFreeVerify,
+      freeVerifyPayload,
+      handleStartFreeVerification,
+      handleFreeCardVerified,
+      handleFreeQuizSubmit,
     ],
   )
 

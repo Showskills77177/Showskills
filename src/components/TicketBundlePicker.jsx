@@ -14,7 +14,8 @@ export function TicketBundlePicker({
   visibleTicketBundles,
 }) {
   const bundles = visibleTicketBundles?.length ? visibleTicketBundles : []
-  const selectValue = paidEntryRoute === 'postal' ? 'postal' : paidBundleId
+  const selectValue =
+    paidEntryRoute === 'postal' ? 'postal' : paidEntryRoute === 'free_online' ? 'free_online' : paidBundleId
 
   return (
     <div>
@@ -35,6 +36,10 @@ export function TicketBundlePicker({
                 setPaidEntryRoute('postal')
                 return
               }
+              if (v === 'free_online') {
+                setPaidEntryRoute('free_online')
+                return
+              }
               setPaidEntryRoute('tickets')
               setPaidBundleId(v)
             }}
@@ -47,6 +52,7 @@ export function TicketBundlePicker({
               </option>
             ))}
           </optgroup>
+          <option value="free_online">Free online entry (card verify, £0)</option>
           <option value="postal">Free postal entry (same draw)</option>
           </select>
           <ChevronDown
@@ -68,6 +74,12 @@ export function TicketBundlePicker({
               <p className="mt-1 text-xs text-stone-500">{selectedTicketBundle.bullets[0]}</p>
             ) : null}
           </div>
+        ) : null}
+        {paidEntryRoute === 'free_online' ? (
+          <p className="mt-2 text-xs leading-relaxed text-stone-500">
+            Verify your card online (£0, no charge), then answer three skill questions — same Ronaldo Legacy Bundle
+            prize pool as paid tickets.
+          </p>
         ) : null}
         {paidEntryRoute === 'postal' ? (
           <p className="mt-2 text-xs leading-relaxed text-stone-500">
@@ -124,6 +136,37 @@ export function TicketBundlePicker({
             </div>
           </label>
         ))}
+        <label
+          className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
+            paidEntryRoute === 'free_online'
+              ? 'border-teal-400/45 bg-teal-950/30 ring-1 ring-teal-500/20'
+              : 'border-white/10 bg-black/20 hover:border-white/18'
+          }`}
+        >
+          <input
+            type="radio"
+            name="legacy-draw-entry"
+            value="free_online"
+            checked={paidEntryRoute === 'free_online'}
+            onChange={() => setPaidEntryRoute('free_online')}
+            className="mt-1 h-4 w-4 shrink-0 border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-base" aria-hidden>
+                🎟️
+              </span>
+              <span className="font-semibold text-stone-100">Free online entry</span>
+              <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-200/90">
+                £0 card verify
+              </span>
+            </div>
+            <p className="mt-0.5 text-sm text-stone-400">
+              Same draw as paid tickets. Verify your card (£0 authorisation, no charge), then answer three skill
+              questions online.
+            </p>
+          </div>
+        </label>
         <label
           className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
             paidEntryRoute === 'postal'

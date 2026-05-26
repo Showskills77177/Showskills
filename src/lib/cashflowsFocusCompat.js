@@ -11,7 +11,7 @@ export const CASHFLOWS_IFRAME_COPY_STYLE = {
   fontFamily:
     'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   caretColor: 'rgb(245, 245, 244)',
-  padding: '11px 14px',
+  padding: '7px 16px',
   border: 'none',
   borderRadius: '0',
   boxShadow: 'none',
@@ -23,7 +23,7 @@ export function applyCashflowsHostFieldTheme(input) {
   Object.assign(input.style, CASHFLOWS_IFRAME_COPY_STYLE)
   input.style.setProperty('-webkit-text-fill-color', 'rgb(245, 245, 244)')
   input.style.width = '100%'
-  input.style.minHeight = '48px'
+  input.style.minHeight = '40px'
 }
 
 /** Reset SDK-copied styles; host shell provides the visible box. */
@@ -32,8 +32,8 @@ export function normalizeCashflowsFieldIframe(iframe) {
   iframe.style.cssText = [
     'display:block',
     'width:100%',
-    'min-height:48px',
-    'height:48px',
+    'min-height:40px',
+    'height:40px',
     'margin:0',
     'padding:0',
     'border:none',

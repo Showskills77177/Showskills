@@ -58,23 +58,14 @@ function PaymentStatusMessage({ status, message }) {
   )
 }
 
-/**
- * Soft tint over Cashflows demo placeholders — pointer-events: none; host shell does not capture clicks.
- */
-function MaskedCardField({ label, htmlFor, hostRef, mask, ready, revealed, onReveal }) {
+function CardField({ label, htmlFor, hostRef, size }) {
   return (
     <div className="ss-cf-row">
       <label htmlFor={htmlFor} className="ss-cf-label">
         {label}
       </label>
-      <div
-        className={`ss-cf-field-host${revealed ? ' ss-cf-field-host--touched' : ''}`}
-        onPointerDownCapture={() => onReveal()}
-      >
+      <div className={`ss-cf-field-host ss-cf-field-host--${size}`}>
         <div ref={hostRef} className="ss-cf-field-host__slot" />
-        {mask && ready && !revealed ? (
-          <div className={`ss-cf-placeholder-mask ss-cf-placeholder-mask--${mask}`} aria-hidden="true" />
-        ) : null}
       </div>
     </div>
   )
@@ -92,7 +83,12 @@ export function CashflowsPaymentForm({
   disabled,
   onSuccess,
   onError,
+  /** `free_verify` — £0 card authorisation for Legacy free online entry */
+  flow = 'purchase',
+  payButtonLabel,
+  panelTitle = 'Debit or credit card',
 }) {
+  const isFreeVerify = flow === 'free_verify'
   const mountRef = useRef(null)
   const numberHostRef = useRef(null)
   const nameHostRef = useRef(null)
@@ -108,16 +104,6 @@ export function CashflowsPaymentForm({
   const [paying, setPaying] = useState(false)
   const [applePayVisible, setApplePayVisible] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
-  const [placeholderRevealed, setPlaceholderRevealed] = useState({
-    number: false,
-    expiry: false,
-    cvc: false,
-  })
-
-  const revealPlaceholder = useCallback((key) => {
-    setPlaceholderRevealed((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
-  }, [])
-
   const mapPreparationIds = useCallback(() => {
     const map = {}
     const pairs = [
@@ -144,6 +130,29 @@ export function CashflowsPaymentForm({
   )
 
   const confirmOnServer = useCallback(async () => {
+    if (isFreeVerify) {
+      const res = await fetch(apiUrl('/api/confirm-cashflows-free-verification'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          paymentJobReference,
+          token: intentToken,
+          ...recordPayload,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Could not verify card')
+      }
+      onSuccess?.({
+        verified: true,
+        paymentJobReference,
+        ...data,
+      })
+      return
+    }
+
     const res = await fetch(apiUrl('/api/record-cashflows-payment'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -168,19 +177,7 @@ export function CashflowsPaymentForm({
       customerFullName: data.customerFullName,
       resumeToken: data.resumeToken,
     })
-  }, [paymentJobReference, recordPayload, onSuccess])
-
-  useEffect(() => {
-    const onValidate = (event) => {
-      if (event?.data?.event !== 'validate') return
-      const key = prepIdToFieldRef.current[event.data.preparationId]
-      if (key === 'number' || key === 'expiry' || key === 'cvc') {
-        revealPlaceholder(key)
-      }
-    }
-    window.addEventListener('message', onValidate)
-    return () => window.removeEventListener('message', onValidate)
-  }, [revealPlaceholder])
+  }, [isFreeVerify, intentToken, paymentJobReference, recordPayload, onSuccess])
 
   useEffect(() => {
     if (!intentToken) return undefined
@@ -190,7 +187,6 @@ export function CashflowsPaymentForm({
     setReady(false)
     setApplePayVisible(false)
     setStatus({ type: '', message: '' })
-    setPlaceholderRevealed({ number: false, expiry: false, cvc: false })
     prepIdToFieldRef.current = {}
     pointerFixCleanupRef.current?.()
     pointerFixCleanupRef.current = null
@@ -274,7 +270,10 @@ export function CashflowsPaymentForm({
           .then(async () => {
             if (cancelled || generation !== initGenerationRef.current) return
             setPaying(true)
-            setStatus({ type: 'info', message: 'Confirming your payment…' })
+            setStatus({
+              type: 'info',
+              message: isFreeVerify ? 'Confirming card verification…' : 'Confirming your payment…',
+            })
             await confirmOnServer()
           })
           .catch((e) => {
@@ -333,7 +332,7 @@ export function CashflowsPaymentForm({
                 />
               </svg>
             </span>
-            <h3 className="text-sm font-semibold text-stone-100">Debit or credit card</h3>
+            <h3 className="text-sm font-semibold text-stone-100">{panelTitle}</h3>
           </div>
           <CardBrandLogos className="!justify-end !gap-1.5" />
         </div>
@@ -363,48 +362,50 @@ export function CashflowsPaymentForm({
         ) : null}
 
         <div className="ss-checkout-fields space-y-3">
-          <MaskedCardField
+          <CardField
             label="Card number"
             htmlFor={FIELD_IDS.number}
             hostRef={numberHostRef}
-            mask="card"
-            ready={ready}
-            revealed={placeholderRevealed.number}
-            onReveal={() => revealPlaceholder('number')}
+            size="card"
           />
-          <MaskedCardField
+          <CardField
             label="Name on card"
             htmlFor={FIELD_IDS.name}
             hostRef={nameHostRef}
-            mask={null}
-            ready={ready}
-            revealed
-            onReveal={() => {}}
+            size="name"
           />
-          <div className="grid grid-cols-2 gap-3">
-            <MaskedCardField
+          {isIntegration ? (
+            <p className="text-[11px] leading-relaxed text-amber-200/85">
+              Sandbox: use name <strong className="font-semibold">Luke Skywalker</strong> for a successful payment.
+              Other names (e.g. Han Solo) fail 3D Secure on purpose. On the simulator page, choose{' '}
+              <strong className="font-semibold">Authentication successful</strong>.
+            </p>
+          ) : (
+            <p className="text-[11px] leading-relaxed text-stone-500">
+              Use the name on your card and complete your bank&apos;s 3D Secure step (app or SMS). A random name
+              often causes &quot;3D Secure Authentication Failed&quot;.
+            </p>
+          )}
+          <div className="ss-cf-inline-fields">
+            <CardField
               label="Expiry"
               htmlFor={FIELD_IDS.expiry}
               hostRef={expiryHostRef}
-              mask="expiry"
-              ready={ready}
-              revealed={placeholderRevealed.expiry}
-              onReveal={() => revealPlaceholder('expiry')}
+              size="expiry"
             />
-            <MaskedCardField
+            <CardField
               label="Security code"
               htmlFor={FIELD_IDS.cvc}
               hostRef={cvcHostRef}
-              mask="cvc"
-              ready={ready}
-              revealed={placeholderRevealed.cvc}
-              onReveal={() => revealPlaceholder('cvc')}
+              size="cvc"
             />
           </div>
         </div>
 
         <p className="ss-checkout-trust mt-3 text-center text-[11px] leading-relaxed text-stone-500">
-          Secured by Cashflows — card details never touch our servers.
+          {isFreeVerify
+            ? '£0.00 authorisation only — your card will not be charged. Secured by Cashflows.'
+            : 'Secured by Cashflows — card details never touch our servers.'}
         </p>
       </div>
 
@@ -413,7 +414,13 @@ export function CashflowsPaymentForm({
       <input
         id={FIELD_IDS.pay}
         type="button"
-        value={paying ? 'Processing…' : amountLabel ? `Pay ${amountLabel}` : 'Pay with card'}
+        value={
+          paying
+            ? isFreeVerify
+              ? 'Verifying…'
+              : 'Processing…'
+            : payButtonLabel || (amountLabel ? `Pay ${amountLabel}` : 'Pay with card')
+        }
         disabled={disabled || paying || !ready}
         data-ss-cf-ignore-focus
         className="ss-cf-pay-button mt-4 min-h-[50px] w-full cursor-pointer rounded-xl border-0 bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg shadow-teal-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"

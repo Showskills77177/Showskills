@@ -357,16 +357,16 @@ export default function FaqPage() {
                     . Include your order reference for ticket issues.
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                <div className="flex w-full flex-col gap-2 sm:w-56 sm:shrink-0">
                   <Link
                     to="/contact"
-                    className="inline-flex min-h-[2.75rem] items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
+                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
                   >
                     Contact us
                   </Link>
                   <Link
                     to="/competitions"
-                    className="inline-flex min-h-[2.75rem] items-center justify-center rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-stone-300 transition hover:bg-white/5"
+                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-stone-300 transition hover:bg-white/5"
                   >
                     Enter a competition
                   </Link>

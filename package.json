@@ -9,6 +9,8 @@
     "dev:all": "node scripts/kill-port.mjs 3000 && concurrently -k \"npm run dev\" \"node scripts/kill-port.mjs 3000 && node server.js\"",
     "dev:integration": "node scripts/dev-cashflows-integration.mjs",
     "cashflows:test-gateway": "node scripts/test-cashflows-gateway.mjs",
+    "cashflows:probe": "node scripts/probe-cashflows-gateway.mjs",
+    "cashflows:test-free-api": "node scripts/test-cashflows-free-local.mjs",
     "dev:e2e": "concurrently -k \"PORT=3001 node server.js\" \"VITE_PROXY_API_TARGET=http://127.0.0.1:3001 vite --port 5173 --strictPort\"",
     "build": "vite build",
     "lint": "eslint .",
