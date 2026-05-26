@@ -1,32 +1,54 @@
-/** Cashflows embedded iframes — same Safari / overlay focus issues as Stripe Payment Element. */
+/** Cashflows embedded iframes — focus/pointer fixes + dark field chrome. */
 
 export const CASHFLOWS_MOUNT_SELECTOR = '.ss-cashflows-pay'
 
-/** Copied from host inputs into Cashflows iframes at init — keep text light on dark fields. */
-export const CASHFLOWS_FIELD_THEME = {
-  color: '#ffffff',
-  backgroundColor: 'rgb(7, 21, 18)',
+/** Only these are copied into Cashflows iframes (see cashflows-clientlib-js initCard). */
+export const CASHFLOWS_IFRAME_COPY_STYLE = {
+  color: 'rgb(245, 245, 244)',
+  backgroundColor: 'transparent',
   fontSize: '16px',
   lineHeight: '1.25',
   fontFamily:
     'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  caretColor: '#ffffff',
-  borderRadius: '0.75rem',
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  boxSizing: 'border-box',
+  caretColor: 'rgb(245, 245, 244)',
+  padding: '12px 16px',
+  border: 'none',
+  boxShadow: 'none',
+  margin: '0',
 }
 
 export function applyCashflowsHostFieldTheme(input) {
   if (!(input instanceof HTMLInputElement)) return
-  Object.assign(input.style, CASHFLOWS_FIELD_THEME)
-  input.style.setProperty('-webkit-text-fill-color', '#ffffff')
+  Object.assign(input.style, CASHFLOWS_IFRAME_COPY_STYLE)
+  input.style.setProperty('-webkit-text-fill-color', 'rgb(245, 245, 244)')
+  input.style.width = '100%'
+  input.style.minHeight = '48px'
 }
 
-export function applyCashflowsIframeTheme(iframe) {
+/** Reset SDK-copied styles; host shell provides the visible box. */
+export function normalizeCashflowsFieldIframe(iframe) {
   if (!(iframe instanceof HTMLIFrameElement)) return
-  Object.assign(iframe.style, CASHFLOWS_FIELD_THEME)
-  iframe.style.setProperty('-webkit-text-fill-color', '#ffffff')
-  iframe.style.colorScheme = 'dark'
+  iframe.style.cssText = [
+    'display:block',
+    'width:100%',
+    'min-height:48px',
+    'height:48px',
+    'margin:0',
+    'padding:0',
+    'border:none',
+    'border-radius:0',
+    'background:transparent',
+    'box-shadow:none',
+    'pointer-events:auto',
+    'position:relative',
+    'z-index:1',
+    'transform:none',
+    '-webkit-transform:none',
+    'color-scheme:dark',
+    /* Cross-origin field pages default to light UI — invert to match dark checkout */
+    'filter:invert(1) hue-rotate(180deg)',
+  ].join(';')
+  iframe.setAttribute('allowtransparency', 'true')
 }
 
 export function isIosSafari() {
@@ -38,7 +60,6 @@ export function isIosSafari() {
   return isAppleMobile || isIpadOs
 }
 
-/** Apple Pay embedded button only works in Safari with ApplePaySession (not a redirect). */
 export function isApplePayEmbeddedAvailable() {
   if (typeof window === 'undefined') return false
   try {
@@ -55,9 +76,6 @@ function isInsideCashflowsMount(target) {
   return false
 }
 
-/**
- * After Cashflows replaces inputs with iframes, force them interactive (Steps 1–3 Stripe parity).
- */
 export function enableCashflowsIframePointerEvents(root) {
   if (typeof document === 'undefined') return
   const scope =
@@ -71,7 +89,7 @@ export function enableCashflowsIframePointerEvents(root) {
   scope.style.webkitTransform = 'none'
   scope.style.overflow = 'visible'
 
-  scope.querySelectorAll('.ss-cf-field-wrap, .ss-cf-field-host, .ss-checkout-card-panel').forEach((el) => {
+  scope.querySelectorAll('.ss-cf-field-host, .ss-checkout-card-panel').forEach((el) => {
     if (el instanceof HTMLElement) {
       el.style.pointerEvents = 'auto'
       el.style.transform = 'none'
@@ -80,19 +98,10 @@ export function enableCashflowsIframePointerEvents(root) {
   })
 
   scope.querySelectorAll('iframe').forEach((iframe) => {
-    iframe.style.pointerEvents = 'auto'
-    iframe.style.position = 'relative'
-    iframe.style.zIndex = '1'
-    iframe.style.transform = 'none'
-    iframe.style.webkitTransform = 'none'
-    applyCashflowsIframeTheme(iframe)
+    normalizeCashflowsFieldIframe(iframe)
   })
 }
 
-/**
- * @param {HTMLElement | null} root — payment sheet panel
- * @returns {() => void}
- */
 export function attachCashflowsFocusCompat(root) {
   if (!root || typeof root.addEventListener !== 'function') return () => {}
 
@@ -120,7 +129,7 @@ export function focusCashflowsMountForIos() {
   })
 }
 
-export function scheduleCashflowsPointerFix(root, { durationMs = 4000, intervalMs = 400 } = {}) {
+export function scheduleCashflowsPointerFix(root, { durationMs = 5000, intervalMs = 350 } = {}) {
   const apply = () => enableCashflowsIframePointerEvents(root)
   apply()
   requestAnimationFrame(apply)

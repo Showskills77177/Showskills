@@ -312,7 +312,7 @@ export function CashflowsPaymentForm({
         </div>
 
         <p className="ss-checkout-trust mt-3 text-center text-[11px] leading-relaxed text-stone-500">
-          Tap a field to type. Details stay in secure Cashflows fields — we never see your full card number.
+          Secured by Cashflows — card details never touch our servers.
         </p>
       </div>
 
