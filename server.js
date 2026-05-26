@@ -111,6 +111,8 @@ const mountedPaths = Object.keys(routes)
   .filter((p) => !SKIP_ROUTE_MOUNT.has(p))
   .sort()
 for (const required of [
+  '/api/payment-config',
+  '/api/create-cashflows-payment-intent',
   '/api/admin/verify-sms',
   '/api/admin/resend-code',
   '/api/admin/resend-winner-email',

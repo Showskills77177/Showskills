@@ -8,5 +8,6 @@ export function isCashflowsFrontendEnabled(env = import.meta.env) {
     .toLowerCase()
   if (v === '0' || v === 'false' || v === 'no') return false
   if (v === '1' || v === 'true' || v === 'yes') return true
-  return Boolean(env.PROD)
+  // Default on in dev and production unless explicitly disabled.
+  return true
 }

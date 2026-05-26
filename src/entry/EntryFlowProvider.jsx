@@ -116,8 +116,9 @@ export function EntryFlowProvider({ children }) {
   useEffect(() => {
     if (!cashflowsFrontendOn) return
     void fetch(apiUrl('/api/payment-config'), { credentials: 'include' })
-      .then((res) => res.json().catch(() => ({})))
-      .then((data) => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) return
         if (typeof data === 'object' && data !== null) setServerPaymentConfig(data)
       })
       .catch(() => {})
@@ -834,7 +835,7 @@ export function EntryFlowProvider({ children }) {
     if (import.meta.env.PROD) {
       return 'Payments are loading or not configured. If this stays, check Cashflows env vars in Vercel and redeploy.'
     }
-    return 'Payments are not configured. Add Cashflows (CASHFLOWS_* + VITE_CASHFLOWS_ENABLED=1) or PayPal — see .env.example.'
+    return 'Payments are not configured locally. Add CASHFLOWS_CONFIGURATION_ID, CASHFLOWS_API_KEY, and VITE_CASHFLOWS_ENABLED=1 to .env.local, then run npm run dev:all (not npm run dev alone) and refresh.'
   }, [hasPayPal, hasCardCheckout, serverPaymentConfig, entriesClosedMessage])
 
   const value = useMemo(
