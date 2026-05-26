@@ -73,27 +73,39 @@ export function PaymentCheckoutSheet({
           className="h-1 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-teal-500/80 via-emerald-500/60 to-transparent"
           aria-hidden
         />
-        <header className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 text-stone-300 hover:bg-white/5"
-            aria-label="Back"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="min-w-0 flex-1">
-            <h2 id="payment-sheet-title" className="text-base font-semibold text-stone-100 sm:text-lg">
-              Complete payment
-            </h2>
-            <p className="truncate text-sm text-teal-200/90">
-              {bundleTitle ? `${bundleTitle} · ` : ''}
-              <span className="font-display tabular-nums text-white">{amountLabel}</span>
-            </p>
-            {bundleLine ? <p className="truncate text-xs text-stone-500">{bundleLine}</p> : null}
+        <header className="shrink-0 border-b border-white/10 px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 text-stone-300 hover:bg-white/5"
+              aria-label="Back"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="min-w-0 flex-1">
+              <h2 id="payment-sheet-title" className="text-base font-semibold text-stone-100 sm:text-lg">
+                Secure checkout
+              </h2>
+              <p className="text-xs text-stone-500">256-bit encrypted payment</p>
+            </div>
           </div>
+          {cashflowsReady || preparing ? (
+            <div className="ss-checkout-order-summary mt-3 rounded-xl border border-teal-500/20 bg-teal-950/25 px-3.5 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-300/80">Your order</p>
+                  <p className="mt-0.5 truncate text-sm font-medium text-stone-100">
+                    {bundleTitle || 'Ticket bundle'}
+                  </p>
+                  {bundleLine ? <p className="truncate text-xs text-stone-500">{bundleLine}</p> : null}
+                </div>
+                <p className="shrink-0 font-display text-lg font-bold tabular-nums text-white">{amountLabel}</p>
+              </div>
+            </div>
+          ) : null}
         </header>
 
         <div className="ss-payment-sheet-body min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -147,11 +159,7 @@ export function PaymentCheckoutSheet({
           ) : null}
 
           {cashflowsReady && hasPayPal ? (
-            <div className="shrink-0 border-t border-white/10 px-4 pb-5 pt-3 sm:px-5">
-              <p className="mb-2 text-center text-[10px] leading-relaxed text-stone-500">
-                PayPal uses a separate PayPal checkout (requires our PayPal business account). Card and Apple Pay
-                above are processed by Cashflows in one settlement.
-              </p>
+            <div className="shrink-0 border-t border-white/10 px-4 pb-5 pt-4 sm:px-5">
               <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                 or pay with PayPal
               </p>

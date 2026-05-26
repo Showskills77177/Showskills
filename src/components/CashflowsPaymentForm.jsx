@@ -13,12 +13,13 @@ const FIELD_IDS = {
 }
 
 /** Cashflows replaces these inputs with iframes — create outside React to avoid re-render conflicts. */
-function createCardInput(id, { inputMode, autoComplete, type = 'tel' }) {
+function createCardInput(id, { inputMode, autoComplete, type = 'tel', placeholder = '' }) {
   const input = document.createElement('input')
   input.id = id
   input.type = type
   input.inputMode = inputMode
   input.autocomplete = autoComplete
+  input.placeholder = placeholder
   input.className = 'ss-cf-field'
   input.setAttribute('aria-required', 'true')
   return input
@@ -50,6 +51,31 @@ function PaymentStatusMessage({ status, message }) {
 }
 
 /**
+ * Covers Cashflows iframe demo placeholders (e.g. 0000 / 000) until the shopper taps the field.
+ * Placeholders live inside cross-origin iframes and cannot be removed via CSS.
+ */
+function SecureCardField({ label, htmlFor, hostRef, ready, revealed, onReveal, maskPlaceholder }) {
+  return (
+    <div className="ss-cf-row">
+      <label htmlFor={htmlFor} className="ss-cf-label">
+        {label}
+      </label>
+      <div
+        className={`ss-cf-field-wrap${revealed ? ' ss-cf-field-wrap--revealed' : ''}`}
+        onPointerDown={() => {
+          if (!revealed) onReveal()
+        }}
+      >
+        <div ref={hostRef} className="ss-cf-field-host" />
+        {ready && maskPlaceholder && !revealed ? (
+          <div className="ss-cf-field-cover" aria-hidden="true" />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Cashflows Embedded Checkout — card iframes + Apple Pay (when enabled in Cashflows Portal).
  */
 export function CashflowsPaymentForm({
@@ -75,6 +101,16 @@ export function CashflowsPaymentForm({
   const [paying, setPaying] = useState(false)
   const [applePayVisible, setApplePayVisible] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
+  const [revealed, setRevealed] = useState({
+    number: false,
+    name: false,
+    expiry: false,
+    cvc: false,
+  })
+
+  const revealField = useCallback((key) => {
+    setRevealed((prev) => (prev[key] ? prev : { ...prev, [key]: true }))
+  }, [])
 
   const reportError = useCallback(
     (message) => {
@@ -113,6 +149,16 @@ export function CashflowsPaymentForm({
   }, [paymentJobReference, recordPayload, onSuccess])
 
   useEffect(() => {
+    const onValidate = (event) => {
+      if (event?.data?.event === 'validate') {
+        setRevealed({ number: true, name: true, expiry: true, cvc: true })
+      }
+    }
+    window.addEventListener('message', onValidate)
+    return () => window.removeEventListener('message', onValidate)
+  }, [])
+
+  useEffect(() => {
     if (!intentToken) return undefined
 
     const generation = ++initGenerationRef.current
@@ -120,6 +166,7 @@ export function CashflowsPaymentForm({
     setReady(false)
     setApplePayVisible(false)
     setStatus({ type: '', message: '' })
+    setRevealed({ number: false, name: false, expiry: false, cvc: false })
     checkoutStartedRef.current = false
 
     const clearHosts = () => {
@@ -143,19 +190,23 @@ export function CashflowsPaymentForm({
         const numberEl = mountCardField(numberHostRef.current, FIELD_IDS.number, {
           inputMode: 'numeric',
           autoComplete: 'cc-number',
+          placeholder: '',
         })
         const nameEl = mountCardField(nameHostRef.current, FIELD_IDS.name, {
           inputMode: 'text',
           autoComplete: 'cc-name',
           type: 'text',
+          placeholder: '',
         })
         const expiryEl = mountCardField(expiryHostRef.current, FIELD_IDS.expiry, {
           inputMode: 'numeric',
           autoComplete: 'cc-exp',
+          placeholder: '',
         })
         const cvcEl = mountCardField(cvcHostRef.current, FIELD_IDS.cvc, {
           inputMode: 'numeric',
           autoComplete: 'cc-csc',
+          placeholder: '',
         })
 
         if (!numberEl || !nameEl || !expiryEl || !cvcEl) {
@@ -230,57 +281,84 @@ export function CashflowsPaymentForm({
   }, [intentToken, isIntegration, confirmOnServer, reportError])
 
   return (
-    <div className="ss-cashflows-pay space-y-4">
-      <CardBrandLogos className="pb-1" />
+    <div className="ss-cashflows-pay">
+      <div className="ss-checkout-card-panel">
+        <div className="ss-checkout-card-panel__head">
+          <div className="flex items-center gap-2">
+            <span className="ss-checkout-lock" aria-hidden>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            </span>
+            <h3 className="text-sm font-semibold text-stone-100">Debit or credit card</h3>
+          </div>
+          <CardBrandLogos className="!justify-end !gap-1.5" />
+        </div>
 
-      <button
-        ref={applePayRef}
-        id={FIELD_IDS.applePay}
-        type="button"
-        hidden={!applePayVisible}
-        className={`apple-pay-button w-full ${applePayVisible ? '' : 'hidden'}`}
-        aria-label="Pay with Apple Pay"
-        disabled={disabled || paying || !ready}
-      />
+        <button
+          ref={applePayRef}
+          id={FIELD_IDS.applePay}
+          type="button"
+          hidden={!applePayVisible}
+          className={`apple-pay-button w-full ${applePayVisible ? 'mb-4' : 'hidden'}`}
+          aria-label="Pay with Apple Pay"
+          disabled={disabled || paying || !ready}
+        />
 
-      {applePayVisible ? (
-        <p className="text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
-          or pay by card
+        {applePayVisible ? (
+          <p className="mb-4 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+            or pay by card
+          </p>
+        ) : null}
+
+        <div className="ss-checkout-fields space-y-3">
+          <SecureCardField
+            label="Card number"
+            htmlFor={FIELD_IDS.number}
+            hostRef={numberHostRef}
+            ready={ready}
+            revealed={revealed.number}
+            onReveal={() => revealField('number')}
+            maskPlaceholder
+          />
+          <SecureCardField
+            label="Name on card"
+            htmlFor={FIELD_IDS.name}
+            hostRef={nameHostRef}
+            ready={ready}
+            revealed={revealed.name}
+            onReveal={() => revealField('name')}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <SecureCardField
+              label="Expiry"
+              htmlFor={FIELD_IDS.expiry}
+              hostRef={expiryHostRef}
+              ready={ready}
+              revealed={revealed.expiry}
+              onReveal={() => revealField('expiry')}
+              maskPlaceholder
+            />
+            <SecureCardField
+              label="Security code"
+              htmlFor={FIELD_IDS.cvc}
+              hostRef={cvcHostRef}
+              ready={ready}
+              revealed={revealed.cvc}
+              onReveal={() => revealField('cvc')}
+              maskPlaceholder
+            />
+          </div>
+        </div>
+
+        <p className="ss-checkout-trust mt-3 text-center text-[11px] leading-relaxed text-stone-500">
+          Card details are encrypted in secure Cashflows fields. We never see your full card number.
         </p>
-      ) : null}
-
-      <p className="text-xs leading-relaxed text-stone-500">
-        Card details are entered in secure Cashflows fields on this page. Payments are processed by Cashflows — we
-        never see your full card number.
-      </p>
-
-      <div className="space-y-3">
-        <div>
-          <label htmlFor={FIELD_IDS.number} className="ss-cf-label">
-            Card number
-          </label>
-          <div ref={numberHostRef} />
-        </div>
-        <div>
-          <label htmlFor={FIELD_IDS.name} className="ss-cf-label">
-            Name on card
-          </label>
-          <div ref={nameHostRef} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor={FIELD_IDS.expiry} className="ss-cf-label">
-              Expiry
-            </label>
-            <div ref={expiryHostRef} />
-          </div>
-          <div>
-            <label htmlFor={FIELD_IDS.cvc} className="ss-cf-label">
-              CVC
-            </label>
-            <div ref={cvcHostRef} />
-          </div>
-        </div>
       </div>
 
       <PaymentStatusMessage status={status.type} message={status.message} />
@@ -290,13 +368,13 @@ export function CashflowsPaymentForm({
         id={FIELD_IDS.pay}
         type="button"
         disabled={disabled || paying || !ready}
-        className="ss-cf-pay-button min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        className="ss-cf-pay-button mt-4 min-h-[50px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg shadow-teal-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {paying ? 'Processing…' : amountLabel ? `Pay ${amountLabel}` : 'Pay with card'}
       </button>
 
       {!ready && !status.message ? (
-        <p className="text-center text-xs text-stone-500" role="status">
+        <p className="mt-3 text-center text-xs text-stone-500" role="status">
           Loading secure card fields…
         </p>
       ) : null}
