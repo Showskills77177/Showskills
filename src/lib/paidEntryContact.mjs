@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'ss_paid_entry_contact'
 
-/** Remember name/email across Stripe Checkout redirect (full page reload). */
-export function savePaidEntryContact({ email, fullName }) {
+/** Remember name, email, phone across payment redirect / full page reload. */
+export function savePaidEntryContact({ email, fullName, phone }) {
   if (typeof window === 'undefined') return
   try {
     sessionStorage.setItem(
@@ -9,6 +9,7 @@ export function savePaidEntryContact({ email, fullName }) {
       JSON.stringify({
         email: (email || '').trim(),
         fullName: (fullName || '').trim(),
+        phone: (phone || '').trim(),
       }),
     )
   } catch {
@@ -16,7 +17,7 @@ export function savePaidEntryContact({ email, fullName }) {
   }
 }
 
-/** @returns {{ email: string, fullName: string } | null} */
+/** @returns {{ email: string, fullName: string, phone: string } | null} */
 export function loadPaidEntryContact() {
   if (typeof window === 'undefined') return null
   try {
@@ -27,6 +28,7 @@ export function loadPaidEntryContact() {
     return {
       email: typeof data.email === 'string' ? data.email.trim() : '',
       fullName: typeof data.fullName === 'string' ? data.fullName.trim() : '',
+      phone: typeof data.phone === 'string' ? data.phone.trim() : '',
     }
   } catch {
     return null

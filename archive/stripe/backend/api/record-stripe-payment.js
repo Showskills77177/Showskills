@@ -1,0 +1,129 @@
+import Stripe from 'stripe'
+import { parseJsonBody, json } from './lib/http.mjs'
+import {
+  recordStripePaymentIntentCompleted,
+  parseReservedTicketNumbersMetadata,
+} from '../lib/recordSaleStripe.mjs'
+import { isDbConfigured, query } from './lib/db.mjs'
+import { applyRateLimit } from './lib/rateLimit.mjs'
+import { assertPaymentIntentMatchesBundle } from '../lib/paymentSecurity.mjs'
+import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
+import { ensureQuizResumeToken } from './lib/quizResumeToken.mjs'
+
+export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    return res.status(204).end()
+  }
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST, OPTIONS')
+    return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'record-stripe-payment', max: 24, windowMs: 60_000 })
+  if (limited.blocked) {
+    return json(res, 429, { error: 'Too many requests. Please wait and try again.' })
+  }
+
+  const secret = process.env.STRIPE_SECRET_KEY
+  if (!secret) {
+    return json(res, 503, { error: 'Stripe not configured' })
+  }
+
+  const body = parseJsonBody(req)
+  const paymentIntentId =
+    typeof body.paymentIntentId === 'string' ? body.paymentIntentId.trim() : ''
+  if (!paymentIntentId.startsWith('pi_')) {
+    return json(res, 400, { error: 'Invalid paymentIntentId' })
+  }
+
+  const customerEmail =
+    typeof body.customerEmail === 'string' ? body.customerEmail.trim().slice(0, 320) : ''
+  const customerFullName =
+    typeof body.customerFullName === 'string' ? body.customerFullName.trim().slice(0, 200) : ''
+  const customerPhone =
+    typeof body.customerPhone === 'string'
+      ? body.customerPhone
+      : typeof body.phone === 'string'
+        ? body.phone
+        : ''
+  const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : ''
+
+  try {
+    const stripe = new Stripe(secret)
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
+
+    if (intent.status !== 'succeeded') {
+      return json(res, 400, { error: 'Payment not completed', status: intent.status })
+    }
+
+    const resolvedBundleId =
+      bundleId || (typeof intent.metadata?.bundle_id === 'string' ? intent.metadata.bundle_id.trim() : '')
+    const bundleCheck = assertPaymentIntentMatchesBundle(intent, resolvedBundleId)
+    if (!bundleCheck.ok) {
+      return json(res, 400, { error: bundleCheck.error })
+    }
+    const bundle = bundleCheck.bundle ?? getTicketBundleById(resolvedBundleId)
+    if (!bundle) {
+      return json(res, 400, { error: 'Invalid bundleId' })
+    }
+
+    if (!isDbConfigured()) {
+      return json(res, 200, {
+        ok: true,
+        skipped: true,
+        reason: 'no_database',
+        paymentIntentId: intent.id,
+      })
+    }
+
+    const md = intent.metadata || {}
+    const email = (customerEmail || intent.receipt_email || '').trim().toLowerCase()
+    const receiptEmail = (intent.receipt_email || '').trim().toLowerCase()
+    if (receiptEmail && email && receiptEmail !== email) {
+      return json(res, 400, { error: 'Email does not match payment record' })
+    }
+    const fullName = customerFullName || md.customer_full_name || ''
+    const ticketMeta = await query(`SELECT period_id FROM tickets WHERE stripe_payment_intent_id = $1`, [
+      paymentIntentId,
+    ])
+    const periodId = ticketMeta.rows[0]?.period_id || null
+
+    const recorded = await recordStripePaymentIntentCompleted({
+      paymentIntentId: intent.id,
+      customerEmail: email || receiptEmail,
+      customerFullName: fullName,
+      customerPhone,
+      periodId,
+      bundleId: bundle.id,
+      quantity: bundle.qty,
+      amountPence: intent.amount_received || intent.amount,
+      currency: intent.currency || 'gbp',
+      reservedTicketNumbers: parseReservedTicketNumbersMetadata(md),
+    })
+
+    if (!recorded) {
+      return json(res, 200, { ok: true, skipped: true, reason: 'not_recorded' })
+    }
+
+    const resolvedEmail = (email || receiptEmail || '').trim().toLowerCase()
+
+    const resumeToken = await ensureQuizResumeToken(recorded.ticketId)
+
+    return json(res, 200, {
+      ok: true,
+      deduped: Boolean(recorded.deduped),
+      orderRef: recorded.ticketPublicId,
+      ticketNumbers: recorded.ticketNumbers || [],
+      emailSent: Boolean(recorded.emailSent),
+      customerEmail: resolvedEmail,
+      customerFullName: (fullName || '').trim(),
+      resumeToken,
+    })
+  } catch (e) {
+    console.error(e)
+    return json(res, 500, { error: e instanceof Error ? e.message : 'Stripe error' })
+  }
+}

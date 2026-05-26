@@ -37,6 +37,23 @@ export async function ensureTicketSchema() {
     } catch {
       /* already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS period_id TEXT`)
+    } catch {
+      /* already exists */
+    }
+    try {
+      await query(
+        `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS cashflows_payment_job_reference TEXT UNIQUE`,
+      )
+    } catch {
+      /* already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS cashflows_intent_token TEXT`)
+    } catch {
+      /* already exists */
+    }
   } else {
     await query(`
       CREATE TABLE IF NOT EXISTS ticket_numbers (
@@ -68,7 +85,34 @@ export async function ensureTicketSchema() {
     } catch {
       /* column already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN period_id TEXT`)
+    } catch {
+      /* column already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN cashflows_payment_job_reference TEXT`)
+    } catch {
+      /* column already exists */
+    }
+    try {
+      await query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_cashflows_job ON tickets (cashflows_payment_job_reference)`,
+      )
+    } catch {
+      /* index already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN cashflows_intent_token TEXT`)
+    } catch {
+      /* column already exists */
+    }
   }
 
   ensured = true
+}
+
+/** Re-run DDL after schema fixes (dev hot-reload). */
+export function resetTicketSchemaCache() {
+  ensured = false
 }

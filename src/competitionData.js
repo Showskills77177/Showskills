@@ -18,4 +18,11 @@ export const GRAND_PRIZE_BUNDLE = {
   title: 'Ronaldo Legacy Bundle',
 }
 
-export const COMPETITION_NAME_POSTAL = 'Ronaldo Legacy Bundle — ShowSkills Rewards'
+export {
+  COMPETITION_NAME_POSTAL,
+  POSTAL_ENTRY_ADDRESS,
+  PROMOTER_NAME,
+  PROMOTER_STREET,
+  PROMOTER_POSTCODE,
+  PROMOTER_ADDRESS_LINES,
+} from '../shared/competitionCopy.mjs'

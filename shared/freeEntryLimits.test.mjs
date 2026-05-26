@@ -15,7 +15,7 @@ test('buildNameAddressKey normalises spacing', () => {
     addressLine1: '35 irvine street',
     addressLine2: '',
     city: 'liverpool',
-    postcode: 'L78SY',
+    postcode: 'L7 8SY',
   })
   assert.equal(a, b)
 })

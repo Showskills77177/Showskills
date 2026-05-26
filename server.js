@@ -1,6 +1,6 @@
 /**
  * Local API server for `npm run dev:api` (port 3000).
- * Vite proxies `/api` here. Production uses `api/*` serverless routes (see `api/_dispatch.mjs`).
+ * Vite proxies `/api` here. Production uses one Vercel handler (see `lib/vercelApiDispatch.mjs`).
  */
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
@@ -58,11 +58,11 @@ app.use(
     credentials: true,
   }),
 )
-const stripeWebhookHandler = (await import('./backend/api/stripe-webhook.js')).default
+const cashflowsWebhookHandler = (await import('./backend/api/cashflows-webhook.js')).default
 app.post(
-  '/api/stripe-webhook',
-  express.raw({ type: 'application/json', limit: '1mb' }),
-  adapt(stripeWebhookHandler),
+  '/api/cashflows-webhook',
+  express.json({ limit: '1mb' }),
+  adapt(cashflowsWebhookHandler),
 )
 
 app.use(express.json({ limit: '2mb' }))
@@ -98,12 +98,9 @@ app.post(
   adapt(kickupsUploadHandler),
 )
 
-/** Same handlers as Vercel production (`api/_dispatch.mjs`) — avoids missing local routes. */
-const { routes } = await import('./api/_dispatch.mjs')
-const SKIP_ROUTE_MOUNT = new Set([
-  '/api/stripe-webhook',
-  '/api/submissions/kickups/upload',
-])
+/** Same handlers as Vercel production (`lib/vercelApiDispatch.mjs`) — avoids missing local routes. */
+const { routes } = await import('./lib/vercelApiDispatch.mjs')
+const SKIP_ROUTE_MOUNT = new Set(['/api/cashflows-webhook', '/api/submissions/kickups/upload'])
 
 for (const [routePath, handler] of Object.entries(routes)) {
   if (SKIP_ROUTE_MOUNT.has(routePath)) continue
@@ -113,7 +110,12 @@ for (const [routePath, handler] of Object.entries(routes)) {
 const mountedPaths = Object.keys(routes)
   .filter((p) => !SKIP_ROUTE_MOUNT.has(p))
   .sort()
-for (const required of ['/api/admin/verify-sms', '/api/admin/resend-code']) {
+for (const required of [
+  '/api/admin/verify-sms',
+  '/api/admin/resend-code',
+  '/api/admin/resend-winner-email',
+  '/api/admin/competition-periods',
+]) {
   if (!mountedPaths.includes(required)) {
     console.error(`[api] FATAL: ${required} missing from dispatch routes`)
     process.exit(1)
@@ -134,13 +136,12 @@ app.get('/api/health', (_req, res) => {
 })
 
 if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
-  const { recordStripeCheckoutCompleted, recordStripePaymentIntentCompleted } = await import(
-    './backend/api/lib/recordSale.mjs',
-  )
+  const { recordCashflowsPaymentCompleted } = await import('./backend/api/lib/recordSale.mjs')
   const { reserveTicketNumbers } = await import('./backend/api/lib/ticketNumbers.mjs')
   const { createPendingTicketCheckout } = await import('./backend/api/lib/pendingCheckout.mjs')
+  const { getTicketBundleById } = await import('./shared/ticketBundles.mjs')
   const e2eSecret = (process.env.E2E_SECRET || 'e2e-dev-only-secret').trim()
-  app.post('/api/e2e/mock-stripe-completion', express.json(), async (req, res) => {
+  app.post('/api/e2e/mock-paid-completion', express.json(), async (req, res) => {
     if ((req.headers['x-e2e-secret'] || '').trim() !== e2eSecret) {
       return res.status(403).json({ error: 'Forbidden' })
     }
@@ -149,25 +150,37 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
     const customerFullName =
       typeof body.customerFullName === 'string' ? body.customerFullName.trim() : 'E2E User'
     const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'single'
-    const quantity = Number(body.quantity) > 0 ? Number(body.quantity) : 1
-    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 75
-    const stripeSessionId =
-      typeof body.stripeSessionId === 'string' && body.stripeSessionId.trim()
-        ? body.stripeSessionId.trim()
-        : `e2e_cs_${Date.now()}`
+    const bundle = getTicketBundleById(bundleId)
+    const quantity = bundle?.qty ?? (Number(body.quantity) > 0 ? Number(body.quantity) : 1)
+    const amountPence = bundle?.totalPence ?? (Number(body.amountPence) >= 0 ? Number(body.amountPence) : 75)
+    const paymentJobReference =
+      typeof body.paymentJobReference === 'string' && body.paymentJobReference.trim()
+        ? body.paymentJobReference.trim()
+        : `e2e_cf_${Date.now()}`
     if (!customerEmail.includes('@')) {
       return res.status(400).json({ error: 'customerEmail required' })
     }
     try {
-      const r = await recordStripeCheckoutCompleted({
-        stripeSessionId,
+      const ticketNumbers = await reserveTicketNumbers(quantity)
+      await createPendingTicketCheckout({
+        provider: 'cashflows',
+        externalId: paymentJobReference,
+        bundleId: bundle?.id ?? bundleId,
+        quantity,
+        ticketNumbers,
         customerEmail,
         customerFullName,
-        bundleId,
+        cashflowsIntentToken: `e2e_token_${paymentJobReference}`,
+      })
+      const r = await recordCashflowsPaymentCompleted({
+        paymentJobReference,
+        customerEmail,
+        customerFullName,
+        bundleId: bundle?.id ?? bundleId,
         quantity,
         amountPence,
         currency: 'gbp',
-        paymentIntentId: `pi_e2e_${stripeSessionId}`,
+        reservedTicketNumbers: ticketNumbers,
       })
       if (!r?.ticketId) {
         return res.status(400).json({ error: 'Could not record sale (check email and DB)' })
@@ -178,67 +191,17 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
       return res.status(500).json({ error: e instanceof Error ? e.message : 'e2e mock failed' })
     }
   })
-
-  app.post('/api/e2e/mock-stripe-payment-intent', express.json(), async (req, res) => {
-    if ((req.headers['x-e2e-secret'] || '').trim() !== e2eSecret) {
-      return res.status(403).json({ error: 'Forbidden' })
-    }
-    const body = req.body || {}
-    const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim() : ''
-    const customerFullName =
-      typeof body.customerFullName === 'string' ? body.customerFullName.trim() : 'E2E User'
-    const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'single'
-    const quantity = Number(body.quantity) > 0 ? Number(body.quantity) : 1
-    const amountPence = Number(body.amountPence) >= 0 ? Number(body.amountPence) : 75
-    const paymentIntentId =
-      typeof body.paymentIntentId === 'string' && body.paymentIntentId.trim()
-        ? body.paymentIntentId.trim()
-        : `pi_e2e_${Date.now()}`
-    if (!customerEmail.includes('@')) {
-      return res.status(400).json({ error: 'customerEmail required' })
-    }
-    try {
-      const ticketNumbers = await reserveTicketNumbers(quantity)
-      await createPendingTicketCheckout({
-        provider: 'stripe_pi',
-        externalId: paymentIntentId,
-        bundleId,
-        quantity,
-        ticketNumbers,
-        customerEmail,
-        customerFullName,
-      })
-      const r = await recordStripePaymentIntentCompleted({
-        paymentIntentId,
-        customerEmail,
-        customerFullName,
-        bundleId,
-        quantity,
-        amountPence,
-        currency: 'gbp',
-        reservedTicketNumbers: ticketNumbers,
-      })
-      if (!r?.ticketId) {
-        return res.status(400).json({ error: 'Could not record payment intent sale' })
-      }
-      if (!r.ticketNumbers?.length || r.ticketNumbers.length !== quantity) {
-        return res.status(500).json({
-          error: 'Ticket numbers missing or wrong count',
-          expected: quantity,
-          got: r.ticketNumbers?.length ?? 0,
-        })
-      }
-      return res.status(200).json({ ok: true, ...r })
-    } catch (e) {
-      console.error(e)
-      return res.status(500).json({ error: e instanceof Error ? e.message : 'e2e mock PI failed' })
-    }
-  })
 }
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found', path: req.path })
 })
+
+const { ensureLocalDevEntryPeriod } = await import('./backend/api/lib/competitionPeriods.mjs')
+const devPeriod = await ensureLocalDevEntryPeriod()
+if (devPeriod) {
+  console.log(`[competition] Local dev entry period open: ${devPeriod.id}`)
+}
 
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)

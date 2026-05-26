@@ -9,6 +9,8 @@ import { applyRateLimit } from '../lib/rateLimit.mjs'
 import { checkShirtGiveawayLimits, logEntryAttempt } from '../lib/freeEntryAbuse.mjs'
 import { checkVpnForRequest } from '../lib/vpnDetection.mjs'
 import { COMPETITION_SHIRT_GIVEAWAY } from '../../../shared/freeEntryLimits.mjs'
+import { validateContactPhone } from '../../../shared/contactPhone.mjs'
+import { upsertUserContact } from '../lib/userContact.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -40,6 +42,16 @@ export default async function handler(req, res) {
   const qualificationAnswer =
     typeof body.qualificationAnswer === 'string' ? body.qualificationAnswer.trim().slice(0, 500) : ''
 
+  const phone =
+    typeof body.phone === 'string'
+      ? body.phone
+      : typeof body.customerPhone === 'string'
+        ? body.customerPhone
+        : ''
+  const phoneCheck = validateContactPhone(phone)
+  if (!phoneCheck.ok) {
+    return json(res, 400, { error: phoneCheck.error })
+  }
   if (!fullName || !email.includes('@')) {
     return json(res, 400, { error: 'fullName and valid email required' })
   }
@@ -70,6 +82,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    await upsertUserContact({ email, fullName, phone: phoneCheck.phone })
     const id = randomUUID()
     const storedRef = qualificationAnswer ? 'answer:ronaldo-shirt-giveaway' : videoRef
     const storedFilename = qualificationAnswer ? `Answer: ${qualificationAnswer}` : videoFilename || null

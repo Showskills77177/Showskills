@@ -18,7 +18,7 @@ const countArg = args.find((a) => /^\d+$/.test(a))
 const entrantCount = countArg ? Math.min(500, Math.max(1, parseInt(countArg, 10))) : 3
 
 const { ensureTicketSchema } = await import('../backend/api/lib/ensureTicketSchema.mjs')
-const { recordStripePaymentIntentCompleted } = await import('../backend/api/lib/recordSale.mjs')
+const { recordStripePaymentIntentCompleted } = await import('../archive/stripe/backend/lib/recordSaleStripe.mjs')
 const { reserveTicketNumbers } = await import('../backend/api/lib/ticketNumbers.mjs')
 const { query, isDbConfigured, dbIsPostgres } = await import('../backend/api/lib/db.mjs')
 const { fetchDrawPoolSummary } = await import('../backend/api/lib/qualifiedDrawPool.mjs')

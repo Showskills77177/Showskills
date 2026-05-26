@@ -21,8 +21,8 @@ npm run test:ui           # Playwright UI mode
 Playwright starts **`npm run dev:e2e`** (Vite on **:5173** with `--strictPort`, API on **:3001**) so it does not fight a normal **`npm run dev:all`** on :5173/:3000. Controlled environment:
 
 - `SQLITE_PATH=db/e2e.sqlite` — wiped and re-schematized in **global setup** before the dev server starts
-- `VITE_E2E_SIMULATE_CHECKOUT=1` — shows **Continue (E2E simulated checkout)** and skips real Stripe/PayPal
-- `E2E_MODE=1` — enables `POST /api/e2e/mock-stripe-completion` (header `x-e2e-secret`) to insert paid **tickets** + **payments** like a successful Stripe checkout
+- `VITE_E2E_SIMULATE_CHECKOUT=1` — shows **Continue (E2E simulated checkout)** and skips real card/PayPal checkout
+- `E2E_MODE=1` — enables `POST /api/e2e/mock-paid-completion` (header `x-e2e-secret`) to insert paid **tickets** + **payments** like a successful card checkout
 
 Optional overrides: copy **`.env.e2e.example`** → **`.env.e2e`** (see example file).
 

@@ -15,12 +15,15 @@ export function MobileNavDock() {
 
   return (
     <div className="ss-mobile-nav-dock sm:hidden" aria-label="Site menu">
-      <nav className="ss-mobile-nav-dock__grid grid grid-cols-3 gap-2 p-2.5 pt-2">
+      <nav className="ss-mobile-nav-dock__grid grid grid-cols-4 gap-1.5 p-2.5 pt-2">
         <NavLink to="/" end className={navBtnClass}>
           Home
         </NavLink>
         <NavLink to="/competitions" className={navBtnClass}>
-          Competitions
+          Compete
+        </NavLink>
+        <NavLink to="/faq" className={navBtnClass}>
+          FAQ
         </NavLink>
         <button type="button" onClick={() => openTerms()} className={navBtnClass({ isActive: false })}>
           T&amp;C

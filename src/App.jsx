@@ -17,6 +17,7 @@ import AdminTestEmailPage from './pages/admin/TestEmailPage'
 import AdminDrawWinnerPage from './pages/admin/DrawWinnerPage'
 import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import ContactPage from './pages/ContactPage'
+import FaqPage from './pages/FaqPage'
 import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
 
 const rawBase = import.meta.env.BASE_URL
@@ -65,6 +66,7 @@ export default function App() {
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
             <Route path="contact" element={<ContactPage />} />
+            <Route path="faq" element={<FaqPage />} />
             <Route path="archive/ronaldo-shirt-giveaway" element={<KickupsArchivePage />} />
             <Route path="archive/35-kickups" element={<Navigate to="/archive/ronaldo-shirt-giveaway" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,12 +1,33 @@
 import { requireAdmin } from '../lib/adminAuth.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
-import { json } from '../lib/http.mjs'
+import { parseJsonBody, json } from '../lib/http.mjs'
 import {
   DEFAULT_DRAW_COMPETITION,
   fetchDrawPoolSummary,
   listDrawRuns,
   runFairDraw,
 } from '../lib/qualifiedDrawPool.mjs'
+import {
+  listCompetitionPeriods,
+  resolvePeriodForAdmin,
+} from '../lib/competitionPeriods.mjs'
+import {
+  DRAW_COMPETITION_LABEL,
+  PERIOD_COPY,
+  PERIOD_STATUS_LABELS,
+  formatPeriodRange,
+  isPeriodEligibleForDraw,
+} from '../../../shared/competitionPeriods.mjs'
+
+function queryParam(req, key) {
+  try {
+    const raw = typeof req.url === 'string' ? req.url : ''
+    const u = new URL(raw, 'http://localhost')
+    return u.searchParams.get(key)
+  } catch {
+    return null
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -30,25 +51,61 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      const periodId = queryParam(req, 'periodId')
+      const resolved = await resolvePeriodForAdmin(competition, periodId)
+      if (!resolved.ok) return json(res, 400, { error: resolved.error })
+
+      const period = resolved.period
+      const allPeriods = resolved.periods ?? (await listCompetitionPeriods(competition))
+
       const [summary, history] = await Promise.all([
-        fetchDrawPoolSummary(competition),
-        listDrawRuns(competition, 15),
+        fetchDrawPoolSummary(competition, period),
+        listDrawRuns(competition, { periodId: period.id, limit: 15 }),
       ])
+
+      const canDraw = isPeriodEligibleForDraw(period.status) && summary.poolSize > 0
+
       return json(res, 200, {
         ...summary,
-        label: 'Ronaldo Legacy Bundle',
-        history,
+        label: DRAW_COMPETITION_LABEL,
+        period: {
+          ...period,
+          statusLabel: PERIOD_STATUS_LABELS[period.status] || period.status,
+          entryWindowLabel: formatPeriodRange(period.entryOpensAt, period.entryClosesAt),
+        },
+        periods: allPeriods.map((p) => ({
+          ...p,
+          statusLabel: PERIOD_STATUS_LABELS[p.status] || p.status,
+          entryWindowLabel: formatPeriodRange(p.entryOpensAt, p.entryClosesAt),
+        })),
+        canDraw,
+        governance: PERIOD_COPY,
         notes: [
-          'Each qualified ticket number is one entry in the draw (more tickets = more chances).',
-          'Re-running the draw picks again from the same pool — for the real winner, run once when the competition closes.',
-          'Only paid online entries with all three skill answers correct are included.',
-          'Free postal entries are not stored in the database — handle those separately if applicable.',
+          PERIOD_COPY.isolation,
+          PERIOD_COPY.closeBeforeDraw,
+          PERIOD_COPY.drawnArchive,
+          'Each qualified ticket number within this period is one draw chance (more tickets = higher odds).',
+          PERIOD_COPY.postalNote,
         ],
+        history,
       })
     }
 
     if (req.method === 'POST') {
-      const result = await runFairDraw({ competition })
+      const body = parseJsonBody(req)
+      const periodId = typeof body.periodId === 'string' ? body.periodId.trim() : ''
+      if (!periodId) {
+        return json(res, 400, { error: 'periodId is required. Select the closed competition period to draw from.' })
+      }
+
+      const resolved = await resolvePeriodForAdmin(competition, periodId)
+      if (!resolved.ok) return json(res, 400, { error: resolved.error })
+
+      const result = await runFairDraw({
+        competition,
+        period: resolved.period,
+        sendWinnerEmail: body.sendWinnerEmail !== false,
+      })
       if (!result.ok) {
         return json(res, 400, { error: result.error })
       }

@@ -36,6 +36,7 @@ export function PayPalPayButton({
   ticketQuantity,
   customerEmail,
   customerFullName,
+  customerPhone,
   disabled,
   onPaid,
   onError,
@@ -78,6 +79,7 @@ export function PayPalPayButton({
               bundleId,
               customerEmail: customerEmail?.trim() || '',
               customerFullName: customerFullName?.trim() || '',
+              customerPhone: customerPhone?.trim() || '',
             }),
           })
           const data = await res.json().catch(() => ({}))
@@ -98,6 +100,7 @@ export function PayPalPayButton({
               ticketQuantity: ticketQuantity ?? 1,
               customerEmail: customerEmail?.trim() || '',
               customerFullName: customerFullName?.trim() || '',
+              customerPhone: customerPhone?.trim() || '',
             }),
           })
           const cap = await res.json().catch(() => ({}))

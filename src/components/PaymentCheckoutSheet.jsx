@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { formatBundlePriceGBP } from '../competitionData'
-import { attachStripeFocusCompat } from '../lib/stripeFocusCompat'
 import { ErrorBanner } from './ErrorBanner'
 import { PayPalPayButton } from './PayPalPayButton'
-import { StripePaymentForm } from './StripePaymentForm'
+import { CashflowsPaymentForm } from './CashflowsPaymentForm'
 
 /**
  * Payment step overlaid inside the entry modal (single layer — no nested native dialogs).
@@ -16,14 +15,14 @@ export function PaymentCheckoutSheet({
   bundleLine,
   preparing,
   paidError,
-  hasStripeElements,
-  stripePublishableKey,
-  paidStripeClientSecret,
-  paidStripePaymentIntentId,
+  hasCashflowsEmbedded,
+  paidCashflowsToken,
+  paidCashflowsJobRef,
+  paidCashflowsIntegration,
   paidFormReadyForPayment,
   recordPayload,
-  onStripeSuccess,
-  onStripeError,
+  onCardSuccess,
+  onCardError,
   onRetryPayment,
   hasPayPal,
   payPalClientId,
@@ -34,6 +33,7 @@ export function PaymentCheckoutSheet({
   ticketQuantity,
   customerEmail,
   customerFullName,
+  customerPhone,
   paidConsent,
   onPayPalPaid,
   onPayPalError,
@@ -45,17 +45,12 @@ export function PaymentCheckoutSheet({
     if (open && onClearError) onClearError()
   }, [open, onClearError])
 
-  useEffect(() => {
-    if (!open) return undefined
-    return attachStripeFocusCompat(panelRef.current)
-  }, [open])
-
   if (!open) return null
 
   const amountLabel = formatBundlePriceGBP(amountPence ?? 0)
-  const stripeReady = hasStripeElements && Boolean(paidStripeClientSecret)
-  const showStripeEmpty = hasStripeElements && !preparing && !paidStripeClientSecret
-  const showStandalonePayPal = hasPayPal && !hasStripeElements
+  const cashflowsReady = hasCashflowsEmbedded && Boolean(paidCashflowsToken && paidCashflowsJobRef)
+  const showCardEmpty = hasCashflowsEmbedded && !preparing && !cashflowsReady && !paidError
+  const showStandalonePayPal = hasPayPal && !hasCashflowsEmbedded
 
   const payPalDisabled =
     !paidConsent ||
@@ -87,7 +82,6 @@ export function PaymentCheckoutSheet({
           <button
             type="button"
             onClick={onClose}
-            data-ss-stripe-ignore-focus
             className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 text-stone-300 hover:bg-white/5"
             aria-label="Back"
           >
@@ -124,10 +118,11 @@ export function PaymentCheckoutSheet({
             </div>
           ) : null}
 
-          {showStripeEmpty ? (
+          {showCardEmpty ? (
             <div className="flex shrink-0 flex-col items-center gap-4 px-4 py-10 text-center">
               <p className="max-w-md text-sm text-stone-400">
-                Secure checkout could not start. Allow cookies for this site (Safari / Brave) and try again.
+                Secure checkout could not start. Check the API is running (<code className="text-teal-300/90">npm run dev:all</code>
+                ), then try again. On Safari or Brave, allow cookies for this site.
               </p>
               {onRetryPayment ? (
                 <button
@@ -141,23 +136,27 @@ export function PaymentCheckoutSheet({
             </div>
           ) : null}
 
-          {stripeReady ? (
-            <div className="ss-payment-stripe-zone overflow-visible px-4 py-4 sm:px-5 sm:py-5">
-              <StripePaymentForm
-                publishableKey={stripePublishableKey}
-                clientSecret={paidStripeClientSecret}
-                paymentIntentId={paidStripePaymentIntentId}
+          {cashflowsReady ? (
+            <div className="ss-payment-cashflows-zone overflow-visible px-4 py-4 sm:px-5 sm:py-5">
+              <CashflowsPaymentForm
+                intentToken={paidCashflowsToken}
+                isIntegration={paidCashflowsIntegration}
+                paymentJobReference={paidCashflowsJobRef}
                 amountLabel={amountLabel}
                 recordPayload={recordPayload}
                 disabled={!paidFormReadyForPayment}
-                onSuccess={onStripeSuccess}
-                onError={onStripeError}
+                onSuccess={onCardSuccess}
+                onError={onCardError}
               />
             </div>
           ) : null}
 
-          {stripeReady && hasPayPal ? (
+          {cashflowsReady && hasPayPal ? (
             <div className="shrink-0 border-t border-white/10 px-4 pb-5 pt-3 sm:px-5">
+              <p className="mb-2 text-center text-[10px] leading-relaxed text-stone-500">
+                PayPal uses a separate PayPal checkout (requires our PayPal business account). Card and Apple Pay
+                above are processed by Cashflows in one settlement.
+              </p>
               <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                 or pay with PayPal
               </p>
@@ -170,6 +169,7 @@ export function PaymentCheckoutSheet({
                 ticketQuantity={ticketQuantity}
                 customerEmail={customerEmail}
                 customerFullName={customerFullName}
+                customerPhone={customerPhone}
                 disabled={payPalDisabled}
                 onPaid={onPayPalPaid}
                 onError={onPayPalError}
@@ -188,6 +188,7 @@ export function PaymentCheckoutSheet({
                 ticketQuantity={ticketQuantity}
                 customerEmail={customerEmail}
                 customerFullName={customerFullName}
+                customerPhone={customerPhone}
                 disabled={payPalDisabled}
                 onPaid={onPayPalPaid}
                 onError={onPayPalError}
@@ -195,7 +196,7 @@ export function PaymentCheckoutSheet({
             </div>
           ) : null}
 
-          {!preparing && !stripeReady && !showStandalonePayPal && !showStripeEmpty ? (
+          {!preparing && !cashflowsReady && !showStandalonePayPal && !showCardEmpty ? (
             <p className="px-4 py-10 text-center text-sm text-stone-500">No payment methods are configured.</p>
           ) : null}
         </div>

@@ -7,6 +7,8 @@ import {
 } from '../../shared/checkoutTicketDescription.mjs'
 import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
 import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
+import { validateContactPhone } from '../../shared/contactPhone.mjs'
+import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 
 function parseBody(req) {
@@ -59,6 +61,27 @@ export default async function handler(req, res) {
     typeof body.customerEmail === 'string' ? body.customerEmail.trim().slice(0, 320) : ''
   const customerFullName =
     typeof body.customerFullName === 'string' ? body.customerFullName.trim().slice(0, 200) : ''
+  const customerPhone =
+    typeof body.customerPhone === 'string'
+      ? body.customerPhone
+      : typeof body.phone === 'string'
+        ? body.phone
+        : ''
+  const phoneCheck = validateContactPhone(customerPhone)
+  if (!phoneCheck.ok) {
+    return res.status(400).json({ error: phoneCheck.error })
+  }
+  if (!customerEmail.includes('@')) {
+    return res.status(400).json({ error: 'Valid customerEmail required' })
+  }
+  if (!customerFullName) {
+    return res.status(400).json({ error: 'customerFullName required' })
+  }
+
+  const periodResult = await getOpenCompetitionPeriodForEntry()
+  if (!periodResult.ok) {
+    return res.status(403).json({ error: periodResult.error })
+  }
 
   const ticketNumbers = await reserveTicketNumbers(bundle.qty)
   const description = buildCheckoutDescription({
@@ -110,6 +133,8 @@ export default async function handler(req, res) {
         ticketNumbers,
         customerEmail,
         customerFullName,
+        customerPhone: phoneCheck.phone,
+        periodId: periodResult.period.id,
       })
     } catch (pendingErr) {
       console.error('createPendingTicketCheckout (paypal):', pendingErr)

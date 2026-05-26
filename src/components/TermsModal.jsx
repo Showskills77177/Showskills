@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { COMPETITION_NAME_POSTAL } from '../competitionData'
+import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
+import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 
 function PaidTicketNonRefundCallout() {
   return (
@@ -35,13 +36,19 @@ function PrivacyPolicySection() {
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.1 Information we collect</h3>
       <p className="mb-2">We only collect the minimum information necessary to run our competitions:</p>
       <ul className="mb-3 list-inside list-disc space-y-1">
-        <li>Name and email address (when you enter a competition or buy tickets)</li>
+        <li>Name, email address, and mobile phone number (when you enter a competition or buy tickets online)</li>
         <li>
-          Payment information (processed securely by <strong>Stripe</strong> and/or <strong>PayPal</strong> — we do not
+          Payment information (processed securely by our payment providers, e.g. <strong>Cashflows</strong> and/or{' '}
+          <strong>PayPal</strong> — we do not
           store your full card details)
         </li>
         <li>Answers to skill-based questions (paid entries after purchase and free postal or giveaway routes)</li>
         <li>Postal address (only if you submit a free postal entry)</li>
+        <li>
+          <strong>Contact telephone number</strong> — collected at online entry so we can reach you if you win or need
+          to verify your entry. We use it only for competition administration and prize fulfilment, and we delete it
+          after the relevant competition period ends unless a longer period is required by law or to resolve a dispute.
+        </li>
         <li>IP address and basic technical data (for security and anonymous analytics)</li>
       </ul>
       <p className="mb-2">We do not collect:</p>
@@ -55,7 +62,7 @@ function PrivacyPolicySection() {
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.2 How we use your information</h3>
       <p className="mb-2">We use your personal data only for:</p>
       <ul className="mb-3 list-inside list-disc space-y-1">
-        <li>Administering competitions and contacting winners</li>
+        <li>Administering competitions and contacting winners (by email and telephone where provided)</li>
         <li>Processing ticket payments and sending purchase or entry confirmations</li>
         <li>Verifying skill answers and qualifying entries</li>
         <li>Responding to enquiries via our contact form or email</li>
@@ -79,7 +86,7 @@ function PrivacyPolicySection() {
       <p className="mb-2">We share your data only with:</p>
       <ul className="mb-3 list-inside list-disc space-y-1">
         <li>
-          <strong>Stripe</strong> and/or <strong>PayPal</strong> — secure payment processing
+          <strong>Cashflows</strong> and/or <strong>PayPal</strong> — secure payment processing
         </li>
         <li>
           <strong>Email providers</strong> (e.g. Resend) — competition-related emails such as confirmations and results
@@ -102,7 +109,7 @@ function PrivacyPolicySection() {
           <strong>Winner data:</strong> basic details may be kept longer for legal, tax, and record-keeping purposes
         </li>
         <li>
-          <strong>Payment data:</strong> handled by Stripe and PayPal under their own retention policies
+          <strong>Payment data:</strong> handled by our payment providers under their own retention policies
         </li>
       </ul>
 
@@ -123,7 +130,8 @@ function PrivacyPolicySection() {
         >
           {mail}
         </a>{' '}
-        or use the <strong>contact form</strong> on this website.
+        or use the <strong>contact form</strong> on this website. The data controller is{' '}
+        <span className="text-zinc-300">{POSTAL_ENTRY_ADDRESS}</span>.
       </p>
 
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.7 Cookies</h3>
@@ -149,7 +157,7 @@ function PrivacyPolicySection() {
 }
 
 export function TermsModal({ open, onClose }) {
-  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + Stripe).
+  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + card iframes).
 
   useEffect(() => {
     if (!open) return
@@ -197,17 +205,25 @@ export function TermsModal({ open, onClose }) {
             and the separate <strong>free Ronaldo shirt giveaway</strong>. By entering, you agree to these terms.
           </p>
 
+          <p className="mb-4 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
+            {UK_AVAILABILITY_NOTICE}
+          </p>
+
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">1. Eligibility and age</h3>
           <p className="mb-3">
             Promotions are open to residents of the United Kingdom aged <strong>18 or over</strong> at the date of entry.
-            Employees of the promoter, their immediate families, and anyone otherwise connected with administration may be
-            excluded. We may require proof of age, identity, and residency before awarding any prize.
+            <strong> ShowSkills Rewards is currently available for UK residents only.</strong> We are expanding globally
+            soon; until then, entries and payments from outside the UK are not accepted. Employees of the promoter,
+            their immediate families, and anyone otherwise connected with administration may be excluded. We may require
+            proof of age, identity, and residency before awarding any prize.
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">2. Paid competition — skill-based (not a lottery)</h3>
           <p className="mb-3">
-            The <strong>Ronaldo Legacy Bundle</strong> draw is a <strong>skill-based competition</strong>, not a lottery
-            or raffle. After purchasing ticket(s), you must submit <strong>three free-text answers</strong> about
+            The <strong>Ronaldo Legacy Bundle</strong> draw is a <strong>skill-based competition</strong>, not a lottery.
+            Each competition runs for a defined <strong>entry period</strong>; only qualifying entries received within that
+            period are included in the draw for that period. When a period closes, the winner is drawn only from that
+            period&apos;s pool — entries from earlier or later periods are not mixed in. After purchasing ticket(s), you must submit <strong>three free-text answers</strong> about
             Cristiano Ronaldo. <strong>All answers must be correct</strong> for your entry to qualify. There are{' '}
             <strong>no multiple-choice options</strong>; answers are typed manually and judged against the correct
             solutions. <strong>Incorrect or incomplete answers do not win</strong> and do not receive a prize. Multiple
@@ -216,18 +232,20 @@ export function TermsModal({ open, onClose }) {
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">3. Winner selection (paid)</h3>
           <p className="mb-3">
-            Among entries that have <strong>paid, submitted answers, and answered all three questions correctly</strong>,
-            the winner is selected <strong>at random</strong> from that pool. There is <strong>no prize</strong> for
-            incorrect, incomplete, or unsuccessful entries. We may verify answers and eligibility before confirming a
-            winner.
+            Among entries that have <strong>paid, submitted answers, and answered all three questions correctly</strong>
+            within the active competition period, the winner is selected <strong>at random</strong> from that
+            period&apos;s pool only. There is <strong>no prize</strong> for incorrect, incomplete, or unsuccessful entries.
+            The winner is contacted by email and must respond within the timeframe stated in that notification. We may
+            verify answers and eligibility before confirming a winner.
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Ronaldo Legacy Bundle)</h3>
           <p className="mb-3">
             You may enter the same draw <strong>without payment</strong> by post. Send your <strong>full name</strong>,{' '}
             <strong>full postal address</strong>, <strong>email address</strong>, and the{' '}
-            <strong>competition name</strong> (<span className="text-zinc-300">{COMPETITION_NAME_POSTAL}</span>) to the
-            promoter address shown on the website. <strong>Limit: one free postal entry per person.</strong> Free postal
+            <strong>competition name</strong> (<span className="text-zinc-300">{COMPETITION_NAME_POSTAL}</span>) to:{' '}
+            <span className="text-zinc-300">{POSTAL_ENTRY_ADDRESS}</span>. <strong>Limit: one free postal entry per person.</strong>{' '}
+            Free postal
             entries are afforded the <strong>same opportunity to win</strong> as paid entries, subject to the same skill
             requirement (you must submit correct answers to the three questions by the method we specify for postal
             entrants — e.g. included in your postal entry or as directed on the site).
@@ -274,7 +292,7 @@ export function TermsModal({ open, onClose }) {
             9. Payments (paid tickets)
           </h3>
           <p className="mb-3">
-            Payments for <strong>ticket bundles</strong> are processed by our payment providers (e.g. Stripe, PayPal).
+            Payments for <strong>ticket bundles</strong> are processed by our payment providers (e.g. Cashflows, PayPal).
             This section applies to <strong>paid ticket purchases only</strong> (not free postal entries or free
             giveaways).
           </p>
@@ -332,7 +350,7 @@ export function TermsModal({ open, onClose }) {
           <PrivacyPolicySection />
 
           <p className="mt-6 text-xs text-zinc-500">
-            Promoter: ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY. Contact:{' '}
+            Promoter: {POSTAL_ENTRY_ADDRESS}. Contact:{' '}
             <a href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`} className="text-zinc-400 underline hover:text-zinc-300">
               {SHOWSKILLS_CONTACT_EMAIL}
             </a>

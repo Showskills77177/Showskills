@@ -1,6 +1,7 @@
 import { requireAdmin } from '../lib/adminAuth.mjs'
 import { query, isDbConfigured } from '../lib/db.mjs'
 import { json } from '../lib/http.mjs'
+import { parseAdminListQuery, adminListMeta } from '../lib/adminPagination.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -20,27 +21,34 @@ export default async function handler(req, res) {
   }
 
   if (!isDbConfigured()) {
-    return json(res, 200, { rows: [] })
+    return json(res, 200, { rows: [], ...adminListMeta(0, 1, 50) })
   }
 
   try {
     const url = new URL(req.url || '/', 'http://local')
-    const q = (url.searchParams.get('q') || '').trim()
-    const limit = Math.min(300, Math.max(1, parseInt(url.searchParams.get('limit') || '120', 10)))
+    const { q, page, pageSize, offset } = parseAdminListQuery(url)
+
+    let where = 'WHERE 1=1'
+    const params = []
+    if (q) {
+      params.push(`%${q}%`, `%${q}%`)
+      where += ` AND (u.email ILIKE $1 OR u.full_name ILIKE $2)`
+    }
+
+    const countSql = `SELECT COUNT(*)::int AS c FROM users u ${where}`
+    const countRes = await query(countSql, params)
+    const total = Number(countRes.rows[0]?.c ?? 0)
+
     let sql = `
       SELECT u.*,
         (SELECT COUNT(*)::int FROM competition_entries e WHERE e.user_id = u.id) AS entries_count,
         (SELECT COUNT(*)::int FROM tickets t WHERE t.user_id = u.id) AS tickets_count
       FROM users u
-      WHERE 1=1`
-    const params = []
-    if (q) {
-      params.push(`%${q}%`, `%${q}%`)
-      sql += ` AND (u.email ILIKE $1 OR u.full_name ILIKE $2)`
-    }
-    sql += ` ORDER BY u.created_at DESC LIMIT ${limit}`
+      ${where}
+      ORDER BY u.created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}`
     const r = await query(sql, params)
-    return json(res, 200, { rows: r.rows })
+    return json(res, 200, { rows: r.rows, ...adminListMeta(total, page, pageSize) })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Database error' })

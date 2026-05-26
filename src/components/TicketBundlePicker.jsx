@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { COMPETITION_NAME_POSTAL, formatBundlePriceGBP } from '../competitionData'
+import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, formatBundlePriceGBP } from '../competitionData'
 import { TicketBundleIcon } from './TicketBundleIcon'
 
 /**
@@ -14,8 +14,7 @@ export function TicketBundlePicker({
   visibleTicketBundles,
 }) {
   const bundles = visibleTicketBundles?.length ? visibleTicketBundles : []
-  const selectValue =
-    paidEntryRoute === 'postal' ? 'postal' : paidEntryRoute === 'free_online' ? 'free_online' : paidBundleId
+  const selectValue = paidEntryRoute === 'postal' ? 'postal' : paidBundleId
 
   return (
     <div>
@@ -36,10 +35,6 @@ export function TicketBundlePicker({
                 setPaidEntryRoute('postal')
                 return
               }
-              if (v === 'free_online') {
-                setPaidEntryRoute('free_online')
-                return
-              }
               setPaidEntryRoute('tickets')
               setPaidBundleId(v)
             }}
@@ -52,7 +47,6 @@ export function TicketBundlePicker({
               </option>
             ))}
           </optgroup>
-          <option value="free_online">Free online entry (card verify, £0)</option>
           <option value="postal">Free postal entry (same draw)</option>
           </select>
           <ChevronDown
@@ -75,16 +69,11 @@ export function TicketBundlePicker({
             ) : null}
           </div>
         ) : null}
-        {paidEntryRoute === 'free_online' ? (
-          <p className="mt-2 text-xs leading-relaxed text-stone-500">
-            Answer three skill questions online. Verify your card with Stripe (£0, not charged). Max 3 free entries
-            per name and address.
-          </p>
-        ) : null}
         {paidEntryRoute === 'postal' ? (
           <p className="mt-2 text-xs leading-relaxed text-stone-500">
             No payment online. Post your details and three skill answers for{' '}
-            <span className="text-stone-400">{COMPETITION_NAME_POSTAL}</span>.
+            <span className="text-stone-400">{COMPETITION_NAME_POSTAL}</span> to{' '}
+            <span className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</span>.
           </p>
         ) : null}
       </div>
@@ -137,37 +126,6 @@ export function TicketBundlePicker({
         ))}
         <label
           className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
-            paidEntryRoute === 'free_online'
-              ? 'border-teal-400/45 bg-teal-950/30 ring-1 ring-teal-500/25'
-              : 'border-white/10 bg-black/20 hover:border-white/18'
-          }`}
-        >
-          <input
-            type="radio"
-            name="legacy-draw-entry"
-            value="free_online"
-            checked={paidEntryRoute === 'free_online'}
-            onChange={() => setPaidEntryRoute('free_online')}
-            className="mt-1 h-4 w-4 shrink-0 border-white/20 bg-black/40 text-teal-500 focus:ring-teal-600/50"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base" aria-hidden>
-                🎟️
-              </span>
-              <span className="font-semibold text-stone-100">Free online entry</span>
-              <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-200/90">
-                £0 verify
-              </span>
-            </div>
-            <p className="mt-0.5 text-sm text-stone-400">
-              Same draw as paid tickets. Answer three skill questions, then verify your card (not charged). Card or
-              Apple Pay via Stripe. Limit: 3 entries per name and address.
-            </p>
-          </div>
-        </label>
-        <label
-          className={`flex cursor-pointer gap-3 rounded-xl border p-3 transition ${
             paidEntryRoute === 'postal'
               ? 'border-stone-400/45 bg-stone-900/40 ring-1 ring-stone-500/20'
               : 'border-white/10 bg-black/20 hover:border-white/18'
@@ -193,7 +151,8 @@ export function TicketBundlePicker({
             </div>
             <p className="mt-0.5 text-sm text-stone-400">
               No payment. Post your details and the three written skill answers — same Ronaldo Legacy Bundle
-              prize pool as paid tickets. One postal entry per person.
+              prize pool as paid tickets. One postal entry per person. Post to{' '}
+              <span className="text-stone-300">{POSTAL_ENTRY_ADDRESS}</span>.
             </p>
           </div>
         </label>

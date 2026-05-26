@@ -2,6 +2,7 @@ import { requireAdmin } from '../lib/adminAuth.mjs'
 import { ensureTicketSchema } from '../lib/ensureTicketSchema.mjs'
 import { query, isDbConfigured } from '../lib/db.mjs'
 import { json } from '../lib/http.mjs'
+import { parseAdminListQuery, adminListMeta } from '../lib/adminPagination.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -21,26 +22,37 @@ export default async function handler(req, res) {
   }
 
   if (!isDbConfigured()) {
-    return json(res, 200, { rows: [] })
+    return json(res, 200, { rows: [], ...adminListMeta(0, 1, 40) })
   }
 
   try {
     await ensureTicketSchema()
     const pathAndQuery = req.originalUrl || req.url || '/'
     const url = new URL(pathAndQuery, 'http://local')
-    const q = (url.searchParams.get('q') || '').trim()
-    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '100', 10)))
+    const { q, page, pageSize, offset } = parseAdminListQuery(url)
+
+    let where = 'WHERE 1=1'
+    const params = []
+    if (q) {
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`)
+      where += ` AND (t.ticket_public_id ILIKE $1 OR u.email ILIKE $2 OR u.full_name ILIKE $3)`
+    }
+
+    const countSql = `
+      SELECT COUNT(*)::int AS c
+      FROM tickets t
+      LEFT JOIN users u ON u.id = t.user_id
+      ${where}`
+    const countRes = await query(countSql, params)
+    const total = Number(countRes.rows[0]?.c ?? 0)
+
     let sql = `
       SELECT t.*, u.email, u.full_name
       FROM tickets t
       LEFT JOIN users u ON u.id = t.user_id
-      WHERE 1=1`
-    const params = []
-    if (q) {
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`)
-      sql += ` AND (t.ticket_public_id ILIKE $1 OR u.email ILIKE $2 OR u.full_name ILIKE $3)`
-    }
-    sql += ` ORDER BY t.created_at DESC LIMIT ${limit}`
+      ${where}
+      ORDER BY t.created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}`
     const r = await query(sql, params)
     const rows = r.rows
     if (rows.length) {
@@ -59,7 +71,7 @@ export default async function handler(req, res) {
         row.ticket_numbers = byTicket.get(row.id) || []
       }
     }
-    return json(res, 200, { rows })
+    return json(res, 200, { rows, ...adminListMeta(total, page, pageSize) })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Database error' })

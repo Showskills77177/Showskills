@@ -3,6 +3,7 @@ import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
 import iphone17ProMaxGoldCase from '../assets/iphone-17-pro-max-gold-case.png'
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
+import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import { TicketBundlePrice } from '../components/siteChrome'
 import { useEntryFlow } from '../entry/entryContext'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
@@ -19,7 +20,10 @@ export default function CompetitionsPage() {
         </p>
         <p className="mt-3 max-w-2xl text-sm text-stone-500">
           The bundle uses paid ticket bundles or free postal entry, then three skill questions. The shirt giveaway is free:
-          answer one simple qualification question to enter.
+          answer one simple qualification question to enter.{' '}
+          <Link to="/faq" className="text-teal-400/90 underline decoration-teal-700/50 underline-offset-2 hover:text-teal-300">
+            Common questions (FAQ)
+          </Link>
         </p>
 
         <ul className="mt-12 grid list-none gap-8 lg:grid-cols-2 lg:items-stretch">
@@ -85,7 +89,8 @@ export default function CompetitionsPage() {
               <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-500">
                 Pay for a ticket bundle <strong className="text-stone-400">or</strong> choose free postal entry in the same
                 panel — then answer <strong className="text-stone-400">three skill questions</strong> in writing. All correct
-                → you join the random draw for the full bundle (phone, shirt, ball, case).{' '}
+                → you join the random draw for the full bundle (phone, shirt, ball, case). Free postal entries: post to{' '}
+                <strong className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</strong>.{' '}
                 <strong className="text-stone-400">Not</strong> a video challenge.
               </p>
               <TicketBundlePrice className="mt-4" compact />

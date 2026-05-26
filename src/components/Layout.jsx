@@ -1,8 +1,9 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
 import { EntryModal } from './EntryModal'
-import { StripeReturnOverlay } from './StripeReturnOverlay'
 import { TermsModal } from './TermsModal'
+import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
+import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import { MobileNavDock } from './MobileNavDock'
 import { QuizPromptNav } from './QuizPromptNav'
 import { TrustpilotReviewCollector } from './TrustpilotFeedback'
@@ -35,13 +36,11 @@ function LogoMark({ className = 'h-10 sm:h-12' }) {
 }
 
 export function Layout() {
-  const { termsOpen, setTermsOpen, openTerms, stripeReturnStatus, paidError, paidQuizNavStatus } =
-    useEntryFlow()
+  const { termsOpen, setTermsOpen, openTerms, paidQuizNavStatus } = useEntryFlow()
   const showQuizPrompt = paidQuizNavStatus !== 'none'
 
   return (
     <div className="ss-page-bg min-h-svh font-sans text-stone-300 antialiased">
-      <StripeReturnOverlay status={stripeReturnStatus} message={paidError} />
       <EntryModal />
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 
@@ -83,6 +82,12 @@ export function Layout() {
             <span className="select-none text-stone-600" aria-hidden>
               —
             </span>
+            <NavLink to="/faq" className={desktopNavClass}>
+              FAQ
+            </NavLink>
+            <span className="select-none text-stone-600" aria-hidden>
+              —
+            </span>
             <button
               type="button"
               onClick={() => openTerms()}
@@ -117,28 +122,33 @@ export function Layout() {
       <Outlet />
 
       <footer className="ss-footer-bg relative overflow-hidden border-t border-white/[0.06]">
-        <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6">
-          <div className="flex flex-col items-center gap-6">
-            <div className="flex items-center justify-center">
-              <LogoMark className="h-8 sm:h-9" />
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+        <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-7">
+          <div className="flex flex-col items-center gap-3">
+            <LogoMark className="h-7 sm:h-8" />
+            <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
               <Link
                 to="/competitions"
-                className="text-sm font-medium text-stone-400 underline decoration-stone-600 underline-offset-4 hover:text-stone-200"
+                className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-stone-200"
               >
                 Competitions
               </Link>
               <Link
                 to="/contact"
-                className="text-sm font-medium text-stone-400 underline decoration-stone-600 underline-offset-4 hover:text-stone-200"
+                className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-stone-200"
               >
                 Contact
+              </Link>
+              <Link
+                to="/faq"
+                className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-stone-200"
+                title="Frequently asked questions about ShowSkills Rewards"
+              >
+                FAQ
               </Link>
               <button
                 type="button"
                 onClick={() => openTerms()}
-                className="text-sm font-medium text-stone-400 underline decoration-stone-600 underline-offset-4 hover:text-stone-200"
+                className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-stone-200"
               >
                 Full terms &amp; privacy
               </button>
@@ -150,25 +160,22 @@ export function Layout() {
                     document.getElementById('ss-terms-ticket-payments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                   }, 200)
                 }}
-                className="text-xs font-medium text-stone-500 underline decoration-stone-700 underline-offset-4 hover:text-stone-300"
+                className="text-xs font-medium text-stone-500 underline decoration-stone-700 underline-offset-2 hover:text-stone-300"
               >
                 Paid ticket terms
               </button>
-            </div>
+            </nav>
           </div>
-          <p className="mx-auto mt-4 max-w-md text-center text-sm text-stone-400">
-            Paid draw: skill answers then random winner from correct entries. Free postal entry is in the same Legacy
-            Bundle panel as paid tickets. UK-focused.
+          <p className="mx-auto mt-3 max-w-lg text-center text-xs leading-snug text-stone-500">
+            Skill-based paid draw — winner picked at random from correct entries. Free postal entry in the Legacy Bundle
+            panel — post to {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
           </p>
-          <div className="mx-auto mt-6 w-full max-w-[12.75rem]">
-            <p className="mb-2 text-center text-[11px] font-medium text-stone-500">
-              Leave feedback on Trustpilot
-            </p>
+          <div className="mx-auto mt-4 w-full max-w-[12.75rem]">
+            <p className="mb-1 text-center text-[10px] font-medium text-stone-600">Trustpilot feedback</p>
             <TrustpilotReviewCollector centered compact />
           </div>
-          <p className="mt-8 border-t border-white/[0.06] pt-8 text-center text-xs leading-relaxed text-stone-600">
-            Paid promotion is skill-based (not a lottery); winner chosen at random from entrants who answered all
-            questions correctly. Not affiliated with any athlete, club, or brand shown in illustrative prize imagery.
+          <p className="mt-5 border-t border-white/[0.06] pt-4 text-center text-[11px] leading-snug text-stone-600">
+            Not a lottery. Not affiliated with any athlete, club, or brand in prize imagery.
           </p>
         </div>
       </footer>

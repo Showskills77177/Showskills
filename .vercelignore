@@ -1,0 +1,11 @@
+# Not deployed to Vercel — keeps serverless function count low
+archive/
+tmp/
+server.js
+scripts/
+db/*.sqlite
+db/*.sqlite-*
+uploads/
+playwright-report/
+test-results/
+.cursor/

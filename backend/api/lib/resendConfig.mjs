@@ -61,6 +61,29 @@ export function resolveAdminOtpRecipient(adminEmail) {
   return to
 }
 
+/**
+ * Resend sandbox only delivers to the account signup address.
+ * In non-production, prefer RESEND_ACCOUNT_EMAIL when set.
+ */
+export function resolveCustomerEmailRecipient(customerEmail) {
+  const intended = (customerEmail || '').trim().toLowerCase()
+  if (!intended || !intended.includes('@')) {
+    return { to: intended, intendedTo: intended, redirected: false }
+  }
+  if (isResendProductionMode()) {
+    return { to: intended, intendedTo: intended, redirected: false }
+  }
+  const account = resendAccountEmail()
+  if (account) {
+    return {
+      to: account,
+      intendedTo: intended,
+      redirected: account !== intended,
+    }
+  }
+  return { to: intended, intendedTo: intended, redirected: false }
+}
+
 export function formatResendError(data, status) {
   const msg = typeof data?.message === 'string' ? data.message : ''
   const hint =

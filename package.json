@@ -16,12 +16,16 @@
     "seed:kickup": "node scripts/seed-kickup-video.mjs",
     "seed:draw-pool": "node scripts/seed-draw-pool.mjs",
     "seed:draw-pool:200": "node scripts/seed-draw-pool.mjs 200 --clear",
+    "seed:period-split": "node scripts/seed-period-split-test.mjs",
+    "seed:test3-bulk": "node scripts/seed-ronaldo-bundle-test3-bulk.mjs 334 --clear",
+    "preview:winner-email": "node scripts/preview-winner-email.mjs",
+    "test:period-split": "node scripts/test-period-split-draw.mjs",
     "test:draw-local": "node scripts/test-draw-local.mjs",
     "test": "playwright test",
     "test:e2e": "playwright test",
     "test:admin": "playwright test tests/e2e/admin.spec.js",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
-    "test:quiz": "node --test shared/paidSkillQuestions.test.mjs shared/vpnDetection.test.mjs",
+    "test:quiz": "node --test shared/paidSkillQuestions.test.mjs shared/vpnDetection.test.mjs shared/competitionPeriods.test.mjs shared/competitionCopy.test.mjs",
     "test:email-templates": "node --test shared/emailTemplates.test.mjs shared/siteContact.test.mjs",
     "test:stress": "playwright test tests/e2e/quiz-session-stress.spec.js tests/e2e/payment-mocked.spec.js tests/e2e/edge-cases.spec.js tests/e2e/contact.spec.js",
     "test:ui": "playwright test --ui",
@@ -33,11 +37,10 @@
     "test:admin-email": "node scripts/test-admin-otp-email.mjs"
   },
   "dependencies": {
-    "@stripe/react-stripe-js": "^6.4.0",
-    "@stripe/stripe-js": "^9.6.0",
     "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",
+    "cashflows-clientlib-js": "^1.0.51",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -47,8 +50,7 @@
     "pg": "^8.14.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.14.0",
-    "stripe": "^22.0.0"
+    "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

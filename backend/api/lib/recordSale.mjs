@@ -6,34 +6,13 @@ import {
   ensureTicketNumbersForPurchase,
 } from './ticketNumbers.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
+import { upsertUserContact } from './userContact.mjs'
 
 function orderPublicId() {
   return `ORD-${randomBytes(4).toString('hex').toUpperCase()}`
 }
 
-/** After unique violation on email, fetch id */
-async function upsertUserSimple(email, fullName) {
-  const e = email.trim().toLowerCase()
-  const n = fullName?.trim() || 'Unknown'
-  const newId = randomUUID()
-  try {
-    await query(`INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) RETURNING id`, [newId, e, n])
-    return newId
-  } catch (err) {
-    if (!isUniqueViolation(err)) throw err
-    const u = await query(`SELECT id FROM users WHERE lower(email) = $1`, [e])
-    if (u.rows[0]) {
-      await query(`UPDATE users SET full_name = COALESCE(NULLIF($2,''), full_name) WHERE id = $1`, [
-        u.rows[0].id,
-        n,
-      ])
-      return u.rows[0].id
-    }
-    throw err
-  }
-}
-
-/** No email on payment — one confirmation email is sent after skill answers (Stripe/PayPal may send their own receipt). */
+/** No email on payment — one confirmation email is sent after skill answers (payment providers may send their own receipt). */
 function paymentEmailDeferred() {
   return { emailSent: false, emailSkipped: true, reason: 'deferred_until_quiz' }
 }
@@ -42,6 +21,8 @@ async function finalizePendingTicket({
   row,
   customerEmail,
   customerFullName,
+  customerPhone,
+  periodId,
   amountPence,
   currency,
   provider,
@@ -61,18 +42,25 @@ async function finalizePendingTicket({
 
   let ticketNumbers = await ensureTicketNumbersForPurchase(row.id, qty)
 
-  const userId = await upsertUserSimple(customerEmail, customerFullName || '')
+  const userId = await upsertUserContact({
+    email: customerEmail,
+    fullName: customerFullName || '',
+    phone: customerPhone,
+  })
   const purchasedAt = new Date().toISOString()
-  await query(`UPDATE tickets SET payment_status = 'paid', purchased_at = $2, user_id = $3 WHERE id = $1`, [
-    row.id,
-    purchasedAt,
-    userId,
-  ])
+  await query(
+    `UPDATE tickets SET payment_status = 'paid', purchased_at = $2, user_id = $3, period_id = COALESCE(period_id, $4) WHERE id = $1`,
+    [row.id, purchasedAt, userId, periodId || null],
+  )
 
   const payId = randomUUID()
   const txId =
     paymentIntentId ||
-    (provider === 'stripe' ? `stripe_session_${externalId}` : `paypal_${externalId}`)
+    (provider === 'stripe'
+      ? `stripe_session_${externalId}`
+      : provider === 'cashflows'
+        ? `cashflows_${externalId}`
+        : `paypal_${externalId}`)
   await query(
     `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'successful', $8)
@@ -90,7 +78,9 @@ async function finalizePendingTicket({
           ? { stripe_payment_intent_id: paymentIntentId }
           : provider === 'stripe'
             ? { stripe_session_id: externalId }
-            : { paypal_order_id: externalId },
+            : provider === 'cashflows'
+              ? { cashflows_payment_job_reference: externalId }
+              : { paypal_order_id: externalId },
       ),
     ],
   )
@@ -103,82 +93,12 @@ async function finalizePendingTicket({
   }
 }
 
-export async function recordStripeCheckoutCompleted({
-  stripeSessionId,
-  customerEmail,
-  customerFullName,
-  bundleId,
-  quantity,
-  amountPence,
-  currency,
-  paymentIntentId,
-  reservedTicketNumbers,
-}) {
-  if (!isDbConfigured()) return null
-  const email = customerEmail?.trim()
-  if (!email || !email.includes('@')) return null
-
-  await ensureTicketSchema()
-
-  const dup = await query(
-    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE stripe_session_id = $1`,
-    [stripeSessionId],
-  )
-  if (dup.rows[0]) {
-    return finalizePendingTicket({
-      row: dup.rows[0],
-      customerEmail: email,
-      customerFullName,
-      amountPence,
-      currency,
-      provider: 'stripe',
-      externalId: stripeSessionId,
-      paymentIntentId,
-    })
-  }
-
-  const userId = await upsertUserSimple(email, customerFullName || '')
-
-  const tid = orderPublicId()
-  const ticketId = randomUUID()
-  const payId = randomUUID()
-  const purchasedAt = new Date().toISOString()
-  const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
-
-  await query(
-    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, purchased_at)
-     VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7)`,
-    [ticketId, tid, userId, bundleId || null, qty, stripeSessionId, purchasedAt],
-  )
-
-  const txId = paymentIntentId || `stripe_session_${stripeSessionId}`
-  await query(
-    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, 'stripe', 'successful', $7)
-     ON CONFLICT (transaction_id) DO NOTHING`,
-    [
-      payId,
-      txId,
-      userId,
-      ticketId,
-      amountPence,
-      (currency || 'gbp').toLowerCase(),
-      JSON.stringify({ stripe_session_id: stripeSessionId }),
-    ],
-  )
-
-  const reserved = Array.isArray(reservedTicketNumbers) ? reservedTicketNumbers.filter(Boolean) : []
-  const ticketNumbers =
-    reserved.length === qty
-      ? await insertPreservedTicketNumbers(ticketId, reserved)
-      : await insertTicketNumbers(ticketId, qty)
-  return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
-}
-
 export async function recordPayPalCapture({
   paypalOrderId,
   customerEmail,
   customerFullName,
+  customerPhone,
+  periodId,
   bundleId,
   quantity,
   amountPence,
@@ -199,6 +119,8 @@ export async function recordPayPalCapture({
       row: existing.rows[0],
       customerEmail: email,
       customerFullName,
+      customerPhone,
+      periodId,
       amountPence,
       currency,
       provider: 'paypal',
@@ -214,7 +136,11 @@ export async function recordPayPalCapture({
     return finalized
   }
 
-  const userId = await upsertUserSimple(email, customerFullName || '')
+  const userId = await upsertUserContact({
+    email,
+    fullName: customerFullName || '',
+    phone: customerPhone,
+  })
   const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
 
   const tid = orderPublicId()
@@ -222,9 +148,9 @@ export async function recordPayPalCapture({
   const payId = randomUUID()
   const purchasedAt = new Date().toISOString()
   await query(
-    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, paypal_order_id, purchased_at)
-     VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7)`,
-    [ticketId, tid, userId, bundleId || null, qty, paypalOrderId, purchasedAt],
+    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, paypal_order_id, purchased_at, period_id)
+     VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7, $8)`,
+    [ticketId, tid, userId, bundleId || null, qty, paypalOrderId, purchasedAt, periodId || null],
   )
 
   await query(
@@ -246,10 +172,12 @@ export async function recordPayPalCapture({
   return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
 }
 
-export async function recordStripePaymentIntentCompleted({
-  paymentIntentId,
+export async function recordCashflowsPaymentCompleted({
+  paymentJobReference,
   customerEmail,
   customerFullName,
+  customerPhone,
+  periodId,
   bundleId,
   quantity,
   amountPence,
@@ -259,23 +187,26 @@ export async function recordStripePaymentIntentCompleted({
   if (!isDbConfigured()) return null
   const email = customerEmail?.trim()
   if (!email || !email.includes('@')) return null
+  const jobRef = typeof paymentJobReference === 'string' ? paymentJobReference.trim() : ''
+  if (!jobRef) return null
 
   await ensureTicketSchema()
 
   const dup = await query(
-    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE stripe_payment_intent_id = $1`,
-    [paymentIntentId],
+    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE cashflows_payment_job_reference = $1`,
+    [jobRef],
   )
   if (dup.rows[0]) {
     const finalized = await finalizePendingTicket({
       row: dup.rows[0],
       customerEmail: email,
       customerFullName,
+      customerPhone,
+      periodId,
       amountPence,
       currency,
-      provider: 'stripe',
-      externalId: paymentIntentId,
-      paymentIntentId,
+      provider: 'cashflows',
+      externalId: jobRef,
     })
     if (!finalized.ticketNumbers?.length) {
       const nums = await ensureTicketNumbersForPurchase(
@@ -287,7 +218,11 @@ export async function recordStripePaymentIntentCompleted({
     return finalized
   }
 
-  const userId = await upsertUserSimple(email, customerFullName || '')
+  const userId = await upsertUserContact({
+    email,
+    fullName: customerFullName || '',
+    phone: customerPhone,
+  })
   const tid = orderPublicId()
   const ticketId = randomUUID()
   const payId = randomUUID()
@@ -295,23 +230,23 @@ export async function recordStripePaymentIntentCompleted({
   const qty = Math.max(1, parseInt(String(quantity), 10) || 1)
 
   await query(
-    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_payment_intent_id, purchased_at)
-     VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7)`,
-    [ticketId, tid, userId, bundleId || null, qty, paymentIntentId, purchasedAt],
+    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, cashflows_payment_job_reference, purchased_at, period_id)
+     VALUES ($1, $2, $3, $4, $5, 'paid', $6, $7, $8)`,
+    [ticketId, tid, userId, bundleId || null, qty, jobRef, purchasedAt, periodId || null],
   )
 
   await query(
     `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, 'stripe', 'successful', $7)
+     VALUES ($1, $2, $3, $4, $5, $6, 'cashflows', 'successful', $7)
      ON CONFLICT (transaction_id) DO NOTHING`,
     [
       payId,
-      paymentIntentId,
+      `cashflows_${jobRef}`,
       userId,
       ticketId,
       amountPence,
       (currency || 'gbp').toLowerCase(),
-      JSON.stringify({ stripe_payment_intent_id: paymentIntentId }),
+      JSON.stringify({ cashflows_payment_job_reference: jobRef }),
     ],
   )
 
@@ -321,14 +256,4 @@ export async function recordStripePaymentIntentCompleted({
       ? await insertPreservedTicketNumbers(ticketId, reserved)
       : await insertTicketNumbers(ticketId, qty)
   return { ticketId, userId, ticketPublicId: tid, ticketNumbers, ...paymentEmailDeferred() }
-}
-
-/** Parse comma-separated ticket numbers from Stripe session metadata. */
-export function parseReservedTicketNumbersMetadata(metadata) {
-  const raw = metadata?.ticket_numbers
-  if (typeof raw !== 'string' || !raw.trim()) return []
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
 }

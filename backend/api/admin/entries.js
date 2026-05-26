@@ -1,6 +1,7 @@
 import { requireAdmin } from '../lib/adminAuth.mjs'
 import { query, isDbConfigured } from '../lib/db.mjs'
 import { parseJsonBody, json } from '../lib/http.mjs'
+import { parseAdminListQuery, adminListMeta } from '../lib/adminPagination.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -17,29 +18,40 @@ export default async function handler(req, res) {
   }
 
   if (!isDbConfigured()) {
-    if (req.method === 'GET') return json(res, 200, { rows: [] })
+    if (req.method === 'GET') return json(res, 200, { rows: [], ...adminListMeta(0, 1, 50) })
     return json(res, 503, { error: 'Database not configured' })
   }
 
   try {
     if (req.method === 'GET') {
       const url = new URL(req.url || '/', 'http://local')
-      const q = (url.searchParams.get('q') || '').trim()
-      const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '80', 10)))
+      const { q, page, pageSize, offset } = parseAdminListQuery(url)
+
+      let where = 'WHERE 1=1'
+      const params = []
+      if (q) {
+        params.push(`%${q}%`, `%${q}%`)
+        where += ` AND (u.email ILIKE $1 OR u.full_name ILIKE $2)`
+      }
+
+      const countSql = `
+        SELECT COUNT(*)::int AS c
+        FROM competition_entries e
+        LEFT JOIN users u ON u.id = e.user_id
+        ${where}`
+      const countRes = await query(countSql, params)
+      const total = Number(countRes.rows[0]?.c ?? 0)
+
       let sql = `
         SELECT e.id, e.competition, e.entry_type, e.answers_json, e.all_correct, e.reviewed_valid, e.created_at,
                u.email, u.full_name
         FROM competition_entries e
         LEFT JOIN users u ON u.id = e.user_id
-        WHERE 1=1`
-      const params = []
-      if (q) {
-        params.push(`%${q}%`, `%${q}%`)
-        sql += ` AND (u.email ILIKE $1 OR u.full_name ILIKE $2)`
-      }
-      sql += ` ORDER BY e.created_at DESC LIMIT ${limit}`
+        ${where}
+        ORDER BY e.created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}`
       const r = await query(sql, params)
-      return json(res, 200, { rows: r.rows })
+      return json(res, 200, { rows: r.rows, ...adminListMeta(total, page, pageSize) })
     }
 
     if (req.method === 'PATCH') {

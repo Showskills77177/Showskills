@@ -1,5 +1,5 @@
 /**
- * Paid draw ticket bundles — single source of truth for UI + Stripe/PayPal APIs.
+ * Paid draw ticket bundles — single source of truth for UI + payment APIs.
  * Amounts in pence (GBP). Server must resolve `bundleId` against this list only.
  */
 

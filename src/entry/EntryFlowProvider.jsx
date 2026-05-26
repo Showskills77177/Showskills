@@ -14,10 +14,10 @@ import {
   savePaidEntryContact,
 } from '../lib/paidEntryContact'
 import { loadPaidQuizSession, savePaidQuizSession } from '../lib/paidQuizSession'
-import { preloadStripe } from '../lib/stripeLoader'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
+import { validateContactPhone } from '../../shared/contactPhone.mjs'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -75,55 +75,23 @@ export function EntryFlowProvider({ children }) {
   const [paidEmail, setPaidEmail] = useState(
     () => initialQuizSession?.email || initialContact?.email || '',
   )
+  const [paidPhone, setPaidPhone] = useState(() => initialContact?.phone || '')
 
   const [kickFullName, setKickFullName] = useState('')
   const [kickAnswer, setKickAnswer] = useState('')
   const [kickEmail, setKickEmail] = useState('')
+  const [kickPhone, setKickPhone] = useState('')
   const [kickConsent, setKickConsent] = useState(false)
   const [kickError, setKickError] = useState('')
   const [kickSuccess, setKickSuccess] = useState(false)
   const [kickVpnBlocked, setKickVpnBlocked] = useState(false)
   const [kickCheckingVpn, setKickCheckingVpn] = useState(false)
 
-  const [freeAddressLine1, setFreeAddressLine1] = useState('')
-  const [freeAddressLine2, setFreeAddressLine2] = useState('')
-  const [freeCity, setFreeCity] = useState('')
-  const [freePostcode, setFreePostcode] = useState('')
-  const [freeSetupClientSecret, setFreeSetupClientSecret] = useState('')
-  const [freeSetupIntentId, setFreeSetupIntentId] = useState('')
-  const [freePreparing, setFreePreparing] = useState(false)
-  const [freeSuccess, setFreeSuccess] = useState(false)
-  const [freeCardVerified, setFreeCardVerified] = useState(false)
-  const [freeQuizResult, setFreeQuizResult] = useState(null)
-  const [freeQuizSubmitting, setFreeQuizSubmitting] = useState(false)
-  /** null | 'confirming' | 'failed' — Stripe redirect return handling */
-  const [stripeReturnStatus, setStripeReturnStatus] = useState(null)
   /** Avoid sending the unanswered ticket email more than once per checkout. */
   const unansweredTicketEmailRequestedRef = useRef(false)
 
-  const stripePublishableKey = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '').trim()
-  const stripePaymentIntentApiOverride = (import.meta.env.VITE_STRIPE_PAYMENT_INTENT_API_URL ?? '').trim()
-  const stripeCheckoutApiOverride = (import.meta.env.VITE_STRIPE_CHECKOUT_API_URL ?? '').trim()
-  const stripePaymentLink = (import.meta.env.VITE_STRIPE_PAYMENT_LINK ?? '').trim()
   const baseUrl = import.meta.env.BASE_URL.replace(/\/?$/, '')
-  const defaultPaymentIntentApi = stripePublishableKey ? `${baseUrl}/api/create-payment-intent` : ''
-  const defaultCheckoutApi = stripePublishableKey ? `${baseUrl}/api/create-checkout-session` : ''
-  const stripePaymentIntentApi = stripePaymentIntentApiOverride || defaultPaymentIntentApi
-  const stripeCheckoutApi = stripeCheckoutApiOverride || defaultCheckoutApi
-  /** In-modal PE is opt-in only — hosted Checkout is default (avoids iframe typing bugs). */
-  const useStripePaymentElement =
-    import.meta.env.VITE_STRIPE_USE_PAYMENT_ELEMENT === '1' ||
-    import.meta.env.VITE_STRIPE_USE_PAYMENT_ELEMENT === 'true'
-  const hasStripeElements =
-    useStripePaymentElement && Boolean(stripePaymentIntentApi && stripePublishableKey)
-  const hasStripeHostedCheckout =
-    !useStripePaymentElement && Boolean(stripeCheckoutApi && stripePublishableKey)
-  const hasStripeCheckout = hasStripeHostedCheckout || hasStripeElements || Boolean(stripePaymentLink)
-  const hasStripeFreeVerify = Boolean(stripePublishableKey)
-
-  const [paidStripeClientSecret, setPaidStripeClientSecret] = useState('')
-  const [paidStripePaymentIntentId, setPaidStripePaymentIntentId] = useState('')
-  const [paidStripePreparing, setPaidStripePreparing] = useState(false)
+  const [paidCardPreparing, setPaidCardPreparing] = useState(false)
 
   const payPalClientId = (import.meta.env.VITE_PAYPAL_CLIENT_ID ?? '').trim()
   const paypalCreateOverride = (import.meta.env.VITE_PAYPAL_CREATE_ORDER_URL ?? '').trim()
@@ -136,6 +104,21 @@ export function EntryFlowProvider({ children }) {
     : ''
   const hasPayPal = Boolean(payPalClientId)
   const payPalCurrency = (import.meta.env.VITE_PAYPAL_CURRENCY ?? 'GBP').trim().toUpperCase()
+
+  const cashflowsEnabled =
+    import.meta.env.VITE_CASHFLOWS_ENABLED === '1' ||
+    import.meta.env.VITE_CASHFLOWS_ENABLED === 'true'
+  const cashflowsCreateOverride = (import.meta.env.VITE_CASHFLOWS_CREATE_INTENT_URL ?? '').trim()
+  const cashflowsCreateApi = cashflowsEnabled
+    ? cashflowsCreateOverride || `${baseUrl}/api/create-cashflows-payment-intent`
+    : ''
+  const hasCashflowsEmbedded = Boolean(cashflowsCreateApi)
+  const hasEmbeddedCardCheckout = hasCashflowsEmbedded
+  const hasCardCheckout = hasCashflowsEmbedded
+
+  const [paidCashflowsToken, setPaidCashflowsToken] = useState('')
+  const [paidCashflowsJobRef, setPaidCashflowsJobRef] = useState('')
+  const [paidCashflowsIntegration, setPaidCashflowsIntegration] = useState(true)
 
   const visibleTicketBundles = useMemo(() => getVisibleTicketBundles(), [])
 
@@ -155,8 +138,10 @@ export function EntryFlowProvider({ children }) {
     const stored = loadPaidEntryContact()
     const em = (contact?.email || stored?.email || '').trim()
     const fn = (contact?.fullName || stored?.fullName || '').trim()
+    const ph = (contact?.phone || stored?.phone || '').trim()
     if (em) setPaidEmail(em)
     if (fn) setPaidFullName(fn)
+    if (ph) setPaidPhone(ph)
     if (em || fn) clearPaidEntryContact()
   }, [])
 
@@ -416,115 +401,13 @@ export function EntryFlowProvider({ children }) {
   ])
 
   useEffect(() => {
-    if (hasStripeElements && stripePublishableKey) preloadStripe(stripePublishableKey)
-  }, [hasStripeElements, stripePublishableKey])
-
-  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const isStripeReturn =
-      params.get('stripe_return') === '1' ||
-      (params.get('payment_intent')?.startsWith('pi_') && params.get('redirect_status'))
-
-    if (isStripeReturn) {
-      const redirectStatus = params.get('redirect_status')
-      const paymentIntentId = params.get('payment_intent')?.trim() || ''
-      const failMessage =
-        redirectStatus === 'failed'
-          ? 'Payment failed or was cancelled.'
-          : 'Payment could not be confirmed. Please try again.'
-
-      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
-
-      if (redirectStatus !== 'succeeded' || !paymentIntentId.startsWith('pi_')) {
-        setStripeReturnStatus('failed')
-        setPaidError(failMessage)
-        setEntryModalType('paid')
-        return
-      }
-
-      setStripeReturnStatus('confirming')
-      setEntryModalType('paid')
-      setPaidError('')
-
-      fetch(apiUrl('/api/record-stripe-payment'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ paymentIntentId }),
-      })
-        .then((res) => res.json().catch(() => ({})))
-        .then((data) => {
-          if (data.skipped) {
-            throw new Error('Payment received but tickets could not be saved. Contact support with your email.')
-          }
-          if (!data.ok) {
-            throw new Error(typeof data.error === 'string' ? data.error : 'Could not confirm payment')
-          }
-          if (data.emailSent) setPaidEmailConfirmationSent(true)
-          beginPaidQuizPending({
-            orderRef: data.orderRef,
-            ticketNumbers: data.ticketNumbers,
-            customerEmail: data.customerEmail,
-            customerFullName: data.customerFullName,
-          })
-          setPaidError('')
-          setStripeReturnStatus(null)
-        })
-        .catch((err) => {
-          setStripeReturnStatus('failed')
-          setPaidError(err instanceof Error ? err.message : 'Could not confirm payment')
-          setPaidPostCheckout(false)
-        })
-      return
-    }
-
     if (params.get('checkout') === 'cancelled') {
       setPaidError('Payment was cancelled. You can try again when ready.')
       setEntryModalType('paid')
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
-      return
     }
-
-    if (params.get('checkout') !== 'success') return
-    const sessionId = params.get('session_id')
-    if (sessionId) {
-      fetch(apiUrl('/api/records/stripe-session'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ sessionId }),
-      })
-        .then((res) => res.json().catch(() => ({})))
-        .then((data) => {
-          if (Array.isArray(data.ticketNumbers) && data.ticketNumbers.length) {
-            setPaidTicketNumbers(data.ticketNumbers)
-          }
-          if (typeof data.orderRef === 'string' && data.orderRef) {
-            setPaidOrderRef(data.orderRef)
-          }
-          if (data.emailSent) setPaidEmailConfirmationSent(true)
-          beginPaidQuizPending({
-            orderRef: data.orderRef,
-            ticketNumbers: data.ticketNumbers,
-            customerEmail: data.customerEmail,
-            customerFullName: data.customerFullName,
-          })
-          setEntryModalType('paid')
-          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
-        })
-        .catch(() => {
-          applyPaidEntryContact()
-          beginPaidQuizPending()
-          setEntryModalType('paid')
-          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
-        })
-      return
-    }
-    applyPaidEntryContact()
-    beginPaidQuizPending()
-    setEntryModalType('paid')
-    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
-  }, [applyPaidEntryContact, beginPaidQuizPending])
+  }, [])
 
   const openEntry = useCallback((type) => {
     setEntryModalType(type)
@@ -553,28 +436,22 @@ export function EntryFlowProvider({ children }) {
     }
     if (type === 'paid') {
       setPaidError('')
-      setFreeSuccess(false)
-      setFreeCardVerified(false)
-      setFreeQuizResult(null)
-      setFreeSetupClientSecret('')
-      setFreeSetupIntentId('')
       const session = loadPaidQuizSession()
       if (session?.status === 'pending' || session?.status === 'answered') {
         restorePaidQuizFromSession(session)
       } else {
         setPaidBundleId(getInitialPaidBundleId(searchParams))
         setPaidEntryRoute('tickets')
-        setPaidStripeClientSecret('')
-        setPaidStripePaymentIntentId('')
       }
-      preloadStripe(stripePublishableKey)
+      setPaidCashflowsToken('')
+      setPaidCashflowsJobRef('')
     }
-  }, [stripePublishableKey, searchParams, restorePaidQuizFromSession])
+  }, [searchParams, restorePaidQuizFromSession])
 
-  const closeStripePayment = useCallback(() => {
-    setPaidStripeClientSecret('')
-    setPaidStripePaymentIntentId('')
-    setPaidStripePreparing(false)
+  const closeCardPayment = useCallback(() => {
+    setPaidCashflowsToken('')
+    setPaidCashflowsJobRef('')
+    setPaidCardPreparing(false)
     setPaidError('')
   }, [])
 
@@ -599,8 +476,8 @@ export function EntryFlowProvider({ children }) {
   const closeEntry = useCallback(() => {
     notifyUnansweredQuizTicketEmail()
     setEntryModalType(null)
-    closeStripePayment()
-  }, [closeStripePayment, notifyUnansweredQuizTicketEmail])
+    closeCardPayment()
+  }, [closeCardPayment, notifyUnansweredQuizTicketEmail])
 
   useEffect(() => {
     if (!paidPostCheckout || paidQuizSubmitted) return
@@ -614,8 +491,8 @@ export function EntryFlowProvider({ children }) {
   const markPaidCheckoutComplete = useCallback(
     (purchaseInfo) => {
       setPaidError('')
-      setPaidStripeClientSecret('')
-      setPaidStripePaymentIntentId('')
+      setPaidCashflowsToken('')
+      setPaidCashflowsJobRef('')
       if (purchaseInfo?.emailSent) setPaidEmailConfirmationSent(true)
       beginPaidQuizPending({
         orderRef: purchaseInfo?.orderRef,
@@ -630,13 +507,14 @@ export function EntryFlowProvider({ children }) {
   const paidFormReadyForPayment =
     paidConsent &&
     paidFullName.trim() &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim()) &&
+    validateContactPhone(paidPhone).ok
 
-  const fetchPaymentIntent = useCallback(
+  const fetchCashflowsIntent = useCallback(
     async ({ signal } = {}) => {
       const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
       if (!bundle) throw new Error('Choose a ticket bundle.')
-      const res = await fetch(apiUrl(stripePaymentIntentApi), {
+      const res = await fetch(apiUrl(cashflowsCreateApi), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -645,34 +523,40 @@ export function EntryFlowProvider({ children }) {
           bundleId: bundle.id,
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),
+          customerPhone: paidPhone.trim(),
         }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Could not start card payment')
       }
-      const secret = typeof data.clientSecret === 'string' ? data.clientSecret : ''
-      if (!secret) throw new Error('Invalid payment response')
-      setPaidStripeClientSecret(secret)
-      setPaidStripePaymentIntentId(
-        typeof data.paymentIntentId === 'string' ? data.paymentIntentId : '',
-      )
+      savePaidEntryContact({
+        email: paidEmail.trim(),
+        fullName: paidFullName.trim(),
+        phone: paidPhone.trim(),
+      })
+      const token = typeof data.token === 'string' ? data.token : ''
+      const jobRef = typeof data.paymentJobReference === 'string' ? data.paymentJobReference : ''
+      if (!token || !jobRef) throw new Error('Invalid Cashflows payment response')
+      setPaidCashflowsToken(token)
+      setPaidCashflowsJobRef(jobRef)
+      setPaidCashflowsIntegration(Boolean(data.isIntegration))
       if (typeof data.orderRef === 'string' && data.orderRef) setPaidOrderRef(data.orderRef)
       if (Array.isArray(data.ticketNumbers) && data.ticketNumbers.length) {
         setPaidTicketNumbers(data.ticketNumbers)
       }
-      return secret
+      return token
     },
-    [paidBundleId, paidEmail, paidFullName, stripePaymentIntentApi],
+    [paidBundleId, paidEmail, paidFullName, paidPhone, cashflowsCreateApi],
   )
 
   /** Background warm-up once name, email, and consent are filled (Pay now opens faster). */
   useEffect(() => {
-    if (!paidFormReadyForPayment || paidEntryRoute !== 'tickets' || !hasStripeElements) return
-    if (paidStripeClientSecret) return
+    if (!paidFormReadyForPayment || paidEntryRoute !== 'tickets' || !hasCashflowsEmbedded) return
+    if (paidCashflowsToken) return
     const ac = new AbortController()
     const t = setTimeout(() => {
-      fetchPaymentIntent({ signal: ac.signal }).catch(() => {})
+      fetchCashflowsIntent({ signal: ac.signal }).catch(() => {})
     }, 600)
     return () => {
       clearTimeout(t)
@@ -681,83 +565,28 @@ export function EntryFlowProvider({ children }) {
   }, [
     paidFormReadyForPayment,
     paidEntryRoute,
-    hasStripeElements,
-    paidStripeClientSecret,
+    hasCashflowsEmbedded,
+    paidCashflowsToken,
     paidBundleId,
     paidEmail,
     paidFullName,
-    fetchPaymentIntent,
+    fetchCashflowsIntent,
   ])
 
-  const startHostedCheckout = useCallback(async () => {
+  const prepareCashflowsPayment = useCallback(async () => {
     setPaidError('')
     if (!paidFormReadyForPayment) {
-      setPaidError('Enter your full name, email, and agree to the terms before paying.')
-      return
-    }
-    const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
-    if (!bundle) {
-      setPaidError('Choose a ticket bundle.')
-      return
-    }
-
-    const origin = window.location.origin
-    const pathname = window.location.pathname || `${baseUrl}/competitions`
-    const successUrl = `${origin}${pathname}?checkout=success&session_id={CHECKOUT_SESSION_ID}`
-    const cancelUrl = `${origin}${pathname}?checkout=cancelled`
-
-    setPaidLoading(true)
-    try {
-      const res = await fetch(apiUrl(stripeCheckoutApi), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          bundleId: bundle.id,
-          customerEmail: paidEmail.trim(),
-          customerFullName: paidFullName.trim(),
-          successUrl,
-          cancelUrl,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(typeof data.error === 'string' ? data.error : 'Could not start checkout')
-      }
-      const url = typeof data.url === 'string' ? data.url : ''
-      if (!url) throw new Error('Stripe did not return a checkout URL')
-      savePaidEntryContact({
-        email: paidEmail.trim(),
-        fullName: paidFullName.trim(),
-      })
-      window.location.assign(url)
-    } catch (e) {
-      setPaidError(e instanceof Error ? e.message : 'Could not start checkout')
-      setPaidLoading(false)
-    }
-  }, [
-    paidFormReadyForPayment,
-    paidBundleId,
-    paidEmail,
-    paidFullName,
-    stripeCheckoutApi,
-    baseUrl,
-  ])
-
-  const prepareStripePayment = useCallback(async () => {
-    setPaidError('')
-    if (!paidFormReadyForPayment) {
-      setPaidError('Enter your full name, email, and agree to the terms before paying.')
+      setPaidError('Enter your full name, email, phone number, and agree to the terms before paying.')
       return false
     }
-    if (paidStripeClientSecret) return true
-    setPaidStripePreparing(true)
+    if (paidCashflowsToken) return true
+    setPaidCardPreparing(true)
     const controller = new AbortController()
     let prepareTimeout
     try {
       prepareTimeout = setTimeout(() => controller.abort(), 20_000)
-      const secret = await fetchPaymentIntent({ signal: controller.signal })
-      return Boolean(secret)
+      const token = await fetchCashflowsIntent({ signal: controller.signal })
+      return Boolean(token)
     } catch (e) {
       const aborted = e instanceof Error && e.name === 'AbortError'
       setPaidError(
@@ -770,13 +599,18 @@ export function EntryFlowProvider({ children }) {
       return false
     } finally {
       clearTimeout(prepareTimeout)
-      setPaidStripePreparing(false)
+      setPaidCardPreparing(false)
     }
-  }, [paidFormReadyForPayment, paidStripeClientSecret, fetchPaymentIntent])
+  }, [paidFormReadyForPayment, paidCashflowsToken, fetchCashflowsIntent])
+
+  const prepareEmbeddedCardPayment = useCallback(async () => {
+    if (hasCashflowsEmbedded) return prepareCashflowsPayment()
+    return false
+  }, [hasCashflowsEmbedded, prepareCashflowsPayment])
 
   useEffect(() => {
-    setPaidStripeClientSecret('')
-    setPaidStripePaymentIntentId('')
+    setPaidCashflowsToken('')
+    setPaidCashflowsJobRef('')
   }, [paidBundleId, paidEmail, paidFullName, paidEntryRoute])
 
   const handlePaidEntry = useCallback(async () => {
@@ -806,7 +640,7 @@ export function EntryFlowProvider({ children }) {
         }
         const e2eSecret = (import.meta.env.VITE_E2E_SECRET ?? '').trim()
         if (e2eSecret) {
-          const res = await fetch(apiUrl('/api/e2e/mock-stripe-completion'), {
+          const res = await fetch(apiUrl('/api/e2e/mock-paid-completion'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-e2e-secret': e2eSecret },
             body: JSON.stringify({
@@ -833,15 +667,10 @@ export function EntryFlowProvider({ children }) {
         return
       }
 
-      if (stripePaymentLink) {
-        window.location.href = stripePaymentLink
-        return
-      }
-
       setPaidError(
         hasPayPal
-          ? 'Card payment is not configured. Use PayPal below or add Stripe keys (see .env.example).'
-          : 'Add Stripe (VITE_STRIPE_PUBLISHABLE_KEY + STRIPE_SECRET_KEY) or PayPal.',
+          ? 'Card payment is not configured. Use PayPal below or add Cashflows keys (see .env.example).'
+          : 'Add Cashflows (CASHFLOWS_* + VITE_CASHFLOWS_ENABLED) or PayPal.',
       )
     } catch (e) {
       setPaidError(e instanceof Error ? e.message : 'Something went wrong')
@@ -854,7 +683,6 @@ export function EntryFlowProvider({ children }) {
     paidEmail,
     paidFullName,
     markPaidCheckoutComplete,
-    stripePaymentLink,
     hasPayPal,
   ])
 
@@ -915,132 +743,6 @@ export function EntryFlowProvider({ children }) {
     [paidA1, paidA2, paidA3, paidEmail, paidFullName, paidOrderRef, paidTicketNumbers],
   )
 
-  const freeVerifyPayload = useMemo(
-    () => ({
-      fullName: paidFullName.trim(),
-      email: paidEmail.trim(),
-      addressLine1: freeAddressLine1.trim(),
-      addressLine2: freeAddressLine2.trim(),
-      city: freeCity.trim(),
-      postcode: freePostcode.trim(),
-    }),
-    [paidFullName, paidEmail, freeAddressLine1, freeAddressLine2, freeCity, freePostcode],
-  )
-
-  const handleStartFreeVerification = useCallback(async () => {
-    setPaidError('')
-    setFreeSuccess(false)
-    setFreeCardVerified(false)
-    setFreeQuizResult(null)
-    setPaidQuizSubmitted(false)
-    setPaidQuizResult(null)
-    if (!paidConsent) {
-      setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
-      return
-    }
-    if (!paidFullName.trim()) {
-      setPaidError('Please enter your full name.')
-      return
-    }
-    if (!paidEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())) {
-      setPaidError('Please enter a valid email address.')
-      return
-    }
-    if (!freeAddressLine1.trim() || !freeCity.trim() || freePostcode.trim().length < 4) {
-      setPaidError('Please enter your full postal address (line 1, town/city, and postcode).')
-      return
-    }
-    if (!hasStripeFreeVerify) {
-      setPaidError('Card verification is not configured. Please try again later.')
-      return
-    }
-    setFreePreparing(true)
-    setFreeSetupClientSecret('')
-    try {
-      const res = await fetch(apiUrl('/api/create-free-setup-intent'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(freeVerifyPayload),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setPaidError(data.error || `Could not start verification (HTTP ${res.status}).`)
-        return
-      }
-      setFreeSetupClientSecret(data.clientSecret || '')
-      setFreeSetupIntentId(data.setupIntentId || '')
-    } catch {
-      setPaidError('Network error. Check your connection and try again.')
-    } finally {
-      setFreePreparing(false)
-    }
-  }, [paidConsent, paidFullName, paidEmail, freeAddressLine1, freeCity, freePostcode, hasStripeFreeVerify, freeVerifyPayload])
-
-  const handleFreeCardVerified = useCallback((data) => {
-    setFreeSetupClientSecret('')
-    setFreeCardVerified(true)
-    if (data.setupIntentId) setFreeSetupIntentId(data.setupIntentId)
-    setPaidError('')
-  }, [])
-
-  const handleFreeQuizSubmit = useCallback(
-    async (e) => {
-      e.preventDefault()
-      setPaidError('')
-      if (!paidConsent) {
-        setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
-        return
-      }
-      if (!freeCardVerified || !freeSetupIntentId) {
-        setPaidError('Please verify your card first, then answer the skill questions.')
-        return
-      }
-      if (!paidA1.trim() || !paidA2.trim() || !paidA3.trim()) {
-        setPaidError('Please answer all three skill questions.')
-        return
-      }
-      setFreeQuizSubmitting(true)
-      try {
-        const res = await fetch(apiUrl('/api/complete-free-entry'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            ...freeVerifyPayload,
-            setupIntentId: freeSetupIntentId,
-            answers: { q1: paidA1.trim(), q2: paidA2.trim(), q3: paidA3.trim() },
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          setPaidError(typeof data.error === 'string' ? data.error : 'Could not submit your free entry.')
-          return
-        }
-        setFreeSuccess(true)
-        setFreeQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
-        setPaidOrderRef(data.orderRef || '')
-        setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
-        setPaidQuizSubmitted(true)
-        setPaidQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
-        if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
-      } catch {
-        setPaidError('Network error. Check your connection and try again.')
-      } finally {
-        setFreeQuizSubmitting(false)
-      }
-    },
-    [
-      paidConsent,
-      freeCardVerified,
-      freeSetupIntentId,
-      freeVerifyPayload,
-      paidA1,
-      paidA2,
-      paidA3,
-    ],
-  )
-
   const handleKickupsGiveawaySubmit = useCallback(
     async (e) => {
       e.preventDefault()
@@ -1062,6 +764,11 @@ export function EntryFlowProvider({ children }) {
         setKickError('Please enter a valid email address.')
         return
       }
+      const kickPhoneCheck = validateContactPhone(kickPhone)
+      if (!kickPhoneCheck.ok) {
+        setKickError(kickPhoneCheck.error)
+        return
+      }
       const answer = kickAnswer.trim()
       if (!answer) {
         setKickError('Please answer the qualification question.')
@@ -1079,6 +786,8 @@ export function EntryFlowProvider({ children }) {
           body: JSON.stringify({
             fullName: kickFullName.trim(),
             email: kickEmail.trim(),
+            phone: kickPhone.trim(),
+            customerPhone: kickPhone.trim(),
             qualificationAnswer: answer,
           }),
         })
@@ -1091,7 +800,7 @@ export function EntryFlowProvider({ children }) {
         setKickError(err instanceof Error ? err.message : 'Submission failed')
       }
     },
-    [kickAnswer, kickConsent, kickEmail, kickFullName, kickVpnBlocked],
+    [kickAnswer, kickConsent, kickEmail, kickFullName, kickPhone, kickVpnBlocked],
   )
 
   const value = useMemo(
@@ -1132,20 +841,21 @@ export function EntryFlowProvider({ children }) {
       setPaidFullName,
       paidEmail,
       setPaidEmail,
+      paidPhone,
+      setPaidPhone,
       handlePaidEntry,
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
-      hasStripeCheckout,
-      hasStripeHostedCheckout,
-      useStripePaymentElement,
-      startHostedCheckout,
-      hasStripeElements,
-      stripePublishableKey,
-      paidStripeClientSecret,
-      paidStripePaymentIntentId,
-      paidStripePreparing,
-      prepareStripePayment,
-      closeStripePayment,
+      hasCardCheckout,
+      hasCashflowsEmbedded,
+      hasEmbeddedCardCheckout,
+      paidCashflowsToken,
+      paidCashflowsJobRef,
+      paidCashflowsIntegration,
+      paidCardPreparing,
+      prepareCashflowsPayment,
+      prepareEmbeddedCardPayment,
+      closeCardPayment,
       paidFormReadyForPayment,
       hasPayPal,
       payPalClientId,
@@ -1158,6 +868,8 @@ export function EntryFlowProvider({ children }) {
       setKickAnswer,
       kickEmail,
       setKickEmail,
+      kickPhone,
+      setKickPhone,
       kickConsent,
       setKickConsent,
       kickError,
@@ -1166,28 +878,7 @@ export function EntryFlowProvider({ children }) {
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,
-      freeAddressLine1,
-      setFreeAddressLine1,
-      freeAddressLine2,
-      setFreeAddressLine2,
-      freeCity,
-      setFreeCity,
-      freePostcode,
-      setFreePostcode,
-      freeSetupClientSecret,
-      freeSetupIntentId,
-      freePreparing,
-      freeSuccess,
-      freeCardVerified,
-      freeQuizResult,
-      freeQuizSubmitting,
-      hasStripeFreeVerify,
-      handleStartFreeVerification,
-      handleFreeCardVerified,
-      handleFreeQuizSubmit,
-      freeVerifyPayload,
       PAID_SKILL_QUESTIONS,
-      stripeReturnStatus,
       paidQuizNavStatus,
       openResumePaidQuiz,
     }),
@@ -1218,20 +909,20 @@ export function EntryFlowProvider({ children }) {
       visibleTicketBundles,
       paidFullName,
       paidEmail,
+      paidPhone,
       handlePaidEntry,
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
-      hasStripeCheckout,
-      hasStripeHostedCheckout,
-      useStripePaymentElement,
-      startHostedCheckout,
-      hasStripeElements,
-      stripePublishableKey,
-      paidStripeClientSecret,
-      paidStripePaymentIntentId,
-      paidStripePreparing,
-      prepareStripePayment,
-      closeStripePayment,
+      hasCardCheckout,
+      hasCashflowsEmbedded,
+      hasEmbeddedCardCheckout,
+      paidCashflowsToken,
+      paidCashflowsJobRef,
+      paidCashflowsIntegration,
+      paidCardPreparing,
+      prepareCashflowsPayment,
+      prepareEmbeddedCardPayment,
+      closeCardPayment,
       paidFormReadyForPayment,
       hasPayPal,
       payPalClientId,
@@ -1248,23 +939,6 @@ export function EntryFlowProvider({ children }) {
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,
-      freeAddressLine1,
-      freeAddressLine2,
-      freeCity,
-      freePostcode,
-      freeSetupClientSecret,
-      freeSetupIntentId,
-      freePreparing,
-      freeSuccess,
-      freeCardVerified,
-      freeQuizResult,
-      freeQuizSubmitting,
-      hasStripeFreeVerify,
-      handleStartFreeVerification,
-      handleFreeCardVerified,
-      handleFreeQuizSubmit,
-      freeVerifyPayload,
-      stripeReturnStatus,
       paidQuizNavStatus,
       openResumePaidQuiz,
     ],

@@ -16,7 +16,7 @@ function buildReceiptBlock({ orderRef, bundleTitle, quantity, amountPence }) {
         ${bundleTitle ? `<tr><td style="padding:5px 0;${LABEL_STYLE}">Bundle</td><td align="right" style="padding:5px 0;${VALUE_STYLE}">${escapeHtml(bundleTitle)}${quantity ? ` · ${quantity} ticket${quantity === 1 ? '' : 's'}` : ''}</td></tr>` : ''}
         ${price ? `<tr><td style="padding:5px 0;${LABEL_STYLE}">Paid</td><td align="right" style="padding:5px 0;font-weight:700;color:#6ee7b7;font-size:14px">${escapeHtml(price)}</td></tr>` : ''}
       </table>
-      <p style="margin:10px 0 0;font-size:11px;line-height:1.45;color:#78716c">You may also receive a payment receipt from Stripe or PayPal.</p>
+      <p style="margin:10px 0 0;font-size:11px;line-height:1.45;color:#78716c">You may also receive a payment receipt from your payment provider.</p>
     </td></tr>
   </table>`
 }
@@ -108,7 +108,7 @@ export function buildQuizResultText(props) {
   if (orderRef) lines.push(`Order: ${orderRef}`)
   if (bundleTitle) lines.push(`Bundle: ${bundleTitle}${quantity ? ` (${quantity} tickets)` : ''}`)
   if (price) lines.push(`Paid: ${price}`)
-  lines.push('(You may also receive a receipt from Stripe or PayPal.)', '')
+  lines.push('(You may also receive a receipt from your payment provider.)', '')
   lines.push('--- Skill answers ---')
   if (allCorrect) {
     lines.push('All three answers correct — you qualify for the draw.')

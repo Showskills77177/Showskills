@@ -8,7 +8,7 @@ import {
 } from '../support/db.mjs'
 
 test.describe('B) Mocked payment + persistence', () => {
-  test('mock Stripe completion creates paid ticket; quiz creates competition entry', async ({ page }) => {
+  test('mock paid completion creates paid ticket; quiz creates competition entry', async ({ page }) => {
     const email = `e2e-pay-${Date.now()}@example.test`
     const name = 'E2E Payment User'
 

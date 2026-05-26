@@ -1,6 +1,6 @@
 import { getPayPalCredentials, paypalAccessToken } from './lib/paypal.js'
 import { recordPayPalCapture } from './lib/recordSale.mjs'
-import { isDbConfigured } from './lib/db.mjs'
+import { isDbConfigured, query } from './lib/db.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 import { assertPayPalCaptureMatchesBundle } from './lib/paymentSecurity.mjs'
 
@@ -72,6 +72,12 @@ export default async function handler(req, res) {
     if (isDbConfigured()) {
       const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim() : ''
       const customerFullName = typeof body.customerFullName === 'string' ? body.customerFullName.trim() : ''
+      const customerPhone =
+        typeof body.customerPhone === 'string'
+          ? body.customerPhone
+          : typeof body.phone === 'string'
+            ? body.phone
+            : ''
       const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : ''
       const qty = Math.max(1, parseInt(body.ticketQuantity, 10) || 1)
       if (customerEmail.includes('@')) {
@@ -80,10 +86,13 @@ export default async function handler(req, res) {
           if (!bundleCheck.ok) {
             return res.status(400).json({ error: bundleCheck.error })
           }
+          const ticketMeta = await query(`SELECT period_id FROM tickets WHERE paypal_order_id = $1`, [data.id])
           const recorded = await recordPayPalCapture({
             paypalOrderId: data.id,
             customerEmail,
             customerFullName,
+            customerPhone,
+            periodId: ticketMeta.rows[0]?.period_id || null,
             bundleId: bundleCheck.bundle.id,
             quantity: bundleCheck.bundle.qty,
             amountPence: bundleCheck.amountPence,

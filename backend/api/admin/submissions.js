@@ -2,6 +2,7 @@ import { requireAdmin } from '../lib/adminAuth.mjs'
 import { query, isDbConfigured } from '../lib/db.mjs'
 import { json, readJsonBody } from '../lib/http.mjs'
 import { deleteLocalKickupFileFromRef } from '../lib/kickupUploads.mjs'
+import { parseAdminListQuery, adminListMeta } from '../lib/adminPagination.mjs'
 
 /** Express: use native .status().json() so the response always completes (avoids subtle res.end issues). */
 function sendJson(res, status, data) {
@@ -59,26 +60,34 @@ export default async function handler(req, res) {
   }
 
   if (!isDbConfigured()) {
-    if (req.method === 'GET') return sendJson(res, 200, { rows: [] })
+    if (req.method === 'GET') return sendJson(res, 200, { rows: [], ...adminListMeta(0, 1, 40) })
     return sendJson(res, 503, { error: 'Database not configured' })
   }
 
   try {
     if (req.method === 'GET') {
       const sp = searchParamsFromReq(req)
-      const q = (firstQueryString(req.query?.q) || sp.get('q') || '').trim()
-      const limitRaw = firstQueryString(req.query?.limit) || sp.get('limit') || '80'
-      const limit = Math.min(200, Math.max(1, parseInt(limitRaw, 10)))
-      let sql = `SELECT * FROM kickup_submissions WHERE 1=1`
+      const pathUrl = new URL(req.originalUrl || req.url || '/', 'http://local')
+      const q = (firstQueryString(req.query?.q) || sp.get('q') || pathUrl.searchParams.get('q') || '').trim()
+      const { page, pageSize, offset } = parseAdminListQuery(pathUrl)
+
+      let where = 'WHERE 1=1'
       const params = []
       if (q) {
         params.push(`%${q}%`, `%${q}%`)
-        sql += ` AND (email ILIKE $1 OR full_name ILIKE $2)`
+        where += ` AND (email ILIKE $1 OR full_name ILIKE $2)`
       }
-      sql += ` ORDER BY created_at DESC LIMIT ${limit}`
+
+      const countRes = await query(`SELECT COUNT(*)::int AS c FROM kickup_submissions ${where}`, params)
+      const total = Number(countRes.rows[0]?.c ?? 0)
+
+      let sql = `SELECT * FROM kickup_submissions ${where} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${offset}`
       const r = await query(sql, params)
       res.setHeader('Cache-Control', 'private, no-store')
-      return sendJson(res, 200, { rows: normalizeKickupRows(r.rows) })
+      return sendJson(res, 200, {
+        rows: normalizeKickupRows(r.rows),
+        ...adminListMeta(total, page, pageSize),
+      })
     }
 
     if (req.method === 'PATCH') {

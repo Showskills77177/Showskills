@@ -5,24 +5,8 @@ import { ensureFreeEntrySchema } from './ensureFreeEntrySchema.mjs'
 import { reserveTicketNumbers } from './ticketNumbers.mjs'
 import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
 import { COMPETITION_LEGACY_BUNDLE } from '../../../shared/freeEntryLimits.mjs'
-
-async function upsertUserSimple(email, fullName) {
-  const newUserId = randomUUID()
-  try {
-    await query(`INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) RETURNING id`, [
-      newUserId,
-      email,
-      fullName,
-    ])
-    return newUserId
-  } catch (err) {
-    if (!isUniqueViolation(err)) throw err
-    const u = await query(`SELECT id FROM users WHERE lower(email) = $1`, [email])
-    const userId = u.rows[0].id
-    await query(`UPDATE users SET full_name = $2 WHERE id = $1`, [userId, fullName])
-    return userId
-  }
-}
+import { upsertUserContact } from './userContact.mjs'
+import { getOpenCompetitionPeriodForEntry } from './competitionPeriods.mjs'
 
 /**
  * After SetupIntent succeeds: one free draw slot (ticket number), quiz entry, audit row.
@@ -31,6 +15,7 @@ export async function recordFreeOnlineEntry({
   setupIntentId,
   customerEmail,
   customerFullName,
+  customerPhone,
   address,
   nameAddressKey,
   ipAddress,
@@ -59,9 +44,9 @@ export async function recordFreeOnlineEntry({
   await query(
     `INSERT INTO tickets (
       id, ticket_public_id, user_id, bundle_id, quantity, payment_status,
-      stripe_payment_intent_id, purchased_at
-    ) VALUES ($1, $2, $3, 'free_online', 1, 'free_verified', $4, $5)`,
-    [ticketId, ticketPublicId, userId, setupIntentId, purchasedAt],
+      stripe_payment_intent_id, purchased_at, period_id
+    ) VALUES ($1, $2, $3, 'free_online', 1, 'free_verified', $4, $5, $6)`,
+    [ticketId, ticketPublicId, userId, setupIntentId, purchasedAt, periodResult.period.id],
   )
 
   const tnId = randomUUID()

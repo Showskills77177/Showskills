@@ -11,14 +11,14 @@ import {
   validatePaidSkillAnswers,
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import { PromoterAddress } from './PromoterAddress'
 import { ErrorBanner } from './ErrorBanner'
-import { preloadStripe } from '../lib/stripeLoader'
 import { ModalPortal } from './ModalPortal'
 import { PaymentCheckoutSheet } from './PaymentCheckoutSheet'
 import { PayPalPayButton } from './PayPalPayButton'
 import { EntryTermsConsent } from './EntryTermsConsent'
 import { TicketBundlePicker } from './TicketBundlePicker'
-import { StripeSetupForm } from './StripeSetupForm'
+import { PHONE_COLLECTION_NOTICE } from '../../shared/contactPhone.mjs'
 
 export function EntryModal() {
   const {
@@ -54,21 +54,23 @@ export function EntryModal() {
     setPaidFullName,
     paidEmail,
     setPaidEmail,
+    paidPhone,
+    setPaidPhone,
+    kickPhone,
+    setKickPhone,
     selectedTicketBundle,
     handlePaidEntry,
     handlePaidQuizSubmit,
     markPaidCheckoutComplete,
-    hasStripeCheckout,
-    hasStripeHostedCheckout,
-    useStripePaymentElement,
-    startHostedCheckout,
-    hasStripeElements,
-    stripePublishableKey,
-    paidStripeClientSecret,
-    paidStripePaymentIntentId,
-    paidStripePreparing,
-    prepareStripePayment,
-    closeStripePayment,
+    hasCardCheckout,
+    hasCashflowsEmbedded,
+    hasEmbeddedCardCheckout,
+    paidCashflowsToken,
+    paidCashflowsJobRef,
+    paidCashflowsIntegration,
+    paidCardPreparing,
+    prepareEmbeddedCardPayment,
+    closeCardPayment,
     paidFormReadyForPayment,
     hasPayPal,
     payPalClientId,
@@ -89,25 +91,6 @@ export function EntryModal() {
     kickVpnBlocked,
     kickCheckingVpn,
     handleKickupsGiveawaySubmit,
-    freeAddressLine1,
-    setFreeAddressLine1,
-    freeAddressLine2,
-    setFreeAddressLine2,
-    freeCity,
-    setFreeCity,
-    freePostcode,
-    setFreePostcode,
-    freeSetupClientSecret,
-    freeSetupIntentId,
-    freePreparing,
-    freeSuccess,
-    freeCardVerified,
-    freeQuizSubmitting,
-    hasStripeFreeVerify,
-    handleStartFreeVerification,
-    handleFreeCardVerified,
-    handleFreeQuizSubmit,
-    freeVerifyPayload,
     PAID_SKILL_QUESTIONS,
   } = useEntryFlow()
 
@@ -115,34 +98,28 @@ export function EntryModal() {
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
 
   const showPaymentSheet =
-    useStripePaymentElement &&
+    hasEmbeddedCardCheckout &&
     paymentSheetOpen &&
     entryModalType === 'paid' &&
     !paidPostCheckout &&
     paidEntryRoute === 'tickets'
 
   function handleClosePaymentSheet() {
-    closeStripePayment()
+    closeCardPayment()
     setPaymentSheetOpen(false)
     setPaidError('')
   }
 
   async function handlePayNow() {
     if (!paidFormReadyForPayment) {
-      setPaidError('Enter your full name, email, and agree to the terms before paying.')
+      setPaidError('Enter your full name, email, phone number, and agree to the terms before paying.')
       return
     }
     setPaidError('')
 
-    if (hasStripeHostedCheckout) {
-      await startHostedCheckout()
-      return
-    }
-
-    if (hasStripeElements && stripePublishableKey) {
-      preloadStripe(stripePublishableKey)
+    if (hasCashflowsEmbedded) {
       setPaymentSheetOpen(true)
-      if (!paidStripeClientSecret) await prepareStripePayment()
+      if (!paidCashflowsToken) await prepareEmbeddedCardPayment()
       return
     }
 
@@ -261,7 +238,7 @@ export function EntryModal() {
                 or choose free postal entry for the same prize pool. Then type three Ronaldo skill answers (no multiple
                 choice). All must be correct to qualify; winner picked at random from correct entries.
               </p>
-              {(paidPostCheckout || freeSuccess) && paidQuizSubmitted ? (
+              {paidPostCheckout && paidQuizSubmitted ? (
                 <div className="mt-4 flex flex-col gap-4 text-center">
                   <div className="rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-emerald-950/50 to-stone-950/80 px-5 py-8">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400/90">
@@ -294,7 +271,7 @@ export function EntryModal() {
                       {paidEmailConfirmationSent
                         ? 'A confirmation email has been sent (check inbox and spam).'
                         : 'If email is configured, a confirmation will arrive shortly.'}{' '}
-                      Stripe or PayPal may send a separate payment receipt.
+                      Your payment provider may send a separate payment receipt.
                     </p>
                   </div>
                   <button
@@ -330,7 +307,7 @@ export function EntryModal() {
                       Submit your three skill answers below now.{' '}
                       <strong className="text-teal-50">You only qualify for the draw if all answers are correct.</strong>{' '}
                       One confirmation email (receipt, ticket numbers, and result) is sent after you submit.
-                      Stripe or PayPal may also send their own payment receipt.
+                      Your payment provider may also send its own payment receipt.
                     </p>
                     <p className="mt-3 rounded-lg border border-stone-600/35 bg-stone-900/45 px-3 py-2.5 text-sm text-stone-200">
                       Please take your time and think carefully about the answers.
@@ -370,7 +347,7 @@ export function EntryModal() {
                   </div>
                   <p className="text-xs text-stone-500">
                     Confirm the name and email you used to pay so we can link your entry (especially after returning from
-                    Stripe on Safari).
+                    card checkout on Safari).
                   </p>
                   {PAID_SKILL_QUESTIONS.map((q, i) => {
                     const qCorrect = paidAnswerValidation
@@ -448,154 +425,6 @@ export function EntryModal() {
                     selectedTicketBundle={selectedTicketBundle}
                     visibleTicketBundles={visibleTicketBundles}
                   />
-                  {paidEntryRoute === 'free_online' ? (
-                    <>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="sm:col-span-2">
-                          <label htmlFor="modal-free-fullname" className="block text-sm font-medium text-stone-300">
-                            Full name
-                          </label>
-                          <input
-                            id="modal-free-fullname"
-                            type="text"
-                            autoComplete="name"
-                            value={paidFullName}
-                            onChange={(e) => setPaidFullName(e.target.value)}
-                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label htmlFor="modal-free-email" className="block text-sm font-medium text-stone-300">
-                            Email
-                          </label>
-                          <input
-                            id="modal-free-email"
-                            type="email"
-                            autoComplete="email"
-                            value={paidEmail}
-                            onChange={(e) => setPaidEmail(e.target.value)}
-                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label htmlFor="modal-free-addr1" className="block text-sm font-medium text-stone-300">
-                            Address line 1
-                          </label>
-                          <input
-                            id="modal-free-addr1"
-                            type="text"
-                            autoComplete="street-address"
-                            value={freeAddressLine1}
-                            onChange={(e) => setFreeAddressLine1(e.target.value)}
-                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label htmlFor="modal-free-addr2" className="block text-sm font-medium text-stone-300">
-                            Address line 2 (optional)
-                          </label>
-                          <input
-                            id="modal-free-addr2"
-                            type="text"
-                            autoComplete="address-line2"
-                            value={freeAddressLine2}
-                            onChange={(e) => setFreeAddressLine2(e.target.value)}
-                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="modal-free-city" className="block text-sm font-medium text-stone-300">
-                            Town / city
-                          </label>
-                          <input
-                            id="modal-free-city"
-                            type="text"
-                            autoComplete="address-level2"
-                            value={freeCity}
-                            onChange={(e) => setFreeCity(e.target.value)}
-                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="modal-free-postcode" className="block text-sm font-medium text-stone-300">
-                            Postcode
-                          </label>
-                          <input
-                            id="modal-free-postcode"
-                            type="text"
-                            autoComplete="postal-code"
-                            value={freePostcode}
-                            onChange={(e) => setFreePostcode(e.target.value)}
-                            className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs leading-relaxed text-stone-500">
-                        Max 3 free online entries per name and address. Verify your card first (£0, no charge), then
-                        answer three skill questions. PayPal is not used for free entry.
-                      </p>
-                      {freeCardVerified ? (
-                        <form className="flex flex-col gap-4" onSubmit={handleFreeQuizSubmit}>
-                          <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
-                            <p className="font-medium text-teal-50">Card verified</p>
-                            <p className="mt-1 text-teal-100/90">
-                              Answer all three skill questions below. You only qualify for the draw if every answer is
-                              correct.
-                            </p>
-                          </div>
-                          {PAID_SKILL_QUESTIONS.map((q, i) => (
-                            <div key={q.id}>
-                              <label
-                                htmlFor={`modal-free-q-${q.id}`}
-                                className="block text-sm font-medium text-stone-300"
-                              >
-                                {i + 1}. {q.prompt}
-                              </label>
-                              <input
-                                id={`modal-free-q-${q.id}`}
-                                type="text"
-                                value={i === 0 ? paidA1 : i === 1 ? paidA2 : paidA3}
-                                onChange={(e) => {
-                                  const v = e.target.value
-                                  if (i === 0) setPaidA1(v)
-                                  else if (i === 1) setPaidA2(v)
-                                  else setPaidA3(v)
-                                }}
-                                className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                                placeholder="Type your answer"
-                              />
-                            </div>
-                          ))}
-                          <button
-                            type="submit"
-                            disabled={freeQuizSubmitting}
-                            className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {freeQuizSubmitting ? 'Submitting…' : 'Submit free entry'}
-                          </button>
-                        </form>
-                      ) : !freeSetupClientSecret ? (
-                        <button
-                          type="button"
-                          onClick={handleStartFreeVerification}
-                          disabled={freePreparing || !hasStripeFreeVerify}
-                          className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {freePreparing ? 'Preparing verification…' : 'Continue to card verification'}
-                        </button>
-                      ) : (
-                        <StripeSetupForm
-                          publishableKey={stripePublishableKey}
-                          clientSecret={freeSetupClientSecret}
-                          setupIntentId={freeSetupIntentId}
-                          confirmPayload={freeVerifyPayload}
-                          onVerified={handleFreeCardVerified}
-                          onError={(msg) => setPaidError(msg)}
-                          disabled={!paidConsent}
-                        />
-                      )}
-                    </>
-                  ) : null}
                   {paidEntryRoute === 'tickets' ? (
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="sm:col-span-2">
@@ -631,6 +460,11 @@ export function EntryModal() {
                           autoCorrect="off"
                         />
                       </div>
+                      <EntryPhoneField
+                        id="modal-paid-phone"
+                        value={paidPhone}
+                        onChange={setPaidPhone}
+                      />
                     </div>
                   ) : null}
                   <EntryTermsConsent
@@ -652,20 +486,21 @@ export function EntryModal() {
                         </li>
                         <li>Written answers to all three skill questions (same as online)</li>
                       </ul>
-                      <p className="mt-3 text-xs text-zinc-500">
-                        <strong className="text-zinc-400">Limit:</strong> one free postal entry per person. Post to:{' '}
-                        <span className="text-zinc-400">ShowSkills Rewards, 35 Irvine Street, Flat 3, L7 8SY</span>
+                      <p className="mt-3 text-xs font-medium text-zinc-400">Post to:</p>
+                      <PromoterAddress className="mt-1 text-sm text-zinc-300" />
+                      <p className="mt-2 text-xs text-zinc-500">
+                        <strong className="text-zinc-400">Limit:</strong> one free postal entry per person.
                       </p>
                     </div>
                   ) : null}
-                  {!hasStripeCheckout &&
+                  {!hasCardCheckout &&
                   !hasPayPal &&
                   paidEntryRoute === 'tickets' &&
                   !E2E_SIMULATE_CHECKOUT ? (
-                    <ErrorBanner message="Payments are not configured. Add Stripe and/or PayPal (see .env.example)." />
+                    <ErrorBanner message="Payments are not configured. Add Cashflows and/or PayPal (see .env.example)." />
                   ) : null}
                   {paidEntryRoute === 'tickets' &&
-                  (hasStripeCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&
+                  (hasCardCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&
                   !showPaymentSheet ? (
                     <div className="ss-entry-checkout-actions flex flex-col gap-3 border-t border-white/10 pt-4">
                       <p className="rounded-lg border border-amber-800/35 bg-amber-950/25 px-3 py-2.5 text-center text-[11px] font-medium leading-snug text-amber-100/90">
@@ -684,28 +519,26 @@ export function EntryModal() {
                       <button
                         type="button"
                         onClick={handlePayNow}
-                        disabled={paidLoading || paidStripePreparing || !paidFormReadyForPayment}
+                        disabled={paidLoading || paidCardPreparing || !paidFormReadyForPayment}
                         className="min-h-[48px] w-full shrink-0 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:text-lg"
                       >
-                        {paidLoading || paidStripePreparing
-                          ? 'Redirecting to secure checkout…'
-                          : 'Pay now'}
+                        {paidLoading || paidCardPreparing ? 'Preparing secure checkout…' : 'Pay now'}
                       </button>
-                      {hasStripeHostedCheckout ? (
+                      {hasCashflowsEmbedded ? (
                         <p className="text-center text-xs leading-relaxed text-stone-500">
-                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — you&apos;ll pay on
-                          Stripe&apos;s secure page (card &amp; Apple Pay), then return here for the quiz.
+                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — pay by card on the
+                          next screen (secure fields on this site), then complete the quiz.
                         </p>
                       ) : null}
-                      {hasStripeElements && hasPayPal ? (
+                      {hasCashflowsEmbedded && hasPayPal ? (
                         <p className="text-center text-xs leading-relaxed text-stone-500">
-                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card, Apple Pay, or
-                          PayPal on the next screen.
+                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card or PayPal on the
+                          next screen.
                         </p>
                       ) : null}
                       {hasPayPal ? (
                         <div className="pt-1">
-                          {hasStripeHostedCheckout || hasStripeElements ? (
+                          {hasCashflowsEmbedded ? (
                             <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                               or pay with PayPal
                             </p>
@@ -719,11 +552,8 @@ export function EntryModal() {
                             ticketQuantity={selectedTicketBundle?.qty ?? 1}
                             customerEmail={paidEmail}
                             customerFullName={paidFullName}
-                            disabled={
-                              !paidConsent ||
-                              !paidFullName.trim() ||
-                              !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paidEmail.trim())
-                            }
+                            customerPhone={paidPhone}
+                            disabled={!paidFormReadyForPayment}
                             onPaid={markPaidCheckoutComplete}
                             onError={(msg) => setPaidError(msg)}
                           />
@@ -794,6 +624,7 @@ export function EntryModal() {
                     placeholder="you@example.com"
                   />
                 </div>
+                <EntryPhoneField id="modal-kick-phone" value={kickPhone} onChange={setKickPhone} variant="emerald" />
                 <EntryTermsConsent
                   checked={kickConsent}
                   onChange={setKickConsent}
@@ -833,31 +664,32 @@ export function EntryModal() {
         </div>
       </div>
 
-          {useStripePaymentElement ? (
+          {hasEmbeddedCardCheckout ? (
           <PaymentCheckoutSheet
             open={showPaymentSheet}
         onClose={handleClosePaymentSheet}
         amountPence={selectedTicketBundle?.totalPence ?? 0}
         bundleTitle={selectedTicketBundle?.title}
         bundleLine={selectedTicketBundle?.line1}
-        preparing={paidStripePreparing}
+        preparing={paidCardPreparing}
         paidError={paidError}
-        hasStripeElements={hasStripeElements}
-        stripePublishableKey={stripePublishableKey}
-        paidStripeClientSecret={paidStripeClientSecret}
-        paidStripePaymentIntentId={paidStripePaymentIntentId}
+        hasCashflowsEmbedded={hasCashflowsEmbedded}
+        paidCashflowsToken={paidCashflowsToken}
+        paidCashflowsJobRef={paidCashflowsJobRef}
+        paidCashflowsIntegration={paidCashflowsIntegration}
         paidFormReadyForPayment={paidFormReadyForPayment}
         recordPayload={{
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),
+          customerPhone: paidPhone.trim(),
           bundleId: paidBundleId,
         }}
-        onStripeSuccess={(info) => {
+        onCardSuccess={(info) => {
           setPaymentSheetOpen(false)
           markPaidCheckoutComplete(info)
         }}
-        onStripeError={(msg) => setPaidError(msg)}
-        onRetryPayment={prepareStripePayment}
+        onCardError={(msg) => setPaidError(msg)}
+        onRetryPayment={prepareEmbeddedCardPayment}
         hasPayPal={hasPayPal}
         payPalClientId={payPalClientId}
         payPalCurrency={payPalCurrency}
@@ -867,6 +699,7 @@ export function EntryModal() {
         ticketQuantity={selectedTicketBundle?.qty ?? 1}
         customerEmail={paidEmail}
         customerFullName={paidFullName}
+        customerPhone={paidPhone}
         paidConsent={paidConsent}
         onPayPalPaid={(info) => {
           setPaymentSheetOpen(false)
@@ -877,5 +710,26 @@ export function EntryModal() {
       />
           ) : null}
     </ModalPortal>
+  )
+}
+
+function EntryPhoneField({ id, value, onChange, variant = 'teal' }) {
+  const ring = variant === 'emerald' ? 'focus:ring-emerald-900/40 focus:border-emerald-600/50' : 'focus:ring-teal-900/40 focus:border-teal-600/50'
+  return (
+    <div className="sm:col-span-2">
+      <label htmlFor={id} className="block text-sm font-medium text-stone-300">
+        Mobile / contact phone
+      </label>
+      <input
+        id={id}
+        type="tel"
+        autoComplete="tel"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:outline-none focus:ring-2 ${ring}`}
+        placeholder="e.g. 07XXX XXXXXX"
+      />
+      <p className="mt-2 text-xs leading-relaxed text-stone-500">{PHONE_COLLECTION_NOTICE}</p>
+    </div>
   )
 }

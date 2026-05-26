@@ -2,41 +2,22 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { query, isDbConfigured, isUniqueViolation } from './db.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { insertPreservedTicketNumbers, getTicketNumbersForPurchase } from './ticketNumbers.mjs'
+import { upsertUserContact } from './userContact.mjs'
 
 function orderPublicId() {
   return `ORD-${randomBytes(4).toString('hex').toUpperCase()}`
 }
 
-async function upsertUserSimple(email, fullName) {
-  const e = email.trim().toLowerCase()
-  const n = fullName?.trim() || 'Unknown'
-  const newId = randomUUID()
-  try {
-    await query(`INSERT INTO users (id, email, full_name) VALUES ($1, $2, $3) RETURNING id`, [newId, e, n])
-    return newId
-  } catch (err) {
-    if (!isUniqueViolation(err)) throw err
-    const u = await query(`SELECT id FROM users WHERE lower(email) = $1`, [e])
-    if (u.rows[0]) {
-      await query(`UPDATE users SET full_name = COALESCE(NULLIF($2,''), full_name) WHERE id = $1`, [
-        u.rows[0].id,
-        n,
-      ])
-      return u.rows[0].id
-    }
-    throw err
-  }
-}
-
 function providerColumn(provider) {
   if (provider === 'stripe') return 'stripe_session_id'
   if (provider === 'stripe_pi') return 'stripe_payment_intent_id'
+  if (provider === 'cashflows') return 'cashflows_payment_job_reference'
   return 'paypal_order_id'
 }
 
 /**
  * Reserve ticket numbers on a pending ticket row before payment completes.
- * @param {'stripe'|'stripe_pi'|'paypal'} provider
+ * @param {'stripe'|'stripe_pi'|'paypal'|'cashflows'} provider
  */
 export async function createPendingTicketCheckout({
   provider,
@@ -46,6 +27,9 @@ export async function createPendingTicketCheckout({
   ticketNumbers,
   customerEmail,
   customerFullName,
+  customerPhone,
+  periodId,
+  cashflowsIntentToken,
 }) {
   if (!isDbConfigured() || !externalId) return null
   await ensureTicketSchema()
@@ -65,7 +49,11 @@ export async function createPendingTicketCheckout({
   let userId = null
   const email = typeof customerEmail === 'string' ? customerEmail.trim() : ''
   if (email.includes('@')) {
-    userId = await upsertUserSimple(email, customerFullName || '')
+    userId = await upsertUserContact({
+      email,
+      fullName: customerFullName || '',
+      phone: customerPhone,
+    })
   }
 
   const ticketId = randomUUID()
@@ -74,10 +62,15 @@ export async function createPendingTicketCheckout({
   const stripeSessionId = provider === 'stripe' ? externalId : null
   const stripePaymentIntentId = provider === 'stripe_pi' ? externalId : null
   const paypalOrderId = provider === 'paypal' ? externalId : null
+  const cashflowsJobRef = provider === 'cashflows' ? externalId : null
+  const cashflowsToken =
+    provider === 'cashflows' && typeof cashflowsIntentToken === 'string'
+      ? cashflowsIntentToken.trim()
+      : null
 
   await query(
-    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, stripe_payment_intent_id, paypal_order_id)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)`,
+    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, stripe_payment_intent_id, paypal_order_id, cashflows_payment_job_reference, cashflows_intent_token, period_id)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)`,
     [
       ticketId,
       tid,
@@ -87,9 +80,12 @@ export async function createPendingTicketCheckout({
       stripeSessionId,
       stripePaymentIntentId,
       paypalOrderId,
+      cashflowsJobRef,
+      cashflowsToken,
+      periodId || null,
     ],
   )
 
   const nums = await insertPreservedTicketNumbers(ticketId, ticketNumbers)
-  return { ticketId, ticketPublicId: tid, ticketNumbers: nums }
+  return { ticketId, ticketPublicId: tid, ticketNumbers: nums, periodId }
 }
