@@ -103,6 +103,7 @@ export function CashflowsPaymentForm({
   const [ready, setReady] = useState(false)
   const [paying, setPaying] = useState(false)
   const [applePayVisible, setApplePayVisible] = useState(false)
+  const [applePayUnavailable, setApplePayUnavailable] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
   const mapPreparationIds = useCallback(() => {
     const map = {}
@@ -186,6 +187,7 @@ export function CashflowsPaymentForm({
     let cancelled = false
     setReady(false)
     setApplePayVisible(false)
+    setApplePayUnavailable(false)
     setStatus({ type: '', message: '' })
     prepIdToFieldRef.current = {}
     pointerFixCleanupRef.current?.()
@@ -263,6 +265,10 @@ export function CashflowsPaymentForm({
           const observer = new MutationObserver(syncAppleVisibility)
           observer.observe(appleBtn, { attributes: true, attributeFilter: ['hidden'] })
           setTimeout(syncAppleVisibility, 1200)
+          setTimeout(() => {
+            if (!appleBtn.hidden) return
+            setApplePayUnavailable(true)
+          }, 2500)
           checkoutPromise.finally(() => observer.disconnect())
         }
 
@@ -351,6 +357,12 @@ export function CashflowsPaymentForm({
             {applePayVisible ? (
               <p className="mb-3 text-center text-[10px] leading-relaxed text-stone-500">
                 Apple Pay opens in Safari on iPhone or Mac — use card below on other browsers.
+              </p>
+            ) : applePayUnavailable ? (
+              <p className="mb-3 text-center text-[10px] leading-relaxed text-amber-200/80">
+                Apple Pay is not available in this browser session (check Wallet on Mac, domain
+                verification, or use card below). Safari card autofill is not the same as the Apple
+                Pay button above.
               </p>
             ) : null}
             {applePayVisible ? (
