@@ -66,6 +66,8 @@ export function EntryModal() {
     hasCardCheckout,
     paymentNotConfiguredMessage,
     hasCashflowsEmbedded,
+    googlePayEnabled,
+    googlePayMerchantId,
     hasEmbeddedCardCheckout,
     paidCashflowsToken,
     paidCashflowsJobRef,
@@ -295,7 +297,7 @@ export function EntryModal() {
                   <button
                     type="button"
                     onClick={closeEntry}
-                    className="w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110"
+                    className="ss-pay-cta w-full rounded-xl py-3.5 text-base transition hover:brightness-110"
                   >
                     Done
                   </button>
@@ -428,7 +430,7 @@ export function EntryModal() {
                   <button
                     type="submit"
                     disabled={paidQuizSubmitting}
-                    className="w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="ss-pay-cta w-full rounded-xl py-3 text-sm transition hover:brightness-110 disabled:cursor-not-allowed"
                   >
                     {paidQuizSubmitting ? 'Submitting…' : 'Submit answers'}
                   </button>
@@ -569,7 +571,7 @@ export function EntryModal() {
                           <button
                             type="submit"
                             disabled={freeQuizSubmitting}
-                            className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="ss-pay-cta min-h-[48px] w-full rounded-xl py-3.5 text-base transition hover:brightness-110 disabled:cursor-not-allowed"
                           >
                             {freeQuizSubmitting ? 'Submitting…' : 'Submit free entry'}
                           </button>
@@ -579,7 +581,7 @@ export function EntryModal() {
                           type="button"
                           onClick={handleStartFreeVerification}
                           disabled={freePreparing || !hasCashflowsFreeVerify}
-                          className="min-h-[48px] w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="ss-pay-cta min-h-[48px] w-full rounded-xl py-3.5 text-base transition hover:brightness-110 disabled:cursor-not-allowed"
                         >
                           {freePreparing ? 'Preparing verification…' : 'Continue to card verification (£0)'}
                         </button>
@@ -593,6 +595,7 @@ export function EntryModal() {
                           flow="free_verify"
                           panelTitle="Card verification (£0)"
                           payButtonLabel="Verify card (£0)"
+                          googlePayEnabled={false}
                           onSuccess={handleFreeCardVerified}
                           onError={(msg) => setPaidError(msg)}
                           disabled={!paidConsent}
@@ -693,7 +696,7 @@ export function EntryModal() {
                         type="button"
                         onClick={handlePayNow}
                         disabled={paidLoading || paidCardPreparing || !paidFormReadyForPayment}
-                        className="min-h-[48px] w-full shrink-0 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:text-lg"
+                        className="ss-pay-cta min-h-[48px] w-full shrink-0 rounded-xl py-3.5 text-base transition hover:brightness-110 disabled:cursor-not-allowed sm:text-lg"
                       >
                         {paidLoading || paidCardPreparing ? 'Preparing secure checkout…' : 'Pay now'}
                       </button>
@@ -851,6 +854,8 @@ export function EntryModal() {
         paidCashflowsJobRef={paidCashflowsJobRef}
         paidCashflowsIntegration={paidCashflowsIntegration}
         paidFormReadyForPayment={paidFormReadyForPayment}
+        googlePayEnabled={googlePayEnabled}
+        googlePayMerchantId={googlePayMerchantId}
         recordPayload={{
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),

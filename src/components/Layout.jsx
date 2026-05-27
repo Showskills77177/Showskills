@@ -10,7 +10,7 @@ import { TrustpilotReviewCollector } from './TrustpilotFeedback'
 import { useEntryFlow } from '../entry/entryContext'
 
 function desktopNavClass({ isActive }) {
-  return `rounded-md px-1.5 py-1 text-white transition ${
+  return `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
     isActive ? 'opacity-100' : 'opacity-90 hover:opacity-100'
   }`
 }
@@ -91,7 +91,7 @@ export function Layout() {
             <button
               type="button"
               onClick={() => openTerms()}
-              className="rounded-md px-1.5 py-1 text-white opacity-90 transition hover:opacity-100"
+              className="ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white opacity-90 transition hover:opacity-100"
             >
               T&amp;C
             </button>

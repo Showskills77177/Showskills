@@ -24,6 +24,8 @@ If deploy still fails with “more than 12 functions”, check the Vercel projec
 3. Email **implementations@cashflows.com** for the Apple Pay domain verification file. Place it at `public/.well-known/apple-developer-merchantid-domain-association` (copied into `dist` on build). It must return **200** as `text/plain`, not the SPA `index.html` — `vercel.json` excludes `/.well-known/` from the SPA rewrite.
 4. **Mac Safari:** needs a card in **Wallet on this Mac** (or iPhone nearby with “Allow payments on Mac”). If the domain file is missing, Cashflows hides the Apple Pay button and only card iframes show — Safari autofill on the card field is **not** the same as Apple Pay and may prompt to add card details.
 5. Apple Pay appears on Safari / iOS when the device and domain are fully set up; localhost will not show Apple Pay.
+6. **Google Pay:** enable in Cashflows Portal, complete Google Pay Business Console, set `CASHFLOWS_GOOGLE_PAY_MERCHANT_ID` on Vercel. Shown on supported Android / Chrome when Cashflows returns ready.
+7. **Samsung Pay** is not part of embedded checkout — see `docs/CASHFLOWS-TESTING.md`.
 
 ## PayPal
 

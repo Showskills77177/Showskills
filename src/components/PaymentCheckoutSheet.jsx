@@ -21,6 +21,8 @@ export function PaymentCheckoutSheet({
   paidCashflowsJobRef,
   paidCashflowsIntegration,
   paidFormReadyForPayment,
+  googlePayEnabled,
+  googlePayMerchantId,
   recordPayload,
   onCardSuccess,
   onCardError,
@@ -158,6 +160,8 @@ export function PaymentCheckoutSheet({
                 amountLabel={amountLabel}
                 recordPayload={recordPayload}
                 disabled={!paidFormReadyForPayment}
+                googlePayEnabled={googlePayEnabled}
+                googlePayMerchantId={googlePayMerchantId}
                 onSuccess={onCardSuccess}
                 onError={onCardError}
               />

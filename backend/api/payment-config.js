@@ -17,9 +17,18 @@ export default async function handler(req, res) {
 
   const cfg = getCashflowsConfig()
   const entry = await getOpenCompetitionPeriodForEntry()
+  const googlePayMerchantId = (
+    process.env.CASHFLOWS_GOOGLE_PAY_MERCHANT_ID ||
+    process.env.GOOGLE_PAY_MERCHANT_ID ||
+    ''
+  ).trim()
+
   return json(res, 200, {
     cashflows: cfg.configured,
     cashflowsIntegration: cfg.isIntegration,
+    /** Embedded checkout supports Google Pay (not Samsung Pay — separate Cashflows + Samsung integration). */
+    googlePay: cfg.configured,
+    googlePayMerchantId: googlePayMerchantId || null,
     paypal: Boolean((process.env.PAYPAL_CLIENT_ID || '').trim()),
     entriesOpen: entry.ok,
     ...(entry.ok ? {} : { entriesClosedMessage: entry.error }),

@@ -136,6 +136,12 @@ export function EntryFlowProvider({ children }) {
   const hasCashflowsEmbedded = Boolean(
     cashflowsCreateApi && (serverPaymentConfig === null || serverPaymentConfig.cashflows === true),
   )
+  const googlePayMerchantId =
+    (typeof serverPaymentConfig?.googlePayMerchantId === 'string'
+      ? serverPaymentConfig.googlePayMerchantId.trim()
+      : '') || (import.meta.env.VITE_CASHFLOWS_GOOGLE_MERCHANT_ID ?? '').trim()
+  const googlePayEnabled =
+    hasCashflowsEmbedded && (serverPaymentConfig === null || serverPaymentConfig.googlePay !== false)
   const hasCashflowsFreeVerify = hasCashflowsEmbedded
   const hasEmbeddedCardCheckout = hasCashflowsEmbedded
   const hasCardCheckout = hasCashflowsEmbedded
@@ -1040,6 +1046,8 @@ export function EntryFlowProvider({ children }) {
       hasCardCheckout,
       paymentNotConfiguredMessage,
       hasCashflowsEmbedded,
+      googlePayEnabled,
+      googlePayMerchantId,
       hasEmbeddedCardCheckout,
       paidCashflowsToken,
       paidCashflowsJobRef,
@@ -1126,6 +1134,8 @@ export function EntryFlowProvider({ children }) {
       hasCardCheckout,
       paymentNotConfiguredMessage,
       hasCashflowsEmbedded,
+      googlePayEnabled,
+      googlePayMerchantId,
       hasEmbeddedCardCheckout,
       paidCashflowsToken,
       paidCashflowsJobRef,

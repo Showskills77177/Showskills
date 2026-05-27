@@ -103,7 +103,7 @@ export const FAQ_SECTIONS = [
         id: 'payment-methods',
         question: 'Which payment methods do you accept?',
         answer:
-          'Paid tickets can be bought with debit or credit card (secure Cashflows fields on our site), Apple Pay on supported iPhones and Safari when enabled, and optionally PayPal if we have turned it on. Card and Apple Pay are settled through Cashflows — you do not need a separate card merchant account for those. PayPal on our site uses your PayPal wallet and is only shown when we have connected a PayPal business account; for a single settlement through Cashflows only, use card or Apple Pay.',
+          'Paid tickets can be bought with debit or credit card (secure Cashflows fields on our site), Apple Pay in Safari when enabled, Google Pay on supported Android phones and Chrome when enabled, and optionally PayPal if we have turned it on. Card and wallet buttons are settled through Cashflows. Samsung Pay is not available on our embedded checkout — many Samsung users can pay with Google Pay in Chrome instead. PayPal uses your PayPal wallet separately when we have connected a PayPal business account.',
       },
       {
         id: 'payment-failed',

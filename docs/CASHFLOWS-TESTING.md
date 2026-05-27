@@ -57,6 +57,16 @@ After any `.env` change: **Ctrl+C** the running dev terminal, then start again. 
 
 ---
 
+## Digital wallets (Apple Pay, Google Pay, Samsung Pay)
+
+| Wallet | On our embedded checkout? |
+|--------|---------------------------|
+| **Apple Pay** | Yes — `initApplePay` in Cashflows JS; enable in portal + Apple domain file on your site. |
+| **Google Pay** | Yes — `initGooglePay` in Cashflows JS; enable in portal + Google Pay Business Console; set `CASHFLOWS_GOOGLE_PAY_MERCHANT_ID` (or `VITE_CASHFLOWS_GOOGLE_MERCHANT_ID`). Usually **mobile Chrome / Android** only. |
+| **Samsung Pay** | **No** — not in `cashflows-clientlib-js`. Cashflows can accept Samsung Pay via a **separate** Remote Authentication / Samsung Web SDK flow; ask **implementations@cashflows.com** if you need it. Many Samsung phones can use **Google Pay** in Chrome on our checkout instead. |
+
+---
+
 ## Sandbox test card flow (only with integration keys)
 
 1. Put sandbox **Configuration ID** and **API key** in `.env.integration.local` (not only in `.env.local`).

@@ -17,6 +17,7 @@ const FIELD_IDS = {
   cvc: 'ss-cf-card-cvc',
   pay: 'ss-cf-pay-button',
   applePay: 'ss-cf-apple-pay',
+  googlePay: 'ss-cf-google-pay',
 }
 
 /** Cashflows replaces these inputs with iframes — create outside React to avoid re-render conflicts. */
@@ -72,7 +73,8 @@ function CardField({ label, htmlFor, hostRef, size }) {
 }
 
 /**
- * Cashflows Embedded Checkout — card iframes + Apple Pay (when enabled in Cashflows Portal).
+ * Cashflows Embedded Checkout — card iframes + Apple Pay / Google Pay (when enabled in Cashflows Portal).
+ * Samsung Pay is not available in cashflows-clientlib-js; use Google Pay on supported Android browsers.
  */
 export function CashflowsPaymentForm({
   intentToken,
@@ -87,6 +89,8 @@ export function CashflowsPaymentForm({
   flow = 'purchase',
   payButtonLabel,
   panelTitle = 'Debit or credit card',
+  googlePayEnabled = true,
+  googlePayMerchantId = '',
 }) {
   const isFreeVerify = flow === 'free_verify'
   const mountRef = useRef(null)
@@ -104,6 +108,7 @@ export function CashflowsPaymentForm({
   const [paying, setPaying] = useState(false)
   const [applePayVisible, setApplePayVisible] = useState(false)
   const [applePayUnavailable, setApplePayUnavailable] = useState(false)
+  const [googlePayVisible, setGooglePayVisible] = useState(false)
   const [status, setStatus] = useState({ type: '', message: '' })
   const mapPreparationIds = useCallback(() => {
     const map = {}
@@ -188,6 +193,7 @@ export function CashflowsPaymentForm({
     setReady(false)
     setApplePayVisible(false)
     setApplePayUnavailable(false)
+    setGooglePayVisible(false)
     setStatus({ type: '', message: '' })
     prepIdToFieldRef.current = {}
     pointerFixCleanupRef.current?.()
@@ -246,9 +252,21 @@ export function CashflowsPaymentForm({
         enableCashflowsIframePointerEvents(mountRef.current)
         mapPreparationIds()
 
+        const walletInits = []
         if (applePaySupported && document.getElementById(FIELD_IDS.applePay)) {
-          await cf.initApplePay(`#${FIELD_IDS.applePay}`)
+          walletInits.push(cf.initApplePay(`#${FIELD_IDS.applePay}`))
         }
+        if (googlePayEnabled && document.getElementById(FIELD_IDS.googlePay)) {
+          const merchantId = googlePayMerchantId.trim() || undefined
+          walletInits.push(
+            cf.initGooglePay(
+              `#${FIELD_IDS.googlePay}`,
+              { buttonSizeMode: 'fill', buttonType: 'pay' },
+              merchantId,
+            ),
+          )
+        }
+        if (walletInits.length) await Promise.all(walletInits)
 
         if (cancelled || generation !== initGenerationRef.current) return
 
@@ -270,6 +288,18 @@ export function CashflowsPaymentForm({
             setApplePayUnavailable(true)
           }, 2500)
           checkoutPromise.finally(() => observer.disconnect())
+        }
+
+        const googleEl = document.getElementById(FIELD_IDS.googlePay)
+        if (googleEl && googlePayEnabled) {
+          const syncGoogleVisibility = () => {
+            if (!googleEl.hidden) setGooglePayVisible(true)
+          }
+          syncGoogleVisibility()
+          const googleObserver = new MutationObserver(syncGoogleVisibility)
+          googleObserver.observe(googleEl, { attributes: true, attributeFilter: ['hidden'] })
+          setTimeout(syncGoogleVisibility, 1200)
+          checkoutPromise.finally(() => googleObserver.disconnect())
         }
 
         checkoutPromise
@@ -319,6 +349,8 @@ export function CashflowsPaymentForm({
     confirmOnServer,
     reportError,
     applePaySupported,
+    googlePayEnabled,
+    googlePayMerchantId,
     disabled,
     mapPreparationIds,
   ])
@@ -343,34 +375,49 @@ export function CashflowsPaymentForm({
           <CardBrandLogos className="!justify-end !gap-1.5" />
         </div>
 
-        {applePaySupported ? (
-          <>
-            <button
-              id={FIELD_IDS.applePay}
-              type="button"
-              hidden={!applePayVisible}
-              className={`apple-pay-button w-full ${applePayVisible ? 'mb-2' : 'hidden'}`}
-              aria-label="Pay with Apple Pay"
-              disabled={disabled || paying || !ready}
-              data-ss-cf-ignore-focus
-            />
-            {applePayVisible ? (
-              <p className="mb-3 text-center text-[10px] leading-relaxed text-stone-500">
-                Apple Pay opens in Safari on iPhone or Mac — use card below on other browsers.
-              </p>
-            ) : applePayUnavailable ? (
-              <p className="mb-3 text-center text-[10px] leading-relaxed text-amber-200/80">
-                Apple Pay is not available in this browser session (check Wallet on Mac, domain
-                verification, or use card below). Safari card autofill is not the same as the Apple
-                Pay button above.
-              </p>
+        {applePaySupported || googlePayEnabled ? (
+          <div className="ss-wallet-buttons mb-1 space-y-2">
+            {applePaySupported ? (
+              <>
+                <div
+                  className={`ss-apple-pay-button-wrap ${applePayVisible ? 'is-visible' : ''}`}
+                >
+                  <button
+                    id={FIELD_IDS.applePay}
+                    type="button"
+                    className="apple-pay-button w-full"
+                    aria-label="Pay with Apple Pay"
+                    disabled={disabled || paying || !ready}
+                    data-ss-cf-ignore-focus
+                  />
+                </div>
+                {applePayVisible ? (
+                  <p className="text-center text-[10px] leading-relaxed text-stone-500">
+                    Apple Pay — Safari on iPhone or Mac.
+                  </p>
+                ) : applePayUnavailable ? (
+                  <p className="text-center text-[10px] leading-relaxed text-amber-200/80">
+                    Apple Pay unavailable (domain verification or Wallet). Card fields below still
+                    work.
+                  </p>
+                ) : null}
+              </>
             ) : null}
-            {applePayVisible ? (
-              <p className="mb-4 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+            {googlePayEnabled ? (
+              <div
+                id={FIELD_IDS.googlePay}
+                hidden
+                className={`ss-google-pay-button-wrap ${googlePayVisible ? 'is-visible' : ''}`}
+                aria-label="Pay with Google Pay"
+                data-ss-cf-ignore-focus
+              />
+            ) : null}
+            {applePayVisible || googlePayVisible ? (
+              <p className="pb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
                 or pay by card
               </p>
             ) : null}
-          </>
+          </div>
         ) : null}
 
         <div className="ss-checkout-fields space-y-3">
@@ -423,20 +470,19 @@ export function CashflowsPaymentForm({
 
       <PaymentStatusMessage status={status.type} message={status.message} />
 
-      <input
+      <button
         id={FIELD_IDS.pay}
         type="button"
-        value={
-          paying
-            ? isFreeVerify
-              ? 'Verifying…'
-              : 'Processing…'
-            : payButtonLabel || (amountLabel ? `Pay ${amountLabel}` : 'Pay with card')
-        }
         disabled={disabled || paying || !ready}
         data-ss-cf-ignore-focus
-        className="ss-cf-pay-button mt-4 min-h-[50px] w-full cursor-pointer rounded-xl border-0 bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-base font-bold text-white shadow-lg shadow-teal-950/40 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-      />
+        className="ss-cf-pay-button ss-pay-cta mt-4 min-h-[50px] w-full cursor-pointer rounded-xl border-0 py-3.5 text-base transition hover:brightness-110 disabled:cursor-not-allowed"
+      >
+        {paying
+          ? isFreeVerify
+            ? 'Verifying…'
+            : 'Processing…'
+          : payButtonLabel || (amountLabel ? `Pay ${amountLabel}` : 'Pay with card')}
+      </button>
 
       {!ready && !status.message ? (
         <p className="mt-3 text-center text-xs text-stone-500" role="status">

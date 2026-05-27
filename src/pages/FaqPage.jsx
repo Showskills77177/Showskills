@@ -11,6 +11,7 @@ import {
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { useEntryFlow } from '../entry/entryContext'
+import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
 
 function FaqItemCard({ item, open, onToggle }) {
   const panelId = `faq-answer-${item.id}`
@@ -103,14 +104,12 @@ export default function FaqPage() {
   }
 
   return (
-    <main className="m-0 p-0">
+    <main className="ss-photo-page relative m-0 overflow-x-clip p-0">
+      <PhotoPageBackdrop />
+      <div className="relative z-[1]">
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-emerald-900/25 bg-[#071512]">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(16,185,129,0.18),transparent_55%)]"
-          aria-hidden
-        />
-        <div className="relative mx-auto max-w-5xl px-4 pb-10 pt-12 sm:px-6 sm:pb-14 sm:pt-16">
+      <section className="relative overflow-hidden border-b border-emerald-900/25">
+        <div className="mx-auto max-w-5xl px-4 pb-10 pt-12 sm:px-6 sm:pb-14 sm:pt-16">
           <p className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-200">
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             Help centre
@@ -375,6 +374,7 @@ export default function FaqPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </main>
   )

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
 import iphone17ProMaxGoldCase from '../assets/iphone-17-pro-max-gold-case.png'
@@ -12,8 +13,9 @@ export default function CompetitionsPage() {
   const { openEntry } = useEntryFlow()
 
   return (
-    <main className="m-0 p-0">
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+    <main className="ss-photo-page relative m-0 overflow-x-clip p-0">
+      <PhotoPageBackdrop />
+      <div className="relative z-[1] mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
         <h1 className="font-display text-4xl uppercase tracking-[0.08em] text-white sm:text-5xl">Competitions</h1>
         <p className="mt-4 max-w-2xl text-base text-stone-400 sm:text-lg">
           Two live promotions for now: the Ronaldo Legacy Bundle draw and the free Ronaldo signed shirt giveaway.
