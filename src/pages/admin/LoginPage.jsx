@@ -38,6 +38,7 @@ export default function AdminLoginPage() {
   const [resetStep, setResetStep] = useState(false)
   const [forgotOpen, setForgotOpen] = useState(false)
   const [resetUsername, setResetUsername] = useState('')
+  const [resetSecretAnswer, setResetSecretAnswer] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -160,7 +161,7 @@ export default function AdminLoginPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: resetUsername.trim() }),
+        body: JSON.stringify({ username: resetUsername.trim(), secretAnswer: resetSecretAnswer }),
       })
       const text = await res.text()
       const { data, apiMsg } = parseLoginResponse(res, text)
@@ -430,14 +431,8 @@ export default function AdminLoginPage() {
         ) : forgotOpen ? (
           <>
             <p className="mt-2 text-center text-sm text-stone-400">
-              Enter your admin username{setupStatus?.adminLoginUsername ? (
-                <>
-                  {' '}
-                  (<span className="font-mono text-stone-300">{setupStatus.adminLoginUsername}</span>)
-                </>
-              ) : null}
-              . We&apos;ll email a reset code to {setupStatus?.maskedAdminEmail || 'the address on file'} — that inbox
-              is separate from the username field.
+              Enter your admin username and answer the security question. A reset code will be emailed to{' '}
+              {setupStatus?.maskedAdminEmail || 'the address on file'}.
             </p>
             <form className="mt-6 flex flex-col gap-4" onSubmit={onForgotPasswordSubmit}>
               <div>
@@ -449,15 +444,29 @@ export default function AdminLoginPage() {
                   autoComplete="username"
                   value={resetUsername}
                   onChange={(e) => setResetUsername(e.target.value)}
-                  placeholder={setupStatus?.adminLoginUsername || 'admin'}
                   className={theme.input}
                 />
               </div>
+              {setupStatus?.resetSecretQuestion ? (
+                <div>
+                  <label htmlFor="admin-reset-secret" className="block text-xs font-medium text-stone-400">
+                    {setupStatus.resetSecretQuestion}
+                  </label>
+                  <input
+                    id="admin-reset-secret"
+                    type="text"
+                    autoComplete="off"
+                    value={resetSecretAnswer}
+                    onChange={(e) => setResetSecretAnswer(e.target.value)}
+                    className={theme.input}
+                  />
+                </div>
+              ) : null}
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
               {info ? <p className="text-sm text-teal-400/90">{info}</p> : null}
               <button
                 type="submit"
-                disabled={loading || !resetUsername.trim()}
+                disabled={loading || !resetUsername.trim() || !resetSecretAnswer.trim()}
                 className="rounded-xl bg-teal-700 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
               >
                 {loading ? 'Sending…' : 'Send reset code'}
@@ -467,6 +476,7 @@ export default function AdminLoginPage() {
                 className="text-xs text-stone-500 underline underline-offset-2 hover:text-stone-300"
                 onClick={() => {
                   setForgotOpen(false)
+                  setResetSecretAnswer('')
                   setError('')
                   setInfo('')
                 }}

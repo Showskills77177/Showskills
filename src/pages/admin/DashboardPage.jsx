@@ -49,8 +49,8 @@ export default function DashboardPage() {
       <section>
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">Sales &amp; entries</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Tickets sold (paid)" value={String(stats.ticketsSold)} />
-          <StatCard label="Revenue" value={formatBundlePriceGBP(stats.revenuePence)} />
+          <StatCard label="Tickets sold (Cashflows)" value={String(stats.ticketsSold)} />
+          <StatCard label="Revenue (Cashflows)" value={formatBundlePriceGBP(stats.revenuePence)} />
           <StatCard label="Quiz entries" value={String(stats.entriesCount)} />
           <StatCard label="Active competitions" value={String(stats.competitionsActive)} />
         </div>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
         </AnalyticsPanel>
       </div>
 
-      <AnalyticsPanel title="Tickets sold by region" subtitle="From completed payments · country from checkout IP when available">
+      <AnalyticsPanel title="Tickets sold by region" subtitle="Cashflows payments only · country from checkout when available">
         <RankedList
           emptyLabel="No regional ticket data yet — country is recorded on new purchases."
           rows={(analytics.ticketsByRegion || []).map((row) => ({

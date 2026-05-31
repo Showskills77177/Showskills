@@ -1,6 +1,8 @@
 import { requireAdmin } from '../lib/adminAuth.mjs'
 import { query } from '../lib/db.mjs'
 import { loadAdminAnalytics } from '../lib/adminAnalytics.mjs'
+import { loadProductionSalesTotals } from '../lib/adminSalesStats.mjs'
+import { listCompetitions } from '../lib/competitionCatalog.mjs'
 import { json } from '../lib/http.mjs'
 
 const EMPTY_ANALYTICS = {
@@ -35,21 +37,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const [tickets, revenue, entries, pending, analytics] = await Promise.all([
-      query(`SELECT COALESCE(SUM(quantity),0)::int AS n FROM tickets WHERE payment_status = 'paid'`),
-      query(`SELECT COALESCE(SUM(amount_pence),0)::bigint AS a FROM payments WHERE status = 'successful'`),
+    const [sales, entries, pending, analytics, competitions] = await Promise.all([
+      loadProductionSalesTotals(),
       query(`SELECT COUNT(*)::int AS c FROM competition_entries`),
       query(`SELECT COUNT(*)::int AS c FROM kickup_submissions WHERE review_status = 'pending'`),
       loadAdminAnalytics().catch((e) => {
         console.error('[admin/stats analytics]', e)
         return { ...EMPTY_ANALYTICS, analyticsReady: false }
       }),
+      listCompetitions().catch(() => []),
     ])
+    const activeCompetitions = competitions.filter((c) => c.status === 'published').length
     return json(res, 200, {
-      ticketsSold: tickets.rows[0]?.n ?? 0,
-      revenuePence: Number(revenue.rows[0]?.a ?? 0),
+      ticketsSold: sales.ticketsSold,
+      revenuePence: sales.revenuePence,
+      cashflowsPaymentCount: sales.cashflowsPaymentCount,
+      salesSource: sales.salesSource,
       entriesCount: entries.rows[0]?.c ?? 0,
-      competitionsActive: 2,
+      competitionsActive: activeCompetitions || 0,
       submissionsPending: pending.rows[0]?.c ?? 0,
       db: true,
       analytics: { ...analytics, analyticsReady: true },
@@ -66,7 +71,7 @@ export default async function handler(req, res) {
         ticketsSold: 0,
         revenuePence: 0,
         entriesCount: 0,
-        competitionsActive: 2,
+        competitionsActive: 0,
         submissionsPending: 0,
         db: false,
         analytics: EMPTY_ANALYTICS,

@@ -10,6 +10,10 @@ import {
   adminOtpVerificationPayload,
   matchesAdminLoginIdentity,
 } from '../lib/adminEmailOtp.mjs'
+import {
+  adminResetSecretConfigured,
+  verifyAdminResetSecretAnswer,
+} from '../lib/adminResetSecret.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
@@ -43,6 +47,12 @@ export default async function handler(req, res) {
         'Password reset requires email. Set RESEND_API_KEY and ADMIN_EMAIL on the server, then redeploy. Locally, edit ADMIN_PASSWORD in .env.local instead.',
     })
   }
+  if (!adminResetSecretConfigured()) {
+    return json(res, 503, {
+      error:
+        'Password reset secret is not configured. Set ADMIN_RESET_SECRET_ANSWER on the server (Production), then redeploy.',
+    })
+  }
 
   const hint = getAdminEmailSetupHint()
   if (hint) {
@@ -51,11 +61,14 @@ export default async function handler(req, res) {
 
   const body = await readJsonBody(req)
   const username = typeof body.username === 'string' ? body.username.trim() : ''
+  const secretAnswer = typeof body.secretAnswer === 'string' ? body.secretAnswer : ''
   if (!matchesAdminLoginIdentity(username)) {
     return json(res, 401, {
-      error:
-        'Unknown admin username. Use your admin username (set in Vercel as ADMIN_USER — often "admin"), not your personal email unless that is ADMIN_EMAIL.',
+      error: 'Unknown admin username. Contact the site owner if you need the username.',
     })
+  }
+  if (!verifyAdminResetSecretAnswer(secretAnswer)) {
+    return json(res, 401, { error: 'Incorrect answer to the security question.' })
   }
 
   try {

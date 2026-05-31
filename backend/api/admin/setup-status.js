@@ -5,8 +5,11 @@ import {
   getAdminEmailSetupHint,
   adminEmail,
   maskAdminEmail,
-  adminLoginUsername,
 } from '../lib/adminEmailOtp.mjs'
+import {
+  adminResetSecretConfigured,
+  getAdminResetSecretQuestion,
+} from '../lib/adminResetSecret.mjs'
 import { getResendApiKey, isResendProductionMode, resolveResendFrom } from '../lib/resendConfig.mjs'
 import { json } from '../lib/http.mjs'
 
@@ -38,13 +41,14 @@ export default async function handler(req, res) {
     adminAuthMissing: auth.missing,
     emailOtpEnabled: emailOtp,
     emailOtpBypassed: otpBypassed,
-    passwordResetEnabled: isAdminEmailOtpConfigured() && !hint,
+    passwordResetEnabled:
+      isAdminEmailOtpConfigured() && !hint && adminResetSecretConfigured(),
+    resetSecretQuestion: adminResetSecretConfigured() ? getAdminResetSecretQuestion() : null,
     emailOtpHint: hint,
     emailOtpMissing: missingEmail,
     hasResendKey,
     hasAdminEmail,
     maskedAdminEmail: hasAdminEmail ? maskAdminEmail() : null,
-    adminLoginUsername: adminLoginUsername() || null,
     resendProductionMode: isResendProductionMode(),
     fromAddress: resolveResendFrom().replace(/<[^>]+>/, '…'),
     vercelEnv: process.env.VERCEL_ENV || null,

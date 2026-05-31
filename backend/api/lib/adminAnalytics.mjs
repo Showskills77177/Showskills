@@ -1,6 +1,7 @@
 import { countryDisplayName } from '../../../shared/trafficSource.mjs'
 import { query, dbIsPostgres } from './db.mjs'
 import { ensureAnalyticsSchema } from './ensureAnalyticsSchema.mjs'
+import { PRODUCTION_SALES_PAYMENT_SQL } from './adminSalesStats.mjs'
 
 /** @param {number} hours */
 function sinceHours(hours) {
@@ -66,7 +67,7 @@ export async function loadAdminAnalytics() {
               COALESCE(SUM(p.amount_pence), 0)::bigint AS revenue_pence
        FROM payments p
        JOIN tickets t ON t.id = p.ticket_id
-       WHERE p.status = 'successful'
+       WHERE ${PRODUCTION_SALES_PAYMENT_SQL}
        GROUP BY 1
        ORDER BY tickets_sold DESC
        LIMIT 8`,
