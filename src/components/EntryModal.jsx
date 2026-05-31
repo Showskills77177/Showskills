@@ -42,6 +42,7 @@ export function EntryModal() {
     paidEntryMethods,
     postalCompetitionName,
     paidCompetitionTitle,
+    paidCompetitionTitle,
     paidEntryRoute,
     setPaidEntryRoute,
     paidConsent,
@@ -218,7 +219,7 @@ export function EntryModal() {
   if (!entryModalType) return null
 
   const titles = {
-    paid: 'Enter — Ronaldo Legacy Bundle',
+    paid: `Enter — ${paidCompetitionTitle}`,
     kickups: 'Enter — Ronaldo shirt giveaway',
   }
 
@@ -279,10 +280,11 @@ export function EntryModal() {
           {entryModalType === 'paid' ? (
             <>
               <p className="text-sm text-stone-500">
-                <strong className="text-stone-300">Ronaldo Legacy Bundle draw.</strong> Pick a ticket bundle to pay online,
-                free online entry (£0 card verify), or free postal entry for the same prize pool. Then type three Ronaldo skill answers (no multiple
-                choice). <strong className="text-stone-400">All must be correct to qualify</strong> for the main draw — you have{' '}
-                <strong className="text-stone-400">one attempt</strong> per entry. The winner is picked at random from correct entries only.
+                <strong className="text-stone-300">{paidCompetitionTitle}.</strong> Pick a ticket bundle to pay online,
+                free online entry (£0 card verify), or free postal entry for the same prize pool. Then answer the skill
+                questions (no multiple choice). <strong className="text-stone-400">All must be correct to qualify</strong>{' '}
+                for the main draw — you have <strong className="text-stone-400">one attempt</strong> per entry. The winner
+                is picked at random from correct entries only.
               </p>
               <p className="mt-2 rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-xs leading-relaxed text-stone-400">
                 <strong className="text-stone-300">Consolation prize:</strong> {CONSOLATION_PRIZE_SUMMARY}{' '}
