@@ -1,10 +1,77 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { apiFetch } from '../../lib/api'
+import { useSpeechDictation } from '../../hooks/useSpeechDictation'
 
 const FIELD_LABELS = {
   competition_summary: 'summary',
   competition_rules: 'rules',
   bundle_checkout_line: 'checkout line',
+}
+
+function MicIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z" />
+      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+      <path d="M12 18v3" />
+    </svg>
+  )
+}
+
+function appendDictation(current, chunk) {
+  const base = String(current || '').trimEnd()
+  const next = String(chunk || '').trim()
+  if (!next) return base
+  if (!base) return next
+  return `${base} ${next}`
+}
+
+function InstructionsField({ instructions, setInstructions, rows = 3, placeholder, id }) {
+  const appendTranscript = useCallback(
+    (chunk) => {
+      setInstructions((prev) => appendDictation(prev, chunk))
+    },
+    [setInstructions],
+  )
+  const { listening, supported, speechError, toggle } = useSpeechDictation({
+    onAppend: appendTranscript,
+    lang: 'en-GB',
+  })
+
+  return (
+    <div>
+      <div className="mt-1 flex gap-2">
+        <textarea
+          id={id}
+          rows={rows}
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-stone-100"
+        />
+        {supported ? (
+          <button
+            type="button"
+            onClick={toggle}
+            title={listening ? 'Stop dictation' : 'Dictate with microphone'}
+            aria-label={listening ? 'Stop dictation' : 'Start dictation'}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition ${
+              listening
+                ? 'border-red-500/50 bg-red-950/50 text-red-200 animate-pulse'
+                : 'border-violet-500/35 bg-violet-950/40 text-violet-100 hover:bg-violet-950/60'
+            }`}
+          >
+            <MicIcon />
+          </button>
+        ) : null}
+      </div>
+      {listening ? <p className="mt-1 text-[10px] text-violet-200/90">Listening… speak your instructions, then tap the mic to stop.</p> : null}
+      {speechError ? <p className="mt-1 text-[10px] text-red-400">{speechError}</p> : null}
+      {!supported ? (
+        <p className="mt-1 text-[10px] text-stone-500">Dictation works in Chrome and Edge on desktop.</p>
+      ) : null}
+    </div>
+  )
 }
 
 /**
@@ -18,6 +85,7 @@ const FIELD_LABELS = {
  */
 export function AdminAiCopyAssistant({ field, value = '', onApply, context = {}, compact = false }) {
   const [open, setOpen] = useState(false)
+  const [compactOpen, setCompactOpen] = useState(false)
   const [instructions, setInstructions] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -54,15 +122,43 @@ export function AdminAiCopyAssistant({ field, value = '', onApply, context = {},
   if (compact) {
     return (
       <div className="mt-1">
-        <button
-          type="button"
-          onClick={() => generate('replace')}
-          disabled={loading}
-          className="rounded border border-violet-500/30 bg-violet-950/30 px-2 py-0.5 text-[10px] font-semibold text-violet-100 hover:bg-violet-950/50 disabled:opacity-50"
-          title="Generate checkout line with AI"
-        >
-          {loading ? '…' : 'AI line'}
-        </button>
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            onClick={() => generate('replace')}
+            disabled={loading}
+            className="rounded border border-violet-500/30 bg-violet-950/30 px-2 py-0.5 text-[10px] font-semibold text-violet-100 hover:bg-violet-950/50 disabled:opacity-50"
+            title="Generate checkout line with AI"
+          >
+            {loading ? '…' : 'AI line'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCompactOpen((v) => !v)}
+            className="rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-stone-400 hover:bg-white/5"
+          >
+            {compactOpen ? 'Hide' : 'Mic / notes'}
+          </button>
+        </div>
+        {compactOpen ? (
+          <div className="mt-2 rounded border border-white/10 bg-black/20 p-2">
+            <InstructionsField
+              id={`ai-instructions-${field}-compact`}
+              instructions={instructions}
+              setInstructions={setInstructions}
+              rows={2}
+              placeholder="Optional: dictate or type how this bundle line should read…"
+            />
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => generate('replace')}
+              className="mt-2 rounded bg-violet-700 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+            >
+              {loading ? 'Generating…' : 'Generate with notes'}
+            </button>
+          </div>
+        ) : null}
         {error ? <p className="mt-1 text-[10px] text-red-400">{error}</p> : null}
       </div>
     )
@@ -80,14 +176,14 @@ export function AdminAiCopyAssistant({ field, value = '', onApply, context = {},
       </button>
       {open ? (
         <div className="mt-3 space-y-2">
-          <label className="block text-[11px] text-stone-400">
-            Tell the AI what you want (optional)
-            <textarea
+          <label className="block text-[11px] text-stone-400" htmlFor={`ai-instructions-${field}`}>
+            Tell the AI what you want — type or use the microphone
+            <InstructionsField
+              id={`ai-instructions-${field}`}
+              instructions={instructions}
+              setInstructions={setInstructions}
               rows={3}
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
               placeholder="e.g. Mention signed shirt, skill quiz, closing date end of June, premium tone…"
-              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-stone-100"
             />
           </label>
           {error ? <p className="text-xs text-red-400">{error}</p> : null}
@@ -110,8 +206,8 @@ export function AdminAiCopyAssistant({ field, value = '', onApply, context = {},
             </button>
           </div>
           <p className="text-[10px] text-stone-500">
-            Uses ChatGPT via OpenAI on the server. Set <code className="text-stone-400">OPENAI_API_KEY</code> in Vercel
-            Production. Review before publishing.
+            Uses ChatGPT via OpenAI on the server. Add <code className="text-stone-400">OPENAI_API_KEY</code> on Vercel
+            Production, then redeploy. Review before publishing.
           </p>
         </div>
       ) : null}
