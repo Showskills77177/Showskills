@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS } from '../competitionData'
+import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
@@ -30,6 +30,10 @@ function PrivacyPolicySection() {
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
           website. It supplements the competition rules above and applies to all promotions on this site.
+        </p>
+        <p className="mt-4 rounded-lg border border-teal-800/40 bg-teal-950/30 px-3 py-2.5 text-zinc-200">
+          {NO_PURCHASE_ENTRY_NOTICE} Paid ticket purchase is optional where free postal or free online entry is offered
+          for the same draw, subject to the same skill requirements.
         </p>
       </div>
 
@@ -226,6 +230,11 @@ export function TermsModal({ open, onClose }) {
             {UK_AVAILABILITY_NOTICE}
           </p>
 
+          <p className="mb-4 rounded-lg border border-teal-800/40 bg-teal-950/30 px-3 py-2.5 text-zinc-200">
+            <strong>{NO_PURCHASE_ENTRY_NOTICE}</strong> Postal address for free entry:{' '}
+            <span className="text-zinc-300">{POSTAL_ENTRY_ADDRESS}</span>.
+          </p>
+
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">1. Eligibility and age</h3>
           <p className="mb-3">
             Promotions are open to residents of the United Kingdom aged <strong>18 or over</strong> at the date of entry.
@@ -273,9 +282,9 @@ export function TermsModal({ open, onClose }) {
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Ronaldo Legacy Bundle)</h3>
           <p className="mb-3">
-            You may enter the same draw <strong>without payment</strong> by post. Send your <strong>full name</strong>,{' '}
-            <strong>full postal address</strong>, <strong>email address</strong>, and the{' '}
-            <strong>competition name</strong> (<span className="text-zinc-300">{COMPETITION_NAME_POSTAL}</span>) to:{' '}
+            <strong>No purchase necessary.</strong> You may enter the same draw <strong>without payment</strong> by post.
+            Send your <strong>full name</strong>, <strong>full postal address</strong>, <strong>email address</strong>, and
+            the <strong>competition name</strong> (<span className="text-zinc-300">{COMPETITION_NAME_POSTAL}</span>) to:{' '}
             <span className="text-zinc-300">{POSTAL_ENTRY_ADDRESS}</span>. <strong>Limit: one free postal entry per person.</strong>{' '}
             Free postal
             entries are afforded the <strong>same opportunity to win</strong> as paid entries, subject to the same skill
@@ -288,9 +297,12 @@ export function TermsModal({ open, onClose }) {
           </h3>
           <p className="mb-3">
             Where offered on the site, you may enter the Ronaldo Legacy Bundle draw <strong>online without paying</strong>{' '}
-            subject to entry limits shown at checkout. Before you submit your skill answers, we may require{' '}
-            <strong>card verification at £0.00</strong> — a <strong>zero-pound authorisation only</strong> (you are{' '}
-            <strong>not charged</strong> for the ticket). This helps reduce abuse and duplicate entries.
+            subject to entry limits shown at checkout. This is part of our <strong>no purchase necessary</strong> free entry
+            route alongside postal entry. Before you submit your skill answers, we may require{' '}
+            <strong>£0 debit card verification</strong> — a <strong>zero-pound authorisation only</strong> (you are{' '}
+            <strong>not charged</strong> for the ticket). This helps reduce abuse and duplicate entries.{' '}
+            <strong>ShowSkills Rewards does not collect or store your debit card details</strong> from this free verification
+            step.
           </p>
           <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
             <strong>Card details are not stored by ShowSkills Rewards.</strong> You enter card details only in{' '}

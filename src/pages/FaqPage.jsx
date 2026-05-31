@@ -10,6 +10,7 @@ import {
 } from '../../shared/faqContent.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
+import { NO_PURCHASE_ENTRY_NOTICE } from '../../shared/competitionCopy.mjs'
 import { useEntryFlow } from '../entry/entryContext'
 import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
 
@@ -143,6 +144,10 @@ export default function FaqPage() {
         {/* UK notice */}
         <p className="rounded-2xl border border-amber-500/20 bg-amber-950/20 px-4 py-3.5 text-sm leading-relaxed text-amber-100/90">
           {UK_AVAILABILITY_NOTICE}
+        </p>
+
+        <p className="mt-4 rounded-2xl border border-teal-500/25 bg-teal-950/25 px-4 py-3.5 text-sm leading-relaxed text-teal-100/95">
+          {NO_PURCHASE_ENTRY_NOTICE}
         </p>
 
         {/* Search */}

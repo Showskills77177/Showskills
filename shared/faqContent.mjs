@@ -7,7 +7,7 @@ import {
 } from './consolationShirtGiveaway.mjs'
 import { UK_AVAILABILITY_NOTICE } from './siteAvailability.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
-import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS } from './competitionCopy.mjs'
+import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from './competitionCopy.mjs'
 
 /** @typedef {{ id: string, question: string, answer: string, popular?: boolean }} FaqItem */
 /** @typedef {{ id: string, title: string, summary: string, items: FaqItem[] }} FaqSection */
@@ -19,8 +19,10 @@ export const FAQ_PAGE_SUBTITLE =
 
 /** Shown at the top of the FAQ page — quick picks. */
 export const FAQ_POPULAR_IDS = [
+  'no-purchase-necessary',
   'how-to-enter-paid',
   'free-postal',
+  'free-online-entry',
   'how-winner-chosen',
   'when-quiz',
   'consolation-prize',
@@ -52,6 +54,8 @@ export const FAQ_SECTIONS = [
         question: 'Is this a lottery?',
         answer:
           'No. The Ronaldo Legacy Bundle draw is a skill competition, not a lottery. You must answer three free-text skill questions correctly to qualify for the main draw. Among everyone who qualified in that competition period, one winner is chosen at random. ' +
+          NO_PURCHASE_ENTRY_NOTICE +
+          ' ' +
           LEGACY_SKILL_ONE_ATTEMPT_NOTICE +
           ' ' +
           CONSOLATION_PRIZE_SUMMARY +
@@ -73,6 +77,16 @@ export const FAQ_SECTIONS = [
     title: 'Ronaldo Legacy Bundle rewards',
     summary: 'Paid tickets, free postal entry, and how your answers qualify you for the draw.',
     items: [
+      {
+        id: 'no-purchase-necessary',
+        question: 'Do I have to pay to enter the Legacy Bundle draw?',
+        answer:
+          NO_PURCHASE_ENTRY_NOTICE +
+          ' Postal address: ' +
+          POSTAL_ENTRY_ADDRESS +
+          '. You still must answer all skill questions correctly to qualify for the main draw, whether you enter by post, free online verification, or paid tickets.',
+        popular: true,
+      },
       {
         id: 'how-to-enter-paid',
         question: 'How do I enter with paid tickets?',
@@ -97,7 +111,14 @@ export const FAQ_SECTIONS = [
         id: 'free-postal',
         question: 'How does free postal entry work?',
         answer:
-          `You may enter the same Legacy Bundle draw without payment by post. Send your full name, full postal address, email, and the competition name (${COMPETITION_NAME_POSTAL}), plus written answers to all three skill questions, to: ${POSTAL_ENTRY_ADDRESS}. Limit: one free postal entry per person. Postal entries have the same chance to qualify as paid entries if answers are correct.`,
+          `${NO_PURCHASE_ENTRY_NOTICE} You may enter the same Legacy Bundle draw without payment by post. Send your full name, full postal address, email, and the competition name (${COMPETITION_NAME_POSTAL}), plus written answers to all three skill questions, to: ${POSTAL_ENTRY_ADDRESS}. Limit: one free postal entry per person. Postal entries have the same chance to qualify as paid entries if answers are correct.`,
+        popular: true,
+      },
+      {
+        id: 'free-online-entry',
+        question: 'How does free online entry work (no payment)?',
+        answer:
+          `${NO_PURCHASE_ENTRY_NOTICE} Where offered on the Legacy Bundle entry form, choose the free online route: complete £0 debit card verification (you are not charged), then answer the three skill questions in the same session. Card details are entered only in our payment provider’s secure fields — ShowSkills Rewards does not collect or store your debit card details from free entry. Entry limits (e.g. per name and address) are shown on the form.`,
         popular: true,
       },
       {

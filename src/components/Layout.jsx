@@ -3,7 +3,7 @@ import showskillsLogo from '../assets/showskills-logo.png'
 import { EntryModal } from './EntryModal'
 import { TermsModal } from './TermsModal'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
-import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
+import { POSTAL_ENTRY_ADDRESS, FOOTER_NO_PURCHASE_NOTICE } from '../competitionData'
 import { MobileNavDock } from './MobileNavDock'
 import { QuizPromptNav } from './QuizPromptNav'
 import { TrustpilotReviewCollector } from './TrustpilotFeedback'
@@ -166,9 +166,12 @@ export function Layout() {
               </button>
             </nav>
           </div>
-          <p className="mx-auto mt-3 max-w-lg text-center text-xs leading-snug text-stone-500">
-            Skill-based paid draw — winner picked at random from correct entries. Free postal entry in the Legacy Bundle
-            panel — post to {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
+          <p className="mx-auto mt-3 max-w-2xl text-center text-xs leading-relaxed text-stone-400">
+            {FOOTER_NO_PURCHASE_NOTICE}
+          </p>
+          <p className="mx-auto mt-2 max-w-lg text-center text-xs leading-snug text-stone-500">
+            Skill-based paid draw — winner picked at random from correct entries only. Free postal entry — post to{' '}
+            {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
           </p>
           <div className="mx-auto mt-4 w-full max-w-[12.75rem]">
             <p className="mb-1 text-center text-[10px] font-medium text-stone-600">Trustpilot feedback</p>
