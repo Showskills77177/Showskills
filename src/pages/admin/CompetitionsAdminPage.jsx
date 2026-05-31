@@ -8,6 +8,7 @@ import {
 import { CompetitionEntryMethodsEditor } from '../../components/admin/CompetitionEntryMethodsEditor'
 import { defaultEntryMethodsForNewCompetition } from '../../../shared/competitionEntryMethods.mjs'
 import { CompetitionSitePreviewModal } from '../../components/admin/CompetitionSitePreviewModal'
+import { AdminAiCopyAssistant } from '../../components/admin/AdminAiCopyAssistant'
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft (hidden on site)' },
@@ -452,6 +453,12 @@ export default function AdminCompetitionsPage() {
                 onChange={(e) => setNewForm((f) => ({ ...f, summary: e.target.value }))}
                 className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-stone-100"
               />
+              <AdminAiCopyAssistant
+                field="competition_summary"
+                value={newForm.summary}
+                onApply={(text) => setNewForm((f) => ({ ...f, summary: text }))}
+                context={{ competitionTitle: newForm.title }}
+              />
             </label>
             <label className="block text-sm text-stone-400 sm:col-span-2">
               First entry period title (optional)
@@ -525,6 +532,7 @@ export default function AdminCompetitionsPage() {
                   compact
                   bundles={newForm.bundles}
                   onChange={(bundles) => setNewForm((f) => ({ ...f, bundles }))}
+                  competitionTitle={newForm.title}
                 />
               </div>
             </div>
@@ -602,6 +610,12 @@ export default function AdminCompetitionsPage() {
                       onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-stone-100"
                     />
+                    <AdminAiCopyAssistant
+                      field="competition_summary"
+                      value={draft.summary || ''}
+                      onApply={(text) => setDraft((d) => ({ ...d, summary: text }))}
+                      context={{ competitionTitle: draft.title }}
+                    />
                   </label>
                   <label className="block text-sm text-stone-400">
                     Rules (markdown)
@@ -610,6 +624,12 @@ export default function AdminCompetitionsPage() {
                       value={draft.rulesMarkdown || ''}
                       onChange={(e) => setDraft((d) => ({ ...d, rulesMarkdown: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-xs text-stone-100"
+                    />
+                    <AdminAiCopyAssistant
+                      field="competition_rules"
+                      value={draft.rulesMarkdown || ''}
+                      onApply={(text) => setDraft((d) => ({ ...d, rulesMarkdown: text }))}
+                      context={{ competitionTitle: draft.title }}
                     />
                   </label>
                   <label className="block text-sm text-stone-400">
@@ -720,7 +740,11 @@ export default function AdminCompetitionsPage() {
               <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Ticket bundles &amp; prices</h2>
                 <div className="mt-3">
-                  <CompetitionBundleEditor bundles={editBundles} onChange={setEditBundles} />
+                  <CompetitionBundleEditor
+                    bundles={editBundles}
+                    onChange={setEditBundles}
+                    competitionTitle={draft.title}
+                  />
                 </div>
                 <button
                   type="button"

@@ -3,6 +3,7 @@ import {
   getStandardCompetitionBundleTemplates,
   perTicketPence,
 } from '../../../shared/ticketBundles.mjs'
+import { AdminAiCopyAssistant } from './AdminAiCopyAssistant'
 
 const INPUT =
   'w-full rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm text-stone-100'
@@ -39,9 +40,10 @@ function gbpInputToPence(value) {
  *   bundles: Array<ReturnType<typeof emptyBundleRow>>,
  *   onChange: (bundles: Array<ReturnType<typeof emptyBundleRow>>) => void,
  *   compact?: boolean,
+ *   competitionTitle?: string,
  * }} props
  */
-export function CompetitionBundleEditor({ bundles, onChange, compact = false }) {
+export function CompetitionBundleEditor({ bundles, onChange, compact = false, competitionTitle = '' }) {
   function updateRow(index, patch) {
     onChange(bundles.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   }
@@ -145,6 +147,18 @@ export function CompetitionBundleEditor({ bundles, onChange, compact = false }) 
                       onChange={(e) => updateRow(index, { line1: e.target.value })}
                       placeholder="Auto-generated if empty"
                       className={INPUT}
+                    />
+                    <AdminAiCopyAssistant
+                      compact
+                      field="bundle_checkout_line"
+                      value={row.line1}
+                      onApply={(text) => updateRow(index, { line1: text })}
+                      context={{
+                        competitionTitle,
+                        bundleTitle: row.title,
+                        bundleQty: row.qty,
+                        bundlePriceGbp: penceToGbpInput(row.totalPence),
+                      }}
                     />
                   </td>
                 ) : null}
