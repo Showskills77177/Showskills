@@ -480,6 +480,7 @@ export async function createCompetition({
   periodTitle,
   openPeriod = false,
   bundles,
+  skillQuestions,
   allowPaidEntry,
   allowFreeOnline,
   allowPostalEntry,
@@ -577,7 +578,18 @@ export async function createCompetition({
     if (entryMethods.allowPaidEntry && !bundleRows.some((b) => b.active !== false)) {
       throw new Error('At least one active ticket bundle is required when paid entry is enabled.')
     }
+
+    const { replaceCompetitionSkillQuestions, defaultSkillQuestionsForNewCompetition } =
+      await import('./competitionSkillQuestions.mjs')
+    const skillInput =
+      Array.isArray(skillQuestions) && skillQuestions.length
+        ? skillQuestions
+        : defaultSkillQuestionsForNewCompetition()
+    const skillResult = await replaceCompetitionSkillQuestions(slug, skillInput)
+    if (!skillResult.ok) throw new Error(skillResult.error)
   } catch (err) {
+    const { deleteCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
+    await deleteCompetitionSkillQuestions(slug).catch(() => {})
     await query(`DELETE FROM competition_bundles WHERE competition = $1`, [slug]).catch(() => {})
     await query(`DELETE FROM competition_periods WHERE competition = $1`, [slug]).catch(() => {})
     await query(`DELETE FROM competitions WHERE slug = $1`, [slug]).catch(() => {})
@@ -748,15 +760,18 @@ export async function getPublicCompetitionDetail(slug, { siteOrigin = '' } = {})
   }
   if (competition.kind !== COMPETITION_KIND.mainDraw) return null
 
-  const [bundles, openPeriod] = await Promise.all([
+  const { listCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
+  const [bundles, openPeriod, skillQuestions] = await Promise.all([
     listCompetitionBundles(slug, { activeOnly: true }),
     getOpenCompetitionPeriod(slug),
+    listCompetitionSkillQuestions(slug, { includeAnswers: false }),
   ])
 
   return {
     ...competition,
     heroImageUrl: competitionImagePublicUrl(competition.heroImageRef, siteOrigin),
     galleryUrls: competition.gallery.map((ref) => competitionImagePublicUrl(ref, siteOrigin)),
+    skillQuestions,
     bundles: bundles.filter((b) => !b.testOnly).map((b) => ({
       id: b.bundleKey,
       qty: b.qty,

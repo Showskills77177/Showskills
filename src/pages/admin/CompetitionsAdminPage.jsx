@@ -6,9 +6,12 @@ import {
   standardBundleRows,
 } from '../../components/admin/CompetitionBundleEditor'
 import { CompetitionEntryMethodsEditor } from '../../components/admin/CompetitionEntryMethodsEditor'
+import {
+  CompetitionSkillChallengeEditor,
+  legacySkillQuestionRows,
+} from '../../components/admin/CompetitionSkillChallengeEditor'
 import { defaultEntryMethodsForNewCompetition } from '../../../shared/competitionEntryMethods.mjs'
 import { CompetitionSitePreviewModal } from '../../components/admin/CompetitionSitePreviewModal'
-import { AdminAiCopyAssistant } from '../../components/admin/AdminAiCopyAssistant'
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft (hidden on site)' },
@@ -27,6 +30,7 @@ function emptyNewForm() {
     entryClosesAt: '',
     openPeriod: false,
     bundles: standardBundleRows(),
+    skillQuestions: legacySkillQuestionRows(),
     ...defaultEntryMethodsForNewCompetition(),
     featuredOnHomepage: false,
   }
@@ -44,6 +48,7 @@ export default function AdminCompetitionsPage() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [newForm, setNewForm] = useState(emptyNewForm)
   const [editBundles, setEditBundles] = useState([])
+  const [editSkillQuestions, setEditSkillQuestions] = useState([])
   const [periodForm, setPeriodForm] = useState({
     title: '',
     summary: '',
@@ -116,6 +121,20 @@ export default function AdminCompetitionsPage() {
       })),
     )
   }, [draft?.slug, draft?.bundles])
+
+  useEffect(() => {
+    if (!draft?.skillQuestions) {
+      setEditSkillQuestions([])
+      return
+    }
+    setEditSkillQuestions(
+      draft.skillQuestions.map((q, index) => ({
+        questionKey: q.questionKey || q.id || `q${index + 1}`,
+        prompt: q.prompt || '',
+        acceptedAnswers: Array.isArray(q.acceptedAnswers) ? [...q.acceptedAnswers] : [],
+      })),
+    )
+  }, [draft?.slug, draft?.skillQuestions])
 
   useEffect(() => {
     if (!draft?.slug) {
@@ -258,6 +277,32 @@ export default function AdminCompetitionsPage() {
     }
   }
 
+  async function saveSkillQuestions() {
+    if (!draft?.slug) return
+    setSaving(true)
+    setErr('')
+    setMsg('')
+    try {
+      const res = await apiFetch('/api/admin/competitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'saveSkillQuestions',
+          competition: draft.slug,
+          questions: editSkillQuestions,
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Save failed')
+      if (j.competition) setDraft(structuredClone(j.competition))
+      setMsg('Skill challenge saved.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function createCompetition(e) {
     e.preventDefault()
     setSaving(true)
@@ -276,6 +321,11 @@ export default function AdminCompetitionsPage() {
         allowPostalEntry: newForm.allowPostalEntry,
         postalCompetitionName: newForm.postalCompetitionName?.trim() || undefined,
         featuredOnHomepage: newForm.featuredOnHomepage === true,
+        skillQuestions: (newForm.skillQuestions || []).map((q, index) => ({
+          questionKey: q.questionKey || `q${index + 1}`,
+          prompt: q.prompt?.trim() || '',
+          acceptedAnswers: Array.isArray(q.acceptedAnswers) ? q.acceptedAnswers : [],
+        })),
       }
       if (newForm.entryOpensAt && newForm.entryClosesAt) {
         payload.entryOpensAt = new Date(newForm.entryOpensAt).toISOString()
@@ -552,12 +602,6 @@ export default function AdminCompetitionsPage() {
                 onChange={(e) => setNewForm((f) => ({ ...f, summary: e.target.value }))}
                 className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-stone-100"
               />
-              <AdminAiCopyAssistant
-                field="competition_summary"
-                value={newForm.summary}
-                onApply={(text) => setNewForm((f) => ({ ...f, summary: text }))}
-                context={{ competitionTitle: newForm.title }}
-              />
             </label>
             <label className="block text-sm text-stone-400 sm:col-span-2">
               First entry period title (optional)
@@ -637,6 +681,19 @@ export default function AdminCompetitionsPage() {
             </div>
           ) : null}
 
+          {(newForm.allowPaidEntry !== false || newForm.allowFreeOnline) ? (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <h3 className="text-sm font-semibold text-stone-300">Skill challenge</h3>
+              <div className="mt-3">
+                <CompetitionSkillChallengeEditor
+                  compact
+                  questions={newForm.skillQuestions || []}
+                  onChange={(skillQuestions) => setNewForm((f) => ({ ...f, skillQuestions }))}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <button
             type="submit"
             disabled={saving}
@@ -709,12 +766,6 @@ export default function AdminCompetitionsPage() {
                       onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-stone-100"
                     />
-                    <AdminAiCopyAssistant
-                      field="competition_summary"
-                      value={draft.summary || ''}
-                      onApply={(text) => setDraft((d) => ({ ...d, summary: text }))}
-                      context={{ competitionTitle: draft.title }}
-                    />
                   </label>
                   <label className="block text-sm text-stone-400">
                     Rules (markdown)
@@ -723,12 +774,6 @@ export default function AdminCompetitionsPage() {
                       value={draft.rulesMarkdown || ''}
                       onChange={(e) => setDraft((d) => ({ ...d, rulesMarkdown: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-xs text-stone-100"
-                    />
-                    <AdminAiCopyAssistant
-                      field="competition_rules"
-                      value={draft.rulesMarkdown || ''}
-                      onApply={(text) => setDraft((d) => ({ ...d, rulesMarkdown: text }))}
-                      context={{ competitionTitle: draft.title }}
                     />
                   </label>
                   <label className="block text-sm text-stone-400">
@@ -834,6 +879,30 @@ export default function AdminCompetitionsPage() {
                 </div>
                 <p className="mt-2 text-xs text-stone-500">Save competition above to persist entry route changes.</p>
               </section>
+
+              {draft.allowPaidEntry !== false || draft.allowFreeOnline ? (
+                <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Skill challenge</h2>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Required for paid and free online entry. Entrants see the question prompts only; acceptable answers
+                    stay private on the server.
+                  </p>
+                  <div className="mt-3">
+                    <CompetitionSkillChallengeEditor
+                      questions={editSkillQuestions}
+                      onChange={setEditSkillQuestions}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={saveSkillQuestions}
+                    className="mt-4 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Save skill challenge
+                  </button>
+                </section>
+              ) : null}
 
               {draft.allowPaidEntry !== false ? (
               <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">

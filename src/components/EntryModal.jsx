@@ -8,7 +8,6 @@ const E2E_SIMULATE_CHECKOUT =
 import {
   COMPETITION_NAME_POSTAL,
   formatBundlePriceGBP,
-  validatePaidSkillAnswers,
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import {
@@ -53,12 +52,10 @@ export function EntryModal() {
     paidPostCheckout,
     paidOrderRef,
     paidTicketNumbers,
-    paidA1,
-    setPaidA1,
-    paidA2,
-    setPaidA2,
-    paidA3,
-    setPaidA3,
+    paidQuizAnswers,
+    setPaidQuizAnswer,
+    paidSkillQuestions,
+    paidQuizValidation,
     paidQuizError,
     paidQuizResult,
     paidConsolationShirtEntries,
@@ -110,7 +107,6 @@ export function EntryModal() {
     kickVpnBlocked,
     kickCheckingVpn,
     handleKickupsGiveawaySubmit,
-    PAID_SKILL_QUESTIONS,
     freeAddressLine1,
     setFreeAddressLine1,
     freeAddressLine2,
@@ -161,8 +157,22 @@ export function EntryModal() {
     setPaidError('Card payment is not configured. Use PayPal below or contact support.')
   }
 
-  const paidAnswerValidation =
-    paidQuizResult != null ? validatePaidSkillAnswers(paidA1, paidA2, paidA3) : null
+  const skillQuestionCount = paidSkillQuestions.length
+  const skillQuestionLabel =
+    skillQuestionCount === 1 ? 'skill question' : `${skillQuestionCount} skill questions`
+
+  const paidAnswerInputClass = (questionKey) => {
+    const base =
+      'mt-2 w-full rounded-lg border px-3 py-2 text-base focus:outline-none focus:ring-2'
+    if (!paidQuizValidation) {
+      return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
+    }
+    const correct = paidQuizValidation[questionKey]
+    if (correct === false) {
+      return `${base} border-red-500/80 bg-red-950/45 text-red-100 placeholder:text-red-400/40 focus:border-red-500/70 focus:ring-red-900/50`
+    }
+    return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
+  }
 
   function renderLegacyNotQualifiedMessage() {
     if (paidConsolationShirtEntries > 0) {
@@ -179,23 +189,6 @@ export function EntryModal() {
       return `${CONSOLATION_PRIZE_SUMMARY} You did not qualify for the main draw on this attempt.`
     }
     return CONSOLATION_NOT_AWARDED_GENERIC
-  }
-  const paidAnswerInputClass = (questionIndex) => {
-    const base =
-      'mt-2 w-full rounded-lg border px-3 py-2 text-base focus:outline-none focus:ring-2'
-    if (!paidAnswerValidation) {
-      return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
-    }
-    const correct =
-      questionIndex === 0
-        ? paidAnswerValidation.q1
-        : questionIndex === 1
-          ? paidAnswerValidation.q2
-          : paidAnswerValidation.q3
-    if (!correct) {
-      return `${base} border-red-500/80 bg-red-950/45 text-red-100 placeholder:text-red-400/40 focus:border-red-500/70 focus:ring-red-900/50`
-    }
-    return `${base} border-white/10 bg-black/30 text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:ring-teal-900/40`
   }
 
   useEffect(() => {
@@ -360,7 +353,7 @@ export function EntryModal() {
                       </div>
                     ) : null}
                     <p className="mt-2 text-teal-100/90">
-                      Submit your three skill answers below now.{' '}
+                      Submit your {skillQuestionLabel} below now.{' '}
                       <strong className="text-teal-50">You only qualify for the main draw if all answers are correct.</strong>{' '}
                       {LEGACY_SKILL_ONE_ATTEMPT_NOTICE} One confirmation email (receipt, ticket numbers, and result) is sent after you submit.
                       Your payment provider may also send its own payment receipt.
@@ -405,35 +398,24 @@ export function EntryModal() {
                     Confirm the name and email you used to pay so we can link your entry (especially after returning from
                     card checkout on Safari).
                   </p>
-                  {PAID_SKILL_QUESTIONS.map((q, i) => {
-                    const qCorrect = paidAnswerValidation
-                      ? i === 0
-                        ? paidAnswerValidation.q1
-                        : i === 1
-                          ? paidAnswerValidation.q2
-                          : paidAnswerValidation.q3
-                      : null
-                    const showIncorrect = paidQuizResult && qCorrect === false
+                  {paidSkillQuestions.map((q, i) => {
+                    const questionKey = q.questionKey || q.id
+                    const showIncorrect = paidQuizResult && paidQuizValidation?.[questionKey] === false
                     return (
-                      <div key={q.id}>
+                      <div key={questionKey}>
                         <label
-                          htmlFor={`modal-paid-q-${q.id}`}
+                          htmlFor={`modal-paid-q-${questionKey}`}
                           className={`block text-sm font-medium ${showIncorrect ? 'text-red-300' : 'text-stone-300'}`}
                         >
                           {i + 1}. {q.prompt}
                         </label>
                         <input
-                          id={`modal-paid-q-${q.id}`}
+                          id={`modal-paid-q-${questionKey}`}
                           type="text"
                           autoComplete="off"
-                          value={i === 0 ? paidA1 : i === 1 ? paidA2 : paidA3}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            if (i === 0) setPaidA1(v)
-                            else if (i === 1) setPaidA2(v)
-                            else setPaidA3(v)
-                          }}
-                          className={`ss-entry-field ${paidAnswerInputClass(i)}`}
+                          value={paidQuizAnswers[questionKey] || ''}
+                          onChange={(e) => setPaidQuizAnswer(questionKey, e.target.value)}
+                          className={`ss-entry-field ${paidAnswerInputClass(questionKey)}`}
                           placeholder="Type your answer"
                           aria-invalid={showIncorrect || undefined}
                           autoCapitalize="off"
@@ -573,7 +555,7 @@ export function EntryModal() {
                       </div>
                       <p className="text-xs leading-relaxed text-stone-500">
                         Max 3 free online entries per name and address. Verify your card first (£0.00 authorisation, no
-                        charge), then answer three skill questions. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}{' '}
+                        charge), then answer the {skillQuestionLabel}. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}{' '}
                         {CONSOLATION_PRIZE_SUMMARY} {CONSOLATION_PRIZE_FREE_APPLIES}
                       </p>
                       {freeCardVerified ? (
@@ -581,33 +563,31 @@ export function EntryModal() {
                           <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
                             <p className="font-medium text-teal-50">Card verified</p>
                             <p className="mt-1 text-teal-100/90">
-                              Answer all three skill questions below. You only qualify for the main draw if every answer is
+                            Answer all {skillQuestionLabel} below. You only qualify for the main draw if every answer is
                               correct. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE} If you get them wrong, you receive 2 automatic entries into the separate Free Ronaldo Shirt Giveaway.
                             </p>
                           </div>
-                          {PAID_SKILL_QUESTIONS.map((q, i) => (
-                            <div key={q.id}>
-                              <label
-                                htmlFor={`modal-free-q-${q.id}`}
-                                className="block text-sm font-medium text-stone-300"
-                              >
-                                {i + 1}. {q.prompt}
-                              </label>
-                              <input
-                                id={`modal-free-q-${q.id}`}
-                                type="text"
-                                value={i === 0 ? paidA1 : i === 1 ? paidA2 : paidA3}
-                                onChange={(e) => {
-                                  const v = e.target.value
-                                  if (i === 0) setPaidA1(v)
-                                  else if (i === 1) setPaidA2(v)
-                                  else setPaidA3(v)
-                                }}
-                                className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
-                                placeholder="Type your answer"
-                              />
-                            </div>
-                          ))}
+                          {paidSkillQuestions.map((q, i) => {
+                            const questionKey = q.questionKey || q.id
+                            return (
+                              <div key={questionKey}>
+                                <label
+                                  htmlFor={`modal-free-q-${questionKey}`}
+                                  className="block text-sm font-medium text-stone-300"
+                                >
+                                  {i + 1}. {q.prompt}
+                                </label>
+                                <input
+                                  id={`modal-free-q-${questionKey}`}
+                                  type="text"
+                                  value={paidQuizAnswers[questionKey] || ''}
+                                  onChange={(e) => setPaidQuizAnswer(questionKey, e.target.value)}
+                                  className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                                  placeholder="Type your answer"
+                                />
+                              </div>
+                            )
+                          })}
                           <button
                             type="submit"
                             disabled={freeQuizSubmitting}
@@ -702,7 +682,7 @@ export function EntryModal() {
                         <li>
                           Competition name: <span className="text-stone-200">{postalCompetitionName}</span>
                         </li>
-                        <li>Written answers to all three skill questions (same as online)</li>
+                        <li>Written answers to all skill questions (same as online)</li>
                       </ul>
                       <p className="mt-3 text-xs font-medium text-zinc-400">Post to:</p>
                       <PromoterAddress className="mt-1 text-sm text-zinc-300" />

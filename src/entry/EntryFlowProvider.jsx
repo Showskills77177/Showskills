@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   PAID_SKILL_QUESTIONS,
-  validatePaidSkillAnswers,
   DEFAULT_TICKET_BUNDLE_ID,
   getTicketBundleById,
   getVisibleTicketBundles,
@@ -69,9 +68,8 @@ export function EntryFlowProvider({ children }) {
     () => initialQuizSession?.ticketNumbers || [],
   )
   const [paidEmailConfirmationSent, setPaidEmailConfirmationSent] = useState(false)
-  const [paidA1, setPaidA1] = useState('')
-  const [paidA2, setPaidA2] = useState('')
-  const [paidA3, setPaidA3] = useState('')
+  const [paidQuizAnswers, setPaidQuizAnswers] = useState({})
+  const [paidQuizValidation, setPaidQuizValidation] = useState(null)
   const [paidQuizError, setPaidQuizError] = useState('')
   const [paidQuizResult, setPaidQuizResult] = useState(() => initialQuizSession?.quizResult || null)
   const [paidConsolationShirtEntries, setPaidConsolationShirtEntries] = useState(0)
@@ -196,6 +194,47 @@ export function EntryFlowProvider({ children }) {
 
   const paidTicketQty = selectedTicketBundle?.qty ?? 1
 
+  const paidSkillQuestions = useMemo(() => {
+    if (paidCompetitionMeta?.skillQuestions?.length) {
+      return paidCompetitionMeta.skillQuestions.map((q, index) => ({
+        id: q.id || q.questionKey || `q${index + 1}`,
+        questionKey: q.questionKey || q.id || `q${index + 1}`,
+        prompt: q.prompt,
+        sortOrder: q.sortOrder ?? index,
+      }))
+    }
+    if (paidCompetitionSlug === DRAW_COMPETITION_SLUG || !paidCompetitionMeta) {
+      return PAID_SKILL_QUESTIONS.map((q, index) => ({
+        id: q.id,
+        questionKey: q.id,
+        prompt: q.prompt,
+        sortOrder: index,
+      }))
+    }
+    return []
+  }, [paidCompetitionMeta, paidCompetitionSlug])
+
+  const setPaidQuizAnswer = useCallback((questionKey, value) => {
+    setPaidQuizAnswers((prev) => ({ ...prev, [questionKey]: value }))
+  }, [])
+
+  const buildPaidQuizAnswersPayload = useCallback(() => {
+    const out = {}
+    for (const q of paidSkillQuestions) {
+      const key = q.questionKey || q.id
+      out[key] = String(paidQuizAnswers[key] || '').trim()
+    }
+    return out
+  }, [paidSkillQuestions, paidQuizAnswers])
+
+  const allPaidQuizAnswersFilled = useCallback(() => {
+    if (!paidSkillQuestions.length) return false
+    return paidSkillQuestions.every((q) => {
+      const key = q.questionKey || q.id
+      return Boolean(String(paidQuizAnswers[key] || '').trim())
+    })
+  }, [paidSkillQuestions, paidQuizAnswers])
+
   useEffect(() => {
     let cancelled = false
     fetch(apiUrl(`/api/competitions?slug=${encodeURIComponent(paidCompetitionSlug)}`))
@@ -270,9 +309,8 @@ export function EntryFlowProvider({ children }) {
     setPaidQuizResult(null)
     setPaidConsolationShirtEntries(0)
     setPaidQuizSubmitting(false)
-    setPaidA1('')
-    setPaidA2('')
-    setPaidA3('')
+    setPaidQuizAnswers({})
+    setPaidQuizValidation(null)
     setPaidQuizError('')
     if (orderRef) setPaidOrderRef(orderRef)
     if (tickets.length) setPaidTicketNumbers(tickets)
@@ -812,8 +850,8 @@ export function EntryFlowProvider({ children }) {
         setPaidError('Please verify your card first, then answer the skill questions.')
         return
       }
-      if (!paidA1.trim() || !paidA2.trim() || !paidA3.trim()) {
-        setPaidError('Please answer all three skill questions.')
+      if (!allPaidQuizAnswersFilled()) {
+        setPaidError('Please answer all skill questions.')
         return
       }
       setFreeQuizSubmitting(true)
@@ -826,7 +864,7 @@ export function EntryFlowProvider({ children }) {
             ...freeVerifyPayload,
             paymentJobReference: freeVerificationJobRef,
             competition: paidCompetitionSlug,
-            answers: { q1: paidA1.trim(), q2: paidA2.trim(), q3: paidA3.trim() },
+            answers: buildPaidQuizAnswersPayload(),
           }),
         })
         const data = await res.json().catch(() => ({}))
@@ -838,6 +876,7 @@ export function EntryFlowProvider({ children }) {
         setPaidTicketNumbers(Array.isArray(data.ticketNumbers) ? data.ticketNumbers : [])
         setPaidPostCheckout(true)
         setPaidQuizSubmitted(true)
+        setPaidQuizValidation(data.validation || null)
         setPaidQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
         setPaidConsolationShirtEntries(Number(data.consolationShirtEntries) || 0)
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
@@ -852,9 +891,9 @@ export function EntryFlowProvider({ children }) {
       freeCardVerified,
       freeVerificationJobRef,
       freeVerifyPayload,
-      paidA1,
-      paidA2,
-      paidA3,
+      paidCompetitionSlug,
+      allPaidQuizAnswersFilled,
+      buildPaidQuizAnswersPayload,
     ],
   )
 
@@ -937,9 +976,8 @@ export function EntryFlowProvider({ children }) {
     async (e) => {
       e.preventDefault()
       setPaidQuizError('')
-      const { allCorrect } = validatePaidSkillAnswers(paidA1, paidA2, paidA3)
-      if (!paidA1.trim() || !paidA2.trim() || !paidA3.trim()) {
-        setPaidQuizError('Please answer all three questions.')
+      if (!allPaidQuizAnswersFilled()) {
+        setPaidQuizError('Please answer all skill questions.')
         return
       }
       const em = paidEmail.trim()
@@ -958,7 +996,7 @@ export function EntryFlowProvider({ children }) {
             email: em,
             competition: paidCompetitionSlug,
             entryType: 'paid',
-            answers: { q1: paidA1, q2: paidA2, q3: paidA3 },
+            answers: buildPaidQuizAnswersPayload(),
           }),
         })
         const data = await res.json().catch(() => ({}))
@@ -968,7 +1006,8 @@ export function EntryFlowProvider({ children }) {
           )
           return
         }
-        const result = allCorrect ? 'qualified' : 'not_qualified'
+        setPaidQuizValidation(data.validation || null)
+        const result = data.allCorrect ? 'qualified' : 'not_qualified'
         setPaidQuizResult(result)
         setPaidConsolationShirtEntries(Number(data.consolationShirtEntries) || 0)
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
@@ -988,7 +1027,15 @@ export function EntryFlowProvider({ children }) {
         setPaidQuizSubmitting(false)
       }
     },
-    [paidA1, paidA2, paidA3, paidEmail, paidFullName, paidOrderRef, paidTicketNumbers, paidCompetitionSlug],
+    [
+      allPaidQuizAnswersFilled,
+      buildPaidQuizAnswersPayload,
+      paidEmail,
+      paidFullName,
+      paidOrderRef,
+      paidTicketNumbers,
+      paidCompetitionSlug,
+    ],
   )
 
   const handleKickupsGiveawaySubmit = useCallback(
@@ -1096,12 +1143,10 @@ export function EntryFlowProvider({ children }) {
       paidOrderRef,
       paidTicketNumbers,
       paidEmailConfirmationSent,
-      paidA1,
-      setPaidA1,
-      paidA2,
-      setPaidA2,
-      paidA3,
-      setPaidA3,
+      paidQuizAnswers,
+      setPaidQuizAnswer,
+      paidSkillQuestions,
+      paidQuizValidation,
       paidQuizError,
       paidQuizResult,
       paidConsolationShirtEntries,
@@ -1152,7 +1197,6 @@ export function EntryFlowProvider({ children }) {
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,
-      PAID_SKILL_QUESTIONS,
       paidQuizNavStatus,
       openResumePaidQuiz,
       freeAddressLine1,
@@ -1194,9 +1238,9 @@ export function EntryFlowProvider({ children }) {
       paidOrderRef,
       paidTicketNumbers,
       paidEmailConfirmationSent,
-      paidA1,
-      paidA2,
-      paidA3,
+      paidQuizAnswers,
+      paidSkillQuestions,
+      paidQuizValidation,
       paidQuizError,
       paidQuizResult,
       paidConsolationShirtEntries,

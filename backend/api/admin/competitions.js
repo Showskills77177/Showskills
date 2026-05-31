@@ -24,18 +24,24 @@ import {
   updateCompetitionPeriodStatus,
 } from '../lib/competitionPeriods.mjs'
 import { PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
+import {
+  listCompetitionSkillQuestions,
+  replaceCompetitionSkillQuestions,
+} from '../lib/competitionSkillQuestions.mjs'
 
 async function enrichCompetition(row, siteOrigin) {
   if (!row) return null
-  const [bundles, periods] = await Promise.all([
+  const [bundles, periods, skillQuestions] = await Promise.all([
     listCompetitionBundles(row.slug),
     listCompetitionPeriods(row.slug),
+    listCompetitionSkillQuestions(row.slug),
   ])
   return {
     ...row,
     heroImageUrl: competitionImagePublicUrl(row.heroImageRef, siteOrigin),
     galleryUrls: row.gallery.map((ref) => competitionImagePublicUrl(ref, siteOrigin)),
     bundles,
+    skillQuestions,
     periods: periods.map((p) => ({
       id: p.id,
       title: p.title,
@@ -122,6 +128,18 @@ export default async function handler(req, res) {
         if (!result.ok) return json(res, 400, { error: result.error, counts: result.counts })
         return json(res, 200, result)
       }
+      if (body.action === 'saveSkillQuestions') {
+        const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''
+        if (!compSlug) return json(res, 400, { error: 'competition required' })
+        const result = await replaceCompetitionSkillQuestions(compSlug, body.questions)
+        if (!result.ok) return json(res, 400, { error: result.error })
+        const row = await getCompetitionBySlug(compSlug)
+        return json(res, 200, {
+          ok: true,
+          skillQuestions: result.questions,
+          competition: await enrichCompetition(row, siteOrigin),
+        })
+      }
       if (body.action === 'createPeriod') {
         const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''
         const check = await assertMainDrawCompetitionSlug(compSlug)
@@ -163,6 +181,7 @@ export default async function handler(req, res) {
         periodTitle: body.periodTitle,
         openPeriod: body.openPeriod === true,
         bundles: Array.isArray(body.bundles) ? body.bundles : undefined,
+        skillQuestions: Array.isArray(body.skillQuestions) ? body.skillQuestions : undefined,
         allowPaidEntry: body.allowPaidEntry,
         allowFreeOnline: body.allowFreeOnline,
         allowPostalEntry: body.allowPostalEntry,

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from '../lib/db.mjs'
-import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
+import { resolveSkillValidation } from '../lib/competitionSkillQuestions.mjs'
 import { sendQuizResultEmail } from '../lib/sendQuizResultEmail.mjs'
 import { getLatestPaidPurchaseForEmail } from '../lib/ticketNumbers.mjs'
 import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
@@ -41,8 +41,6 @@ export default async function handler(req, res) {
     typeof body.competition === 'string' ? body.competition.trim().slice(0, 120) : ''
   const entryType = body.entryType === 'free' ? 'free' : 'paid'
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
-  const validation = validatePaidSkillAnswers(answers.q1, answers.q2, answers.q3)
-  const allCorrect = validation.allCorrect
 
   if (!fullName || !email.includes('@')) {
     return json(res, 400, { error: 'fullName and valid email required' })
@@ -61,6 +59,12 @@ export default async function handler(req, res) {
       (entryType === 'paid' ? purchase?.competition : bodyCompetition) ||
       bodyCompetition ||
       DRAW_COMPETITION_SLUG
+
+    const validation = await resolveSkillValidation(competition, answers)
+    const allCorrect = validation.allCorrect
+    if (validation.error) {
+      return json(res, 400, { error: validation.error })
+    }
 
     let userId
     const newUserId = randomUUID()

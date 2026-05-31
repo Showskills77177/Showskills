@@ -3,7 +3,7 @@ import { query, isDbConfigured, dbIsPostgres } from './db.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { ensureFreeEntrySchema } from './ensureFreeEntrySchema.mjs'
 import { reserveTicketNumbers } from './ticketNumbers.mjs'
-import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
+import { resolveSkillValidation } from './competitionSkillQuestions.mjs'
 import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
 import { upsertUserContact } from './userContact.mjs'
 import { getOpenCompetitionPeriodForEntry } from './competitionPeriods.mjs'
@@ -42,8 +42,9 @@ export async function recordFreeOnlineEntry({
     return { ok: false, error: periodResult.error || 'No open competition period' }
   }
 
-  const validation = validatePaidSkillAnswers(answers?.q1, answers?.q2, answers?.q3)
+  const validation = await resolveSkillValidation(competition, answers || {})
   const allCorrect = validation.allCorrect
+  if (validation.error) return { ok: false, error: validation.error }
 
   const dup = await query(`SELECT id FROM free_online_entries WHERE setup_intent_id = $1`, [sessionId])
   if (dup.rows[0]) {

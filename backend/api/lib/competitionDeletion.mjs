@@ -120,6 +120,9 @@ export async function deleteCompetition(slug, { purgeData = false, confirmSlug =
 
   deleteCompetitionImages(existing)
 
+  const { deleteCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
+  await deleteCompetitionSkillQuestions(slug)
+
   await query(`DELETE FROM competition_bundles WHERE competition = $1`, [slug])
   await query(`DELETE FROM competition_periods WHERE competition = $1`, [slug])
   await query(`DELETE FROM competitions WHERE slug = $1`, [slug])
