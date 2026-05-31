@@ -70,8 +70,22 @@ export function generateAdminOtpCode() {
   return String(randomInt(100_000, 999_999))
 }
 
-/** Send 6-digit code after password succeeded. */
-export async function sendAdminLoginOtpEmail() {
+function buildAdminResetOtpHtml(code, site) {
+  return `
+    <p style="font-family:system-ui,sans-serif;color:#e7e5e4;">
+      Your ShowSkills admin password reset code is:
+    </p>
+    <p style="font-family:ui-monospace,monospace;font-size:28px;font-weight:700;letter-spacing:0.2em;color:#5eead4;">
+      ${code}
+    </p>
+    <p style="font-family:system-ui,sans-serif;font-size:13px;color:#a8a29e;">
+      This code expires in 15 minutes. If you did not request a reset, ignore this email and your password will stay the same.
+    </p>
+    <p style="font-family:system-ui,sans-serif;font-size:12px;color:#78716c;">${site}</p>
+  `.trim()
+}
+
+async function sendAdminOtpEmail({ purpose }) {
   const configuredAdmin = adminEmail()
   if (!configuredAdmin.includes('@')) {
     throw new Error('ADMIN_EMAIL must be a valid email address')
@@ -98,17 +112,21 @@ export async function sendAdminLoginOtpEmail() {
   const code = generateAdminOtpCode()
   const site = resolveSiteUrl()
   const from = resolveResendFrom()
-  const html = buildAdminOtpHtml(code, site)
-  const text = `Your ShowSkills admin sign-in code is: ${code}\n\nExpires in 10 minutes. If you did not try to sign in, ignore this email.`
+  const isReset = purpose === 'reset'
+  const html = isReset ? buildAdminResetOtpHtml(code, site) : buildAdminOtpHtml(code, site)
+  const text = isReset
+    ? `Your ShowSkills admin password reset code is: ${code}\n\nExpires in 15 minutes. If you did not request this, ignore this email.`
+    : `Your ShowSkills admin sign-in code is: ${code}\n\nExpires in 10 minutes. If you did not try to sign in, ignore this email.`
+  const subject = isReset ? 'ShowSkills admin password reset code' : 'ShowSkills admin sign-in code'
 
   let deliveredTo = to
-  let { ok, data, status } = await postResendOtp(apiKey, { from, to, html, text })
+  let { ok, data, status } = await postResendOtp(apiKey, { from, to, html, text, subject })
   if (!ok) {
     const allowed = parseResendSandboxRecipient(data?.message)
     if (allowed && allowed !== to) {
       console.warn(`[admin-otp] Retrying send to Resend sandbox inbox ${allowed} (was ${to})`)
       deliveredTo = allowed
-      ;({ ok, data, status } = await postResendOtp(apiKey, { from, to: allowed, html, text }))
+      ;({ ok, data, status } = await postResendOtp(apiKey, { from, to: allowed, html, text, subject }))
     }
   }
   if (!ok) {
@@ -118,7 +136,7 @@ export async function sendAdminLoginOtpEmail() {
   if (!data?.id) {
     console.warn('[admin-otp] Resend accepted request but returned no email id:', data)
   } else {
-    console.log(`[admin-otp] Sent to ${deliveredTo} from ${from} (id: ${data.id})`)
+    console.log(`[admin-otp] Sent ${purpose} code to ${deliveredTo} from ${from} (id: ${data.id})`)
   }
 
   return {
@@ -129,6 +147,16 @@ export async function sendAdminLoginOtpEmail() {
     configuredAdmin,
     sandboxRedirect: !isResendProductionMode() && deliveredTo !== configuredAdmin,
   }
+}
+
+/** Send 6-digit code after password succeeded. */
+export async function sendAdminLoginOtpEmail() {
+  return sendAdminOtpEmail({ purpose: 'login' })
+}
+
+/** Send 6-digit code for admin password reset (after username verified). */
+export async function sendAdminPasswordResetOtpEmail() {
+  return sendAdminOtpEmail({ purpose: 'reset' })
 }
 
 function buildAdminOtpHtml(code, site) {
@@ -146,7 +174,7 @@ function buildAdminOtpHtml(code, site) {
   `.trim()
 }
 
-async function postResendOtp(apiKey, { from, to, html, text }) {
+async function postResendOtp(apiKey, { from, to, html, text, subject = 'ShowSkills admin sign-in code' }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -156,7 +184,7 @@ async function postResendOtp(apiKey, { from, to, html, text }) {
     body: JSON.stringify({
       from,
       to: [to],
-      subject: 'ShowSkills admin sign-in code',
+      subject,
       html,
       text,
     }),
@@ -181,11 +209,17 @@ const SANDBOX_NOTE =
   'Code sent to your Resend account email (local testing). Check that inbox, not ADMIN_EMAIL, until showskills.co.uk is verified on Resend.'
 
 /** JSON body for login / resend-code after OTP email is sent. */
-export function adminOtpVerificationPayload(sent) {
+export function adminOtpVerificationPayload(sent, { purpose = 'login' } = {}) {
+  const message =
+    purpose === 'reset'
+      ? 'Enter the code from your email, then choose a new password.'
+      : undefined
   return {
     ok: true,
     verificationRequired: true,
     channel: 'email',
+    purpose,
+    message,
     maskedDestination: maskAdminEmail(sent.deliveredTo),
     sandboxNote: sent.sandboxRedirect ? SANDBOX_NOTE : undefined,
   }

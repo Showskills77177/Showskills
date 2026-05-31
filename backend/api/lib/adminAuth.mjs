@@ -2,8 +2,10 @@ import { SignJWT, jwtVerify } from 'jose'
 
 const COOKIE = 'admin_session'
 const SMS_PENDING_COOKIE = 'admin_sms_pending'
+const RESET_PENDING_COOKIE = 'admin_reset_pending'
 const MAX_AGE_SEC = 60 * 60 * 8
 const SMS_PENDING_MAX_AGE_SEC = 60 * 10
+const RESET_PENDING_MAX_AGE_SEC = 60 * 15
 
 function getSecret() {
   const s = process.env.ADMIN_JWT_SECRET
@@ -11,7 +13,7 @@ function getSecret() {
   return new TextEncoder().encode(s)
 }
 
-export { COOKIE as ADMIN_COOKIE_NAME, SMS_PENDING_COOKIE as ADMIN_SMS_PENDING_COOKIE_NAME }
+export { COOKIE as ADMIN_COOKIE_NAME, SMS_PENDING_COOKIE as ADMIN_SMS_PENDING_COOKIE_NAME, RESET_PENDING_COOKIE as ADMIN_RESET_PENDING_COOKIE_NAME }
 
 export async function signAdminSession() {
   const secret = getSecret()
@@ -139,6 +141,46 @@ export function setAdminSmsPendingCookieHeader(token) {
 
 export function clearAdminSmsPendingCookieHeader() {
   return cookieParts(SMS_PENDING_COOKIE, '', 0)
+}
+
+/** @param {string} codeHash — SHA-256 of password-reset OTP */
+export async function signAdminResetPending(codeHash) {
+  const secret = getSecret()
+  if (!secret) throw new Error('ADMIN_JWT_SECRET must be set (min 32 characters)')
+  return new SignJWT({ role: 'admin_reset_pending', otp: codeHash })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${RESET_PENDING_MAX_AGE_SEC}s`)
+    .sign(secret)
+}
+
+export async function verifyAdminResetPending(token) {
+  if (!token) return null
+  const secret = getSecret()
+  if (!secret) return null
+  try {
+    const { payload } = await jwtVerify(token, secret)
+    if (payload.role !== 'admin_reset_pending') return null
+    const otp = typeof payload.otp === 'string' ? payload.otp : ''
+    if (!otp) return null
+    return payload
+  } catch {
+    return null
+  }
+}
+
+export function getAdminResetPendingFromReq(req) {
+  const raw = req.headers?.cookie || req.headers?.Cookie
+  const cookies = parseCookies(raw)
+  return cookies[RESET_PENDING_COOKIE] || null
+}
+
+export function setAdminResetPendingCookieHeader(token) {
+  return cookieParts(RESET_PENDING_COOKIE, token, RESET_PENDING_MAX_AGE_SEC)
+}
+
+export function clearAdminResetPendingCookieHeader() {
+  return cookieParts(RESET_PENDING_COOKIE, '', 0)
 }
 
 export function isAdminAuthConfigured() {

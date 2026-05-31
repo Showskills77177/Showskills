@@ -37,6 +37,7 @@ export default async function handler(req, res) {
     adminAuthMissing: auth.missing,
     emailOtpEnabled: emailOtp,
     emailOtpBypassed: otpBypassed,
+    passwordResetEnabled: isAdminEmailOtpConfigured() && !hint,
     emailOtpHint: hint,
     emailOtpMissing: missingEmail,
     hasResendKey,

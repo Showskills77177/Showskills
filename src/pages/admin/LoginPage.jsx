@@ -35,6 +35,12 @@ export default function AdminLoginPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [setupStatus, setSetupStatus] = useState(null)
+  const [resetStep, setResetStep] = useState(false)
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [resetUsername, setResetUsername] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const otpInputRef = useRef(null)
 
   useEffect(() => {
@@ -114,6 +120,102 @@ export default function AdminLoginPage() {
       setResendLoading(false)
     }
   }, [resendCooldown, resendLoading])
+
+  const onResendResetCode = useCallback(async () => {
+    if (resendCooldown > 0 || resendLoading) return
+    setError('')
+    setInfo('')
+    setResendLoading(true)
+    try {
+      const res = await fetch(apiUrl('/api/admin/resend-reset-code'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
+      const text = await res.text()
+      const { data, apiMsg } = parseLoginResponse(res, text)
+      if (!res.ok) {
+        setError(apiMsg || `Could not resend code (HTTP ${res.status}).`)
+        if (res.status === 401) setResetStep(false)
+        return
+      }
+      applyOtpStepFromResponse(data)
+      setInfo(typeof data.message === 'string' ? data.message : 'A new reset code has been sent.')
+      setResendCooldown(60)
+    } catch (err) {
+      setError(`Network error (${err instanceof Error ? err.message : String(err)}).`)
+    } finally {
+      setResendLoading(false)
+    }
+  }, [resendCooldown, resendLoading])
+
+  async function onForgotPasswordSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setInfo('')
+    setLoading(true)
+    try {
+      const res = await fetch(apiUrl('/api/admin/forgot-password'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: resetUsername.trim() }),
+      })
+      const text = await res.text()
+      const { data, apiMsg } = parseLoginResponse(res, text)
+      if (!res.ok) {
+        setError(apiMsg || `Could not send reset code (HTTP ${res.status}).`)
+        return
+      }
+      applyOtpStepFromResponse(data)
+      setResetStep(true)
+      setResendCooldown(60)
+      setInfo(typeof data.message === 'string' ? data.message : 'Reset code sent.')
+    } catch (err) {
+      setError(`Network error (${err instanceof Error ? err.message : String(err)}).`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function onResetPasswordSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setInfo('')
+    setLoading(true)
+    try {
+      const res = await fetch(apiUrl('/api/admin/reset-password'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: otpCode.trim(),
+          newPassword,
+          confirmPassword,
+        }),
+      })
+      const text = await res.text()
+      const { data, apiMsg } = parseLoginResponse(res, text)
+      if (!res.ok) {
+        setError(apiMsg || `Reset failed (HTTP ${res.status}).`)
+        if (res.status === 401 && apiMsg.includes('expired')) setResetStep(false)
+        return
+      }
+      setResetStep(false)
+      setOtpStep(false)
+      setOtpCode('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPassword('')
+      setUsername(resetUsername.trim() || username.trim())
+      setInfo(typeof data.message === 'string' ? data.message : 'Password updated. Sign in below.')
+    } catch (err) {
+      setError(`Network error (${err instanceof Error ? err.message : String(err)}).`)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function onPasswordSubmit(e) {
     e.preventDefault()
@@ -216,8 +318,157 @@ export default function AdminLoginPage() {
         <div className="mb-6 flex justify-center">
           <AdminLogo linkTo={null} size="lg" />
         </div>
-        <h1 className={theme.loginTitle}>Admin sign in</h1>
-        {otpStep ? (
+        <h1 className={theme.loginTitle}>
+          {resetStep ? 'Reset admin password' : forgotOpen ? 'Forgot password' : otpStep ? 'Verify sign-in' : 'Admin sign in'}
+        </h1>
+        {resetStep ? (
+          <>
+            <p className="mt-2 text-center text-sm text-stone-400">
+              Enter the 6-digit code sent to{' '}
+              <span className="font-mono text-stone-300">{maskedDestination || 'your admin email'}</span>, then choose
+              a new password.
+            </p>
+            {sandboxNote ? (
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-950/40 px-3 py-2 text-center text-xs text-amber-200/90">
+                {sandboxNote}
+              </p>
+            ) : null}
+            <form className="mt-6 flex flex-col gap-4" onSubmit={onResetPasswordSubmit}>
+              <div>
+                <label htmlFor="admin-reset-otp" className="block text-xs font-medium text-stone-400">
+                  Reset code
+                </label>
+                <input
+                  ref={otpInputRef}
+                  id="admin-reset-otp"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className={theme.inputOtp}
+                  placeholder="000000"
+                />
+              </div>
+              <div>
+                <label htmlFor="admin-new-pass" className="block text-xs font-medium text-stone-400">
+                  New password
+                </label>
+                <input
+                  id="admin-new-pass"
+                  type={showNewPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className={theme.input}
+                />
+              </div>
+              <div>
+                <label htmlFor="admin-confirm-pass" className="block text-xs font-medium text-stone-400">
+                  Confirm new password
+                </label>
+                <input
+                  id="admin-confirm-pass"
+                  type={showNewPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={theme.input}
+                />
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-stone-400 select-none">
+                  <input
+                    type="checkbox"
+                    checked={showNewPassword}
+                    onChange={(e) => setShowNewPassword(e.target.checked)}
+                    className={theme.checkbox}
+                  />
+                  Show passwords
+                </label>
+              </div>
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+              {info ? <p className="text-sm text-teal-400/90">{info}</p> : null}
+              <button
+                type="submit"
+                disabled={loading || otpCode.length !== 6 || newPassword.length < 8 || !confirmPassword}
+                className="min-h-[44px] rounded-xl bg-teal-700 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
+              >
+                {loading ? 'Updating…' : 'Update password'}
+              </button>
+              <button
+                type="button"
+                disabled={resendLoading || resendCooldown > 0}
+                onClick={onResendResetCode}
+                className={theme.secondaryBtn}
+              >
+                {resendLoading
+                  ? 'Sending…'
+                  : resendCooldown > 0
+                    ? `Resend code (${resendCooldown}s)`
+                    : 'Resend code'}
+              </button>
+              <button
+                type="button"
+                className="text-xs text-stone-500 underline underline-offset-2 hover:text-stone-300"
+                onClick={() => {
+                  setResetStep(false)
+                  setForgotOpen(false)
+                  setOtpStep(false)
+                  setOtpCode('')
+                  setNewPassword('')
+                  setConfirmPassword('')
+                  setError('')
+                  setInfo('')
+                  setResendCooldown(0)
+                }}
+              >
+                Back to sign in
+              </button>
+            </form>
+          </>
+        ) : forgotOpen ? (
+          <>
+            <p className="mt-2 text-center text-sm text-stone-400">
+              Enter your admin username. We&apos;ll email a reset code to{' '}
+              {setupStatus?.maskedAdminEmail || 'the address on file'}.
+            </p>
+            <form className="mt-6 flex flex-col gap-4" onSubmit={onForgotPasswordSubmit}>
+              <div>
+                <label htmlFor="admin-reset-user" className="block text-xs font-medium text-stone-400">
+                  Username
+                </label>
+                <input
+                  id="admin-reset-user"
+                  autoComplete="username"
+                  value={resetUsername}
+                  onChange={(e) => setResetUsername(e.target.value)}
+                  className={theme.input}
+                />
+              </div>
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+              {info ? <p className="text-sm text-teal-400/90">{info}</p> : null}
+              <button
+                type="submit"
+                disabled={loading || !resetUsername.trim()}
+                className="rounded-xl bg-teal-700 py-2.5 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-50"
+              >
+                {loading ? 'Sending…' : 'Send reset code'}
+              </button>
+              <button
+                type="button"
+                className="text-xs text-stone-500 underline underline-offset-2 hover:text-stone-300"
+                onClick={() => {
+                  setForgotOpen(false)
+                  setError('')
+                  setInfo('')
+                }}
+              >
+                Back to sign in
+              </button>
+            </form>
+          </>
+        ) : otpStep ? (
           <>
             <p className="mt-2 text-center text-sm text-stone-400">
               Enter the 6-digit code sent to{' '}
@@ -348,6 +599,7 @@ export default function AdminLoginPage() {
                 </label>
               </div>
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
+              {info ? <p className="text-sm text-teal-400/90">{info}</p> : null}
               <button
                 type="submit"
                 disabled={loading}
@@ -355,6 +607,20 @@ export default function AdminLoginPage() {
               >
                 {loading ? 'Signing in…' : 'Sign in'}
               </button>
+              {setupStatus?.passwordResetEnabled ? (
+                <button
+                  type="button"
+                  className="text-xs text-stone-500 underline underline-offset-2 hover:text-stone-300"
+                  onClick={() => {
+                    setError('')
+                    setInfo('')
+                    setResetUsername(username.trim())
+                    setForgotOpen(true)
+                  }}
+                >
+                  Forgot password?
+                </button>
+              ) : null}
             </form>
           </>
         )}
