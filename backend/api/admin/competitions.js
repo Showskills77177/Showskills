@@ -14,6 +14,11 @@ import {
   competitionImagePublicUrl,
 } from '../lib/competitionCatalog.mjs'
 import {
+  countCompetitionTransactionalData,
+  deleteCompetition,
+  purgeCompetitionTransactionalData,
+} from '../lib/competitionDeletion.mjs'
+import {
   createCompetitionPeriod,
   listCompetitionPeriods,
   updateCompetitionPeriodStatus,
@@ -91,6 +96,30 @@ export default async function handler(req, res) {
         if (!compSlug) return json(res, 400, { error: 'competition required' })
         const result = await upsertCompetitionBundle(compSlug, body.bundle || body)
         if (!result.ok) return json(res, 400, { error: result.error })
+        return json(res, 200, result)
+      }
+      if (body.action === 'transactionCounts') {
+        const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''
+        if (!compSlug) return json(res, 400, { error: 'competition required' })
+        const counts = await countCompetitionTransactionalData(compSlug)
+        return json(res, 200, { ok: true, counts })
+      }
+      if (body.action === 'purgeCompetitionData') {
+        const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''
+        const confirmSlug = typeof body.confirmSlug === 'string' ? body.confirmSlug.trim() : ''
+        if (!compSlug || confirmSlug !== compSlug) {
+          return json(res, 400, { error: 'Type the competition slug exactly to confirm purge.' })
+        }
+        const result = await purgeCompetitionTransactionalData(compSlug)
+        if (!result.ok) return json(res, 400, { error: result.error })
+        return json(res, 200, result)
+      }
+      if (body.action === 'deleteCompetition') {
+        const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''
+        const confirmSlug = typeof body.confirmSlug === 'string' ? body.confirmSlug.trim() : ''
+        const purgeData = body.purgeData === true
+        const result = await deleteCompetition(compSlug, { purgeData, confirmSlug })
+        if (!result.ok) return json(res, 400, { error: result.error, counts: result.counts })
         return json(res, 200, result)
       }
       if (body.action === 'createPeriod') {

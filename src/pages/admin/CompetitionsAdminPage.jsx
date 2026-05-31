@@ -50,6 +50,10 @@ export default function AdminCompetitionsPage() {
     entryOpensAt: '',
     entryClosesAt: '',
   })
+  const [dataCounts, setDataCounts] = useState(null)
+  const [purgeConfirm, setPurgeConfirm] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deletePurgeData, setDeletePurgeData] = useState(true)
 
   const loadDetail = useCallback(async (slug) => {
     if (!slug) {
@@ -112,6 +116,101 @@ export default function AdminCompetitionsPage() {
       })),
     )
   }, [draft?.slug, draft?.bundles])
+
+  useEffect(() => {
+    if (!draft?.slug) {
+      setDataCounts(null)
+      setPurgeConfirm('')
+      setDeleteConfirm('')
+      return
+    }
+    let cancelled = false
+    apiFetch('/api/admin/competitions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'transactionCounts', competition: draft.slug }),
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled) setDataCounts(j.counts || null)
+      })
+      .catch(() => {
+        if (!cancelled) setDataCounts(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [draft?.slug])
+
+  async function purgeCompetitionData() {
+    if (!draft?.slug || purgeConfirm.trim() !== draft.slug) {
+      setErr('Type the competition slug exactly to confirm purge.')
+      return
+    }
+    setSaving(true)
+    setErr('')
+    setMsg('')
+    try {
+      const res = await apiFetch('/api/admin/competitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'purgeCompetitionData',
+          competition: draft.slug,
+          confirmSlug: purgeConfirm.trim(),
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Purge failed')
+      setMsg(
+        `Purged ${j.purged?.tickets ?? 0} ticket row(s), ${j.purged?.entries ?? 0} quiz entries, ${j.purged?.payments ?? 0} payment(s). Competition setup kept — delete competition when ready.`,
+      )
+      setPurgeConfirm('')
+      const countsRes = await apiFetch('/api/admin/competitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'transactionCounts', competition: draft.slug }),
+      })
+      const countsJson = await countsRes.json().catch(() => ({}))
+      setDataCounts(countsJson.counts || null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Purge failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteCompetitionPermanently() {
+    if (!draft?.slug || deleteConfirm.trim() !== draft.slug) {
+      setErr('Type the competition slug exactly to confirm deletion.')
+      return
+    }
+    setSaving(true)
+    setErr('')
+    setMsg('')
+    try {
+      const res = await apiFetch('/api/admin/competitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deleteCompetition',
+          competition: draft.slug,
+          confirmSlug: deleteConfirm.trim(),
+          purgeData: deletePurgeData,
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Delete failed')
+      setDeleteConfirm('')
+      setPurgeConfirm('')
+      await loadList()
+      setMsg(`Competition "${j.deletedSlug}" deleted permanently.`)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function selectCompetition(slug) {
     setMsg('')
@@ -821,6 +920,77 @@ export default function AdminCompetitionsPage() {
                     Create new period
                   </button>
                 </form>
+              </section>
+
+              <section className="rounded-xl border border-red-500/25 bg-red-950/20 p-4">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-red-200">Data retention &amp; delete</h2>
+                <p className="mt-2 text-xs text-stone-400">
+                  After a draw closes (and once your tax records allow), purge ticket sales and quiz entries. Then delete
+                  the competition so it no longer appears on the site or in admin.
+                </p>
+                {dataCounts ? (
+                  <p className="mt-2 text-xs text-stone-500">
+                    Stored for this competition:{' '}
+                    <span className="font-mono text-stone-300">{dataCounts.tickets}</span> ticket purchase(s),{' '}
+                    <span className="font-mono text-stone-300">{dataCounts.entries}</span> quiz entries,{' '}
+                    <span className="font-mono text-stone-300">{dataCounts.payments}</span> payment(s),{' '}
+                    <span className="font-mono text-stone-300">{dataCounts.drawRuns}</span> draw record(s).
+                  </p>
+                ) : null}
+
+                <div className="mt-4 space-y-4 border-t border-red-500/15 pt-4">
+                  <div>
+                    <h3 className="text-xs font-semibold text-stone-300">Purge tickets, entries &amp; sales</h3>
+                    <p className="mt-1 text-[11px] text-stone-500">
+                      Removes purchases, payments, quiz entries, and draw audit rows. Keeps the competition definition
+                      (rules, bundles, periods) until you delete it.
+                    </p>
+                    <input
+                      value={purgeConfirm}
+                      onChange={(e) => setPurgeConfirm(e.target.value)}
+                      placeholder={`Type ${draft.slug} to confirm purge`}
+                      className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-xs text-stone-100"
+                    />
+                    <button
+                      type="button"
+                      disabled={saving || purgeConfirm.trim() !== draft.slug}
+                      onClick={purgeCompetitionData}
+                      className="mt-2 rounded-lg border border-amber-500/35 bg-amber-950/40 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-950/60 disabled:opacity-50"
+                    >
+                      Purge entry &amp; sales data
+                    </button>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-semibold text-red-200">Delete competition permanently</h3>
+                    <p className="mt-1 text-[11px] text-stone-500">
+                      Removes this competition from admin and the public site (images, bundles, periods). Cannot be undone.
+                    </p>
+                    <label className="mt-2 flex items-start gap-2 text-[11px] text-stone-400">
+                      <input
+                        type="checkbox"
+                        checked={deletePurgeData}
+                        onChange={(e) => setDeletePurgeData(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>Also delete all tickets, entries, payments, and draw records (required if any remain)</span>
+                    </label>
+                    <input
+                      value={deleteConfirm}
+                      onChange={(e) => setDeleteConfirm(e.target.value)}
+                      placeholder={`Type ${draft.slug} to confirm delete`}
+                      className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-xs text-stone-100"
+                    />
+                    <button
+                      type="button"
+                      disabled={saving || deleteConfirm.trim() !== draft.slug}
+                      onClick={deleteCompetitionPermanently}
+                      className="mt-2 rounded-lg border border-red-500/40 bg-red-900/50 px-3 py-2 text-xs font-semibold text-red-100 hover:bg-red-900/70 disabled:opacity-50"
+                    >
+                      Delete competition forever
+                    </button>
+                  </div>
+                </div>
               </section>
             </div>
           ) : (
