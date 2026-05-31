@@ -42,7 +42,6 @@ export function EntryModal() {
     paidEntryMethods,
     postalCompetitionName,
     paidCompetitionTitle,
-    paidCompetitionTitle,
     paidEntryRoute,
     setPaidEntryRoute,
     paidConsent,
