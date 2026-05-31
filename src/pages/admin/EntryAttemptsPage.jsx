@@ -2,9 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../../lib/api'
 import { AdminPagination } from '../../components/admin/AdminPagination'
 import { AdminHelpBanner, ADMIN_PAGE_SIZE } from '../../components/admin/AdminHelpBanner'
+import {
+  AdminCompetitionSelect,
+  competitionFilterLabel,
+} from '../../components/admin/AdminCompetitionSelect'
 import { ENTRY_ATTEMPTS_PAGE_HELP } from '../../../shared/adminListCopy.mjs'
 
 export default function EntryAttemptsPage() {
+  const [competition, setCompetition] = useState('')
   const [flow, setFlow] = useState('')
   const [outcome, setOutcome] = useState('')
   const [page, setPage] = useState(1)
@@ -15,7 +20,7 @@ export default function EntryAttemptsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [flow, outcome])
+  }, [flow, outcome, competition])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -24,6 +29,7 @@ export default function EntryAttemptsPage() {
       const qs = new URLSearchParams({ page: String(page), pageSize: String(ADMIN_PAGE_SIZE) })
       if (flow) qs.set('flow', flow)
       if (outcome) qs.set('outcome', outcome)
+      if (competition) qs.set('competition', competition)
       const res = await apiFetch(`/api/admin/entry-attempts?${qs}`)
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Failed to load')
@@ -34,7 +40,7 @@ export default function EntryAttemptsPage() {
     } finally {
       setLoading(false)
     }
-  }, [flow, outcome, page])
+  }, [flow, outcome, competition, page])
 
   useEffect(() => {
     load()
@@ -46,11 +52,18 @@ export default function EntryAttemptsPage() {
         <h1 className="text-xl font-semibold text-stone-100">Entry attempt log</h1>
       </div>
 
-      <AdminHelpBanner title="Free-route security log (not the skill quiz)">
+      <AdminHelpBanner title={`Free-route security log — ${competitionFilterLabel('any', competition)}`}>
         {ENTRY_ATTEMPTS_PAGE_HELP}
       </AdminHelpBanner>
 
       <div className="flex flex-wrap items-center gap-2">
+        <AdminCompetitionSelect
+          kind="any"
+          value={competition}
+          onChange={setCompetition}
+          allLabel="All routes"
+          label="Route / competition"
+        />
         <select
           value={flow}
           onChange={(e) => setFlow(e.target.value)}

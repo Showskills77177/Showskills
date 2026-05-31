@@ -9,9 +9,11 @@ import {
 import { recordFreeOnlineEntry } from './lib/recordFreeOnlineEntry.mjs'
 import { ensureFreeEntrySchema } from './lib/ensureFreeEntrySchema.mjs'
 import { query } from './lib/db.mjs'
-import { COMPETITION_LEGACY_BUNDLE } from '../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
 import { sendQuizResultEmail } from './lib/sendQuizResultEmail.mjs'
+import { awardConsolationShirtEntries } from './lib/awardConsolationShirtEntries.mjs'
+import { assertCompetitionEntryMethod } from './lib/competitionCatalog.mjs'
+import { parseCheckoutCompetition } from './lib/checkoutBundle.mjs'
 
 /** Step 2 — submit skill answers after £0 card verification. */
 export default async function handler(req, res) {
@@ -36,6 +38,12 @@ export default async function handler(req, res) {
   }
 
   const body = parseJsonBody(req)
+  const competition = await parseCheckoutCompetition(body)
+  const methodCheck = await assertCompetitionEntryMethod(competition, 'free_online')
+  if (!methodCheck.ok) {
+    return json(res, 403, { error: methodCheck.error })
+  }
+
   const verificationId =
     (typeof body.paymentJobReference === 'string' ? body.paymentJobReference.trim() : '') ||
     (typeof body.setupIntentId === 'string' ? body.setupIntentId.trim() : '')
@@ -65,6 +73,7 @@ export default async function handler(req, res) {
     fullName,
     email,
     address: addr,
+    competition,
   })
   if (!limits.ok) {
     return json(res, 403, { error: limits.error, code: limits.code })
@@ -94,6 +103,7 @@ export default async function handler(req, res) {
       nameAddressKey: limits.nameAddressKey,
       ipAddress: pending.rows[0].ip_address || limits.ip,
       answers,
+      competition,
     })
 
     if (!recorded.ok) {
@@ -104,6 +114,24 @@ export default async function handler(req, res) {
       verificationId,
       new Date().toISOString(),
     ])
+
+    let consolationShirtEntries = 0
+    let consolationShirtEntryNumbers = []
+    if (!recorded.duplicate && !recorded.allCorrect && recorded.entryId) {
+      const consolation = await awardConsolationShirtEntries({
+        req,
+        fullName,
+        email,
+        competitionEntryId: recorded.entryId,
+        source: 'free',
+        amountPence: 0,
+        orderRef: recorded.orderRef,
+      })
+      if (consolation.awarded) {
+        consolationShirtEntries = consolation.entryCount
+        consolationShirtEntryNumbers = consolation.entryNumbers ?? []
+      }
+    }
 
     let quizEmailSent = false
     if (!recorded.duplicate) {
@@ -116,12 +144,14 @@ export default async function handler(req, res) {
         quantity: 1,
         amountPence: 0,
         ticketNumbers: recorded.ticketNumbers ?? [],
+        consolationShirtEntries,
+        consolationShirtEntryNumbers,
       })
       quizEmailSent = Boolean(emailResult?.ok)
     }
 
     await logEntryAttempt(req, {
-      competition: COMPETITION_LEGACY_BUNDLE,
+      competition,
       flow: 'legacy_free_online',
       fullName,
       email,
@@ -141,14 +171,18 @@ export default async function handler(req, res) {
       orderRef: recorded.orderRef,
       ticketNumbers: recorded.ticketNumbers,
       quizEmailSent,
+      consolationShirtEntries,
+      consolationShirtEntryNumbers,
       message: recorded.allCorrect
         ? 'Free entry complete — you qualify for the draw. Your ticket number is in your email.'
-        : 'Free entry saved — your skill answers did not all qualify for the draw.',
+        : consolationShirtEntries
+          ? `Free entry saved — you did not qualify for the Legacy Bundle draw, but you received ${consolationShirtEntries} automatic entries into the separate Free Ronaldo Shirt Giveaway.`
+          : 'Free entry saved — your skill answers did not all qualify for the draw.',
     })
   } catch (e) {
     console.error(e)
     await logEntryAttempt(req, {
-      competition: COMPETITION_LEGACY_BUNDLE,
+      competition,
       flow: 'legacy_free_online',
       fullName,
       email,

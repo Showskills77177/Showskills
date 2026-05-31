@@ -94,10 +94,46 @@ CREATE TABLE IF NOT EXISTS kickup_submissions (
 );
 CREATE INDEX IF NOT EXISTS idx_kickups_status ON kickup_submissions (review_status);
 CREATE INDEX IF NOT EXISTS idx_kickups_created ON kickup_submissions (created_at);
+
+CREATE TABLE IF NOT EXISTS site_visits (
+  id TEXT PRIMARY KEY NOT NULL,
+  session_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  country_code TEXT,
+  country_name TEXT,
+  traffic_source TEXT NOT NULL DEFAULT 'Direct',
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  referrer_host TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_site_visits_created ON site_visits (created_at);
+CREATE INDEX IF NOT EXISTS idx_site_visits_session ON site_visits (session_id);
+CREATE INDEX IF NOT EXISTS idx_site_visits_country ON site_visits (country_code);
+CREATE INDEX IF NOT EXISTS idx_site_visits_source ON site_visits (traffic_source);
 `
 
 for (const stmt of ddl.split(';').map((s) => s.trim()).filter(Boolean)) {
   db.exec(stmt + ';')
+}
+
+try {
+  db.exec('ALTER TABLE payments ADD COLUMN country_code TEXT;')
+} catch {
+  /* already exists */
+}
+
+try {
+  db.exec('ALTER TABLE kickup_submissions ADD COLUMN entry_number TEXT;')
+} catch {
+  /* already exists */
+}
+
+try {
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_kickups_entry_number ON kickup_submissions (entry_number);')
+} catch {
+  /* already exists */
 }
 
 db.close()

@@ -1,11 +1,12 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { query, isDbConfigured, isUniqueViolation } from './db.mjs'
+import { query, isDbConfigured } from './db.mjs'
 import {
   insertTicketNumbers,
   insertPreservedTicketNumbers,
   ensureTicketNumbersForPurchase,
 } from './ticketNumbers.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
+import { ensureAnalyticsSchema } from './ensureAnalyticsSchema.mjs'
 import { upsertUserContact } from './userContact.mjs'
 
 function orderPublicId() {
@@ -28,6 +29,7 @@ async function finalizePendingTicket({
   provider,
   externalId,
   paymentIntentId,
+  countryCode,
 }) {
   const qty = Math.max(1, parseInt(String(row.quantity), 10) || 1)
   if (row.payment_status === 'paid') {
@@ -42,15 +44,27 @@ async function finalizePendingTicket({
 
   let ticketNumbers = await ensureTicketNumbersForPurchase(row.id, qty)
 
+  await ensureAnalyticsSchema()
+
   const userId = await upsertUserContact({
     email: customerEmail,
     fullName: customerFullName || '',
     phone: customerPhone,
   })
   const purchasedAt = new Date().toISOString()
+  const effectivePeriodId = periodId || row.period_id || null
+  let competitionSlug = row.competition || null
+  if (!competitionSlug && effectivePeriodId) {
+    try {
+      const pr = await query(`SELECT competition FROM competition_periods WHERE id = $1`, [effectivePeriodId])
+      competitionSlug = pr.rows[0]?.competition || null
+    } catch {
+      /* periods table may not exist in old DBs */
+    }
+  }
   await query(
-    `UPDATE tickets SET payment_status = 'paid', purchased_at = $2, user_id = $3, period_id = COALESCE(period_id, $4) WHERE id = $1`,
-    [row.id, purchasedAt, userId, periodId || null],
+    `UPDATE tickets SET payment_status = 'paid', purchased_at = $2, user_id = $3, period_id = COALESCE(period_id, $4), competition = COALESCE(competition, $5) WHERE id = $1`,
+    [row.id, purchasedAt, userId, effectivePeriodId, competitionSlug],
   )
 
   const payId = randomUUID()
@@ -62,8 +76,8 @@ async function finalizePendingTicket({
         ? `cashflows_${externalId}`
         : `paypal_${externalId}`)
   await query(
-    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'successful', $8)
+    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata, country_code)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'successful', $8, $9)
      ON CONFLICT (transaction_id) DO NOTHING`,
     [
       payId,
@@ -82,6 +96,7 @@ async function finalizePendingTicket({
               ? { cashflows_payment_job_reference: externalId }
               : { paypal_order_id: externalId },
       ),
+      countryCode || null,
     ],
   )
 
@@ -103,12 +118,14 @@ export async function recordPayPalCapture({
   quantity,
   amountPence,
   currency,
+  countryCode,
 }) {
   if (!isDbConfigured()) return null
   const email = customerEmail?.trim()
   if (!email || !email.includes('@')) return null
 
   await ensureTicketSchema()
+  await ensureAnalyticsSchema()
 
   const existing = await query(
     `SELECT id, ticket_public_id, quantity, payment_status, confirmation_email_sent_at FROM tickets WHERE paypal_order_id = $1`,
@@ -125,6 +142,7 @@ export async function recordPayPalCapture({
       currency,
       provider: 'paypal',
       externalId: paypalOrderId,
+      countryCode,
     })
     if (!finalized.ticketNumbers?.length) {
       const nums = await insertTicketNumbers(
@@ -154,8 +172,8 @@ export async function recordPayPalCapture({
   )
 
   await query(
-    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, 'paypal', 'successful', $7)
+    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata, country_code)
+     VALUES ($1, $2, $3, $4, $5, $6, 'paypal', 'successful', $7, $8)
      ON CONFLICT (transaction_id) DO NOTHING`,
     [
       payId,
@@ -165,6 +183,7 @@ export async function recordPayPalCapture({
       amountPence,
       (currency || 'gbp').toLowerCase(),
       JSON.stringify({ paypal_order_id: paypalOrderId }),
+      countryCode || null,
     ],
   )
 
@@ -183,6 +202,7 @@ export async function recordCashflowsPaymentCompleted({
   amountPence,
   currency,
   reservedTicketNumbers,
+  countryCode,
 }) {
   if (!isDbConfigured()) return null
   const email = customerEmail?.trim()
@@ -191,6 +211,7 @@ export async function recordCashflowsPaymentCompleted({
   if (!jobRef) return null
 
   await ensureTicketSchema()
+  await ensureAnalyticsSchema()
 
   const dup = await query(
     `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE cashflows_payment_job_reference = $1`,
@@ -207,6 +228,7 @@ export async function recordCashflowsPaymentCompleted({
       currency,
       provider: 'cashflows',
       externalId: jobRef,
+      countryCode,
     })
     if (!finalized.ticketNumbers?.length) {
       const nums = await ensureTicketNumbersForPurchase(
@@ -236,8 +258,8 @@ export async function recordCashflowsPaymentCompleted({
   )
 
   await query(
-    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, 'cashflows', 'successful', $7)
+    `INSERT INTO payments (id, transaction_id, user_id, ticket_id, amount_pence, currency, provider, status, raw_metadata, country_code)
+     VALUES ($1, $2, $3, $4, $5, $6, 'cashflows', 'successful', $7, $8)
      ON CONFLICT (transaction_id) DO NOTHING`,
     [
       payId,
@@ -247,6 +269,7 @@ export async function recordCashflowsPaymentCompleted({
       amountPence,
       (currency || 'gbp').toLowerCase(),
       JSON.stringify({ cashflows_payment_job_reference: jobRef }),
+      countryCode || null,
     ],
   )
 

@@ -7,7 +7,8 @@ import {
   listCompetitionPeriods,
   updateCompetitionPeriodStatus,
 } from '../lib/competitionPeriods.mjs'
-import { DRAW_COMPETITION_SLUG, PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
+import { PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
+import { resolveAdminMainDrawCompetition } from '../lib/checkoutBundle.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -27,17 +28,32 @@ export default async function handler(req, res) {
     return json(res, 503, { error: 'Database not configured' })
   }
 
-  const competition = DRAW_COMPETITION_SLUG
+  const pathAndQuery = req.originalUrl || req.url || '/'
+  const url = new URL(pathAndQuery, 'http://local')
+  const competitionParam = (url.searchParams.get('competition') || '').trim()
+  const resolvedComp = await resolveAdminMainDrawCompetition(competitionParam)
+  if (!resolvedComp.ok) return json(res, 400, { error: resolvedComp.error })
+  const competition = resolvedComp.slug
 
   try {
     if (req.method === 'GET') {
       await ensureDefaultCompetitionPeriod(competition)
       const periods = await listCompetitionPeriods(competition)
-      return json(res, 200, { ok: true, competition, periods })
+      return json(res, 200, {
+        ok: true,
+        competition,
+        label: resolvedComp.competition.title,
+        periods,
+      })
     }
 
     if (req.method === 'POST') {
       const body = parseJsonBody(req)
+      const bodyResolved = await resolveAdminMainDrawCompetition(
+        typeof body.competition === 'string' ? body.competition.trim() : competition
+      )
+      if (!bodyResolved.ok) return json(res, 400, { error: bodyResolved.error })
+      const bodyCompetition = bodyResolved.slug
       const title = typeof body.title === 'string' ? body.title.trim() : ''
       const summary = typeof body.summary === 'string' ? body.summary.trim() : ''
       const entryOpensAt = body.entryOpensAt || body.entry_opens_at
@@ -52,7 +68,7 @@ export default async function handler(req, res) {
       }
 
       const created = await createCompetitionPeriod({
-        competition,
+        competition: bodyCompetition,
         title,
         summary,
         entryOpensAt,

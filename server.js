@@ -75,6 +75,10 @@ const kickupVideoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 250 * 1024 * 1024 },
 })
+const competitionImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+})
 
 app.post('/api/login', (req, res) => {
   const username = typeof req.body?.username === 'string' ? req.body.username.trim() : ''
@@ -98,9 +102,20 @@ app.post(
   adapt(kickupsUploadHandler),
 )
 
+const competitionUploadHandler = (await import('./backend/api/admin/competition-upload.mjs')).default
+app.post(
+  '/api/admin/competition-upload',
+  competitionImageUpload.single('image'),
+  adapt(competitionUploadHandler),
+)
+
 /** Same handlers as Vercel production (`lib/vercelApiDispatch.mjs`) — avoids missing local routes. */
 const { routes } = await import('./lib/vercelApiDispatch.mjs')
-const SKIP_ROUTE_MOUNT = new Set(['/api/cashflows-webhook', '/api/submissions/kickups/upload'])
+const SKIP_ROUTE_MOUNT = new Set([
+  '/api/cashflows-webhook',
+  '/api/submissions/kickups/upload',
+  '/api/admin/competition-upload',
+])
 
 for (const [routePath, handler] of Object.entries(routes)) {
   if (SKIP_ROUTE_MOUNT.has(routePath)) continue

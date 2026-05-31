@@ -1,16 +1,14 @@
 import { Link } from 'react-router-dom'
 import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
-import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
-import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
-import iphone17ProMaxGoldCase from '../assets/iphone-17-pro-max-gold-case.png'
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
-import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
-import { TicketBundlePrice } from '../components/siteChrome'
 import { useEntryFlow } from '../entry/entryContext'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
+import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 
 export default function CompetitionsPage() {
   const { openEntry } = useEntryFlow()
+  const { competitions, loading } = usePublishedCompetitions()
 
   return (
     <main className="ss-photo-page relative m-0 overflow-x-clip p-0">
@@ -18,93 +16,27 @@ export default function CompetitionsPage() {
       <div className="relative z-[1] mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
         <h1 className="font-display text-4xl uppercase tracking-[0.08em] text-white sm:text-5xl">Competitions</h1>
         <p className="mt-4 max-w-2xl text-base text-stone-400 sm:text-lg">
-          Two live promotions for now: the Ronaldo Legacy Bundle draw and the free Ronaldo signed shirt giveaway.
+          Live prize draws and giveaways on ShowSkills Rewards. Published competitions from admin appear here
+          automatically.
         </p>
         <p className="mt-3 max-w-2xl text-sm text-stone-500">
-          The bundle uses paid ticket bundles or free postal entry, then three skill questions. The shirt giveaway is free:
-          answer one simple qualification question to enter.{' '}
           <Link to="/faq" className="text-teal-400/90 underline decoration-teal-700/50 underline-offset-2 hover:text-teal-300">
             Common questions (FAQ)
           </Link>
         </p>
 
+        {loading ? <p className="mt-10 text-sm text-stone-500">Loading competitions…</p> : null}
+
         <ul className="mt-12 grid list-none gap-8 lg:grid-cols-2 lg:items-stretch">
-          <li className="flex flex-col overflow-hidden rounded-2xl border border-teal-500/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-            <div className="bg-gradient-to-b from-teal-950/50 via-stone-950/80 to-stone-950 px-4 pb-4 pt-7">
-              <div className="ss-prize-studio mx-auto max-w-xl p-2 sm:p-3">
-                <div className="relative z-[1] grid gap-2">
-                  <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
-                    <div className="ss-prize-studio-photo">
-                      <img
-                        src={legacyBundlePoster}
-                        alt="Ronaldo Legacy Bundle promotional poster with signed shirt, signed ball and gold phone case."
-                        width={1024}
-                        height={576}
-                        className="h-auto w-full"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
-                  </div>
-                  <div className="ss-prize-studio-subgrid mx-auto grid w-full gap-1.5 sm:max-w-[17rem] sm:grid-cols-2 sm:gap-0">
-                    <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                      <div className="ss-prize-studio-photo mx-auto max-w-[7rem] rounded-md">
-                        <img
-                          src={iphone17ProMax}
-                          alt="iPhone 17 Pro Max prize photo."
-                          width={768}
-                          height={1024}
-                          className="aspect-[3/4] h-auto w-full scale-125 object-cover object-center"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      </div>
-                      <p className="ss-phone-prize-glow mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em]">
-                        Phone prize
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
-                    </div>
-                    <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                      <div className="ss-prize-studio-photo mx-auto max-w-[7rem] rounded-md">
-                        <img
-                          src={iphone17ProMaxGoldCase}
-                          alt="24K gold case for iPhone 17 Pro Max prize photo."
-                          width={960}
-                          height={1024}
-                          className="aspect-[3/4] h-auto w-full object-cover object-center"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      </div>
-                      <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">
-                        Case prize
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold text-stone-100">24K gold case</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-1 flex-col p-6 pt-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-teal-300/90">Paid · Main prize</p>
-              <h2 className="mt-2 font-display text-2xl text-white">Ronaldo Legacy Bundle</h2>
-              <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-500">
-                Pay for a ticket bundle <strong className="text-stone-400">or</strong> choose free postal entry in the same
-                panel — then answer <strong className="text-stone-400">three skill questions</strong> in writing. All correct
-                → you join the random draw for the full bundle (phone, shirt, ball, case). Free postal entries: post to{' '}
-                <strong className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</strong>.{' '}
-                <strong className="text-stone-400">Not</strong> a video challenge.
-              </p>
-              <TicketBundlePrice className="mt-4" compact />
-              <button
-                type="button"
-                onClick={() => openEntry('paid')}
-                className="mt-6 w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110"
-              >
-                Enter this competition
-              </button>
-            </div>
-          </li>
+          {competitions.map((c) => (
+            <li key={c.slug}>
+              <CompetitionPublicCard
+                competition={c}
+                onEnter={() => openEntry('paid', { competitionSlug: c.slug })}
+              />
+            </li>
+          ))}
+
           <li className="flex flex-col overflow-hidden rounded-2xl border border-lime-400/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
             <div className="bg-gradient-to-b from-lime-950/35 via-stone-950/80 to-stone-950 px-4 pb-4 pt-7">
               <div className="mx-auto flex max-w-sm flex-col items-center rounded-xl border border-lime-400/20 bg-black/25 p-4 text-center">
@@ -152,6 +84,10 @@ export default function CompetitionsPage() {
             </div>
           </li>
         </ul>
+
+        {!loading && competitions.length === 0 ? (
+          <p className="mt-8 text-sm text-stone-500">No published prize draws yet — check back soon.</p>
+        ) : null}
       </div>
     </main>
   )

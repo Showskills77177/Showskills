@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../../lib/api'
 import { PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
+import { AdminCompetitionSelect } from '../../components/admin/AdminCompetitionSelect'
+import { defaultMainDrawCompetitionSlug } from '../../../shared/adminCompetitions.mjs'
 
 export default function DrawWinnerPage() {
+  const [competition, setCompetition] = useState(defaultMainDrawCompetitionSlug())
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -20,12 +23,15 @@ export default function DrawWinnerPage() {
 
   const selectedPeriodId = data?.period?.id ?? ''
 
-  const load = useCallback(async (periodId) => {
+  const load = useCallback(async (periodId, competitionSlug = competition) => {
     setLoading(true)
     setErr('')
     try {
-      const qs = periodId ? `?periodId=${encodeURIComponent(periodId)}` : ''
-      const res = await apiFetch(`/api/admin/draw-winner${qs}`)
+      const qs = new URLSearchParams()
+      if (periodId) qs.set('periodId', periodId)
+      if (competitionSlug) qs.set('competition', competitionSlug)
+      const query = qs.toString() ? `?${qs.toString()}` : ''
+      const res = await apiFetch(`/api/admin/draw-winner${query}`)
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Failed to load draw pool')
       setData(j)
@@ -34,15 +40,20 @@ export default function DrawWinnerPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [competition])
 
   useEffect(() => {
-    load()
-  }, [load])
+    load(undefined, competition)
+  }, [competition, load])
+
+  function onCompetitionChange(nextCompetition) {
+    setCompetition(nextCompetition)
+    setResult(null)
+  }
 
   function onPeriodChange(e) {
     const id = e.target.value
-    load(id || undefined)
+    load(id || undefined, competition)
   }
 
   async function patchPeriodStatus(status) {
@@ -57,7 +68,7 @@ export default function DrawWinnerPage() {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not update period')
-      await load(selectedPeriodId)
+      await load(selectedPeriodId, competition)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Update failed')
     } finally {
@@ -79,13 +90,14 @@ export default function DrawWinnerPage() {
           entryOpensAt: new Date(newPeriod.entryOpensAt).toISOString(),
           entryClosesAt: new Date(newPeriod.entryClosesAt).toISOString(),
           status: PERIOD_STATUS.draft,
+          competition,
         }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not create period')
       setShowNewPeriod(false)
       setNewPeriod({ title: '', summary: '', entryOpensAt: '', entryClosesAt: '' })
-      await load(j.period?.id)
+      await load(j.period?.id, competition)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Create failed')
     } finally {
@@ -123,12 +135,12 @@ export default function DrawWinnerPage() {
       const res = await apiFetch('/api/admin/draw-winner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ periodId: selectedPeriodId, sendWinnerEmail: true }),
+        body: JSON.stringify({ periodId: selectedPeriodId, competition, sendWinnerEmail: true }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Draw failed')
       setResult(j)
-      await load(selectedPeriodId)
+      await load(selectedPeriodId, competition)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Draw failed')
     } finally {
@@ -152,6 +164,18 @@ export default function DrawWinnerPage() {
           selected window are never included, so separate competition cycles cannot mix.
         </p>
       </div>
+
+      <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-900/40 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Competition</h2>
+        <AdminCompetitionSelect
+          kind="mainDraw"
+          value={competition}
+          onChange={onCompetitionChange}
+          allowAll={false}
+          label="Main prize draw"
+          disabled={loading || drawing || periodBusy}
+        />
+      </section>
 
       <section className="space-y-4 rounded-2xl border border-white/10 bg-stone-900/40 p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Competition period</h2>
@@ -408,7 +432,7 @@ export default function DrawWinnerPage() {
         </button>
         <button
           type="button"
-          onClick={() => load(selectedPeriodId)}
+          onClick={() => load(selectedPeriodId, competition)}
           disabled={loading || drawing}
           className="min-h-[44px] rounded-xl border border-white/15 px-5 py-3 text-sm font-medium text-stone-300 hover:bg-white/5 disabled:opacity-50"
         >

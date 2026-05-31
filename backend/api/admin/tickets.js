@@ -29,13 +29,19 @@ export default async function handler(req, res) {
     await ensureTicketSchema()
     const pathAndQuery = req.originalUrl || req.url || '/'
     const url = new URL(pathAndQuery, 'http://local')
-    const { q, page, pageSize, offset } = parseAdminListQuery(url)
+    const { q, page, pageSize, offset, competition } = parseAdminListQuery(url, {
+      competitionKind: 'mainDraw',
+    })
 
     let where = 'WHERE 1=1'
     const params = []
+    if (competition) {
+      params.push(competition)
+      where += ` AND COALESCE(t.competition, 'ronaldo_legacy_bundle') = $${params.length}`
+    }
     if (q) {
       params.push(`%${q}%`, `%${q}%`, `%${q}%`)
-      where += ` AND (t.ticket_public_id ILIKE $1 OR u.email ILIKE $2 OR u.full_name ILIKE $3)`
+      where += ` AND (t.ticket_public_id ILIKE $${params.length - 2} OR u.email ILIKE $${params.length - 1} OR u.full_name ILIKE $${params.length})`
     }
 
     const countSql = `
@@ -47,9 +53,11 @@ export default async function handler(req, res) {
     const total = Number(countRes.rows[0]?.c ?? 0)
 
     let sql = `
-      SELECT t.*, u.email, u.full_name
+      SELECT t.*, u.email, u.full_name,
+        cp.title AS period_title
       FROM tickets t
       LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN competition_periods cp ON cp.id = t.period_id
       ${where}
       ORDER BY t.created_at DESC
       LIMIT ${pageSize} OFFSET ${offset}`
@@ -71,7 +79,7 @@ export default async function handler(req, res) {
         row.ticket_numbers = byTicket.get(row.id) || []
       }
     }
-    return json(res, 200, { rows, ...adminListMeta(total, page, pageSize) })
+    return json(res, 200, { rows, competition: competition || null, ...adminListMeta(total, page, pageSize) })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Database error' })

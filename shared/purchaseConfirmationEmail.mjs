@@ -1,4 +1,5 @@
 import { formatBundlePriceGBP } from './ticketBundles.mjs'
+import { buildTrustpilotEmailHtmlBlock, buildTrustpilotEmailTextLines } from './trustpilotEmailInvite.mjs'
 
 export function escapeHtml(s) {
   return String(s)
@@ -139,6 +140,7 @@ export function buildPurchaseConfirmationHtml(props) {
               <p style="margin:0;font-size:13px;line-height:1.5;color:#78716c">Use this link on any phone or computer until you submit your answers:<br /><a href="${ctaUrl}" style="color:#6ee7b7;word-break:break-all">${ctaUrl}</a></p>`
                   : ''
               }
+              ${buildTrustpilotEmailHtmlBlock()}
             </td>
           </tr>
           <tr>
@@ -200,6 +202,7 @@ export function buildPurchaseConfirmationHtml(props) {
               <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — each number is unique and linked to your qualified draw entry.</p>`
                   : ''
               }
+              ${buildTrustpilotEmailHtmlBlock()}
             </td>
           </tr>
           <tr>
@@ -246,6 +249,7 @@ export function buildPurchaseConfirmationText(props) {
       ...(completeQuizUrl
         ? ['Answer your questions here (any device):', completeQuizUrl, '']
         : []),
+      ...buildTrustpilotEmailTextLines(),
       siteUrl,
     ].join('\n')
   }
@@ -272,6 +276,7 @@ export function buildPurchaseConfirmationText(props) {
           'We will email you whether your answers are correct or not.',
           'If you qualify, your ticket numbers will be in that email.',
         ]),
+    ...buildTrustpilotEmailTextLines(),
     '',
     siteUrl,
   ].join('\n')

@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { query, isDbConfigured, isUniqueViolation } from './db.mjs'
+import { query, isDbConfigured } from './db.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { insertPreservedTicketNumbers, getTicketNumbersForPurchase } from './ticketNumbers.mjs'
 import { upsertUserContact } from './userContact.mjs'
@@ -29,6 +29,7 @@ export async function createPendingTicketCheckout({
   customerFullName,
   customerPhone,
   periodId,
+  competition,
   cashflowsIntentToken,
 }) {
   if (!isDbConfigured() || !externalId) return null
@@ -69,8 +70,8 @@ export async function createPendingTicketCheckout({
       : null
 
   await query(
-    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, stripe_payment_intent_id, paypal_order_id, cashflows_payment_job_reference, cashflows_intent_token, period_id)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)`,
+    `INSERT INTO tickets (id, ticket_public_id, user_id, bundle_id, quantity, payment_status, stripe_session_id, stripe_payment_intent_id, paypal_order_id, cashflows_payment_job_reference, cashflows_intent_token, period_id, competition)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12)`,
     [
       ticketId,
       tid,
@@ -83,6 +84,7 @@ export async function createPendingTicketCheckout({
       cashflowsJobRef,
       cashflowsToken,
       periodId || null,
+      competition || null,
     ],
   )
 

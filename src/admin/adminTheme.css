@@ -1,0 +1,332 @@
+/**
+ * Admin panel themes — light remaps dark Tailwind utilities for readability.
+ * Dark and pitch use component classes from adminThemes.mjs; only light needs overrides here.
+ */
+.ss-admin.ss-admin--light {
+  color-scheme: light;
+  color: #1c1917;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ss-admin.ss-admin--light h1,
+.ss-admin.ss-admin--light h2 {
+  color: #0c0a09 !important;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ss-admin.ss-admin--light th {
+  color: #44403c !important;
+  font-weight: 600;
+}
+
+.ss-admin.ss-admin--light td {
+  color: #292524;
+}
+
+.ss-admin.ss-admin--light strong {
+  color: #0c0a09;
+  font-weight: 600;
+}
+
+/* White page + header; green reserved for panels/cards only */
+.ss-admin.ss-admin--light.bg-white,
+.ss-admin.ss-admin--light.bg-stone-100,
+.ss-admin.ss-admin--light.bg-emerald-50,
+.ss-admin.ss-admin--light.bg-emerald-50\/95,
+.ss-admin.ss-admin--light header.bg-white,
+.ss-admin.ss-admin--light header.bg-stone-50,
+.ss-admin.ss-admin--light header.bg-emerald-50,
+.ss-admin.ss-admin--light header.bg-stone-950\/95 {
+  background-color: #ffffff !important;
+}
+
+.ss-admin.ss-admin--light .bg-stone-950,
+.ss-admin.ss-admin--light .bg-stone-950\/95 {
+  background-color: #ffffff !important;
+}
+
+/* Dark-theme panel classes → darker green surfaces */
+.ss-admin.ss-admin--light .bg-stone-900\/80,
+.ss-admin.ss-admin--light .bg-stone-900\/90,
+.ss-admin.ss-admin--light .bg-stone-900\/50,
+.ss-admin.ss-admin--light .bg-stone-900\/40,
+.ss-admin.ss-admin--light .bg-black\/40,
+.ss-admin.ss-admin--light .bg-black\/30,
+.ss-admin.ss-admin--light .bg-black\/25 {
+  background-color: #a7f3d0 !important;
+}
+
+.ss-admin.ss-admin--light thead.bg-stone-900\/80,
+.ss-admin.ss-admin--light thead.bg-stone-900\/90 {
+  background-color: #6ee7b7 !important;
+}
+
+.ss-admin.ss-admin--light .text-stone-100 {
+  color: #0c0a09 !important;
+  font-weight: 600;
+}
+
+.ss-admin.ss-admin--light .text-stone-200 {
+  color: #1c1917 !important;
+  font-weight: 500;
+}
+
+.ss-admin.ss-admin--light .text-stone-300 {
+  color: #292524 !important;
+}
+
+.ss-admin.ss-admin--light .text-stone-400 {
+  color: #44403c !important;
+}
+
+.ss-admin.ss-admin--light .text-stone-500 {
+  color: #57534e !important;
+}
+
+.ss-admin.ss-admin--light .text-stone-600 {
+  color: #44403c !important;
+  font-weight: 500;
+}
+
+.ss-admin.ss-admin--light .border-white\/10,
+.ss-admin.ss-admin--light .border-white\/15,
+.ss-admin.ss-admin--light .border-white\/5,
+.ss-admin.ss-admin--light .border-b.border-white\/10,
+.ss-admin.ss-admin--light .border-t.border-white\/10 {
+  border-color: #6ee7b7 !important;
+}
+
+.ss-admin.ss-admin--light .border-stone-300\/80,
+.ss-admin.ss-admin--light .border-stone-400\/60 {
+  border-color: #d6d3d1 !important;
+}
+
+.ss-admin.ss-admin--light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #a7f3d0 !important;
+}
+
+.ss-admin.ss-admin--light .hover\:bg-white\/5:hover,
+.ss-admin.ss-admin--light .hover\:bg-white\/\[0\.03\]:hover {
+  background-color: #86efac !important;
+}
+
+.ss-admin.ss-admin--light .bg-teal-900\/50,
+.ss-admin.ss-admin--light .bg-teal-900\/40 {
+  background-color: #99f6e4 !important;
+}
+
+.ss-admin.ss-admin--light .text-teal-100,
+.ss-admin.ss-admin--light .text-teal-100\/90 {
+  color: #134e4a !important;
+  font-weight: 600;
+}
+
+.ss-admin.ss-admin--light .text-teal-400,
+.ss-admin.ss-admin--light .text-teal-400\/90 {
+  color: #0f766e !important;
+  font-weight: 600;
+}
+
+.ss-admin.ss-admin--light .text-teal-400:hover,
+.ss-admin.ss-admin--light a.text-teal-400:hover {
+  color: #0d9488 !important;
+}
+
+.ss-admin.ss-admin--light .bg-amber-950\/25,
+.ss-admin.ss-admin--light .bg-amber-950\/40,
+.ss-admin.ss-admin--light .bg-amber-950\/50,
+.ss-admin.ss-admin--light .bg-amber-950\/60 {
+  background-color: #ecfccb !important;
+}
+
+.ss-admin.ss-admin--light .border-amber-500\/30,
+.ss-admin.ss-admin--light .border-amber-500\/40,
+.ss-admin.ss-admin--light .border-amber-800\/25,
+.ss-admin.ss-admin--light .border-amber-800\/35 {
+  border-color: #bef264 !important;
+}
+
+.ss-admin.ss-admin--light .text-amber-100,
+.ss-admin.ss-admin--light .text-amber-100\/90,
+.ss-admin.ss-admin--light .text-amber-200,
+.ss-admin.ss-admin--light .text-amber-200\/80,
+.ss-admin.ss-admin--light .text-amber-200\/90 {
+  color: #92400e !important;
+}
+
+.ss-admin.ss-admin--light .text-amber-400\/90 {
+  color: #b45309 !important;
+}
+
+.ss-admin.ss-admin--light .bg-teal-950\/25,
+.ss-admin.ss-admin--light .bg-teal-950\/40,
+.ss-admin.ss-admin--light .bg-teal-950\/60 {
+  background-color: #ccfbf1 !important;
+}
+
+.ss-admin.ss-admin--light .border-teal-900\/40,
+.ss-admin.ss-admin--light .border-teal-500\/35,
+.ss-admin.ss-admin--light .border-teal-600\/40 {
+  border-color: #99f6e4 !important;
+}
+
+.ss-admin.ss-admin--light .border-emerald-500\/35 {
+  border-color: #6ee7b7 !important;
+}
+
+.ss-admin.ss-admin--light .from-emerald-950\/50 {
+  --tw-gradient-from: rgb(236 253 245) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+.ss-admin.ss-admin--light .to-stone-950\/80 {
+  --tw-gradient-to: rgb(209 250 229) !important;
+}
+
+.ss-admin.ss-admin--light .text-emerald-50,
+.ss-admin.ss-admin--light .text-emerald-100 {
+  color: #065f46 !important;
+}
+
+.ss-admin.ss-admin--light .text-red-400 {
+  color: #dc2626 !important;
+}
+
+.ss-admin.ss-admin--light .text-red-300 {
+  color: #b91c1c !important;
+}
+
+.ss-admin.ss-admin--light .border-red-500\/35 {
+  border-color: #fca5a5 !important;
+}
+
+.ss-admin.ss-admin--light .bg-amber-900\/40 {
+  background-color: #fef3c7 !important;
+}
+
+.ss-admin.ss-admin--light input:not([type='checkbox']),
+.ss-admin.ss-admin--light select,
+.ss-admin.ss-admin--light textarea {
+  background-color: #ffffff !important;
+  border-color: #34d399 !important;
+  color: #0c0a09 !important;
+  font-weight: 500;
+}
+
+.ss-admin.ss-admin--light input::placeholder {
+  color: #78716c !important;
+}
+
+.ss-admin.ss-admin--light input[type='checkbox'] {
+  border-color: #34d399 !important;
+  background-color: #ffffff !important;
+}
+
+.ss-admin.ss-admin--light .bg-teal-700 {
+  background-color: #0f766e !important;
+  color: #ffffff !important;
+}
+
+.ss-admin.ss-admin--light .hover\:bg-teal-600:hover {
+  background-color: #0d9488 !important;
+}
+
+.ss-admin.ss-admin--light .bg-stone-700 {
+  background-color: #44403c !important;
+  color: #fafaf9 !important;
+}
+
+.ss-admin.ss-admin--light .hover\:bg-stone-600:hover {
+  background-color: #57534e !important;
+}
+
+/* Modal overlay */
+.ss-admin.ss-admin--light .bg-black\/70 {
+  background-color: rgba(28, 25, 23, 0.45) !important;
+}
+
+.ss-admin.ss-admin--light .bg-black\/70 .rounded-2xl.border {
+  background-color: #a7f3d0 !important;
+  border-color: #34d399 !important;
+  box-shadow: 0 25px 50px -12px rgba(6, 78, 59, 0.18);
+}
+
+/* Keep marketing email previews dark inside the canvas only */
+.ss-admin.ss-admin--light .ss-admin-email-preview-canvas {
+  background-color: #0c1a16 !important;
+}
+
+.ss-admin.ss-admin--light .ss-admin-email-preview-canvas .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ss-admin.ss-admin--light .ss-admin-email-preview-canvas .text-stone-500 {
+  color: #78716c !important;
+}
+
+.ss-admin.ss-admin--light .ss-admin-email-preview-canvas .bg-black\/30 {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Pitch green — users & entries tabs readable on dark page */
+.ss-admin.ss-admin--pitch .ss-admin-users-tabs .ss-admin-tab {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.ss-admin.ss-admin--pitch .ss-admin-users-tabs .ss-admin-tab .ss-admin-tab-count {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.ss-admin.ss-admin--pitch .ss-admin-users-tabs .ss-admin-tab:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.ss-admin.ss-admin--pitch .ss-admin-users-tabs .ss-admin-tab:hover .ss-admin-tab-count {
+  color: #ffffff !important;
+}
+
+.ss-admin.ss-admin--pitch .ss-admin-users-tabs .ss-admin-tab--active,
+.ss-admin.ss-admin--pitch .ss-admin-users-tabs .ss-admin-tab--active .ss-admin-tab-count {
+  border-color: rgba(52, 211, 153, 0.35);
+  background-color: rgba(6, 78, 59, 0.55) !important;
+  color: #ffffff !important;
+}
+
+/* Dashboard — featured tickets sold stat */
+.ss-admin.ss-admin--pitch .ss-admin-stat-featured {
+  border-color: rgba(52, 211, 153, 0.55) !important;
+  box-shadow:
+    0 14px 36px -10px rgba(16, 185, 129, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.ss-admin.ss-admin--light .ss-admin-stat-featured {
+  border-color: #059669 !important;
+  background: linear-gradient(135deg, #ecfdf5 0%, #a7f3d0 55%, #6ee7b7 100%) !important;
+  box-shadow: 0 10px 28px -8px rgba(6, 78, 59, 0.22);
+}
+
+.ss-admin.ss-admin--light .ss-admin-stat-featured p:first-child {
+  color: #047857 !important;
+}
+
+.ss-admin.ss-admin--light .ss-admin-stat-featured p:last-child {
+  color: #064e3b !important;
+}
+
+.ss-admin.ss-admin--pitch header .border-b.border-white\/\[0\.06\] {
+  border-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+.ss-admin.ss-admin--light header .border-b.border-white\/\[0\.06\] {
+  border-color: rgba(16, 185, 129, 0.22) !important;
+}
+
+.ss-admin.ss-admin--dark header .border-b.border-white\/\[0\.06\] {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}

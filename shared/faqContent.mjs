@@ -1,4 +1,10 @@
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from './ticketCheckoutNotice.mjs'
+import {
+  CONSOLATION_PRIZE_FREE_APPLIES,
+  CONSOLATION_PRIZE_PAID_THRESHOLD,
+  CONSOLATION_PRIZE_SUMMARY,
+  LEGACY_SKILL_ONE_ATTEMPT_NOTICE,
+} from './consolationShirtGiveaway.mjs'
 import { UK_AVAILABILITY_NOTICE } from './siteAvailability.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS } from './competitionCopy.mjs'
@@ -17,6 +23,7 @@ export const FAQ_POPULAR_IDS = [
   'free-postal',
   'how-winner-chosen',
   'when-quiz',
+  'consolation-prize',
   'refunds',
 ]
 
@@ -31,7 +38,7 @@ export const FAQ_SECTIONS = [
         id: 'what-is-showskills',
         question: 'What is ShowSkills Rewards?',
         answer:
-          'ShowSkills Rewards is a UK skill-based rewards site. Our headline promotion is the Ronaldo Legacy Bundle draw: signed memorabilia, museum football, and iPhone prizes for one winner. You enter with paid tickets or a free postal route, answer three Ronaldo skill questions, and — if every answer is correct — your ticket numbers join a random draw. We also run a separate free Ronaldo signed shirt giveaway.',
+          'ShowSkills Rewards is a UK skill-based rewards site. Our headline promotion is the Ronaldo Legacy Bundle draw: signed memorabilia, a museum football, and iPhone prizes for one winner. You enter with paid tickets or a free postal route, answer three Ronaldo skill questions, and — if every answer is correct — your ticket numbers join a random draw. We also run a separate free Ronaldo signed shirt giveaway.',
         popular: true,
       },
       {
@@ -44,7 +51,14 @@ export const FAQ_SECTIONS = [
         id: 'lottery-or-skill',
         question: 'Is this a lottery?',
         answer:
-          'No. The Ronaldo Legacy Bundle draw is a skill competition, not a lottery. You must answer three free-text skill questions correctly to qualify. Among everyone who qualified in that competition period, one winner is chosen at random. Incorrect answers do not win a prize.',
+          'No. The Ronaldo Legacy Bundle draw is a skill competition, not a lottery. You must answer three free-text skill questions correctly to qualify for the main draw. Among everyone who qualified in that competition period, one winner is chosen at random. ' +
+          LEGACY_SKILL_ONE_ATTEMPT_NOTICE +
+          ' ' +
+          CONSOLATION_PRIZE_SUMMARY +
+          ' ' +
+          CONSOLATION_PRIZE_PAID_THRESHOLD +
+          ' ' +
+          CONSOLATION_PRIZE_FREE_APPLIES,
       },
       {
         id: 'affiliation',
@@ -63,7 +77,7 @@ export const FAQ_SECTIONS = [
         id: 'how-to-enter-paid',
         question: 'How do I enter with paid tickets?',
         answer:
-          'Open the Legacy Bundle entry from Competitions or the home page. Choose a ticket bundle, enter your name, email, and mobile number, agree to the terms, and pay by card (Cashflows) or PayPal. After payment succeeds, complete all three skill questions in the same session. Every answer must be correct for your tickets to count in the draw.',
+          'Open the Legacy Bundle entry from Competitions or the home page. Choose a ticket bundle, enter your name, email, and mobile number, agree to the terms, and pay by debit or credit card (Apple Pay or Google Pay when shown on your device). After payment succeeds, complete all three skill questions in the same session. Every answer must be correct for your tickets to count in the draw.',
         popular: true,
       },
       {
@@ -83,7 +97,7 @@ export const FAQ_SECTIONS = [
         id: 'free-postal',
         question: 'How does free postal entry work?',
         answer:
-          `You may enter the same draw without payment by post. Send your full name, full postal address, email, and the competition name (${COMPETITION_NAME_POSTAL}), plus written answers to all three skill questions, to: ${POSTAL_ENTRY_ADDRESS}. Limit: one free postal entry per person. Postal entries have the same chance to qualify as paid entries if answers are correct.`,
+          `You may enter the same Legacy Bundle draw without payment by post. Send your full name, full postal address, email, and the competition name (${COMPETITION_NAME_POSTAL}), plus written answers to all three skill questions, to: ${POSTAL_ENTRY_ADDRESS}. Limit: one free postal entry per person. Postal entries have the same chance to qualify as paid entries if answers are correct.`,
         popular: true,
       },
       {
@@ -97,19 +111,19 @@ export const FAQ_SECTIONS = [
   {
     id: 'payments',
     title: 'Payments & tickets',
-    summary: 'Card checkout, PayPal, receipts, and what to do if something goes wrong.',
+    summary: 'Secure card checkout, receipts, and what to do if something goes wrong.',
     items: [
       {
         id: 'payment-methods',
         question: 'Which payment methods do you accept?',
         answer:
-          'Paid tickets can be bought with debit or credit card (secure Cashflows fields on our site), Apple Pay in Safari when enabled, Google Pay on supported Android phones and Chrome when enabled, and optionally PayPal if we have turned it on. Card and wallet buttons are settled through Cashflows. Samsung Pay is not available on our embedded checkout — many Samsung users can pay with Google Pay in Chrome instead. PayPal uses your PayPal wallet separately when we have connected a PayPal business account.',
+          'Paid tickets can be bought with debit or credit card on our secure checkout page. Card details are entered in encrypted fields and are not stored on our servers. When enabled, you may also see Apple Pay in Safari or Google Pay on supported Android phones in Chrome. Your bank may ask you to complete 3D Secure (app or SMS). Samsung Pay is not available on our checkout — many Samsung users can pay with Google Pay in Chrome instead.',
       },
       {
         id: 'payment-failed',
         question: 'My payment failed or was declined — what should I do?',
         answer:
-          'Try another card or PayPal, ensure you are in the UK, and disable VPNs. Check with your bank that online payments are allowed. If you were charged but did not get tickets or a quiz link, email us at ' +
+          'Try another card, ensure you are in the UK, and turn off VPNs. Check with your bank that online payments are allowed. If you were charged but did not get tickets or a quiz link, email us at ' +
           SHOWSKILLS_CONTACT_EMAIL +
           ' with the time of purchase and the email you used.',
       },
@@ -119,7 +133,7 @@ export const FAQ_SECTIONS = [
         answer:
           'Wait a few minutes and check your email (including spam) for a confirmation with ticket numbers and a quiz link. If nothing arrives after 30 minutes, contact us at ' +
           SHOWSKILLS_CONTACT_EMAIL +
-          ' with your email, approximate purchase time, and payment reference if you have one (from your payment provider or bank).',
+          ' with your email, approximate purchase time, and payment reference if you have one (from your bank or card statement).',
       },
       {
         id: 'refunds',
@@ -149,7 +163,26 @@ export const FAQ_SECTIONS = [
         id: 'quiz-wrong',
         question: 'I got a question wrong — can I try again?',
         answer:
-          'For a given paid purchase, you complete the quiz in that checkout flow. If answers are wrong, that entry does not qualify. Buying another ticket bundle starts a new entry (subject to our rules and limits). Free routes have their own limits (see free postal / free online above).',
+          'For a given paid purchase or free online Legacy Bundle entry, you have one attempt at the three skill questions. If your answers are wrong, that entry does not qualify for the main draw and tickets are not refunded. ' +
+          CONSOLATION_PRIZE_SUMMARY +
+          ' ' +
+          CONSOLATION_PRIZE_PAID_THRESHOLD +
+          ' ' +
+          CONSOLATION_PRIZE_FREE_APPLIES +
+          ' Buying another ticket bundle starts a new paid entry (subject to our rules and limits). Free postal and free online Legacy Bundle routes have their own limits — see the Legacy Bundle section above.',
+      },
+      {
+        id: 'consolation-prize',
+        question: 'What is the consolation prize if I get the skill questions wrong?',
+        answer:
+          CONSOLATION_PRIZE_SUMMARY +
+          ' ' +
+          CONSOLATION_PRIZE_PAID_THRESHOLD +
+          ' ' +
+          CONSOLATION_PRIZE_FREE_APPLIES +
+          ' Consolation entries are added automatically — you do not need to fill in the separate shirt giveaway form again. ' +
+          TICKET_PURCHASE_NON_REFUND_NOTICE,
+        popular: true,
       },
       {
         id: 'quiz-resume',
@@ -164,7 +197,7 @@ export const FAQ_SECTIONS = [
   {
     id: 'shirt-giveaway',
     title: 'Free Ronaldo shirt giveaway',
-    summary: 'A separate free reward — not the same draw as the Legacy Bundle.',
+    summary: 'A separate free promotion — not the same draw as the Legacy Bundle.',
     items: [
       {
         id: 'shirt-separate',
@@ -176,13 +209,13 @@ export const FAQ_SECTIONS = [
         id: 'shirt-how',
         question: 'How do I enter the shirt giveaway?',
         answer:
-          'From Competitions, open the shirt giveaway entry. Enter your details and mobile number, answer the one qualification question, and submit. You may upload a kick-up video or use the qualification answer route shown on the form — see the live page for current options.',
+          'From Competitions, open the Ronaldo shirt giveaway entry. Enter your full name, email, and mobile number, agree to the terms, and answer the one qualification question on the form. If your answer is correct, you are entered into the random draw for the signed shirt. No payment is required. There is no video upload — entry is by the qualification question only.',
       },
       {
         id: 'shirt-limits',
         question: 'Why was my shirt entry blocked?',
         answer:
-          "Common reasons: you already entered on this device (one entry per device), duplicate name/email, VPN or proxy detected (turn off VPN and try again), or an incorrect qualification answer. The site will show a short message when an entry is blocked.",
+          'Common reasons: you already entered on this device (one entry per device), duplicate name or email, VPN or proxy detected (turn off your VPN and try again), or an incorrect qualification answer. The site will show a short message when an entry is blocked.',
       },
     ],
   },
@@ -245,7 +278,7 @@ export const FAQ_SECTIONS = [
         id: 'email-missing',
         question: 'I am not receiving emails from you',
         answer:
-          'Check spam, promotions, and “blocked” folders. Add ' +
+          'Check spam, promotions, and blocked folders. Add ' +
           SHOWSKILLS_CONTACT_EMAIL +
           ' to your contacts. If you use a work or school email filter, try a personal address. Contact us if confirmations or winner emails still do not arrive.',
       },

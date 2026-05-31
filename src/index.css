@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './admin/adminTheme.css';
 
 :root {
   --ss-bg-deep: #071512;
@@ -365,6 +366,80 @@ body {
     rgba(7, 21, 18, 0.72) 35%,
     rgba(7, 21, 18, 0.88) 100%
   );
+}
+
+/* FAQ — topic filters must wrap; horizontal scroll clipped labels in Brave / mobile Safari */
+.ss-faq-page {
+  overflow-x: visible;
+}
+
+.ss-faq-topic-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .ss-faq-topic-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
+.ss-faq-topic-pill {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.375rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+@media (min-width: 640px) {
+  .ss-faq-topic-pill {
+    width: auto;
+    max-width: 100%;
+    flex: 0 1 auto;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+  }
+}
+
+.ss-faq-topic-pill--active {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.2);
+  color: rgb(209 250 229);
+}
+
+.ss-faq-topic-pill--idle {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgb(168 162 158);
+}
+
+.ss-faq-topic-pill--idle:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgb(231 229 228);
+}
+
+.ss-faq-topic-pill:focus-visible {
+  outline: 2px solid rgba(52, 211, 153, 0.45);
+  outline-offset: 2px;
 }
 
 @media (min-width: 1024px) {

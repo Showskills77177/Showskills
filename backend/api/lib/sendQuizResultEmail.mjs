@@ -16,6 +16,8 @@ export async function sendQuizResultEmail({
   quantity,
   amountPence,
   ticketNumbers,
+  consolationShirtEntries = 0,
+  consolationShirtEntryNumbers = [],
 }) {
   const apiKey = getResendApiKey()
   if (!apiKey) {
@@ -38,6 +40,10 @@ export async function sendQuizResultEmail({
     quantity: quantity ?? bundle?.qty,
     amountPence: amountPence ?? bundle?.totalPence,
     ticketNumbers: Array.isArray(ticketNumbers) ? ticketNumbers : [],
+    consolationShirtEntries: Number(consolationShirtEntries) || 0,
+    consolationShirtEntryNumbers: Array.isArray(consolationShirtEntryNumbers)
+      ? consolationShirtEntryNumbers.filter(Boolean)
+      : [],
   }
 
   const res = await fetch('https://api.resend.com/emails', {

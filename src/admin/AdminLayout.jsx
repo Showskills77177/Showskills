@@ -1,14 +1,34 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { AdminLogo } from './AdminLogo'
+import { AdminThemePicker } from './AdminThemePicker'
+import { useAdminTheme } from './AdminThemeContext'
+import { adminThemeRootClass } from './adminThemes.mjs'
 import { apiFetch } from '../lib/api'
 
-const linkClass = ({ isActive }) =>
-  `rounded-lg px-3 py-2 text-sm font-medium transition ${
-    isActive ? 'bg-teal-900/50 text-teal-100' : 'text-stone-400 hover:bg-white/5 hover:text-stone-200'
-  }`
+const NAV_ITEMS = [
+  { to: '/admin/dashboard', label: 'Dashboard' },
+  { to: '/admin/competitions', label: 'Competitions' },
+  { to: '/admin/users', label: 'Users & entries', competition: 'legacy' },
+  { to: '/admin/tickets', label: 'Tickets', competition: 'legacy' },
+  { to: '/admin/draw', label: 'Draw winner', competition: 'legacy' },
+  { to: '/admin/payments', label: 'Payments', competition: 'legacy' },
+  { to: '/admin/submissions', label: 'Shirt giveaway', competition: 'shirt' },
+  { to: '/admin/entry-attempts', label: 'Entry log', competition: 'shirt' },
+  { to: '/admin/test-email', label: 'Test email', competition: 'both' },
+]
+
+const COMPETITION_TAG = {
+  legacy: 'Main draw',
+  shirt: 'Giveaway',
+  both: 'All emails',
+}
 
 export function AdminLayout() {
   const navigate = useNavigate()
+  const { theme } = useAdminTheme()
+
+  const linkClass = ({ isActive }) =>
+    `transition ${isActive ? theme.navActive : theme.navInactive}`
 
   async function logout() {
     try {
@@ -20,43 +40,30 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-200">
-      <header className="border-b border-white/10 bg-stone-950/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <AdminLogo size="sm" />
-            <span className="hidden text-xs font-medium uppercase tracking-wider text-stone-500 sm:inline">Admin</span>
+    <div className={adminThemeRootClass(theme)}>
+      <header className={theme.header}>
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] py-2.5">
+            <div className="flex items-center gap-3">
+              <AdminLogo size="sm" />
+              <span className={`hidden sm:inline ${theme.adminBadge}`}>Admin</span>
+            </div>
+            <AdminThemePicker compact />
           </div>
-          <nav className="flex flex-wrap items-center gap-1">
-            <NavLink to="/admin/dashboard" className={linkClass} end={false}>
-              Dashboard
-            </NavLink>
-            <NavLink to="/admin/users" className={linkClass}>
-              Users &amp; entries
-            </NavLink>
-            <NavLink to="/admin/tickets" className={linkClass}>
-              Tickets
-            </NavLink>
-            <NavLink to="/admin/draw" className={linkClass}>
-              Draw winner
-            </NavLink>
-            <NavLink to="/admin/entry-attempts" className={linkClass}>
-              Entry log
-            </NavLink>
-            <NavLink to="/admin/payments" className={linkClass}>
-              Payments
-            </NavLink>
-            <NavLink to="/admin/submissions" className={linkClass}>
-              Kick-up videos
-            </NavLink>
-            <NavLink to="/admin/test-email" className={linkClass}>
-              Test email
-            </NavLink>
-            <button
-              type="button"
-              onClick={logout}
-              className="ml-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-stone-300 hover:bg-white/5"
-            >
+          <nav className="flex flex-wrap items-center gap-2 py-3">
+            {NAV_ITEMS.map(({ to, label, competition, end }) => (
+              <NavLink key={to} to={to} className={linkClass} end={end ?? to === '/admin/dashboard'}>
+                <span className="flex flex-col leading-tight">
+                  <span>{label}</span>
+                  {competition ? (
+                    <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-75">
+                      {COMPETITION_TAG[competition]}
+                    </span>
+                  ) : null}
+                </span>
+              </NavLink>
+            ))}
+            <button type="button" onClick={logout} className={theme.logoutBtn}>
               Log out
             </button>
           </nav>

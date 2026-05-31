@@ -25,13 +25,19 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const url = new URL(req.url || '/', 'http://local')
-      const { q, page, pageSize, offset } = parseAdminListQuery(url)
+      const { q, page, pageSize, offset, competition } = parseAdminListQuery(url, {
+        competitionKind: 'mainDraw',
+      })
 
       let where = 'WHERE 1=1'
       const params = []
+      if (competition) {
+        params.push(competition)
+        where += ` AND e.competition = $${params.length}`
+      }
       if (q) {
         params.push(`%${q}%`, `%${q}%`)
-        where += ` AND (u.email ILIKE $1 OR u.full_name ILIKE $2)`
+        where += ` AND (u.email ILIKE $${params.length - 1} OR u.full_name ILIKE $${params.length})`
       }
 
       const countSql = `
@@ -51,7 +57,7 @@ export default async function handler(req, res) {
         ORDER BY e.created_at DESC
         LIMIT ${pageSize} OFFSET ${offset}`
       const r = await query(sql, params)
-      return json(res, 200, { rows: r.rows, ...adminListMeta(total, page, pageSize) })
+      return json(res, 200, { rows: r.rows, competition: competition || null, ...adminListMeta(total, page, pageSize) })
     }
 
     if (req.method === 'PATCH') {

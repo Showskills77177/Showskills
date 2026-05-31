@@ -1,4 +1,5 @@
 import { query, dbIsPostgres } from './db.mjs'
+import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
 
 let ensured = false
 
@@ -51,6 +52,11 @@ export async function ensureTicketSchema() {
     }
     try {
       await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS cashflows_intent_token TEXT`)
+    } catch {
+      /* already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS competition TEXT`)
     } catch {
       /* already exists */
     }
@@ -107,9 +113,43 @@ export async function ensureTicketSchema() {
     } catch {
       /* column already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN competition TEXT`)
+    } catch {
+      /* column already exists */
+    }
   }
 
+  await backfillTicketCompetition()
+
   ensured = true
+}
+
+async function backfillTicketCompetition() {
+  try {
+    await query(`
+      UPDATE tickets
+      SET competition = cp.competition
+      FROM competition_periods cp
+      WHERE tickets.period_id = cp.id
+        AND (tickets.competition IS NULL OR tickets.competition = '')
+    `)
+  } catch {
+    /* competition_periods may not exist yet */
+  }
+  await query(
+    `UPDATE tickets SET competition = $1 WHERE competition IS NULL OR competition = ''`,
+    [DRAW_COMPETITION_SLUG],
+  )
+  try {
+    await query(`CREATE INDEX IF NOT EXISTS idx_tickets_competition ON tickets (competition, created_at DESC)`)
+  } catch {
+    try {
+      await query(`CREATE INDEX IF NOT EXISTS idx_tickets_competition ON tickets (competition, created_at)`)
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 /** Re-run DDL after schema fixes (dev hot-reload). */

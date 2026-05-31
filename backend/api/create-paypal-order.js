@@ -1,5 +1,4 @@
 import { getPayPalCredentials, getCheckoutCurrency, paypalAccessToken } from './lib/paypal.js'
-import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import {
   buildCheckoutDescription,
@@ -9,6 +8,7 @@ import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
 import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
 import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
+import { parseCheckoutCompetition, resolveCheckoutBundle } from './lib/checkoutBundle.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 
 function parseBody(req) {
@@ -49,11 +49,13 @@ export default async function handler(req, res) {
   }
 
   const body = parseBody(req)
+  const competition = await parseCheckoutCompetition(body)
   const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : ''
-  const bundle = getTicketBundleById(bundleId)
-  if (!bundle) {
-    return res.status(400).json({ error: 'Invalid or missing bundleId' })
+  const bundleResult = await resolveCheckoutBundle(competition, bundleId)
+  if (!bundleResult.ok) {
+    return res.status(400).json({ error: bundleResult.error })
   }
+  const { bundle, competitionTitle } = bundleResult
 
   const currency = getCheckoutCurrency()
   const value = (bundle.totalPence / 100).toFixed(2)
@@ -78,14 +80,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'customerFullName required' })
   }
 
-  const periodResult = await getOpenCompetitionPeriodForEntry()
+  const periodResult = await getOpenCompetitionPeriodForEntry(competition)
   if (!periodResult.ok) {
     return res.status(403).json({ error: periodResult.error })
   }
 
   const ticketNumbers = await reserveTicketNumbers(bundle.qty)
   const description = buildCheckoutDescription({
-    bundleSummary: `Ronaldo Legacy Bundle — ${bundle.qty} ticket(s). Submit skill answers after payment.`,
+    bundleSummary: `${competitionTitle} — ${bundle.qty} ticket(s). Submit skill answers after payment.`,
     nonRefundNotice: TICKET_PURCHASE_NON_REFUND_NOTICE,
     maxLength: PAYPAL_CHECKOUT_DESCRIPTION_MAX,
   })
@@ -107,7 +109,7 @@ export default async function handler(req, res) {
               value,
             },
             description,
-            custom_id: `ronaldo_legacy_bundle|${bundle.id}|qty:${bundle.qty}|tickets:${ticketNumbers.length}`,
+            custom_id: `${competition}|${bundle.id}|qty:${bundle.qty}|tickets:${ticketNumbers.length}`,
           },
         ],
         application_context: {
@@ -135,6 +137,7 @@ export default async function handler(req, res) {
         customerFullName,
         customerPhone: phoneCheck.phone,
         periodId: periodResult.period.id,
+        competition,
       })
     } catch (pendingErr) {
       console.error('createPendingTicketCheckout (paypal):', pendingErr)

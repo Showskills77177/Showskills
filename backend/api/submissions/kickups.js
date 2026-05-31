@@ -11,6 +11,7 @@ import { checkVpnForRequest } from '../lib/vpnDetection.mjs'
 import { COMPETITION_SHIRT_GIVEAWAY } from '../../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../../shared/contactPhone.mjs'
 import { upsertUserContact } from '../lib/userContact.mjs'
+import { allocateShirtEntryNumber } from '../lib/shirtEntryNumbers.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -84,15 +85,16 @@ export default async function handler(req, res) {
   try {
     await upsertUserContact({ email, fullName, phone: phoneCheck.phone })
     const id = randomUUID()
+    const entryNumber = await allocateShirtEntryNumber()
     const storedRef = qualificationAnswer ? 'answer:ronaldo-shirt-giveaway' : videoRef
     const storedFilename = qualificationAnswer ? `Answer: ${qualificationAnswer}` : videoFilename || null
     const adminNotes = qualificationAnswer
-      ? `Question: ${SHIRT_GIVEAWAY_QUESTION}\nAnswer: ${qualificationAnswer}`
-      : null
+      ? `Question: ${SHIRT_GIVEAWAY_QUESTION}\nAnswer: ${qualificationAnswer}\nEntry number: ${entryNumber}`
+      : `Entry number: ${entryNumber}`
     const r = await query(
-      `INSERT INTO kickup_submissions (id, full_name, email, video_ref, video_filename, admin_notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [id, fullName, email, storedRef || null, storedFilename, adminNotes],
+      `INSERT INTO kickup_submissions (id, full_name, email, video_ref, video_filename, admin_notes, entry_number, competition)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, entry_number`,
+      [id, fullName, email, storedRef || null, storedFilename, adminNotes, entryNumber, COMPETITION_SHIRT_GIVEAWAY],
     )
     await logEntryAttempt(req, {
       competition: COMPETITION_SHIRT_GIVEAWAY,
@@ -101,9 +103,9 @@ export default async function handler(req, res) {
       email,
       addressKey: shirtLimits.identityKey,
       outcome: 'success',
-      metadata: { submission_id: r.rows[0].id },
+      metadata: { submission_id: r.rows[0].id, entry_number: r.rows[0].entry_number },
     })
-    return json(res, 201, { ok: true, id: r.rows[0].id })
+    return json(res, 201, { ok: true, id: r.rows[0].id, entryNumber: r.rows[0].entry_number })
   } catch (e) {
     console.error(e)
     await logEntryAttempt(req, {

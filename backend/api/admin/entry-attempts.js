@@ -29,12 +29,16 @@ export default async function handler(req, res) {
   try {
     await ensureFreeEntrySchema()
     const url = new URL(req.url || '/', 'http://local')
-    const { page, pageSize, offset } = parseAdminListQuery(url)
+    const { page, pageSize, offset, competition } = parseAdminListQuery(url, { competitionKind: 'any' })
     const outcome = (url.searchParams.get('outcome') || '').trim()
     const flow = (url.searchParams.get('flow') || '').trim()
 
     let where = 'WHERE 1=1'
     const params = []
+    if (competition) {
+      params.push(competition)
+      where += ` AND competition = $${params.length}`
+    }
     if (flow) {
       params.push(flow)
       where += ` AND flow = $${params.length}`
@@ -55,7 +59,7 @@ export default async function handler(req, res) {
       ORDER BY created_at DESC
       LIMIT ${pageSize} OFFSET ${offset}`
     const r = await query(sql, params)
-    return json(res, 200, { rows: r.rows, ...adminListMeta(total, page, pageSize) })
+    return json(res, 200, { rows: r.rows, competition: competition || null, ...adminListMeta(total, page, pageSize) })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Database error' })

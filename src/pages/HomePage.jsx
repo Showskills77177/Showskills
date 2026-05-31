@@ -6,6 +6,10 @@ import iphone17ProMaxGoldCase from '../assets/iphone-17-pro-max-gold-case.png'
 import { BUNDLE_OFFER_ITEMS } from '../competitionData'
 import { useEntryFlow } from '../entry/entryContext'
 import { GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
+import { CompetitionCountdown } from '../components/CompetitionCountdown'
+import { useFeaturedHomepageCompetition } from '../hooks/useFeaturedHomepageCompetition'
+import { HomeFeaturedPromotion } from '../components/HomeFeaturedPromotion'
+import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
 
 const LEGACY_BUNDLE_SPECS = [
   {
@@ -28,6 +32,20 @@ const LEGACY_BUNDLE_SPECS = [
 
 export default function HomePage() {
   const { openEntry } = useEntryFlow()
+  const { competition } = useFeaturedHomepageCompetition()
+  const showDynamicFeatured =
+    competition && competition.slug !== DRAW_COMPETITION_SLUG && competition.featuredOnHomepage
+
+  if (showDynamicFeatured) {
+    return (
+      <main className="m-0 p-0">
+        <HomeFeaturedPromotion
+          competition={competition}
+          onEnter={() => openEntry('paid', { competitionSlug: competition.slug })}
+        />
+      </main>
+    )
+  }
 
   return (
     <main className="m-0 p-0">
@@ -53,6 +71,13 @@ export default function HomePage() {
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
                 Live promotion
               </p>
+              {competition?.openPeriod ? (
+                <CompetitionCountdown
+                  opensAt={competition.openPeriod.entryOpensAt}
+                  closesAt={competition.openPeriod.entryClosesAt}
+                  label="Competition ends"
+                />
+              ) : null}
               <div className="flex flex-wrap items-end gap-3 sm:gap-4">
                 <h1 className="ss-hero-brand font-display text-[clamp(2.75rem,10vw,5.25rem)] leading-[0.92] tracking-tight sm:text-[clamp(3.25rem,11vw,5.75rem)]">
                   ShowSkills Rewards
@@ -66,7 +91,12 @@ export default function HomePage() {
               <p className="max-w-xl text-[clamp(1.35rem,4vw,2.1rem)] font-bold leading-snug tracking-tight text-white">
                 Ronaldo Legacy Bundle — pay online or enter by post, then answer{' '}
                 <span className="ss-pen-highlight whitespace-nowrap text-emerald-100">3 hard skill questions</span> for the
-                full kit draw.
+                full kit draw. One attempt per entry — all correct to qualify.
+              </p>
+              <p className="max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
+                Get the questions wrong? You automatically receive{' '}
+                <strong className="text-stone-300">2 entries</strong> into the separate Free Ronaldo Shirt Giveaway
+                (consolation prize). Tickets are not refunded.
               </p>
               <p className="ss-hero-helper-copy max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
                 Use <strong className="text-stone-300">Competitions</strong> in the menu for the shirt giveaway and a
@@ -147,8 +177,8 @@ export default function HomePage() {
 
               <div className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center gap-2.5 md:mt-auto md:gap-3">
                 <p className="ss-hero-bundle-cta-blurb text-center text-stone-500">
-                  Buy tickets online or enter by post — same prize. Three Ronaldo questions. Full kit: phone, shirt, ball,
-                  case.
+                  Buy tickets online or enter by post — same prize. Three Ronaldo questions, one attempt each. All correct
+                  to qualify for the main draw. Wrong answers? 2 automatic shirt giveaway entries (consolation).
                 </p>
                 <div className="ss-hero-bundle-cta-actions flex w-full justify-center md:border-t md:border-white/10 md:pt-3 lg:pt-4">
                   <button

@@ -105,6 +105,7 @@ export async function recordCashflowsPaymentFromVerifiedIntent(input) {
     amountPence: bundle.totalPence,
     currency: (process.env.CASHFLOWS_CURRENCY || 'gbp').toLowerCase(),
     reservedTicketNumbers,
+    countryCode: input.countryCode || null,
   })
 
   if (!recorded) {

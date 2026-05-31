@@ -33,6 +33,7 @@ export function PayPalPayButton({
   createOrderUrl,
   captureOrderUrl,
   bundleId,
+  competition,
   ticketQuantity,
   customerEmail,
   customerFullName,
@@ -77,6 +78,7 @@ export function PayPalPayButton({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               bundleId,
+              competition: competition || undefined,
               customerEmail: customerEmail?.trim() || '',
               customerFullName: customerFullName?.trim() || '',
               customerPhone: customerPhone?.trim() || '',
@@ -97,6 +99,7 @@ export function PayPalPayButton({
             body: JSON.stringify({
               orderID: data.orderID,
               bundleId,
+              competition: competition || undefined,
               ticketQuantity: ticketQuantity ?? 1,
               customerEmail: customerEmail?.trim() || '',
               customerFullName: customerFullName?.trim() || '',

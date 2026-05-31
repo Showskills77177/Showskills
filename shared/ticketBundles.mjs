@@ -116,3 +116,22 @@ export function formatBundlePriceGBP(totalPence) {
   if (Number.isInteger(pounds)) return `£${pounds}`
   return `£${pounds.toFixed(2)}`
 }
+
+/** Default paid bundle tiers for a new admin-created competition (excludes live test bundle). */
+export function getStandardCompetitionBundleTemplates() {
+  return TICKET_BUNDLES.filter((b) => !b.testOnly).map((b) => ({
+    bundleKey: b.id,
+    title: b.title,
+    qty: b.qty,
+    totalPence: b.totalPence,
+    line1: b.line1 || '',
+    line2: b.line2 || '',
+    featured: Boolean(b.featured),
+    active: true,
+  }))
+}
+
+export function perTicketPence(totalPence, qty) {
+  const q = Math.max(1, Number(qty) || 1)
+  return Math.round(Number(totalPence) / q)
+}

@@ -11,6 +11,16 @@ import {
   validatePaidSkillAnswers,
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import {
+  CONSOLATION_PRIZE_FREE_APPLIES,
+  CONSOLATION_PRIZE_PAID_THRESHOLD,
+  CONSOLATION_PRIZE_SUMMARY,
+  CONSOLATION_NOT_AWARDED_GENERIC,
+  CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD,
+  formatConsolationAwardMessage,
+  LEGACY_SKILL_ONE_ATTEMPT_NOTICE,
+  paidSpendQualifiesForConsolation,
+} from '../../shared/consolationShirtGiveaway.mjs'
 import { PromoterAddress } from './PromoterAddress'
 import { ErrorBanner } from './ErrorBanner'
 import { ModalPortal } from './ModalPortal'
@@ -29,6 +39,10 @@ export function EntryModal() {
     termsOpen,
     paidBundleId,
     setPaidBundleId,
+    paidCompetitionSlug,
+    paidEntryMethods,
+    postalCompetitionName,
+    paidCompetitionTitle,
     paidEntryRoute,
     setPaidEntryRoute,
     paidConsent,
@@ -47,6 +61,7 @@ export function EntryModal() {
     setPaidA3,
     paidQuizError,
     paidQuizResult,
+    paidConsolationShirtEntries,
     paidQuizSubmitted,
     paidQuizSubmitting,
     paidEmailConfirmationSent,
@@ -148,6 +163,23 @@ export function EntryModal() {
 
   const paidAnswerValidation =
     paidQuizResult != null ? validatePaidSkillAnswers(paidA1, paidA2, paidA3) : null
+
+  function renderLegacyNotQualifiedMessage() {
+    if (paidConsolationShirtEntries > 0) {
+      return formatConsolationAwardMessage({ entryCount: paidConsolationShirtEntries })
+    }
+    if (
+      paidEntryRoute === 'tickets' &&
+      selectedTicketBundle &&
+      !paidSpendQualifiesForConsolation(selectedTicketBundle.totalPence)
+    ) {
+      return CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD
+    }
+    if (paidEntryRoute === 'free_online') {
+      return `${CONSOLATION_PRIZE_SUMMARY} You did not qualify for the main draw on this attempt.`
+    }
+    return CONSOLATION_NOT_AWARDED_GENERIC
+  }
   const paidAnswerInputClass = (questionIndex) => {
     const base =
       'mt-2 w-full rounded-lg border px-3 py-2 text-base focus:outline-none focus:ring-2'
@@ -256,7 +288,12 @@ export function EntryModal() {
               <p className="text-sm text-stone-500">
                 <strong className="text-stone-300">Ronaldo Legacy Bundle draw.</strong> Pick a ticket bundle to pay online,
                 free online entry (£0 card verify), or free postal entry for the same prize pool. Then type three Ronaldo skill answers (no multiple
-                choice). All must be correct to qualify; winner picked at random from correct entries.
+                choice). <strong className="text-stone-400">All must be correct to qualify</strong> for the main draw — you have{' '}
+                <strong className="text-stone-400">one attempt</strong> per entry. The winner is picked at random from correct entries only.
+              </p>
+              <p className="mt-2 rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-xs leading-relaxed text-stone-400">
+                <strong className="text-stone-300">Consolation prize:</strong> {CONSOLATION_PRIZE_SUMMARY}{' '}
+                {CONSOLATION_PRIZE_PAID_THRESHOLD} {CONSOLATION_PRIZE_FREE_APPLIES} {TICKET_PURCHASE_NON_REFUND_NOTICE}
               </p>
               {paidPostCheckout && paidQuizSubmitted ? (
                 <div className="mt-4 flex flex-col gap-4 text-center">
@@ -272,8 +309,7 @@ export function EntryModal() {
                       </p>
                     ) : (
                       <p className="mt-3 rounded-lg border border-amber-700/35 bg-amber-950/30 px-3 py-2 text-sm text-amber-100/90">
-                        Thanks for entering. One or more answers were incorrect, so you do not qualify for the prize
-                        under the terms.
+                        {renderLegacyNotQualifiedMessage()}
                       </p>
                     )}
                     {paidOrderRef ? (
@@ -325,8 +361,8 @@ export function EntryModal() {
                     ) : null}
                     <p className="mt-2 text-teal-100/90">
                       Submit your three skill answers below now.{' '}
-                      <strong className="text-teal-50">You only qualify for the draw if all answers are correct.</strong>{' '}
-                      One confirmation email (receipt, ticket numbers, and result) is sent after you submit.
+                      <strong className="text-teal-50">You only qualify for the main draw if all answers are correct.</strong>{' '}
+                      {LEGACY_SKILL_ONE_ATTEMPT_NOTICE} One confirmation email (receipt, ticket numbers, and result) is sent after you submit.
                       Your payment provider may also send its own payment receipt.
                     </p>
                     <p className="mt-3 rounded-lg border border-stone-600/35 bg-stone-900/45 px-3 py-2.5 text-sm text-stone-200">
@@ -424,7 +460,7 @@ export function EntryModal() {
                   ) : null}
                   {paidQuizResult === 'not_qualified' ? (
                     <p className="rounded-lg border border-amber-700/35 bg-amber-950/30 px-3 py-2 text-sm text-amber-100/90">
-                      One or more answers incorrect — no prize under the terms.
+                      {renderLegacyNotQualifiedMessage()}
                     </p>
                   ) : null}
                   <button
@@ -444,6 +480,9 @@ export function EntryModal() {
                     setPaidEntryRoute={setPaidEntryRoute}
                     selectedTicketBundle={selectedTicketBundle}
                     visibleTicketBundles={visibleTicketBundles}
+                    entryMethods={paidEntryMethods}
+                    postalCompetitionName={postalCompetitionName}
+                    competitionTitle={paidCompetitionTitle}
                   />
                   {paidEntryRoute === 'free_online' ? (
                     <>
@@ -534,15 +573,16 @@ export function EntryModal() {
                       </div>
                       <p className="text-xs leading-relaxed text-stone-500">
                         Max 3 free online entries per name and address. Verify your card first (£0.00 authorisation, no
-                        charge), then answer three skill questions.
+                        charge), then answer three skill questions. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}{' '}
+                        {CONSOLATION_PRIZE_SUMMARY} {CONSOLATION_PRIZE_FREE_APPLIES}
                       </p>
                       {freeCardVerified ? (
                         <form className="flex flex-col gap-4" onSubmit={handleFreeQuizSubmit}>
                           <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
                             <p className="font-medium text-teal-50">Card verified</p>
                             <p className="mt-1 text-teal-100/90">
-                              Answer all three skill questions below. You only qualify for the draw if every answer is
-                              correct.
+                              Answer all three skill questions below. You only qualify for the main draw if every answer is
+                              correct. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE} If you get them wrong, you receive 2 automatic entries into the separate Free Ronaldo Shirt Giveaway.
                             </p>
                           </div>
                           {PAID_SKILL_QUESTIONS.map((q, i) => (
@@ -660,7 +700,7 @@ export function EntryModal() {
                         <li>Full postal address</li>
                         <li>Email address</li>
                         <li>
-                          Competition name: <span className="text-stone-200">{COMPETITION_NAME_POSTAL}</span>
+                          Competition name: <span className="text-stone-200">{postalCompetitionName}</span>
                         </li>
                         <li>Written answers to all three skill questions (same as online)</li>
                       </ul>
@@ -681,6 +721,10 @@ export function EntryModal() {
                     <div className="ss-entry-checkout-actions flex flex-col gap-3 border-t border-white/10 pt-4">
                       <p className="rounded-lg border border-amber-800/35 bg-amber-950/25 px-3 py-2.5 text-center text-[11px] font-medium leading-snug text-amber-100/90">
                         {TICKET_PURCHASE_NON_REFUND_NOTICE}
+                      </p>
+                      <p className="rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-center text-[11px] leading-snug text-stone-400">
+                        <strong className="text-stone-300">Skill quiz:</strong> {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}{' '}
+                        {CONSOLATION_PRIZE_PAID_THRESHOLD}
                       </p>
                       {E2E_SIMULATE_CHECKOUT ? (
                         <button
@@ -725,6 +769,7 @@ export function EntryModal() {
                             createOrderUrl={paypalCreateOrderApi}
                             captureOrderUrl={paypalCaptureOrderApi}
                             bundleId={paidBundleId}
+                            competition={paidCompetitionSlug}
                             ticketQuantity={selectedTicketBundle?.qty ?? 1}
                             customerEmail={paidEmail}
                             customerFullName={paidFullName}

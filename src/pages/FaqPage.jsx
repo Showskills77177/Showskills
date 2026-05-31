@@ -104,11 +104,11 @@ export default function FaqPage() {
   }
 
   return (
-    <main className="ss-photo-page relative m-0 overflow-x-clip p-0">
+    <main className="ss-photo-page ss-faq-page relative m-0 overflow-x-visible p-0">
       <PhotoPageBackdrop />
       <div className="relative z-[1]">
       {/* Hero */}
-      <section className="relative overflow-hidden border-b border-emerald-900/25">
+      <section className="relative overflow-visible border-b border-emerald-900/25">
         <div className="mx-auto max-w-5xl px-4 pb-10 pt-12 sm:px-6 sm:pb-14 sm:pt-16">
           <p className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-200">
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
@@ -173,21 +173,17 @@ export default function FaqPage() {
           </p>
         ) : null}
 
-        {/* Topic pills */}
-        <div
-          className="mt-5 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          role="tablist"
-          aria-label="FAQ topics"
-        >
+        {/* Topic pills — wrap / grid so labels are never clipped (no horizontal scroll trap) */}
+        <div className="ss-faq-topic-list mt-5" role="tablist" aria-label="FAQ topics">
           <button
             type="button"
             role="tab"
             aria-selected={activeSection === 'all'}
             onClick={() => setActiveSection('all')}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+            className={`ss-faq-topic-pill ${
               activeSection === 'all'
-                ? 'bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-400/35'
-                : 'bg-white/[0.04] text-stone-400 hover:bg-white/[0.07] hover:text-stone-200'
+                ? 'ss-faq-topic-pill--active'
+                : 'ss-faq-topic-pill--idle'
             }`}
           >
             All topics
@@ -202,10 +198,10 @@ export default function FaqPage() {
                 setActiveSection(section.id)
                 setQuery('')
               }}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`ss-faq-topic-pill ${
                 activeSection === section.id
-                  ? 'bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-400/35'
-                  : 'bg-white/[0.04] text-stone-400 hover:bg-white/[0.07] hover:text-stone-200'
+                  ? 'ss-faq-topic-pill--active'
+                  : 'ss-faq-topic-pill--idle'
               }`}
             >
               {section.title}
@@ -224,13 +220,13 @@ export default function FaqPage() {
                     <button
                       type="button"
                       onClick={() => scrollToSection(section.id)}
-                      className={`w-full rounded-lg px-2.5 py-2 text-left text-sm transition ${
+                      className={`w-full rounded-lg px-2.5 py-2 text-left text-xs leading-snug transition sm:text-sm ${
                         activeSection === section.id
                           ? 'bg-emerald-950/40 font-semibold text-emerald-200'
                           : 'text-stone-400 hover:bg-white/[0.04] hover:text-stone-200'
                       }`}
                     >
-                      {section.title}
+                      <span className="block whitespace-normal break-words">{section.title}</span>
                     </button>
                   </li>
                 ))}
@@ -256,9 +252,9 @@ export default function FaqPage() {
                       <button
                         type="button"
                         onClick={() => openQuestion(item)}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#071512]/80 px-4 py-3.5 text-left text-sm font-semibold text-stone-200 transition hover:border-emerald-500/30 hover:bg-emerald-950/20"
+                        className="flex w-full min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#071512]/80 px-4 py-3.5 text-left text-sm font-semibold text-stone-200 transition hover:border-emerald-500/30 hover:bg-emerald-950/20"
                       >
-                        <span>{item.question}</span>
+                        <span className="min-w-0 whitespace-normal break-words leading-snug">{item.question}</span>
                         <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-emerald-500/70" aria-hidden />
                       </button>
                     </li>
@@ -308,14 +304,14 @@ export default function FaqPage() {
                     >
                       <HelpCircle className="h-5 w-5 text-emerald-400/90" strokeWidth={1.75} />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <h2
                         id={`faq-${section.id}`}
-                        className="font-display text-2xl uppercase tracking-wide text-stone-100"
+                        className="break-words font-display text-xl uppercase tracking-wide text-stone-100 sm:text-2xl"
                       >
                         {section.title}
                       </h2>
-                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-stone-500">{section.summary}</p>
+                      <p className="mt-1 max-w-2xl break-words text-sm leading-relaxed text-stone-500">{section.summary}</p>
                     </div>
                   </div>
                   <ul className="mt-5 space-y-2">

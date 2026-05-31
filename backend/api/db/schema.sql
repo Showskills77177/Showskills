@@ -86,3 +86,27 @@ CREATE TABLE IF NOT EXISTS kickup_submissions (
 
 CREATE INDEX IF NOT EXISTS idx_kickups_status ON kickup_submissions (review_status);
 CREATE INDEX IF NOT EXISTS idx_kickups_created ON kickup_submissions (created_at DESC);
+
+ALTER TABLE kickup_submissions ADD COLUMN IF NOT EXISTS entry_number TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kickups_entry_number ON kickup_submissions (entry_number);
+
+CREATE TABLE IF NOT EXISTS site_visits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  country_code TEXT,
+  country_name TEXT,
+  traffic_source TEXT NOT NULL DEFAULT 'Direct',
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  referrer_host TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_visits_created ON site_visits (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_site_visits_session ON site_visits (session_id);
+CREATE INDEX IF NOT EXISTS idx_site_visits_country ON site_visits (country_code);
+CREATE INDEX IF NOT EXISTS idx_site_visits_source ON site_visits (traffic_source);
+
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS country_code TEXT;

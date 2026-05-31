@@ -1,12 +1,13 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from './db.mjs'
+import { query, isDbConfigured, dbIsPostgres } from './db.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { ensureFreeEntrySchema } from './ensureFreeEntrySchema.mjs'
 import { reserveTicketNumbers } from './ticketNumbers.mjs'
 import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
-import { COMPETITION_LEGACY_BUNDLE } from '../../../shared/freeEntryLimits.mjs'
+import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
 import { upsertUserContact } from './userContact.mjs'
 import { getOpenCompetitionPeriodForEntry } from './competitionPeriods.mjs'
+import { assertCompetitionEntryMethod } from './competitionCatalog.mjs'
 
 /**
  * After £0 card verification succeeds: one free draw slot (ticket number), quiz entry, audit row.
@@ -22,16 +23,21 @@ export async function recordFreeOnlineEntry({
   nameAddressKey,
   ipAddress,
   answers,
+  competition: competitionParam,
 }) {
   if (!isDbConfigured()) return { ok: false, error: 'Database not configured' }
 
   const sessionId = (verificationId || setupIntentId || '').trim()
   if (!sessionId) return { ok: false, error: 'Missing verification session' }
 
+  const competition = String(competitionParam || DRAW_COMPETITION_SLUG).trim()
+  const methodCheck = await assertCompetitionEntryMethod(competition, 'free_online')
+  if (!methodCheck.ok) return { ok: false, error: methodCheck.error }
+
   await ensureTicketSchema()
   await ensureFreeEntrySchema()
 
-  const periodResult = await getOpenCompetitionPeriodForEntry()
+  const periodResult = await getOpenCompetitionPeriodForEntry(competition)
   if (!periodResult.ok) {
     return { ok: false, error: periodResult.error || 'No open competition period' }
   }
@@ -58,9 +64,9 @@ export async function recordFreeOnlineEntry({
   await query(
     `INSERT INTO tickets (
       id, ticket_public_id, user_id, bundle_id, quantity, payment_status,
-      stripe_payment_intent_id, purchased_at, period_id
-    ) VALUES ($1, $2, $3, 'free_online', 1, 'free_verified', $4, $5, $6)`,
-    [ticketId, ticketPublicId, userId, sessionId, purchasedAt, periodResult.period.id],
+      stripe_payment_intent_id, purchased_at, period_id, competition
+    ) VALUES ($1, $2, $3, 'free_online', 1, 'free_verified', $4, $5, $6, $7)`,
+    [ticketId, ticketPublicId, userId, sessionId, purchasedAt, periodResult.period.id, competition],
   )
 
   const tnId = randomUUID()
@@ -91,7 +97,7 @@ export async function recordFreeOnlineEntry({
   await query(
     `INSERT INTO competition_entries (id, user_id, competition, entry_type, answers_json, all_correct)
      VALUES ($1, $2, $3, 'free', $4, $5)`,
-    [entryId, userId, COMPETITION_LEGACY_BUNDLE, JSON.stringify(answers), allVal],
+    [entryId, userId, competition, JSON.stringify(answers), allVal],
   )
 
   const freeRowId = randomUUID()
@@ -104,7 +110,7 @@ export async function recordFreeOnlineEntry({
     [
       freeRowId,
       userId,
-      COMPETITION_LEGACY_BUNDLE,
+      competition,
       nameAddressKey,
       customerFullName,
       customerEmail,

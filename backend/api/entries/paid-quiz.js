@@ -4,8 +4,10 @@ import { query, isDbConfigured, isUniqueViolation, dbIsPostgres } from '../lib/d
 import { validatePaidSkillAnswers } from '../../../shared/paidSkillQuestions.mjs'
 import { sendQuizResultEmail } from '../lib/sendQuizResultEmail.mjs'
 import { getLatestPaidPurchaseForEmail } from '../lib/ticketNumbers.mjs'
-import { getTicketBundleById } from '../../../shared/ticketBundles.mjs'
+import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
+import { resolveTicketBundle } from '../lib/competitionCatalog.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
+import { awardConsolationShirtEntries } from '../lib/awardConsolationShirtEntries.mjs'
 
 /**
  * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
@@ -35,8 +37,8 @@ export default async function handler(req, res) {
   const body = parseJsonBody(req)
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 200) : ''
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 320) : ''
-  const competition =
-    typeof body.competition === 'string' ? body.competition.trim().slice(0, 120) : 'ronaldo_legacy_bundle'
+  const bodyCompetition =
+    typeof body.competition === 'string' ? body.competition.trim().slice(0, 120) : ''
   const entryType = body.entryType === 'free' ? 'free' : 'paid'
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
   const validation = validatePaidSkillAnswers(answers.q1, answers.q2, answers.q3)
@@ -47,6 +49,19 @@ export default async function handler(req, res) {
   }
 
   try {
+    let purchase = null
+    if (entryType === 'paid') {
+      purchase = await getLatestPaidPurchaseForEmail(email)
+      if (!purchase) {
+        return json(res, 400, { error: 'No paid ticket found for this email. Complete checkout first.' })
+      }
+    }
+
+    const competition =
+      (entryType === 'paid' ? purchase?.competition : bodyCompetition) ||
+      bodyCompetition ||
+      DRAW_COMPETITION_SLUG
+
     let userId
     const newUserId = randomUUID()
     try {
@@ -71,10 +86,34 @@ export default async function handler(req, res) {
       [entryId, userId, competition, entryType, JSON.stringify(answers), allVal],
     )
 
+    let consolationShirtEntries = 0
+    let consolationShirtEntryNumbers = []
+    if (!allCorrect) {
+      const bundle =
+        purchase?.bundleId && purchase?.competition
+          ? await resolveTicketBundle(purchase.competition, purchase.bundleId)
+          : null
+      const consolation = await awardConsolationShirtEntries({
+        req,
+        fullName,
+        email,
+        competitionEntryId: entryId,
+        source: entryType === 'free' ? 'free' : 'paid',
+        amountPence: bundle?.totalPence,
+        orderRef: purchase?.orderRef,
+      })
+      if (consolation.awarded) {
+        consolationShirtEntries = consolation.entryCount
+        consolationShirtEntryNumbers = consolation.entryNumbers ?? []
+      }
+    }
+
     let quizEmailSent = false
-    if (entryType === 'paid') {
-      const purchase = await getLatestPaidPurchaseForEmail(email)
-      const bundle = purchase?.bundleId ? getTicketBundleById(purchase.bundleId) : null
+    if (entryType === 'paid' && purchase) {
+      const bundle =
+        purchase.bundleId && purchase.competition
+          ? await resolveTicketBundle(purchase.competition, purchase.bundleId)
+          : null
       let alreadySent = false
       if (purchase?.ticketId) {
         const sentRow = await query(`SELECT confirmation_email_sent_at FROM tickets WHERE id = $1`, [
@@ -92,6 +131,8 @@ export default async function handler(req, res) {
           quantity: purchase.quantity,
           amountPence: bundle?.totalPence,
           ticketNumbers: purchase.ticketNumbers ?? [],
+          consolationShirtEntries,
+          consolationShirtEntryNumbers,
         })
         quizEmailSent = Boolean(emailResult?.ok)
         if (quizEmailSent && purchase.ticketId) {
@@ -103,7 +144,14 @@ export default async function handler(req, res) {
       }
     }
 
-    return json(res, 201, { ok: true, validation, quizEmailSent })
+    return json(res, 201, {
+      ok: true,
+      validation,
+      quizEmailSent,
+      consolationShirtEntries,
+      consolationShirtEntryNumbers,
+      allCorrect,
+    })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not save entry' })

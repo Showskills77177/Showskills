@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto'
 import { query, dbIsPostgres } from './db.mjs'
 import {
   DRAW_COMPETITION_SLUG,
   PERIOD_STATUS,
   isPeriodEligibleForDraw,
 } from '../../../shared/competitionPeriods.mjs'
+import { MJ_COMPETITION_SLUG } from '../../../shared/adminCompetitions.mjs'
 
 let schemaEnsured = false
 
@@ -63,7 +63,7 @@ function mapPeriodRow(row) {
   }
 }
 
-export async function ensureDefaultCompetitionPeriod(competition = DRAW_COMPETITION_SLUG) {
+export async function ensureDefaultCompetitionPeriod(competition = DRAW_COMPETITION_SLUG, { title } = {}) {
   await ensureCompetitionPeriodsSchema()
   const existing = await query(
     `SELECT id FROM competition_periods WHERE competition = $1 LIMIT 1`,
@@ -71,23 +71,30 @@ export async function ensureDefaultCompetitionPeriod(competition = DRAW_COMPETIT
   )
   if (existing.rows[0]) return getCompetitionPeriodById(existing.rows[0].id)
 
-  const id = 'legacy-inaugural'
+  const id =
+    competition === DRAW_COMPETITION_SLUG
+      ? 'legacy-inaugural'
+      : competition === MJ_COMPETITION_SLUG
+        ? 'mj-inaugural'
+        : `${String(competition).replace(/[^a-z0-9_]/g, '_').slice(0, 40)}-inaugural`
   const now = new Date()
   const opens = new Date('2025-01-01T00:00:00.000Z').toISOString()
   const closes = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
+  const periodTitle =
+    typeof title === 'string' && title.trim()
+      ? `${title.trim()} — Inaugural period`
+      : competition === DRAW_COMPETITION_SLUG
+        ? 'Ronaldo Legacy Bundle — Inaugural Competition'
+        : competition === MJ_COMPETITION_SLUG
+          ? 'Michael Jackson Signed Album — Inaugural Competition'
+          : `${competition} — Inaugural period`
+  const summary =
+    'Initial competition period. Close this period when entries end, then run the draw from its isolated pool.'
   await query(
     `INSERT INTO competition_periods (
       id, competition, title, summary, entry_opens_at, entry_closes_at, status
     ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [
-      id,
-      competition,
-      'Ronaldo Legacy Bundle — Inaugural Competition',
-      'Initial competition period. Close this period when entries end, then run the draw from the isolated pool.',
-      opens,
-      closes,
-      PERIOD_STATUS.open,
-    ],
+    [id, competition, periodTitle, summary, opens, closes, PERIOD_STATUS.open],
   )
   const r = await query(`SELECT * FROM competition_periods WHERE id = $1`, [id])
   return mapPeriodRow(r.rows[0])
@@ -188,7 +195,7 @@ export async function createCompetitionPeriod({
   status = PERIOD_STATUS.draft,
 }) {
   await ensureCompetitionPeriodsSchema()
-  const id = `legacy-${Date.now().toString(36)}`
+  const id = `${String(competition).replace(/[^a-z0-9_]/g, '_').slice(0, 24)}-${Date.now().toString(36)}`
   const opens = new Date(entryOpensAt).toISOString()
   const closes = new Date(entryClosesAt).toISOString()
   if (!(closes > opens)) {

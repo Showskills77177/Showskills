@@ -12,16 +12,16 @@ test.describe('D) Admin panel', () => {
 
     await expect(page).toHaveURL(/\/admin\/dashboard/, { timeout: 20_000 })
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
-    await expect(page.getByText(/Kick-up submissions pending/i)).toBeVisible()
+    await expect(page.getByText(/shirt giveaway submissions pending/i)).toBeVisible()
 
     await page.getByRole('navigation').getByRole('link', { name: /Users & entries/i }).click()
     await expect(page.getByRole('heading', { name: /Users & entries/i })).toBeVisible({ timeout: 15_000 })
 
     await page.getByRole('navigation').getByRole('link', { name: /Draw winner/i }).click()
     await expect(page.getByRole('heading', { name: /Draw winner/i })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByRole('button', { name: /Draw winner now/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Draw winner for this period/i })).toBeVisible()
 
-    await page.getByRole('navigation').getByRole('link', { name: /Kick-up videos/i }).click()
+    await page.getByRole('navigation').getByRole('link', { name: /Shirt giveaway/i }).click()
     await expect(page.getByRole('heading', { name: /Free shirt giveaway/i })).toBeVisible()
   })
 

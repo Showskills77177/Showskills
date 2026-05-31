@@ -1,6 +1,8 @@
 import { Analytics } from '@vercel/analytics/react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { SiteAnalytics } from './components/SiteAnalytics'
 import { EntryFlowProvider } from './entry/EntryFlowProvider'
+import { AdminThemeProvider } from './admin/AdminThemeContext'
 import { AdminLayout } from './admin/AdminLayout'
 import { RequireAdmin } from './admin/RequireAdmin'
 import { Layout } from './components/Layout'
@@ -14,8 +16,10 @@ import AdminTicketsPage from './pages/admin/TicketsPage'
 import AdminPaymentsPage from './pages/admin/PaymentsPage'
 import AdminSubmissionsPage from './pages/admin/SubmissionsPage'
 import AdminTestEmailPage from './pages/admin/TestEmailPage'
+import AdminCompetitionsAdminPage from './pages/admin/CompetitionsAdminPage'
 import AdminDrawWinnerPage from './pages/admin/DrawWinnerPage'
 import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
+import AdminThemeDesignerPage from './pages/admin/ThemeDesignerPage'
 import ContactPage from './pages/ContactPage'
 import FaqPage from './pages/FaqPage'
 import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
@@ -30,14 +34,15 @@ export default function App() {
       <Analytics />
       <BrowserRouter basename={routerBasename}>
       <EntryFlowProvider>
+        <SiteAnalytics />
         <Routes>
           {import.meta.env.DEV ? (
             <Route
               path="/dev/email-preview"
               element={
-                <div className="min-h-svh bg-[#071512] px-4 py-8 text-stone-300 sm:px-8">
-                  <div className="mx-auto max-w-6xl">
-                    <p className="mb-6 text-sm text-amber-200/90">
+                <div className="min-h-svh bg-stone-50 px-4 py-8 text-stone-800 sm:px-8">
+                  <div className="ss-admin mx-auto max-w-6xl">
+                    <p className="mb-6 text-sm text-amber-800">
                       Local dev only — same previews as{' '}
                       <span className="font-mono text-stone-400">/admin/test-email</span> (no login).
                     </p>
@@ -47,19 +52,23 @@ export default function App() {
               }
             />
           ) : null}
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/admin" element={<RequireAdmin />}>
-            <Route element={<AdminLayout />}>
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<AdminDashboardPage />} />
-              <Route path="users" element={<AdminUsersPage />} />
-              <Route path="tickets" element={<AdminTicketsPage />} />
-              <Route path="draw" element={<AdminDrawWinnerPage />} />
-              <Route path="entry-attempts" element={<AdminEntryAttemptsPage />} />
-              <Route path="payments" element={<AdminPaymentsPage />} />
-              <Route path="submissions" element={<AdminSubmissionsPage />} />
-              <Route path="test-email" element={<AdminTestEmailPage />} />
-              <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/admin" element={<AdminThemeProvider />}>
+            <Route path="login" element={<AdminLoginPage />} />
+            <Route element={<RequireAdmin />}>
+              <Route element={<AdminLayout />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<AdminDashboardPage />} />
+                <Route path="competitions" element={<AdminCompetitionsAdminPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="tickets" element={<AdminTicketsPage />} />
+                <Route path="draw" element={<AdminDrawWinnerPage />} />
+                <Route path="entry-attempts" element={<AdminEntryAttemptsPage />} />
+                <Route path="payments" element={<AdminPaymentsPage />} />
+                <Route path="submissions" element={<AdminSubmissionsPage />} />
+                <Route path="test-email" element={<AdminTestEmailPage />} />
+                <Route path="theme" element={<AdminThemeDesignerPage />} />
+                <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+              </Route>
             </Route>
           </Route>
           <Route path="/" element={<Layout />}>

@@ -19,6 +19,12 @@ import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
 import { isCashflowsFrontendEnabled } from '../../shared/paymentFrontendConfig.mjs'
+import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
+import {
+  firstAvailableEntryRoute,
+  legacyEntryMethods,
+} from '../../shared/competitionEntryMethods.mjs'
+import { COMPETITION_NAME_POSTAL } from '../competitionData'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -47,6 +53,8 @@ export function EntryFlowProvider({ children }) {
     if (forced && getTicketBundleById(forced)) return forced
     return DEFAULT_TICKET_BUNDLE_ID
   })
+  const [paidCompetitionSlug, setPaidCompetitionSlug] = useState(DRAW_COMPETITION_SLUG)
+  const [paidCompetitionMeta, setPaidCompetitionMeta] = useState(null)
   /** 'tickets' = paid bundles; 'postal' = free postal (same draw), chosen inside Legacy modal */
   const [paidEntryRoute, setPaidEntryRoute] = useState('tickets')
   const [paidConsent, setPaidConsent] = useState(false)
@@ -66,6 +74,7 @@ export function EntryFlowProvider({ children }) {
   const [paidA3, setPaidA3] = useState('')
   const [paidQuizError, setPaidQuizError] = useState('')
   const [paidQuizResult, setPaidQuizResult] = useState(() => initialQuizSession?.quizResult || null)
+  const [paidConsolationShirtEntries, setPaidConsolationShirtEntries] = useState(0)
   const [paidQuizSubmitted, setPaidQuizSubmitted] = useState(
     () => initialQuizSession?.status === 'answered',
   )
@@ -150,7 +159,30 @@ export function EntryFlowProvider({ children }) {
   const [paidCashflowsJobRef, setPaidCashflowsJobRef] = useState('')
   const [paidCashflowsIntegration, setPaidCashflowsIntegration] = useState(true)
 
-  const visibleTicketBundles = useMemo(() => getVisibleTicketBundles(), [])
+  const paidEntryMethods = useMemo(() => {
+    if (paidCompetitionMeta) {
+      return {
+        allowPaidEntry: paidCompetitionMeta.allowPaidEntry !== false,
+        allowFreeOnline: Boolean(paidCompetitionMeta.allowFreeOnline),
+        allowPostalEntry: Boolean(paidCompetitionMeta.allowPostalEntry),
+        postalCompetitionName:
+          paidCompetitionMeta.postalCompetitionName ||
+          paidCompetitionMeta.title ||
+          COMPETITION_NAME_POSTAL,
+      }
+    }
+    return legacyEntryMethods()
+  }, [paidCompetitionMeta])
+
+  const visibleTicketBundles = useMemo(() => {
+    if (paidCompetitionMeta?.bundles?.length) {
+      return paidCompetitionMeta.bundles.map((b) => ({
+        ...b,
+        id: b.id || b.bundleKey,
+      }))
+    }
+    return getVisibleTicketBundles()
+  }, [paidCompetitionMeta])
 
   const selectedTicketBundle = useMemo(() => {
     const fromVisible = visibleTicketBundles.find((b) => b.id === paidBundleId)
@@ -162,18 +194,33 @@ export function EntryFlowProvider({ children }) {
     )
   }, [paidBundleId, visibleTicketBundles])
 
-  const paidTicketQty = selectedTicketBundle.qty
+  const paidTicketQty = selectedTicketBundle?.qty ?? 1
 
-  const applyPaidEntryContact = useCallback((contact) => {
-    const stored = loadPaidEntryContact()
-    const em = (contact?.email || stored?.email || '').trim()
-    const fn = (contact?.fullName || stored?.fullName || '').trim()
-    const ph = (contact?.phone || stored?.phone || '').trim()
-    if (em) setPaidEmail(em)
-    if (fn) setPaidFullName(fn)
-    if (ph) setPaidPhone(ph)
-    if (em || fn) clearPaidEntryContact()
-  }, [])
+  useEffect(() => {
+    let cancelled = false
+    fetch(apiUrl(`/api/competitions?slug=${encodeURIComponent(paidCompetitionSlug)}`))
+      .then((res) => res.json().catch(() => ({})))
+      .then((j) => {
+        if (cancelled) return
+        setPaidCompetitionMeta(j.competition || null)
+      })
+      .catch(() => {
+        if (!cancelled) setPaidCompetitionMeta(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [paidCompetitionSlug])
+
+  useEffect(() => {
+    const routeOk =
+      (paidEntryRoute === 'tickets' && paidEntryMethods.allowPaidEntry) ||
+      (paidEntryRoute === 'free_online' && paidEntryMethods.allowFreeOnline) ||
+      (paidEntryRoute === 'postal' && paidEntryMethods.allowPostalEntry)
+    if (!routeOk) {
+      setPaidEntryRoute(firstAvailableEntryRoute(paidEntryMethods))
+    }
+  }, [paidEntryMethods, paidEntryRoute])
 
   const persistPaidQuizSession = useCallback(
     (overrides = {}) => {
@@ -221,6 +268,7 @@ export function EntryFlowProvider({ children }) {
     setPaidPostCheckout(true)
     setPaidQuizSubmitted(false)
     setPaidQuizResult(null)
+    setPaidConsolationShirtEntries(0)
     setPaidQuizSubmitting(false)
     setPaidA1('')
     setPaidA2('')
@@ -439,7 +487,10 @@ export function EntryFlowProvider({ children }) {
     }
   }, [])
 
-  const openEntry = useCallback((type) => {
+  const openEntry = useCallback((type, options = {}) => {
+    if (options?.competitionSlug) {
+      setPaidCompetitionSlug(String(options.competitionSlug).trim())
+    }
     setEntryModalType(type)
     if (type === 'kickups') {
       setKickError('')
@@ -551,6 +602,7 @@ export function EntryFlowProvider({ children }) {
         signal,
         body: JSON.stringify({
           bundleId: bundle.id,
+          competition: paidCompetitionSlug,
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),
           customerPhone: paidPhone.trim(),
@@ -577,7 +629,7 @@ export function EntryFlowProvider({ children }) {
       }
       return token
     },
-    [paidBundleId, paidEmail, paidFullName, paidPhone, cashflowsCreateApi],
+    [paidBundleId, paidCompetitionSlug, paidEmail, paidFullName, paidPhone, cashflowsCreateApi],
   )
 
   /** Background warm-up once name, email, and consent are filled (Pay now opens faster). */
@@ -661,8 +713,18 @@ export function EntryFlowProvider({ children }) {
       addressLine2: freeAddressLine2.trim(),
       city: freeCity.trim(),
       postcode: freePostcode.trim(),
+      competition: paidCompetitionSlug,
     }),
-    [paidFullName, paidEmail, paidPhone, freeAddressLine1, freeAddressLine2, freeCity, freePostcode],
+    [
+      paidFullName,
+      paidEmail,
+      paidPhone,
+      freeAddressLine1,
+      freeAddressLine2,
+      freeCity,
+      freePostcode,
+      paidCompetitionSlug,
+    ],
   )
 
   const handleStartFreeVerification = useCallback(async () => {
@@ -671,6 +733,7 @@ export function EntryFlowProvider({ children }) {
     setFreeVerificationJobRef('')
     setPaidQuizSubmitted(false)
     setPaidQuizResult(null)
+    setPaidConsolationShirtEntries(0)
     if (!paidConsent) {
       setPaidError('Please agree to the Terms & Conditions and Privacy Policy.')
       return
@@ -762,6 +825,7 @@ export function EntryFlowProvider({ children }) {
           body: JSON.stringify({
             ...freeVerifyPayload,
             paymentJobReference: freeVerificationJobRef,
+            competition: paidCompetitionSlug,
             answers: { q1: paidA1.trim(), q2: paidA2.trim(), q3: paidA3.trim() },
           }),
         })
@@ -775,6 +839,7 @@ export function EntryFlowProvider({ children }) {
         setPaidPostCheckout(true)
         setPaidQuizSubmitted(true)
         setPaidQuizResult(data.allCorrect ? 'qualified' : 'not_qualified')
+        setPaidConsolationShirtEntries(Number(data.consolationShirtEntries) || 0)
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
       } catch {
         setPaidError('Network error. Check your connection and try again.')
@@ -827,6 +892,7 @@ export function EntryFlowProvider({ children }) {
               customerEmail: em,
               customerFullName: fn,
               bundleId: bundle.id,
+              competition: paidCompetitionSlug,
               quantity: bundle.qty,
               amountPence: bundle.totalPence,
             }),
@@ -862,6 +928,7 @@ export function EntryFlowProvider({ children }) {
     paidBundleId,
     paidEmail,
     paidFullName,
+    paidCompetitionSlug,
     markPaidCheckoutComplete,
     hasPayPal,
   ])
@@ -889,7 +956,7 @@ export function EntryFlowProvider({ children }) {
           body: JSON.stringify({
             fullName: fn,
             email: em,
-            competition: 'ronaldo_legacy_bundle',
+            competition: paidCompetitionSlug,
             entryType: 'paid',
             answers: { q1: paidA1, q2: paidA2, q3: paidA3 },
           }),
@@ -903,6 +970,7 @@ export function EntryFlowProvider({ children }) {
         }
         const result = allCorrect ? 'qualified' : 'not_qualified'
         setPaidQuizResult(result)
+        setPaidConsolationShirtEntries(Number(data.consolationShirtEntries) || 0)
         if (data.quizEmailSent) setPaidEmailConfirmationSent(true)
         setPaidQuizSubmitted(true)
         unansweredTicketEmailRequestedRef.current = true
@@ -920,7 +988,7 @@ export function EntryFlowProvider({ children }) {
         setPaidQuizSubmitting(false)
       }
     },
-    [paidA1, paidA2, paidA3, paidEmail, paidFullName, paidOrderRef, paidTicketNumbers],
+    [paidA1, paidA2, paidA3, paidEmail, paidFullName, paidOrderRef, paidTicketNumbers, paidCompetitionSlug],
   )
 
   const handleKickupsGiveawaySubmit = useCallback(
@@ -1010,6 +1078,11 @@ export function EntryFlowProvider({ children }) {
       closeEntry,
       paidBundleId,
       setPaidBundleId,
+      paidCompetitionSlug,
+      setPaidCompetitionSlug,
+      paidEntryMethods,
+      paidCompetitionTitle: paidCompetitionMeta?.title || 'prize draw',
+      postalCompetitionName: paidEntryMethods.postalCompetitionName,
       paidEntryRoute,
       setPaidEntryRoute,
       paidTicketQty,
@@ -1031,6 +1104,7 @@ export function EntryFlowProvider({ children }) {
       setPaidA3,
       paidQuizError,
       paidQuizResult,
+      paidConsolationShirtEntries,
       paidQuizSubmitted,
       paidQuizSubmitting,
       visibleTicketBundles,
@@ -1107,6 +1181,9 @@ export function EntryFlowProvider({ children }) {
       openEntry,
       closeEntry,
       paidBundleId,
+      paidCompetitionSlug,
+      paidEntryMethods,
+      paidCompetitionMeta,
       paidEntryRoute,
       paidTicketQty,
       selectedTicketBundle,
@@ -1122,6 +1199,7 @@ export function EntryFlowProvider({ children }) {
       paidA3,
       paidQuizError,
       paidQuizResult,
+      paidConsolationShirtEntries,
       paidQuizSubmitted,
       paidQuizSubmitting,
       visibleTicketBundles,

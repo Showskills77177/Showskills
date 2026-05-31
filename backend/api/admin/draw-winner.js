@@ -2,7 +2,6 @@ import { requireAdmin } from '../lib/adminAuth.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import {
-  DEFAULT_DRAW_COMPETITION,
   fetchDrawPoolSummary,
   listDrawRuns,
   runFairDraw,
@@ -12,12 +11,12 @@ import {
   resolvePeriodForAdmin,
 } from '../lib/competitionPeriods.mjs'
 import {
-  DRAW_COMPETITION_LABEL,
   PERIOD_COPY,
   PERIOD_STATUS_LABELS,
   formatPeriodRange,
   isPeriodEligibleForDraw,
 } from '../../../shared/competitionPeriods.mjs'
+import { resolveAdminMainDrawCompetition } from '../lib/checkoutBundle.mjs'
 
 function queryParam(req, key) {
   try {
@@ -47,7 +46,10 @@ export default async function handler(req, res) {
     return json(res, 503, { error: 'Database not configured' })
   }
 
-  const competition = DEFAULT_DRAW_COMPETITION
+  const competitionParam = queryParam(req, 'competition')
+  const resolvedComp = await resolveAdminMainDrawCompetition(competitionParam)
+  if (!resolvedComp.ok) return json(res, 400, { error: resolvedComp.error })
+  const competition = resolvedComp.slug
 
   try {
     if (req.method === 'GET') {
@@ -67,7 +69,8 @@ export default async function handler(req, res) {
 
       return json(res, 200, {
         ...summary,
-        label: DRAW_COMPETITION_LABEL,
+        competition,
+        label: resolvedComp.competition.title,
         period: {
           ...period,
           statusLabel: PERIOD_STATUS_LABELS[period.status] || period.status,
@@ -94,15 +97,20 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = parseJsonBody(req)
       const periodId = typeof body.periodId === 'string' ? body.periodId.trim() : ''
+      const drawResolved = await resolveAdminMainDrawCompetition(
+        typeof body.competition === 'string' ? body.competition.trim() : competition
+      )
+      if (!drawResolved.ok) return json(res, 400, { error: drawResolved.error })
+      const drawCompetition = drawResolved.slug
       if (!periodId) {
         return json(res, 400, { error: 'periodId is required. Select the closed competition period to draw from.' })
       }
 
-      const resolved = await resolvePeriodForAdmin(competition, periodId)
+      const resolved = await resolvePeriodForAdmin(drawCompetition, periodId)
       if (!resolved.ok) return json(res, 400, { error: resolved.error })
 
       const result = await runFairDraw({
-        competition,
+        competition: drawCompetition,
         period: resolved.period,
         sendWinnerEmail: body.sendWinnerEmail !== false,
       })

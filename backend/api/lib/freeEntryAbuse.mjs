@@ -74,25 +74,28 @@ export async function countCardVerificationsByIp(ip, competition = COMPETITION_L
 }
 
 /** Setup intents started or completed from this IP (anti card-verify spam). */
-export async function countLegacyVerifyAttemptsByIp(ip) {
+export async function countLegacyVerifyAttemptsByIp(ip, competition = COMPETITION_LEGACY_BUNDLE) {
   await ensureFreeEntrySchema()
   const r = await query(
     `SELECT COUNT(*)::int AS c FROM entry_attempt_logs
      WHERE competition = $1 AND flow = 'legacy_free_online' AND ip_address = $2
        AND outcome IN ('setup_created', 'success')`,
-    [COMPETITION_LEGACY_BUNDLE, ip],
+    [competition, ip],
   )
   return Number(r.rows[0]?.c ?? 0)
 }
 
 /** Before card verify — IP cap only (questions come after verify). */
-export async function checkLegacyFreeIpLimits(req, { fullName, email, address }) {
+export async function checkLegacyFreeIpLimits(req, { fullName, email, address, competition = COMPETITION_LEGACY_BUNDLE }) {
   const ip = clientIp(req)
   const nameAddressKey = buildNameAddressKey({ fullName, ...address })
-  const ipCount = Math.max(await countCardVerificationsByIp(ip), await countLegacyVerifyAttemptsByIp(ip))
+  const ipCount = Math.max(
+    await countCardVerificationsByIp(ip, competition),
+    await countLegacyVerifyAttemptsByIp(ip, competition),
+  )
   if (ipCount >= MAX_CARD_VERIFICATIONS_PER_IP_LEGACY) {
     await logEntryAttempt(req, {
-      competition: COMPETITION_LEGACY_BUNDLE,
+      competition,
       flow: 'legacy_free_online',
       fullName,
       email,
@@ -106,13 +109,16 @@ export async function checkLegacyFreeIpLimits(req, { fullName, email, address })
 }
 
 /** After card verify, when submitting skill answers — name + address cap. */
-export async function checkLegacyFreeNameAddressLimits(req, { fullName, email, address }) {
+export async function checkLegacyFreeNameAddressLimits(
+  req,
+  { fullName, email, address, competition = COMPETITION_LEGACY_BUNDLE },
+) {
   const ip = clientIp(req)
   const nameAddressKey = buildNameAddressKey({ fullName, ...address })
-  const nameCount = await countFreeEntriesByNameAddress(nameAddressKey)
+  const nameCount = await countFreeEntriesByNameAddress(nameAddressKey, competition)
   if (nameCount >= MAX_FREE_LEGACY_PER_NAME_ADDRESS) {
     await logEntryAttempt(req, {
-      competition: COMPETITION_LEGACY_BUNDLE,
+      competition,
       flow: 'legacy_free_online',
       fullName,
       email,

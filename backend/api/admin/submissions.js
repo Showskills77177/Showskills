@@ -3,6 +3,7 @@ import { query, isDbConfigured } from '../lib/db.mjs'
 import { json, readJsonBody } from '../lib/http.mjs'
 import { deleteLocalKickupFileFromRef } from '../lib/kickupUploads.mjs'
 import { parseAdminListQuery, adminListMeta } from '../lib/adminPagination.mjs'
+import { ensureShirtEntrySchema } from '../lib/shirtEntryNumbers.mjs'
 
 /** Express: use native .status().json() so the response always completes (avoids subtle res.end issues). */
 function sendJson(res, status, data) {
@@ -69,23 +70,32 @@ export default async function handler(req, res) {
       const sp = searchParamsFromReq(req)
       const pathUrl = new URL(req.originalUrl || req.url || '/', 'http://local')
       const q = (firstQueryString(req.query?.q) || sp.get('q') || pathUrl.searchParams.get('q') || '').trim()
-      const { page, pageSize, offset } = parseAdminListQuery(pathUrl)
+      const { page, pageSize, offset, competition } = parseAdminListQuery(pathUrl, {
+        competitionKind: 'giveaway',
+      })
+
+      await ensureShirtEntrySchema()
 
       let where = 'WHERE 1=1'
       const params = []
+      if (competition) {
+        params.push(competition)
+        where += ` AND COALESCE(competition, 'ronaldo_shirt_giveaway') = $${params.length}`
+      }
       if (q) {
         params.push(`%${q}%`, `%${q}%`)
-        where += ` AND (email ILIKE $1 OR full_name ILIKE $2)`
+        where += ` AND (email ILIKE $${params.length - 1} OR full_name ILIKE $${params.length})`
       }
 
       const countRes = await query(`SELECT COUNT(*)::int AS c FROM kickup_submissions ${where}`, params)
       const total = Number(countRes.rows[0]?.c ?? 0)
 
-      let sql = `SELECT * FROM kickup_submissions ${where} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${offset}`
+      const sql = `SELECT * FROM kickup_submissions ${where} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${offset}`
       const r = await query(sql, params)
       res.setHeader('Cache-Control', 'private, no-store')
       return sendJson(res, 200, {
         rows: normalizeKickupRows(r.rows),
+        competition: competition || null,
         ...adminListMeta(total, page, pageSize),
       })
     }

@@ -241,10 +241,25 @@ export function TermsModal({ open, onClose }) {
             Each competition runs for a defined <strong>entry period</strong>; only qualifying entries received within that
             period are included in the draw for that period. When a period closes, the winner is drawn only from that
             period&apos;s pool — entries from earlier or later periods are not mixed in. After purchasing ticket(s), you must submit <strong>three free-text answers</strong> about
-            Cristiano Ronaldo. <strong>All answers must be correct</strong> for your entry to qualify. There are{' '}
+            Cristiano Ronaldo. <strong>All answers must be correct</strong> for your entry to qualify for the main draw. There are{' '}
             <strong>no multiple-choice options</strong>; answers are typed manually and judged against the correct
-            solutions. <strong>Incorrect or incomplete answers do not win</strong> and do not receive a prize. Multiple
-            ticket purchases are allowed where shown on the entry page; each qualifying route is described there.
+            solutions. <strong>You have one attempt at the three questions per entry</strong> — answers cannot be changed after submission.
+            Multiple ticket purchases are allowed where shown on the entry page; each purchase starts a new entry (subject to the rules below).
+          </p>
+
+          <h3 className="mb-2 mt-4 font-semibold text-stone-200">2a. Consolation prize (Free Ronaldo Shirt Giveaway)</h3>
+          <p className="mb-3">
+            The main Legacy Bundle draw remains strictly skill-based: incorrect answers do <strong>not</strong> qualify for
+            the bundle prize, and <strong>tickets are not refunded</strong> if your skill answers are wrong.
+          </p>
+          <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
+            <strong>Consolation prize:</strong> If you get the three skill questions wrong, you automatically receive{' '}
+            <strong>2 entries</strong> into the separate <strong>Free Ronaldo Shirt Giveaway</strong> (consolation prize).
+            This applies equally to <strong>free online Legacy Bundle entrants</strong> and to{' '}
+            <strong>paid ticket buyers who spend £10 or more on tickets in a single purchase</strong>. Consolation entries
+            do <strong>not</strong> enter you into the main Legacy Bundle draw and do <strong>not</strong> replace a
+            qualifying entry. They are recorded automatically — you do not need to complete the separate shirt giveaway form
+            again for these consolation entries.
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">3. Winner selection (paid)</h3>
@@ -294,7 +309,8 @@ export function TermsModal({ open, onClose }) {
             The Ronaldo shirt giveaway is a <strong>separate, free engagement giveaway</strong> for promotion only. Entry
             is <strong>free</strong> (no payment). You answer one simple qualification question; the prize is a{' '}
             <strong>Ronaldo signed shirt only</strong> (not the full bundle). It does <strong>not</strong> form part of
-            the paid Ronaldo Legacy Bundle competition unless expressly stated.
+            the paid Ronaldo Legacy Bundle competition unless expressly stated. Legacy Bundle entrants who get the three skill
+            questions wrong may receive <strong>automatic consolation entries</strong> into this shirt draw — see section 2a above.
           </p>
           <p className="mb-3">
             The qualification question is: <strong>{SHIRT_GIVEAWAY_QUESTION}</strong>. Correct eligible entries qualify

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AdminLogo } from '../../admin/AdminLogo'
+import { AdminThemePicker } from '../../admin/AdminThemePicker'
+import { useAdminTheme } from '../../admin/AdminThemeContext'
+import { adminThemeRootClass } from '../../admin/adminThemes.mjs'
 import { apiUrl } from '../../lib/api'
 
 function parseLoginResponse(res, text) {
@@ -16,6 +19,7 @@ function parseLoginResponse(res, text) {
 export default function AdminLoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { theme } = useAdminTheme()
   const from = typeof location.state?.from === 'string' ? location.state.from : '/admin/dashboard'
 
   const [username, setUsername] = useState('')
@@ -204,12 +208,15 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-stone-950 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-stone-900/80 p-8 shadow-xl">
+    <div className={`${adminThemeRootClass(theme)} ${theme.loginOuter}`}>
+      <div className="absolute right-4 top-4">
+        <AdminThemePicker compact />
+      </div>
+      <div className={theme.loginCard}>
         <div className="mb-6 flex justify-center">
           <AdminLogo linkTo={null} size="lg" />
         </div>
-        <h1 className="text-center text-lg font-semibold text-stone-100">Admin sign in</h1>
+        <h1 className={theme.loginTitle}>Admin sign in</h1>
         {otpStep ? (
           <>
             <p className="mt-2 text-center text-sm text-stone-400">
@@ -236,7 +243,7 @@ export default function AdminLoginPage() {
                   maxLength={6}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="mt-1 w-full min-h-[44px] rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-center font-mono text-lg tracking-[0.3em] text-stone-100 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                  className={theme.inputOtp}
                   placeholder="000000"
                 />
               </div>
@@ -255,7 +262,7 @@ export default function AdminLoginPage() {
                 disabled={resendLoading || resendCooldown > 0}
                 onClick={onResendCode}
                 aria-label="Resend verification code to email"
-                className="min-h-[44px] rounded-xl border border-white/15 py-2.5 text-sm font-medium text-stone-200 hover:border-teal-600/40 hover:text-teal-100 disabled:opacity-50"
+                className={theme.secondaryBtn}
               >
                 {resendLoading
                   ? 'Sending…'
@@ -315,7 +322,7 @@ export default function AdminLoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                  className={theme.input}
                 />
               </div>
               <div>
@@ -328,14 +335,14 @@ export default function AdminLoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-200 focus:border-teal-600/50 focus:outline-none focus:ring-2 focus:ring-teal-900/40"
+                  className={theme.input}
                 />
                 <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-stone-400 select-none">
                   <input
                     type="checkbox"
                     checked={showPassword}
                     onChange={(e) => setShowPassword(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-white/25 bg-black/40 text-teal-600 focus:ring-teal-900/40"
+                    className={theme.checkbox}
                   />
                   Show password
                 </label>

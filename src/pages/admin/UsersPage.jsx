@@ -2,9 +2,18 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../../lib/api'
 import { AdminPagination } from '../../components/admin/AdminPagination'
 import { AdminHelpBanner, ADMIN_PAGE_SIZE } from '../../components/admin/AdminHelpBanner'
+import {
+  AdminCompetitionSelect,
+  competitionFilterLabel,
+} from '../../components/admin/AdminCompetitionSelect'
 import { USERS_TAB_HELP } from '../../../shared/adminListCopy.mjs'
+import {
+  defaultMainDrawCompetitionSlug,
+  getMainDrawCompetitionLabel,
+} from '../../../shared/adminCompetitions.mjs'
 
 export default function AdminUsersPage() {
+  const [competition, setCompetition] = useState(defaultMainDrawCompetitionSlug())
   const [tab, setTab] = useState('users')
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
@@ -26,7 +35,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     setUsersPage(1)
     setEntriesPage(1)
-  }, [debounced])
+  }, [debounced, competition])
 
   const loadUsers = useCallback(async () => {
     const qs = new URLSearchParams({
@@ -34,12 +43,13 @@ export default function AdminUsersPage() {
       pageSize: String(ADMIN_PAGE_SIZE),
     })
     if (debounced) qs.set('q', debounced)
+    if (competition) qs.set('competition', competition)
     const res = await apiFetch(`/api/admin/users?${qs}`)
     const j = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(j.error || 'Users failed')
     setUsers(j.rows || [])
     setUsersMeta({ total: j.total ?? 0, totalPages: j.totalPages ?? 1 })
-  }, [debounced, usersPage])
+  }, [debounced, usersPage, competition])
 
   const loadEntries = useCallback(async () => {
     const qs = new URLSearchParams({
@@ -47,12 +57,13 @@ export default function AdminUsersPage() {
       pageSize: String(ADMIN_PAGE_SIZE),
     })
     if (debounced) qs.set('q', debounced)
+    if (competition) qs.set('competition', competition)
     const res = await apiFetch(`/api/admin/entries?${qs}`)
     const j = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(j.error || 'Entries failed')
     setEntries(j.rows || [])
     setEntriesMeta({ total: j.total ?? 0, totalPages: j.totalPages ?? 1 })
-  }, [debounced, entriesPage])
+  }, [debounced, entriesPage, competition])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,36 +105,57 @@ export default function AdminUsersPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-xl font-semibold text-stone-100">Users &amp; entries</h1>
-        <input
-          type="search"
-          placeholder="Search email or name…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none"
-        />
+        <div className="flex flex-wrap items-end gap-3">
+          <AdminCompetitionSelect
+            kind="mainDraw"
+            value={competition}
+            onChange={setCompetition}
+            allowAll={false}
+            label="Main prize draw"
+          />
+          <input
+            type="search"
+            placeholder="Search email or name…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="w-full max-w-xs rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-teal-600/50 focus:outline-none"
+          />
+        </div>
       </div>
 
-      <AdminHelpBanner title={tabHelp.title}>{tabHelp.body}</AdminHelpBanner>
+      <AdminHelpBanner title={`${tabHelp.title} — ${competitionFilterLabel('mainDraw', competition)}`}>
+        {tabHelp.body}
+      </AdminHelpBanner>
 
-      <div className="flex gap-2 border-b border-white/10 pb-2">
+      <div className="ss-admin-users-tabs flex gap-2 border-b border-white/10 pb-2">
         <button
           type="button"
           onClick={() => setTab('users')}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${tab === 'users' ? 'bg-teal-900/40 text-teal-100' : 'text-stone-400 hover:bg-white/5'}`}
+          aria-pressed={tab === 'users'}
+          className={`ss-admin-tab rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium ${
+            tab === 'users' ? 'ss-admin-tab--active bg-teal-900/40 text-teal-100' : 'text-stone-400 hover:bg-white/5'
+          }`}
         >
           Users
           {usersMeta.total ? (
-            <span className="ml-1.5 tabular-nums text-stone-500">({usersMeta.total.toLocaleString()})</span>
+            <span className="ss-admin-tab-count ml-1.5 tabular-nums text-stone-500">
+              ({usersMeta.total.toLocaleString()})
+            </span>
           ) : null}
         </button>
         <button
           type="button"
           onClick={() => setTab('entries')}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium ${tab === 'entries' ? 'bg-teal-900/40 text-teal-100' : 'text-stone-400 hover:bg-white/5'}`}
+          aria-pressed={tab === 'entries'}
+          className={`ss-admin-tab rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium ${
+            tab === 'entries' ? 'ss-admin-tab--active bg-teal-900/40 text-teal-100' : 'text-stone-400 hover:bg-white/5'
+          }`}
         >
           Quiz entries
           {entriesMeta.total ? (
-            <span className="ml-1.5 tabular-nums text-stone-500">({entriesMeta.total.toLocaleString()})</span>
+            <span className="ss-admin-tab-count ml-1.5 tabular-nums text-stone-500">
+              ({entriesMeta.total.toLocaleString()})
+            </span>
           ) : null}
         </button>
       </div>
@@ -179,6 +211,7 @@ export default function AdminUsersPage() {
                 <tr>
                   <th className="px-2.5 py-2 font-medium">Name</th>
                   <th className="px-2.5 py-2 font-medium">Email</th>
+                  <th className="px-2.5 py-2 font-medium">Competition</th>
                   <th className="px-2.5 py-2 font-medium">Type</th>
                   <th className="px-2.5 py-2 font-medium">Auto-correct</th>
                   <th className="px-2.5 py-2 font-medium">Valid</th>
@@ -196,6 +229,9 @@ export default function AdminUsersPage() {
                           {row.full_name || '—'}
                         </td>
                         <td className="max-w-[12rem] truncate px-2.5 py-2 text-stone-400">{row.email || '—'}</td>
+                        <td className="max-w-[10rem] truncate px-2.5 py-2 text-xs text-stone-500">
+                          {getMainDrawCompetitionLabel(row.competition)}
+                        </td>
                         <td className="whitespace-nowrap px-2.5 py-2 text-stone-500">{row.entry_type}</td>
                         <td className="px-2.5 py-2">
                           <BoolPill value={row.all_correct} />
@@ -216,7 +252,7 @@ export default function AdminUsersPage() {
                       </tr>
                       {open ? (
                         <tr className="bg-black/25">
-                          <td colSpan={7} className="px-2.5 py-2">
+                          <td colSpan={8} className="px-2.5 py-2">
                             <pre className="max-h-28 overflow-auto rounded bg-black/40 p-2 font-mono text-xs leading-snug text-stone-400">
                               {JSON.stringify(row.answers_json ?? {}, null, 2)}
                             </pre>

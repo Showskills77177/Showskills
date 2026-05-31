@@ -2,6 +2,7 @@ import { getPayPalCredentials, paypalAccessToken } from './lib/paypal.js'
 import { recordPayPalCapture } from './lib/recordSale.mjs'
 import { isDbConfigured, query } from './lib/db.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
+import { getCountryCodeFromRequest } from './lib/visitorGeo.mjs'
 import { assertPayPalCaptureMatchesBundle } from './lib/paymentSecurity.mjs'
 
 function parseBody(req) {
@@ -97,6 +98,7 @@ export default async function handler(req, res) {
             quantity: bundleCheck.bundle.qty,
             amountPence: bundleCheck.amountPence,
             currency: bundleCheck.currency,
+            countryCode: getCountryCodeFromRequest(req),
           })
           if (recorded) {
             return res.status(200).json({

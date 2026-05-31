@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAdminThemeOptional } from '../../admin/AdminThemeContext'
+import { DEFAULT_ADMIN_THEME_ID, getAdminTheme } from '../../admin/adminThemes.mjs'
 
 /**
  * Renders full HTML emails in admin preview. `srcDoc` + empty sandbox often shows a blank
  * green panel in Chrome/Safari; a blob URL iframe renders the same HTML clients receive.
  */
 export function EmailHtmlPreviewFrame({ html, title = 'Email HTML preview' }) {
+  const ctx = useAdminThemeOptional()
+  const theme = ctx?.theme ?? getAdminTheme(DEFAULT_ADMIN_THEME_ID)
   const iframeRef = useRef(null)
   const [blobUrl, setBlobUrl] = useState('')
 
@@ -30,27 +34,31 @@ export function EmailHtmlPreviewFrame({ html, title = 'Email HTML preview' }) {
   }, [blobUrl, html, resizeFrame])
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0c1a16]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-black/30 px-3 py-2">
-        <span className="text-xs text-stone-500">Rendered like a real inbox (links open in a new tab)</span>
+    <div className={theme.emailPreviewChrome}>
+      <div className={theme.emailPreviewToolbar}>
+        <span className={theme.emailPreviewToolbarText}>
+          Rendered like a real inbox (links open in a new tab)
+        </span>
         {blobUrl ? (
           <a
             href={blobUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-medium text-teal-400 underline underline-offset-2 hover:text-teal-300"
+            className={theme.emailPreviewToolbarLink}
           >
             Open full preview
           </a>
         ) : null}
       </div>
-      <iframe
-        ref={iframeRef}
-        title={title}
-        src={blobUrl || 'about:blank'}
-        onLoad={resizeFrame}
-        className="block w-full min-h-[520px] border-0 bg-[#0c1a16]"
-      />
+      <div className="ss-admin-email-preview-canvas bg-[#0c1a16]">
+        <iframe
+          ref={iframeRef}
+          title={title}
+          src={blobUrl || 'about:blank'}
+          onLoad={resizeFrame}
+          className="block w-full min-h-[520px] border-0 bg-[#0c1a16]"
+        />
+      </div>
     </div>
   )
 }

@@ -125,7 +125,7 @@ export async function getLatestPaidPurchaseForEmail(email) {
   if (!u.rows[0]) return null
 
   const t = await query(
-    `SELECT id, ticket_public_id, bundle_id, quantity
+    `SELECT id, ticket_public_id, bundle_id, quantity, competition
      FROM tickets
      WHERE user_id = $1 AND payment_status = 'paid'
      ORDER BY COALESCE(purchased_at, created_at) DESC
@@ -141,6 +141,7 @@ export async function getLatestPaidPurchaseForEmail(email) {
     orderRef: row.ticket_public_id,
     bundleId: row.bundle_id,
     quantity: row.quantity,
+    competition: row.competition || null,
     ticketNumbers,
   }
 }

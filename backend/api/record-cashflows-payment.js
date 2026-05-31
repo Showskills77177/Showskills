@@ -2,6 +2,7 @@ import { applyRateLimit } from './lib/rateLimit.mjs'
 import { recordCashflowsPaymentFromVerifiedIntent } from './lib/recordCashflowsFromIntent.mjs'
 import { parseJsonBody, json } from './lib/http.mjs'
 import { getCashflowsConfig } from './lib/cashflows.mjs'
+import { getCountryCodeFromRequest } from './lib/visitorGeo.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -39,6 +40,7 @@ export default async function handler(req, res) {
       customerFullName: body.customerFullName,
       customerPhone: body.customerPhone ?? body.phone,
       bundleId: body.bundleId,
+      countryCode: getCountryCodeFromRequest(req),
     })
     if (!result.ok) {
       return json(res, result.status, {

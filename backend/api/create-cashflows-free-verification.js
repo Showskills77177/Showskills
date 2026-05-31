@@ -5,8 +5,9 @@ import {
   logEntryAttempt,
   parsePostalAddress,
 } from './lib/freeEntryAbuse.mjs'
-import { COMPETITION_LEGACY_BUNDLE } from '../../shared/freeEntryLimits.mjs'
 import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
+import { assertCompetitionEntryMethod } from './lib/competitionCatalog.mjs'
+import { parseCheckoutCompetition } from './lib/checkoutBundle.mjs'
 import { createCashflowsPaymentIntent, getCashflowsConfig } from './lib/cashflows.mjs'
 import { parseJsonBody, json } from './lib/http.mjs'
 
@@ -35,12 +36,18 @@ export default async function handler(req, res) {
     return json(res, 503, { error: 'Database not configured' })
   }
 
-  const periodResult = await getOpenCompetitionPeriodForEntry()
+  const body = parseJsonBody(req)
+  const competition = await parseCheckoutCompetition(body)
+  const methodCheck = await assertCompetitionEntryMethod(competition, 'free_online')
+  if (!methodCheck.ok) {
+    return json(res, 403, { error: methodCheck.error })
+  }
+
+  const periodResult = await getOpenCompetitionPeriodForEntry(competition)
   if (!periodResult.ok) {
     return json(res, 403, { error: periodResult.error })
   }
 
-  const body = parseJsonBody(req)
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 200) : ''
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 320) : ''
   const addr = parsePostalAddress(body)
@@ -55,7 +62,7 @@ export default async function handler(req, res) {
     return json(res, 400, { error: addr.error })
   }
 
-  const limits = await checkLegacyFreeIpLimits(req, { fullName, email, address: addr })
+  const limits = await checkLegacyFreeIpLimits(req, { fullName, email, address: addr, competition })
   if (!limits.ok) {
     return json(res, 403, { error: limits.error, code: limits.code })
   }
@@ -68,7 +75,7 @@ export default async function handler(req, res) {
     })
 
     await logEntryAttempt(req, {
-      competition: COMPETITION_LEGACY_BUNDLE,
+      competition,
       flow: 'legacy_free_online',
       fullName,
       email,
@@ -88,7 +95,7 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error(e)
     await logEntryAttempt(req, {
-      competition: COMPETITION_LEGACY_BUNDLE,
+      competition,
       flow: 'legacy_free_online',
       fullName,
       email,

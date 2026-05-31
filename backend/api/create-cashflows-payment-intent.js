@@ -1,9 +1,9 @@
-import { getTicketBundleById } from '../../shared/ticketBundles.mjs'
 import { reserveTicketNumbers } from './lib/ticketNumbers.mjs'
 import { createPendingTicketCheckout } from './lib/pendingCheckout.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
 import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
+import { parseCheckoutCompetition, resolveCheckoutBundle } from './lib/checkoutBundle.mjs'
 import { createCashflowsPaymentIntent, getCashflowsConfig } from './lib/cashflows.mjs'
 import { parseJsonBody, json } from './lib/http.mjs'
 
@@ -33,11 +33,13 @@ export default async function handler(req, res) {
   }
 
   const body = parseJsonBody(req)
+  const competition = await parseCheckoutCompetition(body)
   const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : ''
-  const bundle = getTicketBundleById(bundleId)
-  if (!bundle) {
-    return json(res, 400, { error: 'Invalid or missing bundleId' })
+  const bundleResult = await resolveCheckoutBundle(competition, bundleId)
+  if (!bundleResult.ok) {
+    return json(res, 400, { error: bundleResult.error })
   }
+  const { bundle } = bundleResult
 
   const customerEmail =
     typeof body.customerEmail === 'string' ? body.customerEmail.trim().slice(0, 320) : ''
@@ -61,7 +63,7 @@ export default async function handler(req, res) {
     return json(res, 400, { error: phoneCheck.error })
   }
 
-  const periodResult = await getOpenCompetitionPeriodForEntry()
+  const periodResult = await getOpenCompetitionPeriodForEntry(competition)
   if (!periodResult.ok) {
     return json(res, 403, { error: periodResult.error })
   }
@@ -92,6 +94,7 @@ export default async function handler(req, res) {
         customerFullName,
         customerPhone: phoneCheck.phone,
         periodId: periodResult.period.id,
+        competition,
         cashflowsIntentToken: intent.token,
       })
     } catch (pendingErr) {

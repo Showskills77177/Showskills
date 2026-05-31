@@ -12,9 +12,13 @@ export async function selectTicketBundle(page, bundleId) {
   await page.locator(`input[type="radio"][value="${bundleId}"]`).check()
 }
 
-export async function fillPaidEntryForm(page, { name, email }) {
+export async function fillPaidEntryForm(page, { name, email, phone = '07123456789' }) {
   await page.locator('#modal-paid-fullname').fill(name)
   await page.locator('#modal-paid-email').fill(email)
+  const phoneInput = page.locator('#modal-paid-phone')
+  if (await phoneInput.isVisible().catch(() => false)) {
+    await phoneInput.fill(phone)
+  }
   await page.locator('.ss-entry-consent-label input[type="checkbox"]').check()
 }
 

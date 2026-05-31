@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'playwright-report', 'test-results']),
+  globalIgnores(['dist', 'playwright-report', 'test-results', 'archive/**']),
   {
     files: ['api/**/*.js', 'backend/api/**/*.{js,mjs}'],
     languageOptions: {
@@ -26,7 +26,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['server.js', 'vite.config.js', 'scripts/**/*.mjs', 'db/**/*.js'],
+    files: ['server.js', 'vite.config.js', 'code-guardian.js', 'scripts/**/*.mjs', 'db/**/*.js'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.node,
@@ -51,6 +51,8 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'react-hooks/set-state-in-effect': 'off',
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
 ])
