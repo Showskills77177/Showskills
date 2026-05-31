@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '../../lib/api'
-import { PERIOD_STATUS, PERIOD_STATUS_LABELS } from '../../../shared/competitionPeriods.mjs'
+import { PERIOD_STATUS, PERIOD_STATUS_LABELS, formatPeriodMonthLabel } from '../../../shared/competitionPeriods.mjs'
 import {
   CompetitionBundleEditor,
   standardBundleRows,
@@ -18,6 +18,14 @@ const STATUS_OPTIONS = [
   { value: 'published', label: 'Published (live on site)' },
   { value: 'archived', label: 'Archived' },
 ]
+
+function isoToDatetimeLocal(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 function emptyNewForm() {
   return {
@@ -59,6 +67,8 @@ export default function AdminCompetitionsPage() {
   const [purgeConfirm, setPurgeConfirm] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deletePurgeData, setDeletePurgeData] = useState(true)
+  const [editingPeriodId, setEditingPeriodId] = useState('')
+  const [periodEdits, setPeriodEdits] = useState({ title: '', entryOpensAt: '', entryClosesAt: '' })
 
   const loadDetail = useCallback(async (slug) => {
     if (!slug) {
@@ -531,6 +541,44 @@ export default function AdminCompetitionsPage() {
     }
   }
 
+  function startEditPeriod(period) {
+    setEditingPeriodId(period.id)
+    setPeriodEdits({
+      title: period.title || '',
+      entryOpensAt: isoToDatetimeLocal(period.entryOpensAt),
+      entryClosesAt: isoToDatetimeLocal(period.entryClosesAt),
+    })
+  }
+
+  async function savePeriodDates(periodId) {
+    if (!draft?.slug || !periodId) return
+    setSaving(true)
+    setErr('')
+    setMsg('')
+    try {
+      const res = await apiFetch('/api/admin/competitions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updatePeriod',
+          periodId,
+          title: periodEdits.title.trim(),
+          entryOpensAt: new Date(periodEdits.entryOpensAt).toISOString(),
+          entryClosesAt: new Date(periodEdits.entryClosesAt).toISOString(),
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not save period dates')
+      if (j.competition) setDraft(structuredClone(j.competition))
+      setEditingPeriodId('')
+      setMsg('Entry period dates saved. Open the period if entries should be live now.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not save period dates')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const openPeriod = useMemo(
     () => draft?.periods?.find((p) => p.status === PERIOD_STATUS.open),
     [draft],
@@ -927,36 +975,103 @@ export default function AdminCompetitionsPage() {
 
               <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Entry timeline</h2>
+                <p className="mt-1 text-xs text-stone-500">
+                  Set the entry month and close date here — no code changes. Use <strong className="text-stone-400">Edit dates</strong>{' '}
+                  on a period, then <strong className="text-stone-400">Open</strong> so the site accepts entries. Only{' '}
+                  <strong className="text-stone-400">Published</strong> competitions appear on /competitions.
+                </p>
                 {openPeriod ? (
                   <p className="mt-2 text-sm text-emerald-300">
-                    Open period: {openPeriod.title} · closes{' '}
+                    Open period: {openPeriod.title}
+                    {formatPeriodMonthLabel(openPeriod.entryClosesAt)
+                      ? ` · closes ${formatPeriodMonthLabel(openPeriod.entryClosesAt)}`
+                      : ''}{' '}
+                    ·{' '}
                     {new Date(openPeriod.entryClosesAt).toLocaleString('en-GB', { timeZone: 'Europe/London' })}
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm text-stone-500">No open period — entries blocked until you open one.</p>
+                  <p className="mt-2 text-sm text-amber-200/90">
+                    No open period — entries are blocked on the live site until you open one (after setting dates).
+                  </p>
                 )}
                 <ul className="mt-3 space-y-2">
                   {(draft.periods || []).map((p) => (
                     <li
                       key={p.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
+                      className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm"
                     >
-                      <div>
-                        <div className="font-medium text-stone-200">{p.title}</div>
-                        <div className="text-xs text-stone-500">
-                          {PERIOD_STATUS_LABELS[p.status] || p.status} ·{' '}
-                          {new Date(p.entryOpensAt).toLocaleString('en-GB', { timeZone: 'Europe/London' })} →{' '}
-                          {new Date(p.entryClosesAt).toLocaleString('en-GB', { timeZone: 'Europe/London' })}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="font-medium text-stone-200">{p.title}</div>
+                          <div className="text-xs text-stone-500">
+                            {PERIOD_STATUS_LABELS[p.status] || p.status}
+                            {formatPeriodMonthLabel(p.entryClosesAt)
+                              ? ` · ${formatPeriodMonthLabel(p.entryClosesAt)}`
+                              : ''}{' '}
+                            ·{' '}
+                            {new Date(p.entryOpensAt).toLocaleString('en-GB', { timeZone: 'Europe/London' })} →{' '}
+                            {new Date(p.entryClosesAt).toLocaleString('en-GB', { timeZone: 'Europe/London' })}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          <MiniBtn onClick={() => startEditPeriod(p)}>Edit dates</MiniBtn>
+                          {p.status !== PERIOD_STATUS.open ? (
+                            <MiniBtn onClick={() => setPeriodStatus(p.id, PERIOD_STATUS.open)}>Open</MiniBtn>
+                          ) : null}
+                          {p.status === PERIOD_STATUS.open ? (
+                            <MiniBtn onClick={() => setPeriodStatus(p.id, PERIOD_STATUS.closed)}>Close</MiniBtn>
+                          ) : null}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {p.status !== PERIOD_STATUS.open ? (
-                          <MiniBtn onClick={() => setPeriodStatus(p.id, PERIOD_STATUS.open)}>Open</MiniBtn>
-                        ) : null}
-                        {p.status === PERIOD_STATUS.open ? (
-                          <MiniBtn onClick={() => setPeriodStatus(p.id, PERIOD_STATUS.closed)}>Close</MiniBtn>
-                        ) : null}
-                      </div>
+                      {editingPeriodId === p.id ? (
+                        <div className="mt-3 grid gap-2 border-t border-white/10 pt-3 sm:grid-cols-2">
+                          <label className="block text-xs text-stone-400 sm:col-span-2">
+                            Period title (include month, e.g. June 2026 draw)
+                            <input
+                              value={periodEdits.title}
+                              onChange={(e) => setPeriodEdits((f) => ({ ...f, title: e.target.value }))}
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-100"
+                            />
+                          </label>
+                          <label className="block text-xs text-stone-400">
+                            Entries open
+                            <input
+                              required
+                              type="datetime-local"
+                              value={periodEdits.entryOpensAt}
+                              onChange={(e) => setPeriodEdits((f) => ({ ...f, entryOpensAt: e.target.value }))}
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-100"
+                            />
+                          </label>
+                          <label className="block text-xs text-stone-400">
+                            Entries close
+                            <input
+                              required
+                              type="datetime-local"
+                              value={periodEdits.entryClosesAt}
+                              onChange={(e) => setPeriodEdits((f) => ({ ...f, entryClosesAt: e.target.value }))}
+                              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-stone-100"
+                            />
+                          </label>
+                          <div className="flex flex-wrap gap-2 sm:col-span-2">
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => savePeriodDates(p.id)}
+                              className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                            >
+                              Save period dates
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingPeriodId('')}
+                              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

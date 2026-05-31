@@ -21,6 +21,7 @@ import {
 import {
   createCompetitionPeriod,
   listCompetitionPeriods,
+  updateCompetitionPeriod,
   updateCompetitionPeriodStatus,
 } from '../lib/competitionPeriods.mjs'
 import { PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
@@ -127,6 +128,23 @@ export default async function handler(req, res) {
         const result = await deleteCompetition(compSlug, { purgeData, confirmSlug })
         if (!result.ok) return json(res, 400, { error: result.error, counts: result.counts })
         return json(res, 200, result)
+      }
+      if (body.action === 'updatePeriod') {
+        const periodId = typeof body.periodId === 'string' ? body.periodId.trim() : ''
+        if (!periodId) return json(res, 400, { error: 'periodId required' })
+        const updated = await updateCompetitionPeriod(periodId, {
+          title: body.title,
+          summary: body.summary,
+          entryOpensAt: body.entryOpensAt,
+          entryClosesAt: body.entryClosesAt,
+        })
+        if (!updated.ok) return json(res, 400, { error: updated.error })
+        const row = await getCompetitionBySlug(updated.period.competition)
+        return json(res, 200, {
+          ok: true,
+          period: updated.period,
+          competition: await enrichCompetition(row, siteOrigin),
+        })
       }
       if (body.action === 'saveSkillQuestions') {
         const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''

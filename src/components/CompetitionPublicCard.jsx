@@ -2,7 +2,7 @@ import { CompetitionCountdown } from './CompetitionCountdown'
 import { formatBundlePriceGBP } from '../competitionData'
 import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
-import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
+import { DRAW_COMPETITION_SLUG, formatPeriodMonthLabel } from '../../shared/competitionPeriods.mjs'
 
 function bundlePriceLine(competition) {
   if (!competition?.allowPaidEntry) return 'Free entry routes only'
@@ -85,13 +85,20 @@ export function CompetitionPublicCard({ competition, onEnter, preview = false, d
           {competition.featuredOnHomepage ? 'Featured · Main prize' : 'Main prize draw'}
         </p>
         {competition.openPeriod ? (
-          <div className="mt-2">
+          <div className="mt-2 space-y-1">
+            {formatPeriodMonthLabel(competition.openPeriod.entryClosesAt) ? (
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-400/80">
+                {formatPeriodMonthLabel(competition.openPeriod.entryClosesAt)} draw
+              </p>
+            ) : null}
             <CompetitionCountdown
               opensAt={competition.openPeriod.entryOpensAt}
               closesAt={competition.openPeriod.entryClosesAt}
             />
           </div>
-        ) : null}
+        ) : (
+          <p className="mt-2 text-xs text-amber-200/80">No open entry period — update dates in admin and open a period.</p>
+        )}
         <h2 className="mt-2 font-display text-2xl text-white">{competition.title}</h2>
         <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-500">
           {competition.summary ||

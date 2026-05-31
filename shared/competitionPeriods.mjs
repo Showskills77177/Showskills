@@ -40,6 +40,20 @@ export function formatPeriodRange(opensAt, closesAt, locale = 'en-GB') {
   return `${open} → ${close}`
 }
 
+/** e.g. "June 2026" for entry window labels */
+export function formatPeriodMonthLabel(iso, locale = 'en-GB') {
+  if (!iso) return ''
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'Europe/London',
+    }).format(new Date(iso))
+  } catch {
+    return ''
+  }
+}
+
 export function isPeriodEligibleForDraw(status) {
   return status === PERIOD_STATUS.closed
 }

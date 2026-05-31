@@ -112,9 +112,34 @@ export async function ensureCompetitionCatalogSchema() {
   await ensureCompetitionEntryMethodColumns()
 
   schemaEnsured = true
-  await seedDefaultCompetitionsIfEmpty()
+  await ensureBuiltinCompetitions()
   await backfillLegacyEntryMethods()
 }
+
+const BUILTIN_MAIN_DRAWS = [
+  {
+    slug: DRAW_COMPETITION_SLUG,
+    title: DRAW_COMPETITION_LABEL,
+    summary:
+      'Pay for ticket bundles or enter free by post, then answer three skill questions. All correct to qualify for the main random draw.',
+    rulesMarkdown: `## How to enter\n\n- Buy a ticket bundle online or use free postal entry.\n- Answer all three skill questions correctly in one attempt.\n- Qualified ticket numbers enter the random draw for this competition period.\n\n## Consolation\n\nWrong answers on a qualifying spend may receive automatic entries into the separate Free Ronaldo Shirt Giveaway.`,
+    status: COMPETITION_STATUS.published,
+    kind: COMPETITION_KIND.mainDraw,
+    sortOrder: 0,
+    seedBundles: true,
+  },
+  {
+    slug: MJ_COMPETITION_SLUG,
+    title: MJ_COMPETITION_LABEL,
+    summary:
+      'Win a signed Michael Jackson album. Runs in parallel with other main prize draws — separate timeline and draw pool.',
+    rulesMarkdown: `## How to enter\n\n- Purchase a ticket bundle for this competition when live on site.\n- Complete the skill quiz for this prize draw.\n- Only entries within the active competition period are eligible.`,
+    status: COMPETITION_STATUS.draft,
+    kind: COMPETITION_KIND.mainDraw,
+    sortOrder: 1,
+    seedBundles: true,
+  },
+]
 
 async function ensureCompetitionEntryMethodColumns() {
   const addCol = async (sqlPg, sqlLite) => {
@@ -242,46 +267,48 @@ export function competitionImagePublicUrl(ref, siteOrigin = '') {
   return ref
 }
 
-async function seedDefaultCompetitionsIfEmpty() {
-  const existing = await query(`SELECT slug FROM competitions LIMIT 1`)
-  if (existing.rows[0]) return
-
+/** Ensures Ronaldo Legacy + Michael Jackson rows exist even when other competitions were created first. */
+async function ensureBuiltinCompetitions() {
   const now = new Date().toISOString()
-  const defaults = [
-    {
-      slug: DRAW_COMPETITION_SLUG,
-      title: DRAW_COMPETITION_LABEL,
-      summary:
-        'Pay for ticket bundles or enter free by post, then answer three skill questions. All correct to qualify for the main random draw.',
-      rulesMarkdown: `## How to enter\n\n- Buy a ticket bundle online or use free postal entry.\n- Answer all three skill questions correctly in one attempt.\n- Qualified ticket numbers enter the random draw for this competition period.\n\n## Consolation\n\nWrong answers on a qualifying spend may receive automatic entries into the separate Free Ronaldo Shirt Giveaway.`,
-      status: COMPETITION_STATUS.published,
-      kind: COMPETITION_KIND.mainDraw,
-      sortOrder: 0,
-    },
-    {
-      slug: MJ_COMPETITION_SLUG,
-      title: MJ_COMPETITION_LABEL,
-      summary:
-        'Win a signed Michael Jackson album. Runs in parallel with other main prize draws — separate timeline and draw pool.',
-      rulesMarkdown: `## How to enter\n\n- Purchase a ticket bundle for this competition when live on site.\n- Complete the skill quiz for this prize draw.\n- Only entries within the active competition period are eligible.`,
-      status: COMPETITION_STATUS.draft,
-      kind: COMPETITION_KIND.mainDraw,
-      sortOrder: 1,
-    },
-  ]
 
-  for (const c of defaults) {
-    await query(
-      `INSERT INTO competitions (
-        slug, title, summary, rules_markdown, status, kind, sort_order, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [c.slug, c.title, c.summary, c.rulesMarkdown, c.status, c.kind, c.sortOrder, now],
-    )
-    await ensureDefaultCompetitionPeriod(c.slug)
-    for (let i = 0; i < TICKET_BUNDLES.length; i++) {
-      await upsertCompetitionBundleRow(c.slug, TICKET_BUNDLES[i], i)
+  for (const c of BUILTIN_MAIN_DRAWS) {
+    const existing = await query(`SELECT slug, status FROM competitions WHERE slug = $1`, [c.slug])
+    if (!existing.rows[0]) {
+      await query(
+        `INSERT INTO competitions (
+          slug, title, summary, rules_markdown, status, kind, sort_order, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [c.slug, c.title, c.summary, c.rulesMarkdown, c.status, c.kind, c.sortOrder, now],
+      )
+    } else if (
+      c.slug === DRAW_COMPETITION_SLUG &&
+      existing.rows[0].status !== COMPETITION_STATUS.archived &&
+      existing.rows[0].status !== COMPETITION_STATUS.published
+    ) {
+      await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+        c.slug,
+        COMPETITION_STATUS.published,
+        now,
+      ])
+    }
+
+    await ensureDefaultCompetitionPeriod(c.slug, { title: c.title })
+
+    if (c.seedBundles) {
+      const bundleCount = await query(
+        `SELECT COUNT(*)::int AS c FROM competition_bundles WHERE competition = $1`,
+        [c.slug],
+      )
+      if ((bundleCount.rows[0]?.c ?? 0) === 0) {
+        for (let i = 0; i < TICKET_BUNDLES.length; i++) {
+          await upsertCompetitionBundleRow(c.slug, TICKET_BUNDLES[i], i)
+        }
+      }
     }
   }
+
+  const { ensureCompetitionSkillQuestionsSchema } = await import('./competitionSkillQuestions.mjs')
+  await ensureCompetitionSkillQuestionsSchema()
 }
 
 async function upsertCompetitionBundleRow(competition, bundle, sortOrder) {

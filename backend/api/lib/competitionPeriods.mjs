@@ -210,6 +210,34 @@ export async function createCompetitionPeriod({
   return { ok: true, period: await getCompetitionPeriodById(id) }
 }
 
+export async function updateCompetitionPeriod(periodId, patch = {}) {
+  await ensureCompetitionPeriodsSchema()
+  const period = await getCompetitionPeriodById(periodId)
+  if (!period) return { ok: false, error: 'Competition period not found.' }
+
+  const title =
+    typeof patch.title === 'string' && patch.title.trim() ? patch.title.trim() : period.title
+  const summary = typeof patch.summary === 'string' ? patch.summary.trim() : period.summary
+  const entryOpensAt = patch.entryOpensAt
+    ? new Date(patch.entryOpensAt).toISOString()
+    : period.entryOpensAt
+  const entryClosesAt = patch.entryClosesAt
+    ? new Date(patch.entryClosesAt).toISOString()
+    : period.entryClosesAt
+
+  if (!(new Date(entryClosesAt) > new Date(entryOpensAt))) {
+    return { ok: false, error: 'Close time must be after open time.' }
+  }
+
+  await query(
+    `UPDATE competition_periods
+     SET title = $1, summary = $2, entry_opens_at = $3, entry_closes_at = $4, updated_at = $5
+     WHERE id = $6`,
+    [title, summary, entryOpensAt, entryClosesAt, new Date().toISOString(), periodId],
+  )
+  return { ok: true, period: await getCompetitionPeriodById(periodId) }
+}
+
 export async function updateCompetitionPeriodStatus(periodId, status) {
   await ensureCompetitionPeriodsSchema()
   const period = await getCompetitionPeriodById(periodId)
