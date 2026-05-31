@@ -44,6 +44,21 @@ export function adminEmail() {
   return (process.env.ADMIN_EMAIL || process.env.ADMIN_OTP_EMAIL || '').trim().toLowerCase()
 }
 
+export function adminLoginUsername() {
+  return (process.env.ADMIN_USER || '').trim()
+}
+
+/** Password reset accepts admin username or the configured ADMIN_EMAIL. */
+export function matchesAdminLoginIdentity(input) {
+  const value = typeof input === 'string' ? input.trim() : ''
+  if (!value) return false
+  const username = adminLoginUsername()
+  if (username && value === username) return true
+  const email = adminEmail()
+  if (email.includes('@') && value.toLowerCase() === email) return true
+  return false
+}
+
 /** Mask for UI, e.g. a***n@showskills.co.uk */
 export function maskAdminEmail(email) {
   const e = (email || adminEmail()).trim()

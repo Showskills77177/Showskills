@@ -8,6 +8,7 @@ import {
   isAdminEmailOtpConfigured,
   getAdminEmailSetupHint,
   adminOtpVerificationPayload,
+  matchesAdminLoginIdentity,
 } from '../lib/adminEmailOtp.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
@@ -50,9 +51,11 @@ export default async function handler(req, res) {
 
   const body = await readJsonBody(req)
   const username = typeof body.username === 'string' ? body.username.trim() : ''
-  const adminUser = (process.env.ADMIN_USER || '').trim()
-  if (!adminUser || username !== adminUser) {
-    return json(res, 401, { error: 'Unknown admin username.' })
+  if (!matchesAdminLoginIdentity(username)) {
+    return json(res, 401, {
+      error:
+        'Unknown admin username. Use your admin username (set in Vercel as ADMIN_USER — often "admin"), not your personal email unless that is ADMIN_EMAIL.',
+    })
   }
 
   try {

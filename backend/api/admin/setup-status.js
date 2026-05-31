@@ -5,6 +5,7 @@ import {
   getAdminEmailSetupHint,
   adminEmail,
   maskAdminEmail,
+  adminLoginUsername,
 } from '../lib/adminEmailOtp.mjs'
 import { getResendApiKey, isResendProductionMode, resolveResendFrom } from '../lib/resendConfig.mjs'
 import { json } from '../lib/http.mjs'
@@ -43,6 +44,7 @@ export default async function handler(req, res) {
     hasResendKey,
     hasAdminEmail,
     maskedAdminEmail: hasAdminEmail ? maskAdminEmail() : null,
+    adminLoginUsername: adminLoginUsername() || null,
     resendProductionMode: isResendProductionMode(),
     fromAddress: resolveResendFrom().replace(/<[^>]+>/, '…'),
     vercelEnv: process.env.VERCEL_ENV || null,

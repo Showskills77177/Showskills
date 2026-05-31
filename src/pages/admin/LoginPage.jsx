@@ -430,19 +430,26 @@ export default function AdminLoginPage() {
         ) : forgotOpen ? (
           <>
             <p className="mt-2 text-center text-sm text-stone-400">
-              Enter your admin username. We&apos;ll email a reset code to{' '}
-              {setupStatus?.maskedAdminEmail || 'the address on file'}.
+              Enter your admin username{setupStatus?.adminLoginUsername ? (
+                <>
+                  {' '}
+                  (<span className="font-mono text-stone-300">{setupStatus.adminLoginUsername}</span>)
+                </>
+              ) : null}
+              . We&apos;ll email a reset code to {setupStatus?.maskedAdminEmail || 'the address on file'} — that inbox
+              is separate from the username field.
             </p>
             <form className="mt-6 flex flex-col gap-4" onSubmit={onForgotPasswordSubmit}>
               <div>
                 <label htmlFor="admin-reset-user" className="block text-xs font-medium text-stone-400">
-                  Username
+                  Admin username
                 </label>
                 <input
                   id="admin-reset-user"
                   autoComplete="username"
                   value={resetUsername}
                   onChange={(e) => setResetUsername(e.target.value)}
+                  placeholder={setupStatus?.adminLoginUsername || 'admin'}
                   className={theme.input}
                 />
               </div>
