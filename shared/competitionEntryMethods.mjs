@@ -16,6 +16,16 @@ export function defaultEntryMethodsForNewCompetition(title = '') {
   }
 }
 
+/** Giveaways: free routes only (no ticket bundles). */
+export function defaultEntryMethodsForNewGiveaway(title = '') {
+  return {
+    allowPaidEntry: false,
+    allowFreeOnline: true,
+    allowPostalEntry: true,
+    postalCompetitionName: defaultPostalName(title),
+  }
+}
+
 export function legacyEntryMethods() {
   return {
     allowPaidEntry: true,

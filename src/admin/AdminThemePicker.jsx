@@ -7,7 +7,10 @@ export function AdminThemePicker({ compact = false }) {
 
   if (compact) {
     return (
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        <Link to="/admin/editor" className={theme.themePickerDesignerLink} title="Edit site pages">
+          Pages
+        </Link>
         <label className={theme.themePickerBtn}>
           <span className="flex gap-0.5" aria-hidden>
             {theme.swatch.map((color) => (

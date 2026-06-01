@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { CompetitionCountdown } from './CompetitionCountdown'
+import { LegacyBundlePhonePrizes } from './LegacyBundlePhonePrizes'
 import { GlowingFootballIcon } from './siteChrome'
 import { formatBundlePriceGBP } from '../competitionData'
-import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
+import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
+import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 
 /**
  * Dynamic homepage live promotion panel for admin-created competitions (uploaded images).
@@ -13,6 +15,7 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
   const hero = competition.heroImageUrl
   const gallery = (competition.galleryUrls || []).filter(Boolean)
   const isLegacy = competition.slug === DRAW_COMPETITION_SLUG
+  const countdownPeriod = pickCountdownPeriod(competition)
 
   return (
     <section className={`ss-hero-surface relative -mt-px overflow-x-clip border-b border-emerald-900/20 pb-6 sm:pb-10 ${preview ? 'rounded-xl border border-white/10' : ''}`}>
@@ -35,13 +38,11 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
               <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
               Live promotion
             </p>
-            {competition.openPeriod ? (
-              <CompetitionCountdown
-                opensAt={competition.openPeriod.entryOpensAt}
-                closesAt={competition.openPeriod.entryClosesAt}
-                label="Competition ends"
-              />
-            ) : null}
+            <CompetitionCountdown
+              opensAt={countdownPeriod?.entryOpensAt}
+              closesAt={countdownPeriod?.entryClosesAt}
+              label="Competition ends"
+            />
             <div className="flex flex-wrap items-end gap-3">
               <h1 className="font-display text-[clamp(2rem,8vw,3.5rem)] leading-[0.95] tracking-tight text-white">
                 {competition.title}
@@ -54,7 +55,10 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
               ) : null}
             </div>
             <p className="max-w-xl text-lg font-bold leading-snug text-white sm:text-xl">
-              {competition.summary || 'Enter online or by post, then answer three skill questions for the main draw.'}
+              {publicCompetitionSummary(
+                competition,
+                'Enter online or by post, then answer three skill questions for the main draw.',
+              )}
             </p>
             <div className="flex flex-wrap gap-2 text-xs text-stone-500">
               {competition.allowPaidEntry ? (
@@ -95,7 +99,9 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
                   )}
                 </div>
               </div>
-              {gallery.length ? (
+              {isLegacy ? (
+                <LegacyBundlePhonePrizes />
+              ) : gallery.length ? (
                 <div className="grid grid-cols-2 gap-1.5">
                   {gallery.slice(0, 2).map((url) => (
                     <div key={url} className="ss-prize-studio-tile overflow-hidden rounded-md">

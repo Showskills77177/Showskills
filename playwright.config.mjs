@@ -83,7 +83,7 @@ export default defineConfig({
   ],
   webServer: {
     /** API on :3001 + Vite :5173 so tests do not clash with a normal dev:all on :3000/:5173. */
-    command: 'npm run dev:e2e',
+    command: 'node scripts/e2e-dev.mjs',
     url: 'http://localhost:5173',
     /** Always start E2E env (VITE_E2E_SIMULATE_CHECKOUT, :3001 API) — avoid reusing dev:all. */
     reuseExistingServer: false,

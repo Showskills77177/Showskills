@@ -26,15 +26,23 @@ function formatEndDate(iso) {
 }
 
 /**
- * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string }} props
+ * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean }} props
  */
-export function CompetitionCountdown({ closesAt, opensAt, label = 'Competition ends', className = '' }) {
+export function CompetitionCountdown({
+  closesAt,
+  opensAt,
+  label = 'Competition ends',
+  className = '',
+  live = true,
+  showDot = true,
+}) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
+    if (!live) return
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [live])
 
   const state = useMemo(() => {
     const openMs = opensAt ? new Date(opensAt).getTime() : null
@@ -66,11 +74,11 @@ export function CompetitionCountdown({ closesAt, opensAt, label = 'Competition e
 
   return (
     <p
-      className={`inline-flex w-fit max-w-full flex-wrap items-center gap-x-2 rounded-full border px-3 py-1.5 text-xs font-semibold sm:text-sm ${tone} ${className}`}
+      className={`inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug sm:text-xs md:text-sm ${tone} ${className}`}
       role="status"
     >
-      <span className="h-2 w-2 shrink-0 rounded-full bg-current opacity-80" aria-hidden />
-      {state.text}
+      {showDot ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 opacity-90" aria-hidden /> : null}
+      <span className="min-w-0">{state.text}</span>
     </p>
   )
 }

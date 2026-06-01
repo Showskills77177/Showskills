@@ -91,7 +91,10 @@ export default async function handler(req, res) {
         if (!row) return json(res, 404, { error: 'Competition not found.' })
         return json(res, 200, { ok: true, competition: await enrichCompetition(row, siteOrigin) })
       }
-      const rows = await listCompetitions()
+      const kindFilter = (url.searchParams.get('kind') || '').trim()
+      const rows = await listCompetitions(
+        kindFilter === 'giveaway' || kindFilter === 'main_draw' ? { kind: kindFilter } : {},
+      )
       const enriched = await Promise.all(rows.map((r) => enrichCompetition(r, siteOrigin)))
       return json(res, 200, { ok: true, competitions: enriched })
     }
@@ -200,6 +203,7 @@ export default async function handler(req, res) {
         openPeriod: body.openPeriod === true,
         bundles: Array.isArray(body.bundles) ? body.bundles : undefined,
         skillQuestions: Array.isArray(body.skillQuestions) ? body.skillQuestions : undefined,
+        kind: body.kind === 'giveaway' ? 'giveaway' : 'main_draw',
         allowPaidEntry: body.allowPaidEntry,
         allowFreeOnline: body.allowFreeOnline,
         allowPostalEntry: body.allowPostalEntry,

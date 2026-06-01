@@ -4,7 +4,7 @@ import { BUNDLE_OFFER_ITEMS, formatBundlePriceGBP, getVisibleTicketBundles } fro
 const PUBLIC_TICKET_BUNDLES = getVisibleTicketBundles()
 import { TicketBundleIcon } from './TicketBundleIcon'
 
-export function TicketBundlePrice({ className = '', compact = false }) {
+export function TicketBundlePrice({ className = '', compact = false, style }) {
   if (compact) {
     return (
       <p
@@ -20,6 +20,7 @@ export function TicketBundlePrice({ className = '', compact = false }) {
   return (
     <div
       className={`ss-ticket-bundles-panel flex w-full flex-col rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-4 py-3 shadow-[0_0_24px_rgba(16,185,129,0.12)] sm:px-5 sm:py-4 ${className}`}
+      style={style}
     >
       <p className="ss-ticket-bundles-heading text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200/85">
         Ticket bundles

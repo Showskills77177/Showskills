@@ -10,29 +10,30 @@ function navBtnClass({ isActive }) {
     : `${NAV_BTN_BASE} border-white/10 bg-transparent text-stone-400 hover:border-white/20 hover:bg-white/5 hover:text-white`
 }
 
-export function MobileNavDock() {
+export function MobileNavDock({ navItems = [] }) {
   const { openTerms } = useEntryFlow()
+  const mobileItems = navItems.filter((item) => item.mobile !== false && item.visible !== false)
 
   return (
     <div className="ss-mobile-nav-dock sm:hidden" aria-label="Site menu">
       <nav className="ss-mobile-nav-dock__grid grid gap-1.5 p-2.5 pt-2">
-        <NavLink to="/" end className={navBtnClass}>
-          <span className="ss-mobile-nav-label">Home</span>
-        </NavLink>
-        <NavLink to="/competitions" className={navBtnClass} aria-label="Competitions">
-          <span className="ss-mobile-nav-label">Competitions</span>
-        </NavLink>
-        <NavLink to="/faq" className={navBtnClass}>
-          <span className="ss-mobile-nav-label">FAQ</span>
-        </NavLink>
-        <button
-          type="button"
-          onClick={() => openTerms()}
-          className={navBtnClass({ isActive: false })}
-          aria-label="Terms and conditions"
-        >
-          <span className="ss-mobile-nav-label">T&amp;C</span>
-        </button>
+        {mobileItems.map((item) =>
+          item.action === 'terms' ? (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => openTerms()}
+              className={navBtnClass({ isActive: false })}
+              aria-label={item.label}
+            >
+              <span className="ss-mobile-nav-label">{item.label}</span>
+            </button>
+          ) : (
+            <NavLink key={item.id} to={item.path || '/'} end={item.path === '/'} className={navBtnClass}>
+              <span className="ss-mobile-nav-label">{item.label}</span>
+            </NavLink>
+          ),
+        )}
       </nav>
     </div>
   )

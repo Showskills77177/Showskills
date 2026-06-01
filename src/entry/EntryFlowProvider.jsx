@@ -99,6 +99,10 @@ export function EntryFlowProvider({ children }) {
   const [kickEmail, setKickEmail] = useState('')
   const [kickPhone, setKickPhone] = useState('')
   const [kickConsent, setKickConsent] = useState(false)
+  const [kickNewsletterOptIn, setKickNewsletterOptIn] = useState(false)
+  const [kickSocialPlatform, setKickSocialPlatform] = useState('')
+  const [kickSocialHandle, setKickSocialHandle] = useState('')
+  const [kickSocialFollowConfirmed, setKickSocialFollowConfirmed] = useState(false)
   const [kickError, setKickError] = useState('')
   const [kickSuccess, setKickSuccess] = useState(false)
   const [kickVpnBlocked, setKickVpnBlocked] = useState(false)
@@ -537,6 +541,12 @@ export function EntryFlowProvider({ children }) {
       setKickFullName('')
       setKickAnswer('')
       setKickEmail('')
+      setKickPhone('')
+      setKickConsent(false)
+      setKickNewsletterOptIn(false)
+      setKickSocialPlatform('')
+      setKickSocialHandle('')
+      setKickSocialFollowConfirmed(false)
       setKickCheckingVpn(true)
       void fetch(apiUrl('/api/vpn-check'), { credentials: 'include' })
         .then(async (res) => {
@@ -1064,6 +1074,22 @@ export function EntryFlowProvider({ children }) {
         setKickError(kickPhoneCheck.error)
         return
       }
+      if (!kickNewsletterOptIn) {
+        setKickError('Please subscribe to the ShowSkills newsletter to enter the free shirt giveaway.')
+        return
+      }
+      if (!['tiktok', 'instagram', 'facebook'].includes(kickSocialPlatform)) {
+        setKickError('Choose TikTok, Instagram, or Facebook and confirm you follow us.')
+        return
+      }
+      if (!kickSocialHandle.trim()) {
+        setKickError('Enter your username or handle on the social network you follow us on.')
+        return
+      }
+      if (!kickSocialFollowConfirmed) {
+        setKickError('Please confirm you have followed ShowSkills on the social network you selected.')
+        return
+      }
       const answer = kickAnswer.trim()
       if (!answer) {
         setKickError('Please answer the qualification question.')
@@ -1084,6 +1110,10 @@ export function EntryFlowProvider({ children }) {
             phone: kickPhone.trim(),
             customerPhone: kickPhone.trim(),
             qualificationAnswer: answer,
+            newsletterOptIn: true,
+            socialPlatform: kickSocialPlatform,
+            socialHandle: kickSocialHandle.trim(),
+            socialFollowConfirmed: true,
           }),
         })
         if (!res.ok) {
@@ -1095,7 +1125,7 @@ export function EntryFlowProvider({ children }) {
         setKickError(err instanceof Error ? err.message : 'Submission failed')
       }
     },
-    [kickAnswer, kickConsent, kickEmail, kickFullName, kickPhone, kickVpnBlocked],
+    [kickAnswer, kickConsent, kickEmail, kickFullName, kickPhone, kickVpnBlocked, kickNewsletterOptIn, kickSocialPlatform, kickSocialHandle, kickSocialFollowConfirmed],
   )
 
   const entriesClosedMessage =
@@ -1191,6 +1221,14 @@ export function EntryFlowProvider({ children }) {
       setKickPhone,
       kickConsent,
       setKickConsent,
+      kickNewsletterOptIn,
+      setKickNewsletterOptIn,
+      kickSocialPlatform,
+      setKickSocialPlatform,
+      kickSocialHandle,
+      setKickSocialHandle,
+      kickSocialFollowConfirmed,
+      setKickSocialFollowConfirmed,
       kickError,
       setKickError,
       kickSuccess,
@@ -1276,6 +1314,11 @@ export function EntryFlowProvider({ children }) {
       kickAnswer,
       kickEmail,
       kickConsent,
+      kickNewsletterOptIn,
+      kickSocialPlatform,
+      kickSocialHandle,
+      kickSocialFollowConfirmed,
+      setKickSocialFollowConfirmed,
       kickError,
       setKickError,
       kickSuccess,

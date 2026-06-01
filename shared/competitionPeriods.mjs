@@ -57,3 +57,9 @@ export function formatPeriodMonthLabel(iso, locale = 'en-GB') {
 export function isPeriodEligibleForDraw(status) {
   return status === PERIOD_STATUS.closed
 }
+
+/** Best period for public countdown — open window, or any scheduled/closed period from the API. */
+export function pickCountdownPeriod(competition) {
+  if (!competition || typeof competition !== 'object') return null
+  return competition.countdownPeriod || competition.openPeriod || null
+}

@@ -33,3 +33,7 @@ export function latestKickupByEmail(db, email) {
     .prepare(`SELECT * FROM kickup_submissions WHERE lower(email) = lower(?) ORDER BY created_at DESC LIMIT 1`)
     .get(email)
 }
+
+export function kickupById(db, id) {
+  return db.prepare(`SELECT * FROM kickup_submissions WHERE id = ?`).get(id)
+}

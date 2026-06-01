@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEntryFlow } from '../entry/entryContext'
-import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_QUESTION, isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
+import {
+  SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS,
+  SHIRT_GIVEAWAY_SOCIAL_PLATFORMS,
+} from '../../shared/shirtGiveawayEntryRequirements.mjs'
 
 const E2E_SIMULATE_CHECKOUT =
   import.meta.env.VITE_E2E_SIMULATE_CHECKOUT === 'true' ||
@@ -29,6 +33,7 @@ import { EntryTermsConsent } from './EntryTermsConsent'
 import { TicketBundlePicker } from './TicketBundlePicker'
 import { CashflowsPaymentForm } from './CashflowsPaymentForm'
 import { PHONE_COLLECTION_NOTICE } from '../../shared/contactPhone.mjs'
+import { useHomepageLayout } from '../hooks/useHomepageLayout'
 
 export function EntryModal() {
   const {
@@ -101,6 +106,14 @@ export function EntryModal() {
     setKickEmail,
     kickConsent,
     setKickConsent,
+    kickNewsletterOptIn,
+    setKickNewsletterOptIn,
+    kickSocialPlatform,
+    setKickSocialPlatform,
+    kickSocialHandle,
+    setKickSocialHandle,
+    kickSocialFollowConfirmed,
+    setKickSocialFollowConfirmed,
     kickError,
     setKickError,
     kickSuccess,
@@ -124,6 +137,8 @@ export function EntryModal() {
     handleFreeCardVerified,
     handleFreeQuizSubmit,
   } = useEntryFlow()
+  const { layout: homepageLayout } = useHomepageLayout()
+  const socialLinks = homepageLayout.socialLinks || {}
 
   const panelRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
@@ -770,11 +785,38 @@ export function EntryModal() {
 
           {entryModalType === 'kickups' ? (
             <>
-              <p className="text-sm text-stone-500">
-                <strong className="text-lime-200/90">Free giveaway:</strong> answer one simple qualification question to
-                enter the Ronaldo shirt draw. <strong className="text-stone-300">Prize: signed shirt only</strong> — not
-                the iPhone, ball, or Legacy Bundle. One entry per device — a second email from the same phone or computer
-                is not allowed. VPNs are not permitted.
+              <ul className="space-y-2 rounded-xl border border-lime-500/25 bg-lime-950/20 p-3" aria-label="Entry requirements">
+                {SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS.map((req) => {
+                  const done =
+                    req.id === 'skill_answer'
+                      ? isCorrectShirtGiveawayAnswer(kickAnswer)
+                      : req.id === 'newsletter'
+                        ? kickNewsletterOptIn
+                        : kickSocialPlatform &&
+                          kickSocialHandle.trim() &&
+                          kickSocialFollowConfirmed
+                  return (
+                    <li key={req.id} className="flex gap-3 text-sm">
+                      <span
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                          done ? 'bg-lime-500 text-emerald-950' : 'border border-white/15 bg-black/30 text-stone-500'
+                        }`}
+                        aria-hidden
+                      >
+                        {done ? '✓' : '·'}
+                      </span>
+                      <span>
+                        <span className={done ? 'text-lime-100' : 'text-stone-300'}>{req.title}</span>
+                        <span className="mt-0.5 block text-xs text-stone-500">{req.detail}</span>
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+              <p className="mt-3 text-sm text-stone-500">
+                <strong className="text-lime-200/90">Free giveaway:</strong> complete all three requirements below.
+                Prize is the <strong className="text-stone-300">signed Ronaldo shirt only</strong> — not the Legacy Bundle.
+                One entry per device; VPNs are not permitted.
               </p>
               {kickCheckingVpn ? (
                 <p className="mt-3 text-sm text-stone-500">Checking your connection…</p>
@@ -827,6 +869,92 @@ export function EntryModal() {
                   />
                 </div>
                 <EntryPhoneField id="modal-kick-phone" value={kickPhone} onChange={setKickPhone} variant="emerald" />
+                <div className="rounded-xl border border-lime-500/20 bg-lime-950/15 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-lime-300/90">Newsletter</p>
+                  <label className="mt-2 flex cursor-pointer items-start gap-2 text-sm text-stone-300">
+                    <input
+                      type="checkbox"
+                      checked={kickNewsletterOptIn}
+                      onChange={(e) => setKickNewsletterOptIn(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      Subscribe me to ShowSkills Rewards updates and giveaway news by email (required for this free
+                      entry).
+                    </span>
+                  </label>
+                </div>
+                <div className="rounded-xl border border-lime-500/20 bg-lime-950/15 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-lime-300/90">Social follow</p>
+                  <p className="mt-1 text-xs text-stone-500">
+                    Follow ShowSkills on one network below, then enter your username so we can verify engagement.
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.map(({ id, label }) => (
+                      <label
+                        key={id}
+                        className={`flex cursor-pointer flex-col rounded-lg border px-3 py-2 text-sm ${
+                          kickSocialPlatform === id
+                            ? 'border-lime-400/50 bg-lime-950/40 text-lime-100'
+                            : 'border-white/10 bg-black/20 text-stone-400'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="kick-social-platform"
+                          value={id}
+                          checked={kickSocialPlatform === id}
+                          onChange={() => {
+                            setKickSocialPlatform(id)
+                            setKickSocialFollowConfirmed(false)
+                          }}
+                          className="sr-only"
+                        />
+                        <span className="font-medium">{label}</span>
+                        {socialLinks[id] ? (
+                          <a
+                            href={socialLinks[id]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 text-[11px] text-lime-300/80 underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Open profile
+                          </a>
+                        ) : null}
+                      </label>
+                    ))}
+                  </div>
+                  <label htmlFor="modal-kick-social-handle" className="mt-3 block text-sm font-medium text-stone-300">
+                    Your username / handle on that network
+                  </label>
+                  <input
+                    id="modal-kick-social-handle"
+                    type="text"
+                    autoComplete="off"
+                    value={kickSocialHandle}
+                    onChange={(e) => setKickSocialHandle(e.target.value)}
+                    className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
+                    placeholder="@yourhandle"
+                  />
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-stone-300">
+                    <input
+                      type="checkbox"
+                      checked={kickSocialFollowConfirmed}
+                      onChange={(e) => setKickSocialFollowConfirmed(e.target.checked)}
+                      disabled={!kickSocialPlatform}
+                      className="mt-1"
+                    />
+                    <span>
+                      I have followed ShowSkills on{' '}
+                      {kickSocialPlatform
+                        ? SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.find((p) => p.id === kickSocialPlatform)?.label ||
+                          'the network I selected'
+                        : 'the network I select above'}{' '}
+                      (required).
+                    </span>
+                  </label>
+                </div>
                 <EntryTermsConsent
                   checked={kickConsent}
                   onChange={setKickConsent}

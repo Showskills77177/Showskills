@@ -330,3 +330,17 @@
 .ss-admin.ss-admin--dark header .border-b.border-white\/\[0\.06\] {
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
+
+/* Visual page editor — full-viewport live canvas */
+.ss-page-editor-workspace {
+  background: #030504;
+}
+
+body.ss-editor-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+body.ss-editor-dragging [data-editor-ui] {
+  cursor: grabbing !important;
+}

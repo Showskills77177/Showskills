@@ -4,6 +4,7 @@ import { SiteAnalytics } from './components/SiteAnalytics'
 import { EntryFlowProvider } from './entry/EntryFlowProvider'
 import { AdminThemeProvider } from './admin/AdminThemeContext'
 import { AdminLayout } from './admin/AdminLayout'
+import { EditorLayout } from './editor/EditorLayout'
 import { RequireAdmin } from './admin/RequireAdmin'
 import { Layout } from './components/Layout'
 import HomePage from './pages/HomePage'
@@ -17,9 +18,11 @@ import AdminPaymentsPage from './pages/admin/PaymentsPage'
 import AdminSubmissionsPage from './pages/admin/SubmissionsPage'
 import AdminTestEmailPage from './pages/admin/TestEmailPage'
 import AdminCompetitionsAdminPage from './pages/admin/CompetitionsAdminPage'
+import AdminGiveawaysAdminPage from './pages/admin/GiveawaysAdminPage'
 import AdminDrawWinnerPage from './pages/admin/DrawWinnerPage'
 import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import AdminThemeDesignerPage from './pages/admin/ThemeDesignerPage'
+import AdminPageEditorPage from './pages/admin/PageEditorPage'
 import ContactPage from './pages/ContactPage'
 import FaqPage from './pages/FaqPage'
 import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
@@ -55,10 +58,16 @@ export default function App() {
           <Route path="/admin" element={<AdminThemeProvider />}>
             <Route path="login" element={<AdminLoginPage />} />
             <Route element={<RequireAdmin />}>
+              <Route element={<EditorLayout />}>
+                <Route path="editor" element={<AdminPageEditorPage />} />
+              </Route>
               <Route element={<AdminLayout />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboardPage />} />
                 <Route path="competitions" element={<AdminCompetitionsAdminPage />} />
+                <Route path="giveaways" element={<AdminGiveawaysAdminPage />} />
+                <Route path="pages" element={<Navigate to="/admin/editor" replace />} />
+                <Route path="homepage" element={<Navigate to="/admin/editor" replace />} />
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="tickets" element={<AdminTicketsPage />} />
                 <Route path="draw" element={<AdminDrawWinnerPage />} />

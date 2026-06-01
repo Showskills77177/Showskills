@@ -9,6 +9,7 @@ import { COMPETITION_SHIRT_GIVEAWAY } from '../../../shared/freeEntryLimits.mjs'
 import {
   ensureDefaultCompetitionPeriod,
   getOpenCompetitionPeriod,
+  getCountdownPeriodForDisplay,
 } from './competitionPeriods.mjs'
 import {
   legacyEntryMethods,
@@ -294,6 +295,14 @@ async function ensureBuiltinCompetitions() {
 
     await ensureDefaultCompetitionPeriod(c.slug, { title: c.title })
 
+    if (c.slug === DRAW_COMPETITION_SLUG) {
+      await query(
+        `UPDATE competitions SET summary = $1, updated_at = $2
+         WHERE slug = $3 AND summary IN ($4, $5)`,
+        [c.summary, now, DRAW_COMPETITION_SLUG, 'Updated from catalog test', 'Created from catalog test'],
+      )
+    }
+
     if (c.seedBundles) {
       const bundleCount = await query(
         `SELECT COUNT(*)::int AS c FROM competition_bundles WHERE competition = $1`,
@@ -523,7 +532,7 @@ export async function createCompetition({
 
   const entryMethods = normalizeEntryMethods(
     {
-      allowPaidEntry,
+      allowPaidEntry: kind === COMPETITION_KIND.giveaway ? false : allowPaidEntry,
       allowFreeOnline,
       allowPostalEntry,
       postalCompetitionName:
@@ -533,8 +542,11 @@ export async function createCompetition({
     },
     { title: title.trim() },
   )
+  if (kind === COMPETITION_KIND.giveaway) {
+    entryMethods.allowPaidEntry = false
+  }
   if (!entryMethods.allowPaidEntry && !entryMethods.allowFreeOnline && !entryMethods.allowPostalEntry) {
-    return { ok: false, error: 'Enable at least one entry route (paid, free online, or postal).' }
+    return { ok: false, error: 'Enable at least one entry route (free online or postal for giveaways; paid, free online, or postal for competitions).' }
   }
 
   const dup = await query(`SELECT slug FROM competitions WHERE slug = $1`, [slug])
@@ -545,8 +557,10 @@ export async function createCompetition({
   const freeVal = dbIsPostgres() ? entryMethods.allowFreeOnline : entryMethods.allowFreeOnline ? 1 : 0
   const postalVal = dbIsPostgres() ? entryMethods.allowPostalEntry : entryMethods.allowPostalEntry ? 1 : 0
   const featuredVal = dbIsPostgres() ? Boolean(featuredOnHomepage) : featuredOnHomepage ? 1 : 0
+  const featuredForInsert = kind === COMPETITION_KIND.giveaway ? false : featuredOnHomepage
+  const featuredInsertVal = dbIsPostgres() ? Boolean(featuredForInsert) : featuredForInsert ? 1 : 0
   try {
-    if (featuredOnHomepage) {
+    if (featuredForInsert) {
       await clearFeaturedOnHomepageExcept(null)
     }
     await query(
@@ -567,7 +581,7 @@ export async function createCompetition({
         freeVal,
         postalVal,
         entryMethods.postalCompetitionName,
-        featuredVal,
+        featuredInsertVal,
         now,
       ],
     )
@@ -611,7 +625,9 @@ export async function createCompetition({
     const skillInput =
       Array.isArray(skillQuestions) && skillQuestions.length
         ? skillQuestions
-        : defaultSkillQuestionsForNewCompetition()
+        : kind === COMPETITION_KIND.giveaway
+          ? [{ questionKey: 'q1', prompt: '', acceptedAnswers: [] }]
+          : defaultSkillQuestionsForNewCompetition()
     const skillResult = await replaceCompetitionSkillQuestions(slug, skillInput)
     if (!skillResult.ok) throw new Error(skillResult.error)
   } catch (err) {
@@ -669,7 +685,9 @@ export async function updateCompetition(slug, patch) {
     fields.push(`${col} = $${i++}`)
     vals.push(dbIsPostgres() ? val : val ? 1 : 0)
   }
-  if (typeof patch.allowPaidEntry === 'boolean') setBool('allow_paid_entry', patch.allowPaidEntry)
+  if (typeof patch.allowPaidEntry === 'boolean') {
+    setBool('allow_paid_entry', existing.kind === COMPETITION_KIND.giveaway ? false : patch.allowPaidEntry)
+  }
   if (typeof patch.allowFreeOnline === 'boolean') setBool('allow_free_online', patch.allowFreeOnline)
   if (typeof patch.allowPostalEntry === 'boolean') setBool('allow_postal_entry', patch.allowPostalEntry)
   if (typeof patch.postalCompetitionName === 'string') setText('postal_competition_name', patch.postalCompetitionName)
@@ -788,11 +806,23 @@ export async function getPublicCompetitionDetail(slug, { siteOrigin = '' } = {})
   if (competition.kind !== COMPETITION_KIND.mainDraw) return null
 
   const { listCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
-  const [bundles, openPeriod, skillQuestions] = await Promise.all([
+  const [bundles, openPeriod, countdownPeriod, skillQuestions] = await Promise.all([
     listCompetitionBundles(slug, { activeOnly: true }),
     getOpenCompetitionPeriod(slug),
+    getCountdownPeriodForDisplay(slug),
     listCompetitionSkillQuestions(slug, { includeAnswers: false }),
   ])
+
+  const mapPeriod = (period) =>
+    period
+      ? {
+          id: period.id,
+          title: period.title,
+          entryOpensAt: period.entryOpensAt,
+          entryClosesAt: period.entryClosesAt,
+          status: period.status,
+        }
+      : null
 
   return {
     ...competition,
@@ -809,6 +839,36 @@ export async function getPublicCompetitionDetail(slug, { siteOrigin = '' } = {})
       bullets: b.bullets,
       featured: b.featured,
     })),
+    openPeriod: mapPeriod(openPeriod),
+    countdownPeriod: mapPeriod(countdownPeriod),
+  }
+}
+
+export async function getPublicGiveawayDetail(slug, { siteOrigin = '' } = {}) {
+  const competition = await getCompetitionBySlug(slug)
+  if (!competition || competition.status !== COMPETITION_STATUS.published) {
+    return null
+  }
+  if (competition.kind !== COMPETITION_KIND.giveaway) return null
+
+  const { listCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
+  const [openPeriod, skillQuestions] = await Promise.all([
+    getOpenCompetitionPeriod(slug),
+    listCompetitionSkillQuestions(slug, { includeAnswers: false }),
+  ])
+
+  return {
+    slug: competition.slug,
+    title: competition.title,
+    summary: competition.summary,
+    kind: competition.kind,
+    heroImageUrl: competitionImagePublicUrl(competition.heroImageRef, siteOrigin),
+    galleryUrls: competition.gallery.map((ref) => competitionImagePublicUrl(ref, siteOrigin)),
+    allowPaidEntry: false,
+    allowFreeOnline: competition.allowFreeOnline,
+    allowPostalEntry: competition.allowPostalEntry,
+    postalCompetitionName: competition.postalCompetitionName,
+    skillQuestions,
     openPeriod: openPeriod
       ? {
           id: openPeriod.id,
@@ -821,12 +881,42 @@ export async function getPublicCompetitionDetail(slug, { siteOrigin = '' } = {})
   }
 }
 
+export async function listPublishedGiveawayCompetitions({ siteOrigin = '' } = {}) {
+  const rows = await listCompetitions({ status: COMPETITION_STATUS.published, kind: COMPETITION_KIND.giveaway })
+  const enriched = await Promise.all(
+    rows.map(async (c) => {
+      const openPeriod = await getOpenCompetitionPeriod(c.slug)
+      return {
+        slug: c.slug,
+        title: c.title,
+        summary: c.summary,
+        kind: c.kind,
+        heroImageUrl: competitionImagePublicUrl(c.heroImageRef, siteOrigin),
+        galleryUrls: c.gallery.map((ref) => competitionImagePublicUrl(ref, siteOrigin)),
+        allowPaidEntry: false,
+        allowFreeOnline: c.allowFreeOnline,
+        allowPostalEntry: c.allowPostalEntry,
+        postalCompetitionName: c.postalCompetitionName,
+        openPeriod: openPeriod
+          ? {
+              entryOpensAt: openPeriod.entryOpensAt,
+              entryClosesAt: openPeriod.entryClosesAt,
+              status: openPeriod.status,
+            }
+          : null,
+      }
+    }),
+  )
+  return enriched
+}
+
 export async function listPublishedMainDrawCompetitions({ siteOrigin = '' } = {}) {
   const rows = await listCompetitions({ status: COMPETITION_STATUS.published, kind: COMPETITION_KIND.mainDraw })
   const enriched = await Promise.all(
     rows.map(async (c) => {
-      const [openPeriod, bundles] = await Promise.all([
+      const [openPeriod, countdownPeriod, bundles] = await Promise.all([
         getOpenCompetitionPeriod(c.slug),
+        getCountdownPeriodForDisplay(c.slug),
         listCompetitionBundles(c.slug, { activeOnly: true }),
       ])
       const publicBundles = bundles.filter((b) => !b.testOnly)
@@ -851,6 +941,13 @@ export async function listPublishedMainDrawCompetitions({ siteOrigin = '' } = {}
               entryOpensAt: openPeriod.entryOpensAt,
               entryClosesAt: openPeriod.entryClosesAt,
               status: openPeriod.status,
+            }
+          : null,
+        countdownPeriod: countdownPeriod
+          ? {
+              entryOpensAt: countdownPeriod.entryOpensAt,
+              entryClosesAt: countdownPeriod.entryClosesAt,
+              status: countdownPeriod.status,
             }
           : null,
       }

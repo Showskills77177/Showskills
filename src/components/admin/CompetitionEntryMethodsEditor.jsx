@@ -18,16 +18,19 @@ export function CompetitionEntryMethodsEditor({
   postalCompetitionName,
   competitionTitle = '',
   onChange,
+  giveawayMode = false,
 }) {
   const postalPreview = postalCompetitionName?.trim() || defaultPostalName(competitionTitle) || 'Your competition name'
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-stone-500">
-        Same entry routes as the Ronaldo Legacy Bundle — paid ticket bundles, £0 card-verified free online entry, and
-        free postal entry into the same draw pool.
+        {giveawayMode
+          ? 'Free entry routes only — £0 card-verified online entry and/or free postal entry into the same draw pool.'
+          : 'Same entry routes as the Ronaldo Legacy Bundle — paid ticket bundles, £0 card-verified free online entry, and free postal entry into the same draw pool.'}
       </p>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className={`grid gap-2 ${giveawayMode ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+        {!giveawayMode ? (
         <label className="flex cursor-pointer gap-2 rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-stone-300">
           <input
             type="checkbox"
@@ -40,6 +43,7 @@ export function CompetitionEntryMethodsEditor({
             <span className="mt-0.5 block text-xs text-stone-500">PayPal / card checkout with bundle prices below.</span>
           </span>
         </label>
+        ) : null}
         <label className="flex cursor-pointer gap-2 rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-stone-300">
           <input
             type="checkbox"

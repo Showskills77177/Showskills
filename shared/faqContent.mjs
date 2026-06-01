@@ -230,7 +230,7 @@ export const FAQ_SECTIONS = [
         id: 'shirt-how',
         question: 'How do I enter the shirt giveaway?',
         answer:
-          'From Competitions, open the Ronaldo shirt giveaway entry. Enter your full name, email, and mobile number, agree to the terms, and answer the one qualification question on the form. If your answer is correct, you are entered into the random draw for the signed shirt. No payment is required. There is no video upload — entry is by the qualification question only.',
+          'From Competitions, open the Ronaldo shirt giveaway entry. Enter your full name, email, and mobile number. You must answer the skill question correctly, subscribe to our newsletter (same email), and follow ShowSkills on at least one of TikTok, Instagram, or Facebook — enter your username and confirm you have followed us. Agree to the terms and submit. If everything is correct, you are entered into the random draw for the signed shirt. No payment or video upload is required.',
       },
       {
         id: 'shirt-limits',

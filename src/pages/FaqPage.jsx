@@ -13,6 +13,8 @@ import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { NO_PURCHASE_ENTRY_NOTICE } from '../../shared/competitionCopy.mjs'
 import { useEntryFlow } from '../entry/entryContext'
 import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
+import { usePageLayout } from '../hooks/useSitePages'
+import { FAQ_PAGE_ID } from '../../shared/sitePageLayout.mjs'
 
 function FaqItemCard({ item, open, onToggle }) {
   const panelId = `faq-answer-${item.id}`
@@ -59,6 +61,7 @@ function FaqItemCard({ item, open, onToggle }) {
 
 export default function FaqPage() {
   const { openTerms } = useEntryFlow()
+  const { layout: pageLayout } = usePageLayout(FAQ_PAGE_ID)
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState(null)
   const [activeSection, setActiveSection] = useState('all')
@@ -73,7 +76,7 @@ export default function FaqPage() {
   }, [query, activeSection])
 
   const popularItems = useMemo(() => getPopularFaqItems(), [])
-  const showPopular = !query.trim() && activeSection === 'all'
+  const showPopular = pageLayout.showPopular !== false && !query.trim() && activeSection === 'all'
   const totalMatches = filteredSections.reduce((n, s) => n + s.items.length, 0)
 
   useEffect(() => {
@@ -116,9 +119,11 @@ export default function FaqPage() {
             Help centre
           </p>
           <h1 className="mt-4 max-w-3xl font-display text-[clamp(2.25rem,8vw,3.75rem)] uppercase leading-[0.95] tracking-[0.04em] text-white">
-            {FAQ_PAGE_TITLE}
+            {pageLayout.title || FAQ_PAGE_TITLE}
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">{FAQ_PAGE_SUBTITLE}</p>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">
+            {pageLayout.subtitle || FAQ_PAGE_SUBTITLE}
+          </p>
 
           <div className="mt-6 flex flex-wrap gap-2">
             <Link
@@ -151,6 +156,7 @@ export default function FaqPage() {
         </p>
 
         {/* Search */}
+        {pageLayout.showSearch !== false ? (
         <label className="relative mt-8 block">
           <span className="sr-only">Search questions</span>
           <Search
@@ -169,8 +175,9 @@ export default function FaqPage() {
             autoComplete="off"
           />
         </label>
+        ) : null}
 
-        {query.trim() ? (
+        {pageLayout.showSearch !== false && query.trim() ? (
           <p className="mt-3 text-sm text-stone-500" aria-live="polite">
             {totalMatches === 0
               ? 'No questions match your search — try different words or browse a topic below.'

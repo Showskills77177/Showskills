@@ -22,7 +22,7 @@ export function getVisibleTicketBundles() {
 export { PAID_SKILL_QUESTIONS, validatePaidSkillAnswers } from '../shared/paidSkillQuestions.mjs'
 
 export const BUNDLE_OFFER_ITEMS = [
-  '2008 Cristiano Ronaldo signed shirt',
+  'Cristiano Ronaldo signed shirt (2021–22 season)',
   'Cristiano Ronaldo Museum signed football',
   'iPhone 17 Pro Max',
   'iPhone 17 Pro Max 24K gold case',

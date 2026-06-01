@@ -1,0 +1,308 @@
+/** Editable public site shell + inner page copy (stored in DB, merged with code defaults). */
+
+import { defaultOffset, mergeOffsets, offsetStyle } from './layoutOffsets.mjs'
+import { FAQ_PAGE_TITLE, FAQ_PAGE_SUBTITLE } from './faqContent.mjs'
+
+export const SITE_SHELL_ID = 'site'
+export const COMPETITIONS_PAGE_ID = 'competitions'
+export const FAQ_PAGE_ID = 'faq'
+export const CONTACT_PAGE_ID = 'contact'
+export const SHIRT_GIVEAWAY_PAGE_ID = 'shirt_giveaway'
+
+export const EDITABLE_PAGE_IDS = [
+  SITE_SHELL_ID,
+  COMPETITIONS_PAGE_ID,
+  FAQ_PAGE_ID,
+  CONTACT_PAGE_ID,
+  SHIRT_GIVEAWAY_PAGE_ID,
+]
+
+export const PAGE_EDITOR_LABELS = {
+  [SITE_SHELL_ID]: 'Site header & footer',
+  homepage: 'Homepage',
+  [COMPETITIONS_PAGE_ID]: 'Competitions',
+  [FAQ_PAGE_ID]: 'FAQ',
+  [CONTACT_PAGE_ID]: 'Contact',
+  [SHIRT_GIVEAWAY_PAGE_ID]: 'Shirt giveaway',
+}
+
+export const SITE_PAGE_BACKGROUNDS = {
+  default: 'default',
+  solid: 'solid',
+}
+
+const DEFAULT_NAV = [
+  { id: 'home', label: 'Home', path: '/', visible: true, mobile: true },
+  { id: 'competitions', label: 'Competitions', path: '/competitions', visible: true, mobile: true },
+  { id: 'faq', label: 'FAQ', path: '/faq', visible: true, mobile: true },
+  { id: 'terms', label: 'T&C', action: 'terms', visible: true, mobile: true },
+]
+
+const DEFAULT_FOOTER_LINKS = {
+  competitions: { label: 'Competitions', path: '/competitions', visible: true },
+  contact: { label: 'Contact', path: '/contact', visible: true },
+  faq: { label: 'FAQ', path: '/faq', visible: true },
+  terms: { label: 'Full terms & privacy', action: 'terms', visible: true },
+  ticketTerms: { label: 'Paid ticket terms', action: 'ticketTerms', visible: true },
+}
+
+const DEFAULT_HEADER_OFFSETS = {
+  nav: defaultOffset(),
+  logo: defaultOffset(),
+  tagline: defaultOffset(),
+}
+
+const DEFAULT_FOOTER_OFFSETS = {
+  logo: defaultOffset(),
+  links: defaultOffset(),
+  legal: defaultOffset(),
+  social: defaultOffset(),
+  disclaimer: defaultOffset(),
+}
+
+export function defaultSiteShell() {
+  return {
+    version: 1,
+    headerTagline: 'Prizes that matter',
+    showHeaderTagline: true,
+    pageBackground: SITE_PAGE_BACKGROUNDS.default,
+    navOrder: DEFAULT_NAV.map((n) => n.id),
+    navItems: Object.fromEntries(DEFAULT_NAV.map((n) => [n.id, { ...n }])),
+    headerOffsets: { ...DEFAULT_HEADER_OFFSETS },
+    footerOffsets: { ...DEFAULT_FOOTER_OFFSETS },
+    footer: {
+      visible: true,
+      showLogo: true,
+      legalNotice: '',
+      postalLine: '',
+      disclaimer: 'Not a lottery. Not affiliated with any athlete, club, or brand in prize imagery.',
+      showTrustpilot: true,
+      showSocial: true,
+      socialLinks: {
+        tiktok: '',
+        instagram: '',
+        facebook: '',
+      },
+      linkOrder: ['competitions', 'contact', 'faq', 'terms', 'ticketTerms'],
+      links: { ...DEFAULT_FOOTER_LINKS },
+    },
+  }
+}
+
+export function defaultCompetitionsPageLayout() {
+  return {
+    version: 1,
+    title: 'Competitions',
+    intro:
+      'Paid prize draws and free giveaways on ShowSkills Rewards — same skill-based entry rules, different entry routes.',
+    offsets: {
+      title: defaultOffset(),
+      intro: defaultOffset(),
+      links: defaultOffset(),
+      paid: defaultOffset(),
+      free: defaultOffset(),
+      shirtCard: defaultOffset(1.1),
+    },
+    sectionOrder: ['paid', 'free'],
+    sections: {
+      paid: {
+        visible: true,
+        title: 'Prize draw competitions',
+        subtitle:
+          'Paid ticket bundles plus free postal and free online entry — including the Ronaldo Legacy Bundle.',
+      },
+      free: {
+        visible: true,
+        title: 'Free giveaways',
+        subtitle:
+          'No ticket purchase — enter online or by post (where offered). Newsletter and social follow required for the shirt giveaway.',
+      },
+    },
+    faqLinkLabel: 'Common questions (FAQ)',
+    showFaqLink: true,
+    jumpLinkLabel: 'Jump to free giveaways',
+    showJumpLink: true,
+  }
+}
+
+export function defaultFaqPageLayout() {
+  return {
+    version: 1,
+    title: FAQ_PAGE_TITLE,
+    subtitle: FAQ_PAGE_SUBTITLE,
+    showSearch: true,
+    showPopular: true,
+  }
+}
+
+export function defaultContactPageLayout() {
+  return {
+    version: 1,
+    eyebrow: 'Get in touch',
+    title: 'Contact us',
+    intro:
+      'Questions about the Ronaldo Legacy Bundle, paid tickets, or postal entry? Check our FAQ first, or send a message below — we will reply to the email you provide.',
+    showEmailCard: true,
+    showPostalCard: true,
+  }
+}
+
+export function defaultShirtGiveawayPageLayout() {
+  return {
+    version: 1,
+    badge: 'Free giveaway · Not the paid bundle',
+    title: 'Ronaldo shirt giveaway',
+    intro:
+      'Separate from the paid bundle: answer one simple Ronaldo qualification question for free. Winner gets the shirt in the panel below — not the phone, ball, or Legacy Bundle.',
+    ctaButtonLabel: 'Open free giveaway form',
+    howToTitle: 'How to qualify',
+    prizeImageRef: null,
+    prizeImageUrl: null,
+  }
+}
+
+export function defaultPageLayout(pageId) {
+  switch (pageId) {
+    case SITE_SHELL_ID:
+      return defaultSiteShell()
+    case COMPETITIONS_PAGE_ID:
+      return defaultCompetitionsPageLayout()
+    case FAQ_PAGE_ID:
+      return defaultFaqPageLayout()
+    case CONTACT_PAGE_ID:
+      return defaultContactPageLayout()
+    case SHIRT_GIVEAWAY_PAGE_ID:
+      return defaultShirtGiveawayPageLayout()
+    default:
+      return null
+  }
+}
+
+function mergeNavItems(base, input) {
+  const items = { ...base.navItems }
+  if (input?.navItems && typeof input.navItems === 'object') {
+    for (const [id, patch] of Object.entries(input.navItems)) {
+      if (items[id]) items[id] = { ...items[id], ...patch }
+    }
+  }
+  const order = Array.isArray(input?.navOrder)
+    ? input.navOrder.filter((id) => items[id])
+    : base.navOrder
+  return { navItems: items, navOrder: order.length ? order : base.navOrder }
+}
+
+export function mergeSiteShell(input) {
+  const base = defaultSiteShell()
+  if (!input || typeof input !== 'object') return base
+  const nav = mergeNavItems(base, input)
+  const footerBase = base.footer
+  const footerIn = input.footer && typeof input.footer === 'object' ? input.footer : {}
+  return {
+    ...base,
+    ...input,
+    headerTagline: typeof input.headerTagline === 'string' ? input.headerTagline : base.headerTagline,
+    showHeaderTagline: input.showHeaderTagline !== false,
+    pageBackground:
+      input.pageBackground === SITE_PAGE_BACKGROUNDS.solid
+        ? SITE_PAGE_BACKGROUNDS.solid
+        : SITE_PAGE_BACKGROUNDS.default,
+    navItems: nav.navItems,
+    navOrder: nav.navOrder,
+    headerOffsets: mergeOffsets(base.headerOffsets, input.headerOffsets),
+    footerOffsets: mergeOffsets(base.footerOffsets, input.footerOffsets),
+    footer: {
+      ...footerBase,
+      ...footerIn,
+      showSocial: footerIn.showSocial !== false,
+      socialLinks: {
+        ...footerBase.socialLinks,
+        ...(footerIn.socialLinks && typeof footerIn.socialLinks === 'object' ? footerIn.socialLinks : {}),
+      },
+      links: {
+        ...footerBase.links,
+        ...(footerIn.links && typeof footerIn.links === 'object' ? footerIn.links : {}),
+      },
+      linkOrder: Array.isArray(footerIn.linkOrder)
+        ? footerIn.linkOrder.filter((id) => footerBase.links[id] || footerIn.links?.[id])
+        : footerBase.linkOrder,
+    },
+  }
+}
+
+export function mergeCompetitionsPageLayout(input) {
+  const base = defaultCompetitionsPageLayout()
+  if (!input || typeof input !== 'object') return base
+  return {
+    ...base,
+    ...input,
+    offsets: mergeOffsets(base.offsets, input.offsets),
+    sectionOrder: Array.isArray(input.sectionOrder)
+      ? input.sectionOrder.filter((id) => base.sections[id])
+      : base.sectionOrder,
+    sections: {
+      ...base.sections,
+      ...(input.sections && typeof input.sections === 'object' ? input.sections : {}),
+    },
+  }
+}
+
+export function mergeFaqPageLayout(input) {
+  const base = defaultFaqPageLayout()
+  if (!input || typeof input !== 'object') return base
+  return {
+    ...base,
+    ...input,
+    showSearch: input.showSearch !== false,
+    showPopular: input.showPopular !== false,
+  }
+}
+
+export function mergeContactPageLayout(input) {
+  const base = defaultContactPageLayout()
+  if (!input || typeof input !== 'object') return base
+  return {
+    ...base,
+    ...input,
+    showEmailCard: input.showEmailCard !== false,
+    showPostalCard: input.showPostalCard !== false,
+  }
+}
+
+export function mergeShirtGiveawayPageLayout(input) {
+  const base = defaultShirtGiveawayPageLayout()
+  if (!input || typeof input !== 'object') return base
+  return {
+    ...base,
+    ...input,
+    prizeImageRef: input.prizeImageRef || null,
+    prizeImageUrl: input.prizeImageUrl || null,
+  }
+}
+
+export function mergePageLayout(pageId, input) {
+  switch (pageId) {
+    case SITE_SHELL_ID:
+      return mergeSiteShell(input)
+    case COMPETITIONS_PAGE_ID:
+      return mergeCompetitionsPageLayout(input)
+    case FAQ_PAGE_ID:
+      return mergeFaqPageLayout(input)
+    case CONTACT_PAGE_ID:
+      return mergeContactPageLayout(input)
+    case SHIRT_GIVEAWAY_PAGE_ID:
+      return mergeShirtGiveawayPageLayout(input)
+    default:
+      return null
+  }
+}
+
+/** Human labels for homepage blocks (Page Editor). */
+export const HOMEPAGE_BLOCK_LABELS = {
+  promo_strip: 'Live promotion badge',
+  hero_intro: 'Hero copy & brand title',
+  hero_prizes: 'Prize images & enter button',
+  hero_details: 'Bundle details card',
+  ticket_bundles: 'Ticket bundle prices',
+  winners_panel: 'Recent winners',
+  competitions_hub: 'Competitions hub (paid + free)',
+}

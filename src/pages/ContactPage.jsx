@@ -4,6 +4,8 @@ import { Mail } from 'lucide-react'
 import { CONTACT_TOPICS, SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import { PromoterAddress } from '../components/PromoterAddress'
+import { usePageLayout } from '../hooks/useSitePages'
+import { CONTACT_PAGE_ID } from '../../shared/sitePageLayout.mjs'
 import { apiUrl } from '../lib/api'
 
 const inputClass =
@@ -12,6 +14,7 @@ const inputClass =
 const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text-stone-500'
 
 export default function ContactPage() {
+  const { layout } = usePageLayout(CONTACT_PAGE_ID)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [topic, setTopic] = useState('general')
@@ -78,42 +81,40 @@ export default function ContactPage() {
   return (
     <main className="m-0 p-0">
       <div className="mx-auto max-w-3xl px-4 pb-16 pt-14 sm:px-6 sm:pb-20 sm:pt-20">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400/90">Get in touch</p>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400/90">{layout.eyebrow || 'Get in touch'}</p>
         <h1 className="mt-3 font-display text-4xl uppercase tracking-[0.06em] text-white sm:text-5xl">
-          Contact us
+          {layout.title || 'Contact us'}
         </h1>
-        <p className="mt-5 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">
-          Questions about the Ronaldo Legacy Bundle, paid tickets, or postal entry? Check our{' '}
-          <Link to="/faq" className="font-medium text-teal-300 underline decoration-teal-600/40 underline-offset-2 hover:text-teal-200">
-            FAQ
-          </Link>{' '}
-          first, or send a message below — we will reply to the email you provide.
-        </p>
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">{layout.intro}</p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/[0.08] bg-stone-950/50 px-4 py-3.5 sm:px-5">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-950/80 text-teal-400 ring-1 ring-teal-500/30">
-              <Mail className="h-5 w-5" strokeWidth={1.75} aria-hidden />
-            </span>
-            <p className="min-w-0 flex-1 text-sm leading-relaxed text-stone-400">
-              Prefer email? Write to{' '}
-              <a
-                href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`}
-                className="font-medium text-teal-300 underline decoration-teal-600/40 underline-offset-[3px] transition hover:text-teal-200"
-              >
-                {SHOWSKILLS_CONTACT_EMAIL}
-              </a>
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-stone-950/50 px-4 py-3.5 sm:px-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Free postal entry address</p>
-            <PromoterAddress className="mt-2 text-sm text-stone-300" />
-            <p className="mt-2 text-xs leading-relaxed text-stone-500">
-              Same as{' '}
-              <span className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</span> — one entry per person; include competition
-              name and skill answers in your post.
-            </p>
-          </div>
+          {layout.showEmailCard !== false ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/[0.08] bg-stone-950/50 px-4 py-3.5 sm:px-5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-950/80 text-teal-400 ring-1 ring-teal-500/30">
+                <Mail className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+              </span>
+              <p className="min-w-0 flex-1 text-sm leading-relaxed text-stone-400">
+                Prefer email? Write to{' '}
+                <a
+                  href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`}
+                  className="font-medium text-teal-300 underline decoration-teal-600/40 underline-offset-[3px] transition hover:text-teal-200"
+                >
+                  {SHOWSKILLS_CONTACT_EMAIL}
+                </a>
+              </p>
+            </div>
+          ) : null}
+          {layout.showPostalCard !== false ? (
+            <div className="rounded-2xl border border-white/[0.08] bg-stone-950/50 px-4 py-3.5 sm:px-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Free postal entry address</p>
+              <PromoterAddress className="mt-2 text-sm text-stone-300" />
+              <p className="mt-2 text-xs leading-relaxed text-stone-500">
+                Same as{' '}
+                <span className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</span> — one entry per person; include competition
+                name and skill answers in your post.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {status === 'sent' ? (

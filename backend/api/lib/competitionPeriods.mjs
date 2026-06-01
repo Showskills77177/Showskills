@@ -186,6 +186,33 @@ export async function getOpenCompetitionPeriod(competition = DRAW_COMPETITION_SL
   return mapPeriodRow(r.rows[0])
 }
 
+/** Period dates for public countdown — open period, next future period, or local dev fallback. */
+export async function getCountdownPeriodForDisplay(competition = DRAW_COMPETITION_SLUG) {
+  const open = await getOpenCompetitionPeriod(competition)
+  if (open) return open
+
+  await ensureCompetitionPeriodsSchema()
+  const now = new Date().toISOString()
+  const upcoming = await query(
+    `SELECT * FROM competition_periods
+     WHERE competition = $1 AND entry_closes_at > $2
+     ORDER BY CASE WHEN status = $3 THEN 0 ELSE 1 END, entry_closes_at ASC
+     LIMIT 1`,
+    [competition, now, PERIOD_STATUS.open],
+  )
+  if (upcoming.rows[0]) return mapPeriodRow(upcoming.rows[0])
+
+  const latest = await query(
+    `SELECT * FROM competition_periods
+     WHERE competition = $1
+     ORDER BY entry_closes_at DESC LIMIT 1`,
+    [competition],
+  )
+  if (latest.rows[0]) return mapPeriodRow(latest.rows[0])
+
+  return ensureLocalDevEntryPeriod(competition)
+}
+
 export async function createCompetitionPeriod({
   competition = DRAW_COMPETITION_SLUG,
   title,

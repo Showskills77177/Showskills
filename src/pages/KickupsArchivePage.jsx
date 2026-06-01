@@ -2,26 +2,30 @@ import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
 import { useEntryFlow } from '../entry/entryContext'
 import { ShirtGiveawayCtaButton } from '../components/siteChrome'
 import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { usePageLayout } from '../hooks/useSitePages'
+import { SHIRT_GIVEAWAY_PAGE_ID, mergeShirtGiveawayPageLayout } from '../../shared/sitePageLayout.mjs'
 
 /** Free Ronaldo shirt giveaway (direct URL / footer links). */
-export default function KickupsArchivePage() {
+export default function KickupsArchivePage({ layout: layoutProp = null, editorMode = false }) {
   const { openEntry } = useEntryFlow()
+  const { layout: fetchedLayout } = usePageLayout(SHIRT_GIVEAWAY_PAGE_ID)
+  const layout = mergeShirtGiveawayPageLayout(layoutProp || fetchedLayout)
+  const prizeImage = layout.prizeImageUrl || KICKUPS_GIVEAWAY_IMAGE
 
   return (
-    <main className="m-0 p-0">
+    <main
+      className={`m-0 p-0 ${editorMode ? 'ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none' : ''}`}
+    >
       <section className="ss-rules-pitch-guide border-t border-lime-400/20">
         <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
           <header className="max-w-3xl text-left">
             <p className="font-display text-sm font-bold uppercase tracking-[0.35em] text-lime-300/90 drop-shadow-[0_1px_0_rgba(0,0,0,0.85)]">
-              Free giveaway · Not the paid bundle
+              {layout.badge}
             </p>
             <h1 className="ss-rules-title font-display mt-2 text-[clamp(2.75rem,9vw,4.25rem)] uppercase leading-[0.95] tracking-[0.02em] text-lime-300">
-              Ronaldo shirt giveaway
+              {layout.title}
             </h1>
-            <p className="mt-4 text-base font-medium leading-relaxed text-sky-100/85 sm:text-lg">
-              Separate from the paid bundle: answer one simple Ronaldo qualification question for free. Winner gets the
-              shirt in the panel below — not the phone, ball, or Legacy Bundle.
-            </p>
+            <p className="mt-4 text-base font-medium leading-relaxed text-sky-100/85 sm:text-lg">{layout.intro}</p>
           </header>
 
           <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start lg:gap-14">
@@ -29,7 +33,7 @@ export default function KickupsArchivePage() {
               <div className="flex flex-col gap-4 rounded-2xl border border-lime-400/30 bg-gradient-to-br from-emerald-950/40 to-black/30 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5">
                 <div className="ss-kickups-prize-thumb mx-auto shrink-0 sm:mx-0">
                   <img
-                    src={KICKUPS_GIVEAWAY_IMAGE}
+                    src={prizeImage}
                     alt="Prize: signed Cristiano Ronaldo Manchester United number 7 shirt."
                     width={771}
                     height={1024}
@@ -50,13 +54,26 @@ export default function KickupsArchivePage() {
               </div>
 
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/80">How to qualify</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/80">{layout.howToTitle}</p>
                 <ol className="mt-4 grid list-none gap-3">
                   {[
-                    ['1', 'Answer the question', SHIRT_GIVEAWAY_QUESTION],
-                    ['2', 'Correct answer qualifies', 'Ronaldo R9 or Cristiano Ronaldo qualifies you for the giveaway draw.'],
-                    ['3', 'Free entry', 'No payment and no video upload required.'],
-                    ['4', 'We review entries', 'Manual check before a winner is confirmed.'],
+                    ['1', 'Answer the skill question', SHIRT_GIVEAWAY_QUESTION],
+                    [
+                      '2',
+                      'Correct answer required',
+                      'Ronaldo R9 or Cristiano Ronaldo qualifies you — wrong answers cannot be submitted.',
+                    ],
+                    [
+                      '3',
+                      'Subscribe to our newsletter',
+                      'Required for every free shirt entry — tick the box in the form with the same email you enter.',
+                    ],
+                    [
+                      '4',
+                      'Follow us on social media',
+                      'Follow ShowSkills on TikTok, Instagram, or Facebook (at least one), then enter your username.',
+                    ],
+                    ['5', 'We review entries', 'Manual check before a winner is confirmed. No payment or video upload.'],
                   ].map(([num, title, desc]) => (
                     <li
                       key={title}
@@ -92,8 +109,9 @@ export default function KickupsArchivePage() {
                 type="button"
                 className="mt-5 w-full rounded-xl border border-lime-400/35 px-4 py-3 text-sm font-bold text-lime-100 hover:bg-lime-950/30"
                 onClick={() => openEntry('kickups')}
+                tabIndex={editorMode ? -1 : undefined}
               >
-                Open free giveaway form
+                {layout.ctaButtonLabel || 'Open free giveaway form'}
               </button>
             </aside>
           </div>

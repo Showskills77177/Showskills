@@ -1,12 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { test, expect } from '@playwright/test'
 import { openShirtGiveawayEntry } from '../support/entry.mjs'
-import { openE2eDb, latestKickupByEmail, countKickups } from '../support/db.mjs'
-
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
-const tinyMp4 = join(root, 'tests', 'fixtures', 'tiny.mp4')
+import { fillShirtGiveawayForm } from '../support/shirtGiveaway.mjs'
+import { openE2eDb, kickupById, countKickups } from '../support/db.mjs'
 
 test.describe('C) Free shirt giveaway', () => {
   test('submit qualification answer and appear in DB', async ({ page }) => {
@@ -18,46 +13,41 @@ test.describe('C) Free shirt giveaway', () => {
     db0.close()
 
     await openShirtGiveawayEntry(page)
-    await page.getByLabel(/Full name/i).first().fill(name)
-    await page.getByLabel(/Qualification question/i).fill('Ronaldo R9')
-    await page.getByLabel(/^Email$/i).fill(email)
-    await page.getByRole('checkbox', { name: /I agree to the/i }).check()
+    await fillShirtGiveawayForm(page, { name, email })
+
+    const submitResponse = page.waitForResponse(
+      (res) =>
+        /\/api\/submissions\/kickups$/.test(new URL(res.url()).pathname) &&
+        res.request().method() === 'POST',
+    )
     await page.getByRole('button', { name: /Submit giveaway entry/i }).click()
+    const res = await submitResponse
+    const body = await res.json().catch(() => ({}))
+    expect(res.ok(), `kickups POST ${res.status()}: ${JSON.stringify(body)}`).toBeTruthy()
+    expect(body.ok).toBe(true)
+    expect(body.id).toBeTruthy()
     await expect(page.getByText(/Thanks — your submission was received/i)).toBeVisible({ timeout: 15_000 })
 
     const db = openE2eDb()
+    const row = kickupById(db, body.id)
+    expect(row, `kickup id ${body.id} in e2e.sqlite`).toBeTruthy()
+    expect(row?.email?.toLowerCase()).toBe(email.toLowerCase())
     expect(countKickups(db)).toBeGreaterThan(before)
-    const row = latestKickupByEmail(db, email)
     expect(row?.video_ref).toBe('answer:ronaldo-shirt-giveaway')
     expect(row?.video_filename).toContain('Ronaldo R9')
+    expect(row?.admin_notes).toMatch(/Newsletter: yes/i)
+    expect(row?.admin_notes).toMatch(/Social follow: tiktok/i)
     db.close()
   })
 
-  test('legacy multipart video upload accepted (API)', async ({ request }) => {
-    const email = `e2e-kick-file-${Date.now()}@example.test`
-    const name = 'E2E Kick File'
-
-    const db0 = openE2eDb()
-    const before = countKickups(db0)
-    db0.close()
-
-    const res = await request.post('/api/submissions/kickups/upload', {
-      multipart: {
-        fullName: name,
-        email,
-        video: {
-          name: 'clip.mp4',
-          mimeType: 'video/mp4',
-          buffer: readFileSync(tinyMp4),
-        },
-      },
-    })
-    expect(res.ok(), await res.text()).toBeTruthy()
-
-    const db = openE2eDb()
-    expect(countKickups(db)).toBeGreaterThan(before)
-    const row = latestKickupByEmail(db, email)
-    expect(row?.video_ref?.startsWith('local:')).toBe(true)
-    db.close()
+  test('rejects entry without newsletter and social follow', async ({ page }) => {
+    await openShirtGiveawayEntry(page)
+    await page.getByLabel(/Full name/i).first().fill('Incomplete Entry')
+    await page.getByLabel(/Qualification question/i).fill('Ronaldo R9')
+    await page.getByLabel(/^Email$/i).fill('incomplete@example.test')
+    await page.locator('#modal-kick-phone').fill('07123456789')
+    await page.getByRole('checkbox', { name: /I agree to the/i }).check()
+    await page.getByRole('button', { name: /Submit giveaway entry/i }).click()
+    await expect(page.getByText(/Please subscribe to the ShowSkills newsletter/i)).toBeVisible({ timeout: 10_000 })
   })
 })

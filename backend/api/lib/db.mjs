@@ -12,6 +12,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 loadEnv({ path: join(root, '.env.local') })
 loadEnv({ path: join(root, '.env') })
+if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
+  process.env.SQLITE_PATH = 'db/e2e.sqlite'
+}
 
 let pool
 let sqliteDb

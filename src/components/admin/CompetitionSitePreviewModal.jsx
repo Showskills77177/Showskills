@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ModalPortal } from '../ModalPortal'
 import { CompetitionPublicCard } from '../CompetitionPublicCard'
+import { GiveawayPublicCard } from '../GiveawayPublicCard'
 import { HomeFeaturedPromotion } from '../HomeFeaturedPromotion'
 import { PhotoPageBackdrop } from '../PhotoPageBackdrop'
 
@@ -42,7 +43,8 @@ function buildPreviewModel(draft) {
  * @param {{ draft: object | null, open: boolean, onClose: () => void }} props
  */
 export function CompetitionSitePreviewModal({ draft, open, onClose }) {
-  const [tab, setTab] = useState('competitions')
+  const isGiveaway = draft?.kind === 'giveaway'
+  const [tab, setTab] = useState(isGiveaway ? 'giveaways' : 'competitions')
   const model = buildPreviewModel(draft)
 
   if (!open || !model) return null
@@ -55,7 +57,7 @@ export function CompetitionSitePreviewModal({ draft, open, onClose }) {
             <div>
               <h2 className="text-sm font-semibold text-stone-100">Site preview</h2>
               <p className="text-xs text-stone-500">
-                How visitors see this competition — like the test email preview panel.
+                How visitors see this {isGiveaway ? 'giveaway' : 'competition'} — like the test email preview panel.
               </p>
             </div>
             <button
@@ -68,38 +70,47 @@ export function CompetitionSitePreviewModal({ draft, open, onClose }) {
           </div>
 
           <div className="flex gap-1 border-b border-white/10 px-4 pt-2">
-            <PreviewTab active={tab === 'competitions'} onClick={() => setTab('competitions')}>
-              Competitions page card
+            <PreviewTab
+              active={tab === (isGiveaway ? 'giveaways' : 'competitions')}
+              onClick={() => setTab(isGiveaway ? 'giveaways' : 'competitions')}
+            >
+              {isGiveaway ? 'Giveaways page card' : 'Competitions page card'}
             </PreviewTab>
-            {model.featuredOnHomepage ? (
+            {!isGiveaway && model.featuredOnHomepage ? (
               <PreviewTab active={tab === 'homepage'} onClick={() => setTab('homepage')}>
                 Homepage live promotion
               </PreviewTab>
-            ) : (
+            ) : !isGiveaway ? (
               <span className="px-3 py-2 text-xs text-stone-600">
                 Homepage tab appears when “Feature on homepage” is checked
               </span>
-            )}
+            ) : null}
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto p-4">
-            {tab === 'competitions' ? (
+            {tab === 'homepage' ? (
+              <HomeFeaturedPromotion competition={model} preview />
+            ) : (
               <div className="relative rounded-xl border border-white/10 bg-[#0a0f0d] p-4">
                 <PhotoPageBackdrop />
                 <div className="relative z-[1] mx-auto max-w-lg">
-                  <p className="mb-4 text-xs uppercase tracking-wider text-stone-500">/competitions</p>
-                  <CompetitionPublicCard competition={model} preview draft={model.status !== 'published'} />
+                  <p className="mb-4 text-xs uppercase tracking-wider text-stone-500">
+                    {isGiveaway ? '/giveaways' : '/competitions'}
+                  </p>
+                  {isGiveaway ? (
+                    <GiveawayPublicCard giveaway={model} preview draft={model.status !== 'published'} />
+                  ) : (
+                    <CompetitionPublicCard competition={model} preview draft={model.status !== 'published'} />
+                  )}
                 </div>
               </div>
-            ) : (
-              <HomeFeaturedPromotion competition={model} preview />
             )}
           </div>
 
           <div className="border-t border-white/10 px-4 py-3 text-xs text-stone-500">
             {model.status === 'published'
-              ? 'Published — this competition appears on the public Competitions page automatically.'
-              : 'Set status to Published and open a competition period before entries work on the live site.'}
+              ? `Published — this ${isGiveaway ? 'giveaway' : 'competition'} appears on the public ${isGiveaway ? 'Giveaways' : 'Competitions'} page automatically.`
+              : `Set status to Published and open a ${isGiveaway ? 'giveaway' : 'competition'} period before entries work on the live site.`}
           </div>
         </div>
       </div>

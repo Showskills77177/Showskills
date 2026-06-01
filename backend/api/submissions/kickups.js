@@ -12,6 +12,8 @@ import { COMPETITION_SHIRT_GIVEAWAY } from '../../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../../shared/contactPhone.mjs'
 import { upsertUserContact } from '../lib/userContact.mjs'
 import { allocateShirtEntryNumber } from '../lib/shirtEntryNumbers.mjs'
+import { subscribeNewsletter } from '../lib/newsletter.mjs'
+import { isValidShirtSocialPlatform } from '../../../shared/shirtGiveawayEntryRequirements.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -42,6 +44,13 @@ export default async function handler(req, res) {
   const videoFilename = typeof body.videoFilename === 'string' ? body.videoFilename.trim().slice(0, 500) : ''
   const qualificationAnswer =
     typeof body.qualificationAnswer === 'string' ? body.qualificationAnswer.trim().slice(0, 500) : ''
+  const newsletterOptIn = body.newsletterOptIn === true || body.newsletterOptIn === 'true'
+  const socialPlatform =
+    typeof body.socialPlatform === 'string' ? body.socialPlatform.trim().toLowerCase() : ''
+  const socialHandle =
+    typeof body.socialHandle === 'string' ? body.socialHandle.trim().slice(0, 120) : ''
+  const socialFollowConfirmed =
+    body.socialFollowConfirmed === true || body.socialFollowConfirmed === 'true'
 
   const phone =
     typeof body.phone === 'string'
@@ -59,6 +68,18 @@ export default async function handler(req, res) {
   if (qualificationAnswer) {
     if (!isCorrectShirtGiveawayAnswer(qualificationAnswer)) {
       return json(res, 400, { error: 'Qualification answer is incorrect' })
+    }
+    if (!newsletterOptIn) {
+      return json(res, 400, { error: 'Newsletter subscription is required to enter the free shirt giveaway.' })
+    }
+    if (!isValidShirtSocialPlatform(socialPlatform)) {
+      return json(res, 400, { error: 'Choose TikTok, Instagram, or Facebook and confirm you follow us.' })
+    }
+    if (!socialHandle) {
+      return json(res, 400, { error: 'Enter your social media username or handle for the platform you follow us on.' })
+    }
+    if (!socialFollowConfirmed) {
+      return json(res, 400, { error: 'Confirm that you follow ShowSkills on the social network you selected.' })
     }
   } else if (!videoRef.startsWith('https://')) {
     return json(res, 400, { error: 'qualificationAnswer required' })
@@ -84,12 +105,19 @@ export default async function handler(req, res) {
 
   try {
     await upsertUserContact({ email, fullName, phone: phoneCheck.phone })
+    if (newsletterOptIn) {
+      const sub = await subscribeNewsletter(email, { source: 'shirt_giveaway' })
+      if (!sub.ok) return json(res, 400, { error: sub.error })
+    }
     const id = randomUUID()
     const entryNumber = await allocateShirtEntryNumber()
     const storedRef = qualificationAnswer ? 'answer:ronaldo-shirt-giveaway' : videoRef
     const storedFilename = qualificationAnswer ? `Answer: ${qualificationAnswer}` : videoFilename || null
+    const socialLine = socialPlatform
+      ? `Social follow: ${socialPlatform} (@${socialHandle.replace(/^@/, '')})`
+      : ''
     const adminNotes = qualificationAnswer
-      ? `Question: ${SHIRT_GIVEAWAY_QUESTION}\nAnswer: ${qualificationAnswer}\nEntry number: ${entryNumber}`
+      ? `Question: ${SHIRT_GIVEAWAY_QUESTION}\nAnswer: ${qualificationAnswer}\nNewsletter: yes\n${socialLine}\nEntry number: ${entryNumber}`
       : `Entry number: ${entryNumber}`
     const r = await query(
       `INSERT INTO kickup_submissions (id, full_name, email, video_ref, video_filename, admin_notes, entry_number, competition)

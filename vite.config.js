@@ -5,7 +5,9 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiTarget =
+    process.env.VITE_PROXY_API_TARGET?.trim() ||
     env.VITE_PROXY_API_TARGET?.trim() ||
+    process.env.API_PROXY_TARGET?.trim() ||
     env.API_PROXY_TARGET?.trim() ||
     'http://127.0.0.1:3000'
 

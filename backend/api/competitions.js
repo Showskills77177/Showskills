@@ -4,6 +4,7 @@ import {
   ensureCompetitionCatalogSchema,
   getFeaturedHomepageCompetition,
   getPublicCompetitionDetail,
+  getPublicGiveawayDetail,
   listPublishedMainDrawCompetitions,
 } from './lib/competitionCatalog.mjs'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
@@ -43,7 +44,8 @@ export default async function handler(req, res) {
     }
 
     if (slug) {
-      const detail = await getPublicCompetitionDetail(slug, { siteOrigin })
+      let detail = await getPublicCompetitionDetail(slug, { siteOrigin })
+      if (!detail) detail = await getPublicGiveawayDetail(slug, { siteOrigin })
       if (!detail) return json(res, 404, { error: 'Competition not found or not published.' })
       return json(res, 200, { ok: true, competition: detail })
     }

@@ -319,7 +319,9 @@ export function TermsModal({ open, onClose }) {
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">6. Free Ronaldo shirt giveaway (separate)</h3>
           <p className="mb-3">
             The Ronaldo shirt giveaway is a <strong>separate, free engagement giveaway</strong> for promotion only. Entry
-            is <strong>free</strong> (no payment). You answer one simple qualification question; the prize is a{' '}
+            is <strong>free</strong> (no payment). You answer one simple qualification question; subscribe to the
+            ShowSkills newsletter; follow us on <strong>TikTok, Instagram, or Facebook</strong> (your choice — you only
+            need one); and provide your social handle so we can verify engagement. The prize is a{' '}
             <strong>Ronaldo signed shirt only</strong> (not the full bundle). It does <strong>not</strong> form part of
             the paid Ronaldo Legacy Bundle competition unless expressly stated. Legacy Bundle entrants who get the three skill
             questions wrong may receive <strong>automatic consolation entries</strong> into this shirt draw — see section 2a above.
@@ -352,6 +354,10 @@ export function TermsModal({ open, onClose }) {
             Prizes are as described on this site. The bundle includes (illustratively) iPhone Pro Max, Ronaldo signed
             shirt (Manchester United era), signed football with COA, and premium case. Prizes are non-transferable unless
             we agree otherwise; no cash alternative is guaranteed; we may substitute items of similar value if needed.
+          </p>
+          <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
+            Some product images shown are representative or AI-enhanced for privacy and security reasons, as the items
+            are extremely rare collectibles. The actual physical items will only be revealed after they have been won.
           </p>
 
           <h3 className="mb-2 mt-6 scroll-mt-4 font-semibold text-stone-200" id="ss-terms-ticket-payments">

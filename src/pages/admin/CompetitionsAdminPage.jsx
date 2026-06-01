@@ -10,7 +10,7 @@ import {
   CompetitionSkillChallengeEditor,
   legacySkillQuestionRows,
 } from '../../components/admin/CompetitionSkillChallengeEditor'
-import { defaultEntryMethodsForNewCompetition } from '../../../shared/competitionEntryMethods.mjs'
+import { defaultEntryMethodsForNewCompetition, defaultEntryMethodsForNewGiveaway } from '../../../shared/competitionEntryMethods.mjs'
 import { CompetitionSitePreviewModal } from '../../components/admin/CompetitionSitePreviewModal'
 
 const STATUS_OPTIONS = [
@@ -27,8 +27,10 @@ function isoToDatetimeLocal(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function emptyNewForm() {
+function emptyNewForm(catalogKind = 'main_draw') {
+  const isGiveaway = catalogKind === 'giveaway'
   return {
+    kind: catalogKind,
     title: '',
     slug: '',
     summary: '',
@@ -37,14 +39,15 @@ function emptyNewForm() {
     entryOpensAt: '',
     entryClosesAt: '',
     openPeriod: false,
-    bundles: standardBundleRows(),
+    bundles: isGiveaway ? [] : standardBundleRows(),
     skillQuestions: legacySkillQuestionRows(),
-    ...defaultEntryMethodsForNewCompetition(),
+    ...(isGiveaway ? defaultEntryMethodsForNewGiveaway() : defaultEntryMethodsForNewCompetition()),
     featuredOnHomepage: false,
   }
 }
 
-export default function AdminCompetitionsPage() {
+export default function AdminCompetitionCatalogPage({ catalogKind = 'main_draw' }) {
+  const isGiveawayAdmin = catalogKind === 'giveaway'
   const [rows, setRows] = useState([])
   const [selectedSlug, setSelectedSlug] = useState('')
   const [draft, setDraft] = useState(null)
@@ -54,7 +57,7 @@ export default function AdminCompetitionsPage() {
   const [msg, setMsg] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [newForm, setNewForm] = useState(emptyNewForm)
+  const [newForm, setNewForm] = useState(() => emptyNewForm(catalogKind))
   const [editBundles, setEditBundles] = useState([])
   const [editSkillQuestions, setEditSkillQuestions] = useState([])
   const [periodForm, setPeriodForm] = useState({
@@ -90,7 +93,7 @@ export default function AdminCompetitionsPage() {
       setLoading(true)
       setErr('')
       try {
-        const res = await apiFetch('/api/admin/competitions')
+        const res = await apiFetch(`/api/admin/competitions?kind=${encodeURIComponent(catalogKind)}`)
         const j = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(j.error || 'Failed to load')
         const list = j.competitions || []
@@ -106,7 +109,7 @@ export default function AdminCompetitionsPage() {
         setLoading(false)
       }
     },
-    [loadDetail, selectedSlug],
+    [loadDetail, selectedSlug, catalogKind],
   )
 
   useEffect(() => {
@@ -320,6 +323,7 @@ export default function AdminCompetitionsPage() {
     setMsg('')
     try {
       const payload = {
+        kind: catalogKind,
         title: newForm.title.trim(),
         slug: newForm.slug.trim() || undefined,
         summary: newForm.summary.trim(),
@@ -344,13 +348,21 @@ export default function AdminCompetitionsPage() {
       const bundles = (newForm.bundles || []).filter(
         (b) => b.active !== false && b.bundleKey.trim() && b.title.trim(),
       )
-      if (!bundles.length && newForm.allowPaidEntry !== false) {
+      if (!bundles.length && newForm.allowPaidEntry !== false && !isGiveawayAdmin) {
         throw new Error('Add at least one active ticket bundle when paid entry is enabled.')
       }
-      if (!newForm.allowPaidEntry && !newForm.allowFreeOnline && !newForm.allowPostalEntry) {
+      if (
+        !isGiveawayAdmin &&
+        !newForm.allowPaidEntry &&
+        !newForm.allowFreeOnline &&
+        !newForm.allowPostalEntry
+      ) {
         throw new Error('Enable at least one entry route (paid, free online, or postal).')
       }
-      if (newForm.allowPaidEntry !== false) {
+      if (isGiveawayAdmin && !newForm.allowFreeOnline && !newForm.allowPostalEntry) {
+        throw new Error('Enable at least one free entry route (online or postal).')
+      }
+      if (newForm.allowPaidEntry !== false && !isGiveawayAdmin) {
         payload.bundles = bundles.map((b) => ({
         bundleKey: b.bundleKey.trim(),
         title: b.title.trim(),
@@ -370,9 +382,13 @@ export default function AdminCompetitionsPage() {
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Create failed')
       setNewOpen(false)
-      setNewForm(emptyNewForm())
+      setNewForm(emptyNewForm(catalogKind))
       await loadList(j.competition?.slug)
-      setMsg(`Competition created (${j.competition?.slug}) with ${bundles.length} ticket bundle(s). Select it on the left, then upload images under “Competition images” and publish when ready.`)
+      setMsg(
+        isGiveawayAdmin
+          ? `Giveaway created (${j.competition?.slug}). Select it on the left, upload images, and publish when ready.`
+          : `Competition created (${j.competition?.slug}) with ${bundles.length} ticket bundle(s). Select it on the left, then upload images under “Competition images” and publish when ready.`,
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Create failed')
     } finally {
@@ -579,6 +595,8 @@ export default function AdminCompetitionsPage() {
     }
   }
 
+  const isGiveawayDraft = isGiveawayAdmin || draft?.kind === 'giveaway'
+
   const openPeriod = useMemo(
     () => draft?.periods?.find((p) => p.status === PERIOD_STATUS.open),
     [draft],
@@ -588,26 +606,36 @@ export default function AdminCompetitionsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-stone-100">Competitions</h1>
+          <h1 className="text-xl font-semibold text-stone-100">
+            {isGiveawayAdmin ? 'Giveaways' : 'Competitions'}
+          </h1>
           <p className="mt-1 max-w-2xl text-sm text-stone-500">
-            Create and manage prize draws from admin — photos, rules, ticket bundles, and entry timeline. No code
-            changes needed for the next competition.
+            {isGiveawayAdmin
+              ? 'Create and manage free-only prize draws — photos, skill challenge, postal and online entry. No paid ticket bundles.'
+              : 'Create and manage main prize draws — photos, rules, ticket bundles, and entry timeline. No code changes needed.'}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => setNewOpen((v) => !v)}
+          onClick={() => {
+            setNewOpen((v) => !v)
+            if (newOpen) setNewForm(emptyNewForm(catalogKind))
+          }}
           className="rounded-lg border border-teal-500/35 bg-teal-950/40 px-4 py-2 text-sm font-semibold text-teal-100 hover:bg-teal-950/60"
         >
-          {newOpen ? 'Cancel' : 'Create new competition'}
+          {newOpen ? 'Cancel' : isGiveawayAdmin ? 'Create new giveaway' : 'Create new competition'}
         </button>
       </div>
 
       {newOpen ? (
         <form onSubmit={createCompetition} className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
-          <h2 className="text-sm font-semibold text-stone-300">New competition</h2>
+          <h2 className="text-sm font-semibold text-stone-300">
+            {isGiveawayAdmin ? 'New giveaway' : 'New competition'}
+          </h2>
           <p className="mt-1 text-xs text-stone-500">
-            Creates an isolated main draw with its own periods, ticket bundles, entries, and draw pool.
+            {isGiveawayAdmin
+              ? 'Free entry only — appears on the public Competitions page when published.'
+              : 'Creates an isolated main draw with its own periods, ticket bundles, entries, and draw pool.'}
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block text-sm text-stone-400 sm:col-span-2">
@@ -689,22 +717,25 @@ export default function AdminCompetitionsPage() {
             </label>
           </div>
 
-          <div className="mt-4 border-t border-white/10 pt-4">
-            <label className="flex items-start gap-2 text-sm text-stone-400">
-              <input
-                type="checkbox"
-                checked={Boolean(newForm.featuredOnHomepage)}
-                onChange={(e) => setNewForm((f) => ({ ...f, featuredOnHomepage: e.target.checked }))}
-                className="mt-1"
-              />
-              <span>Feature on homepage live promotion panel (only one at a time; Legacy is featured by default)</span>
-            </label>
-          </div>
+          {!isGiveawayAdmin ? (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <label className="flex items-start gap-2 text-sm text-stone-400">
+                <input
+                  type="checkbox"
+                  checked={Boolean(newForm.featuredOnHomepage)}
+                  onChange={(e) => setNewForm((f) => ({ ...f, featuredOnHomepage: e.target.checked }))}
+                  className="mt-1"
+                />
+                <span>Feature on homepage live promotion panel (only one at a time; Legacy is featured by default)</span>
+              </label>
+            </div>
+          ) : null}
 
           <div className="mt-4 border-t border-white/10 pt-4">
-            <h3 className="text-sm font-semibold text-stone-300">Entry routes (Legacy-style)</h3>
+            <h3 className="text-sm font-semibold text-stone-300">Entry routes</h3>
             <div className="mt-3">
               <CompetitionEntryMethodsEditor
+                giveawayMode={isGiveawayAdmin}
                 allowPaidEntry={newForm.allowPaidEntry}
                 allowFreeOnline={newForm.allowFreeOnline}
                 allowPostalEntry={newForm.allowPostalEntry}
@@ -715,7 +746,7 @@ export default function AdminCompetitionsPage() {
             </div>
           </div>
 
-          {newForm.allowPaidEntry !== false ? (
+          {newForm.allowPaidEntry !== false && !isGiveawayAdmin ? (
             <div className="mt-4 border-t border-white/10 pt-4">
               <h3 className="text-sm font-semibold text-stone-300">Ticket bundles &amp; prices</h3>
               <div className="mt-3">
@@ -747,7 +778,7 @@ export default function AdminCompetitionsPage() {
             disabled={saving}
             className="mt-3 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {saving ? 'Creating…' : 'Create competition'}
+            {saving ? 'Creating…' : isGiveawayAdmin ? 'Create giveaway' : 'Create competition'}
           </button>
         </form>
       ) : null}
@@ -838,6 +869,7 @@ export default function AdminCompetitionsPage() {
                       ))}
                     </select>
                   </label>
+                  {!isGiveawayDraft ? (
                   <label className="flex items-start gap-2 rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-stone-300">
                     <input
                       type="checkbox"
@@ -853,6 +885,7 @@ export default function AdminCompetitionsPage() {
                       </span>
                     </span>
                   </label>
+                  ) : null}
                   <div className="rounded-lg border border-teal-500/20 bg-teal-950/20 p-4">
                     <h3 className="text-sm font-semibold text-teal-100">Competition images</h3>
                     <p className="mt-1 text-xs text-stone-400">
@@ -917,6 +950,7 @@ export default function AdminCompetitionsPage() {
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Entry routes</h2>
                 <div className="mt-3">
                   <CompetitionEntryMethodsEditor
+                    giveawayMode={isGiveawayDraft}
                     allowPaidEntry={draft.allowPaidEntry}
                     allowFreeOnline={draft.allowFreeOnline}
                     allowPostalEntry={draft.allowPostalEntry}
@@ -952,7 +986,7 @@ export default function AdminCompetitionsPage() {
                 </section>
               ) : null}
 
-              {draft.allowPaidEntry !== false ? (
+              {draft.allowPaidEntry !== false && !isGiveawayDraft ? (
               <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Ticket bundles &amp; prices</h2>
                 <div className="mt-3">
@@ -1178,7 +1212,9 @@ export default function AdminCompetitionsPage() {
               </section>
             </div>
           ) : (
-            <p className="text-sm text-stone-500">Select a competition to edit.</p>
+            <p className="text-sm text-stone-500">
+              Select a {isGiveawayAdmin ? 'giveaway' : 'competition'} to edit.
+            </p>
           )}
         </div>
       ) : null}
