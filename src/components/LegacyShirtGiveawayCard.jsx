@@ -10,6 +10,7 @@ import {
 import { SHIRT_GIVEAWAY_CARD_STEP_TITLES } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { defaultShirtGiveawayCardLayout } from '../../shared/sitePageLayout.mjs'
 import { liveOffsetStyle } from '../../shared/layoutOffsets.mjs'
+import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { CompetitionCountdown } from './CompetitionCountdown'
 import { EditableDragFrame } from './admin/EditableDragFrame'
 import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
@@ -65,7 +66,11 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
         scale: moveOnly ? 1 : (pos.scale ?? 1),
       })
       if (!style) return node
-      return <div style={style}>{node}</div>
+      return (
+        <LiveLayoutOffset style={style} variant="card" className={opts.className}>
+          {node}
+        </LiveLayoutOffset>
+      )
     }
     return (
       <EditableDragFrame

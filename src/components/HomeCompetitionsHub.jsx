@@ -109,9 +109,9 @@ export function HomeCompetitionsHub({ block = {}, onEnterPaid, onEnterGiveaway }
           {loading ? (
             <p className="mt-8 text-sm text-stone-600">Loading competitions…</p>
           ) : (
-            <ul className="mt-8 grid list-none gap-8 lg:grid-cols-2 lg:items-stretch">
+            <ul className="mt-8 grid list-none gap-8 md:grid-cols-2 md:items-stretch">
               {legacy ? (
-                <li className={otherPaid.length ? '' : 'lg:col-span-2 lg:max-w-3xl lg:justify-self-center lg:w-full'}>
+                <li className={otherPaid.length ? '' : 'md:col-span-2 md:max-w-3xl md:justify-self-center md:w-full'}>
                   <CompetitionPublicCard
                     competition={legacy}
                     onEnter={() => onEnterPaid(legacy.slug)}
@@ -119,7 +119,7 @@ export function HomeCompetitionsHub({ block = {}, onEnterPaid, onEnterGiveaway }
                   />
                 </li>
               ) : (
-                <li className="rounded-2xl border border-dashed border-white/10 bg-stone-950/40 px-6 py-10 text-center text-sm text-stone-500 lg:col-span-2">
+                <li className="rounded-2xl border border-dashed border-white/10 bg-stone-950/40 px-6 py-10 text-center text-sm text-stone-500 md:col-span-2">
                   No paid competitions published yet.
                 </li>
               )}
@@ -155,8 +155,8 @@ export function HomeCompetitionsHub({ block = {}, onEnterPaid, onEnterGiveaway }
           </div>
 
           {loading ? null : (
-            <ul className="mt-8 grid list-none gap-8 lg:grid-cols-2 lg:items-stretch">
-              <li className="lg:col-span-2">
+            <ul className="mt-8 grid list-none gap-8 md:grid-cols-2 md:items-stretch">
+              <li className="md:col-span-2">
                 <LegacyShirtGiveawayCard onEnter={onEnterGiveaway} />
               </li>
               {giveaways.map((g) => (

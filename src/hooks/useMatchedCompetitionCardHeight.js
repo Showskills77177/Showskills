@@ -10,7 +10,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const shirtSlot = shirtCardRef.current
     if (!paidSlot || !shirtSlot) return
 
-    const mq = window.matchMedia('(min-width: 1024px)')
+    const mq = window.matchMedia('(min-width: 768px)')
     let lastTargetHeight = 0
 
     function cardIn(slot) {

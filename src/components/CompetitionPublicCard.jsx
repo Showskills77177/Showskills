@@ -9,6 +9,7 @@ import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
 import { defaultLegacyBundleCardLayout } from '../../shared/sitePageLayout.mjs'
 import { liveOffsetStyle } from '../../shared/layoutOffsets.mjs'
+import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { DRAW_COMPETITION_SLUG, formatPeriodMonthLabel, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 
 const DEFAULT_SUMMARY =
@@ -93,7 +94,11 @@ export function CompetitionPublicCard({
         scale: moveOnly ? 1 : (pos.scale ?? 1),
       })
       if (!style) return node
-      return <div style={style}>{node}</div>
+      return (
+        <LiveLayoutOffset style={style} variant="card" className={opts.className}>
+          {node}
+        </LiveLayoutOffset>
+      )
     }
     return (
       <EditableDragFrame

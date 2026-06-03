@@ -284,7 +284,7 @@ export function EntryModal() {
           <button
             type="button"
             onClick={closeEntry}
-            className="shrink-0 rounded-lg p-2 text-stone-500 hover:bg-white/5 hover:text-stone-200"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-white/5 hover:text-stone-200"
             aria-label="Close"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -21,6 +21,7 @@ import { EditableSectionOverlay } from '../components/admin/EditableSectionOverl
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { mergePrizeImages } from '../../shared/homepageLayout.mjs'
 import { liveOffsetStyle, offsetStyle } from '../../shared/layoutOffsets.mjs'
+import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
@@ -98,7 +99,7 @@ function HeroHeadline({ text, highlight }) {
   return (
     <>
       {text.slice(0, idx)}
-      <span className="ss-pen-highlight whitespace-nowrap text-emerald-100">{highlight}</span>
+      <span className="ss-pen-highlight text-emerald-100 sm:whitespace-nowrap">{highlight}</span>
       {text.slice(idx + highlight.length)}
     </>
   )
@@ -238,7 +239,11 @@ export function HomePageContent({
         scale: panelScale,
       })
       if (!style) return node
-      return <div style={style}>{node}</div>
+      return (
+        <LiveLayoutOffset style={style} variant={opts.cssScaleOnly ? 'panel' : 'layout'} className={opts.className}>
+          {node}
+        </LiveLayoutOffset>
+      )
     }
 
     return (
@@ -442,7 +447,11 @@ export function HomePageContent({
       if (!editorMode) {
         const style = liveOffsetStyle(pos, { widthOnly: true, scale: pos.scale ?? 1 })
         if (!style) return node
-        return <div style={style}>{node}</div>
+        return (
+          <LiveLayoutOffset style={style} variant="card">
+            {node}
+          </LiveLayoutOffset>
+        )
       }
       return (
         <EditableDragFrame

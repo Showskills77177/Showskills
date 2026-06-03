@@ -1476,7 +1476,7 @@ body {
   min-height: 0;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .ss-competitions-columns--paired {
     align-items: stretch;
   }
@@ -2719,4 +2719,77 @@ input.ss-cf-pay-button.ss-pay-cta {
   width: 100% !important;
   min-height: 48px;
   border-radius: 0.75rem !important;
+}
+
+/* —— Mobile & tablet UX —— */
+@media (max-width: 767px) {
+  .ss-live-layout-offset,
+  .ss-live-panel-offset {
+    transform: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .ss-live-card-offset {
+    transform: none !important;
+  }
+
+  .ss-competitions-columns {
+    gap: 1.5rem;
+  }
+
+  .ss-competition-card-actions .ss-competition-enter-btn {
+    min-height: 48px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  [data-competition-card] {
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 767px) {
+  .ss-entry-checkout-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgb(12 10 9) 72%, rgb(12 10 9 / 0.92) 88%, transparent);
+  }
+
+  .ss-entry-modal-panel {
+    max-height: min(92dvh, 920px);
+  }
+
+  .ss-legacy-bundle-stamp-overlay {
+    top: 22%;
+    left: 72%;
+    transform: translateY(-50%) scale(0.88);
+  }
+
+  .ss-shirt-giveaway-card__body,
+  [data-competition-card] .px-6 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .ss-competitions-columns--paired,
+  .ss-home-competitions-hub ul {
+    gap: 1.75rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: landscape) {
+  .ss-competitions-columns--paired {
+    gap: 1.25rem;
+  }
+
+  .ss-entry-modal-panel {
+    max-height: min(88dvh, 720px);
+  }
 }

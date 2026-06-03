@@ -147,7 +147,7 @@ export function Layout() {
             ? withOffset(
                 headerOffsets,
                 'tagline',
-                <p className="justify-self-end -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95">
+                <p className="hidden justify-self-end -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95 md:block">
                   {shell.headerTagline}
                 </p>,
               )

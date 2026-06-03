@@ -15,6 +15,7 @@ import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
 import { LegacyShirtGiveawayCard } from '../components/LegacyShirtGiveawayCard'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
+import { LiveLayoutOffset } from '../components/LiveLayoutOffset'
 import { liveOffsetStyle } from '../../shared/layoutOffsets.mjs'
 
 function SectionHeading({ id, children }) {
@@ -109,7 +110,15 @@ export default function CompetitionsPage({
         scale: pos.scale ?? 1,
       })
       if (!style) return node
-      return <div style={style}>{node}</div>
+      return (
+        <LiveLayoutOffset
+          style={style}
+          variant={opts.cssScaleOnly ? 'panel' : 'layout'}
+          className={opts.className}
+        >
+          {node}
+        </LiveLayoutOffset>
+      )
     }
     return (
       <EditableDragFrame
@@ -316,7 +325,7 @@ export default function CompetitionsPage({
           <div
             className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
               visibleSectionCount > 1
-                ? 'ss-competitions-columns--paired lg:grid-cols-2 lg:items-stretch'
+                ? 'ss-competitions-columns--paired md:grid-cols-2 md:items-stretch'
                 : 'max-w-xl'
             }`}
           >
