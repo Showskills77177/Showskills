@@ -10,6 +10,8 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const shirtSlot = shirtCardRef.current
     if (!paidSlot || !shirtSlot) return
 
+    const editorPreview = typeof syncKey === 'string' && syncKey.split('|').pop() === 'edit'
+
     const mq = window.matchMedia('(min-width: 768px)')
     let lastTargetHeight = 0
 
@@ -95,7 +97,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     }
 
     function sync() {
-      if (!mq.matches) {
+      if (editorPreview || !mq.matches) {
         clearHeights()
         clearButtonStyles()
         return

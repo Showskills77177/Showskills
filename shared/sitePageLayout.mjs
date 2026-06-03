@@ -162,6 +162,17 @@ function clampTimerScale(scale) {
   return Math.min(TIMER_SCALE_MAX, Math.max(TIMER_SCALE_MIN, Math.round(s * 100) / 100))
 }
 
+function clampCardOffsetYs(offsets) {
+  const out = { ...offsets }
+  for (const key of Object.keys(out)) {
+    const o = out[key]
+    if (!o || typeof o !== 'object') continue
+    const y = Number(o.y) || 0
+    if (y < 0) out[key] = { ...o, y: 0 }
+  }
+  return out
+}
+
 export function defaultShirtGiveawayCardLayout() {
   return {
     badgeLabel: '',
@@ -197,7 +208,7 @@ function mergeStepLabels(base, input) {
 export function mergeShirtGiveawayCardLayout(base, input) {
   if (!input || typeof input !== 'object') return base
   const gap = Number(input.headlineGapPx)
-  const mergedOffsets = mergeOffsets(base.offsets, input.offsets)
+  const mergedOffsets = clampCardOffsetYs(mergeOffsets(base.offsets, input.offsets))
   if (mergedOffsets.timer) {
     mergedOffsets.timer = {
       x: Number(mergedOffsets.timer.x) || 0,
@@ -218,7 +229,7 @@ export function mergeShirtGiveawayCardLayout(base, input) {
       typeof input.enterButtonLabel === 'string' ? input.enterButtonLabel : base.enterButtonLabel,
     prizeImageUrl: typeof input.prizeImageUrl === 'string' ? input.prizeImageUrl : base.prizeImageUrl,
     headlineGapPx: Number.isFinite(gap) && gap >= 0 ? gap : base.headlineGapPx,
-    offsets: mergedOffsets,
+    offsets: clampCardOffsetYs(mergedOffsets),
   }
 }
 
@@ -256,7 +267,7 @@ export function mergeLegacyBundleCardLayout(base, input) {
     summary: typeof input.summary === 'string' ? input.summary : base.summary,
     headlineGapPx: Number.isFinite(gap) && gap >= 0 ? gap : base.headlineGapPx,
     enterButtonLabel: typeof input.enterButtonLabel === 'string' ? input.enterButtonLabel : base.enterButtonLabel,
-    offsets: mergedOffsets,
+    offsets: clampCardOffsetYs(mergedOffsets),
   }
 }
 

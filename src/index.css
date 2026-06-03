@@ -517,6 +517,38 @@ body {
   max-width: 100%;
 }
 
+.ss-page-editor-preview [data-competition-card] .ss-editor-flow-block {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.ss-page-editor-preview [data-competition-card] .ss-shirt-giveaway-card__body,
+.ss-page-editor-preview [data-competition-card] [data-editor-align-group] {
+  overflow: hidden;
+}
+
+.ss-page-editor-preview .ss-competition-paid-slot,
+.ss-page-editor-preview .ss-competition-shirt-slot {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.ss-page-editor-preview .ss-competition-paid-slot [data-competition-card],
+.ss-page-editor-preview .ss-competition-shirt-slot [data-competition-card] {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.ss-page-editor-preview .ss-competition-paid-slot > [data-editor-drag],
+.ss-page-editor-preview .ss-competition-shirt-slot > [data-editor-drag] {
+  flex: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
 .ss-page-editor-preview [data-editor-drag]:not([data-editor-ui]) {
   cursor: grab;
 }

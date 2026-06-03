@@ -115,6 +115,7 @@ export function CompetitionPublicCard({
         moveOnly={moveOnly}
         scaleMin={opts.scaleMin}
         scaleMax={opts.scaleMax}
+        flowSafe
         onChange={(patch) =>
           onPatchCardLayout?.({
             offsets: {

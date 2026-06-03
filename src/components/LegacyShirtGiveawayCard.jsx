@@ -87,6 +87,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
         moveOnly={moveOnly}
         scaleMin={opts.scaleMin}
         scaleMax={opts.scaleMax}
+        flowSafe
         onChange={(patch) =>
           onPatchCardLayout?.({
             offsets: {
@@ -168,9 +169,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
       ref={ref}
       data-competition-card
       data-shirt-giveaway-card
-      className={`ss-shirt-giveaway-card flex h-full w-full max-w-none flex-col overflow-hidden rounded-2xl border border-lime-400/30 bg-stone-950/80 shadow-[0_16px_48px_rgba(0,0,0,0.4)] ${
-        editorMode ? 'overflow-visible' : ''
-      } ${className}`}
+      className={`ss-shirt-giveaway-card flex h-full w-full max-w-none flex-col overflow-hidden rounded-2xl border border-lime-400/30 bg-stone-950/80 shadow-[0_16px_48px_rgba(0,0,0,0.4)] ${className}`}
       style={{
         ...style,
         '--ss-shirt-card-scale': scale,
@@ -178,9 +177,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
       }}
     >
       <div
-        className={`ss-shirt-giveaway-card__body flex min-h-0 flex-1 flex-col px-6 pb-0 pt-4 text-left sm:px-8 sm:pt-5 ${
-          editorMode ? 'overflow-visible' : ''
-        }`}
+        className="ss-shirt-giveaway-card__body flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-0 pt-4 text-left sm:px-8 sm:pt-5"
         data-editor-align-group
         data-editor-center-root
       >

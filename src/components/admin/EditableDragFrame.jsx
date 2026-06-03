@@ -30,6 +30,8 @@ export function EditableDragFrame({
   moveOnly = false,
   scaleMin: scaleMinProp = 0.55,
   scaleMax: scaleMaxProp = 1.85,
+  /** Stack blocks in document flow (margin) instead of transform — for competition cards. */
+  flowSafe = false,
 }) {
   const frameRef = useRef(null)
   const dragging = useRef(false)
@@ -51,22 +53,48 @@ export function EditableDragFrame({
   const offsetX = live?.x ?? x
   const offsetY = live?.y ?? y
   const activeScale = moveOnly ? 1 : scale || 1
-  const style = cssScaleOnly
-    ? offsetX || offsetY
-      ? { transform: `translate(${offsetX}px, ${offsetY}px)`, transformOrigin }
-      : undefined
-    : offsetStyle(
-        { x: offsetX, y: offsetY, scale: activeScale },
-        { scale: activeScale, transformOrigin, widthOnly: moveOnly ? true : widthOnly },
-      )
+  const flowOffsetY = flowSafe ? Math.max(0, offsetY) : offsetY
 
-  function applyPosition(next, snap = snapEnabled) {
+  function emitChange(patch) {
+    if (!onChange) return
+    if (flowSafe && patch.y != null) {
+      onChange({ ...patch, y: Math.max(0, patch.y) })
+      return
+    }
+    onChange(patch)
+  }
+
+  function innerScaleStyle() {
+    if (moveOnly || activeScale === 1) return undefined
+    if (cssScaleOnly) return undefined
+    if (widthOnly) {
+      return { transform: `scaleX(${activeScale})`, transformOrigin }
+    }
+    return { transform: `scale(${activeScale})`, transformOrigin }
+  }
+
+  const style = flowSafe
+    ? {
+        marginTop: flowOffsetY,
+        marginLeft: offsetX,
+        maxWidth: '100%',
+      }
+    : cssScaleOnly
+      ? offsetX || offsetY
+        ? { transform: `translate(${offsetX}px, ${offsetY}px)`, transformOrigin }
+        : undefined
+      : offsetStyle(
+          { x: offsetX, y: offsetY, scale: activeScale },
+          { scale: activeScale, transformOrigin, widthOnly: moveOnly ? true : widthOnly },
+        )
+
+  function applyPosition(patch, snap = snapEnabled) {
     const snapped = snapOffset(
-      { x: next.x, y: next.y, scale: activeScale },
+      { x: patch.x, y: patch.y, scale: activeScale },
       { grid: EDITOR_SNAP_GRID_PX, snap },
     )
     setLive(null)
-    onChange?.({ x: snapped.x, y: snapped.y, scale: snapped.scale })
+    emitChange({ x: snapped.x, y: snapped.y, scale: snapped.scale })
   }
 
   function centerAxis(axis) {
@@ -106,7 +134,7 @@ export function EditableDragFrame({
   }
 
   function resetPosition() {
-    onChange?.({ x: 0, y: 0, scale: activeScale })
+    emitChange({ x: 0, y: 0, scale: activeScale })
     setLive(null)
   }
 
@@ -204,9 +232,9 @@ export function EditableDragFrame({
     setLive(null)
     setSnapEnabled(true)
     if (wasResizing) {
-      onChange?.({ scale: resizeStart.current.lastScale || activeScale })
+      emitChange({ scale: resizeStart.current.lastScale || activeScale })
     } else if (snapped.x !== start.current.x || snapped.y !== start.current.y) {
-      onChange?.({ x: snapped.x, y: snapped.y, scale: activeScale })
+      emitChange({ x: snapped.x, y: snapped.y, scale: activeScale })
     }
   }
 
@@ -276,7 +304,7 @@ export function EditableDragFrame({
       ref={frameRef}
       data-editor-drag={id}
       data-editor-label={label}
-      className={`relative ${selected ? 'z-[20]' : ''} ${className}`}
+      className={`relative w-full max-w-full ${flowSafe ? 'ss-editor-flow-block shrink-0' : ''} ${selected ? 'z-[20]' : ''} ${className}`}
       style={style}
       onPointerDown={onPointerDown}
       onContextMenu={(e) => {
@@ -297,6 +325,7 @@ export function EditableDragFrame({
 
       <div
         className={`relative ${selected ? 'ring-2 ring-teal-400/90 ring-offset-1 ring-offset-[#050807]' : 'ring-1 ring-transparent hover:ring-teal-400/20'}`}
+        style={flowSafe ? innerScaleStyle() : undefined}
       >
         {children}
       </div>
