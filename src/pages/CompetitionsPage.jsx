@@ -174,10 +174,14 @@ export default function CompetitionsPage({
           </p>,
         )}
 
-        {loading ? <p className="mt-10 text-sm text-stone-500">Loading competitions…</p> : null}
+        {loading ? (
+          <p className="mt-10 text-sm text-stone-500" role="status">
+            Loading competitions…
+          </p>
+        ) : null}
 
         <div
-          className={`ss-competitions-columns mt-12 grid gap-8 ${
+          className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
             showPaid && showFree ? 'lg:grid-cols-2 lg:items-start' : 'max-w-xl'
           }`}
         >

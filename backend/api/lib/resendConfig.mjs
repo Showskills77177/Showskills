@@ -16,13 +16,14 @@ export function getResendApiKey() {
   return (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').trim()
 }
 
-/** True only on Vercel Production — local `node server.js` always uses sandbox rules. */
+/**
+ * True when Resend may send from showskills.co.uk to any recipient.
+ * Vercel Production, or local/preview when RESEND_USE_VERIFIED_DOMAIN=1 (domain already verified on Resend).
+ */
 export function isResendProductionMode() {
   if (process.env.RESEND_FORCE_SANDBOX === '1') return false
+  if (process.env.RESEND_USE_VERIFIED_DOMAIN === '1') return true
   if (process.env.VERCEL_ENV === 'production') return true
-  if (process.env.RESEND_USE_VERIFIED_DOMAIN === '1' && process.env.VERCEL_ENV) {
-    return process.env.VERCEL_ENV === 'production'
-  }
   return false
 }
 
@@ -86,9 +87,11 @@ export function resolveCustomerEmailRecipient(customerEmail) {
 
 export function formatResendError(data, status) {
   const msg = typeof data?.message === 'string' ? data.message : ''
-  const hint =
-    msg.includes('testing emails to your own email') || msg.includes('verify a domain')
-      ? ' Set RESEND_ACCOUNT_EMAIL to your Resend signup address for local testing, or verify your domain at resend.com/domains and set PURCHASE_EMAIL_FROM=you@yourdomain.com'
-      : ''
+  let hint = ''
+  if (msg.includes('testing emails to your own email') || msg.includes('verify a domain')) {
+    hint = isResendProductionMode()
+      ? ' Check PURCHASE_EMAIL_FROM uses your verified domain (e.g. orders@showskills.co.uk).'
+      : ' Local dev uses Resend test sender by default. For real sends locally, set RESEND_USE_VERIFIED_DOMAIN=1 and PURCHASE_EMAIL_FROM=ShowSkills Rewards <orders@showskills.co.uk> in .env.local, then restart the API. Or use Send test to your Resend account email only.'
+  }
   return msg ? `${msg}${hint}` : `Resend API error (HTTP ${status})`
 }

@@ -84,6 +84,7 @@ export function EntryFlowProvider({ children }) {
     () => initialQuizSession?.email || initialContact?.email || '',
   )
   const [paidPhone, setPaidPhone] = useState(() => initialContact?.phone || '')
+  const [paidNewsletterOptIn, setPaidNewsletterOptIn] = useState(false)
 
   const [freeAddressLine1, setFreeAddressLine1] = useState('')
   const [freeAddressLine2, setFreeAddressLine2] = useState('')
@@ -654,6 +655,7 @@ export function EntryFlowProvider({ children }) {
           customerEmail: paidEmail.trim(),
           customerFullName: paidFullName.trim(),
           customerPhone: paidPhone.trim(),
+          newsletterOptIn: paidNewsletterOptIn,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -677,7 +679,7 @@ export function EntryFlowProvider({ children }) {
       }
       return token
     },
-    [paidBundleId, paidCompetitionSlug, paidEmail, paidFullName, paidPhone, cashflowsCreateApi],
+    [paidBundleId, paidCompetitionSlug, paidEmail, paidFullName, paidPhone, paidNewsletterOptIn, cashflowsCreateApi],
   )
 
   /** Background warm-up once name, email, and consent are filled (Pay now opens faster). */
@@ -1074,8 +1076,13 @@ export function EntryFlowProvider({ children }) {
         setKickError(kickPhoneCheck.error)
         return
       }
+      const kickEmailNorm = kickEmail.trim().toLowerCase()
       if (!kickNewsletterOptIn) {
         setKickError('Please subscribe to the ShowSkills newsletter to enter the free shirt giveaway.')
+        return
+      }
+      if (!kickEmailNorm) {
+        setKickError('Enter your email before subscribing to the newsletter.')
         return
       }
       if (!['tiktok', 'instagram', 'facebook'].includes(kickSocialPlatform)) {
@@ -1106,7 +1113,7 @@ export function EntryFlowProvider({ children }) {
           credentials: 'include',
           body: JSON.stringify({
             fullName: kickFullName.trim(),
-            email: kickEmail.trim(),
+            email: kickEmailNorm,
             phone: kickPhone.trim(),
             customerPhone: kickPhone.trim(),
             qualificationAnswer: answer,
@@ -1189,6 +1196,8 @@ export function EntryFlowProvider({ children }) {
       setPaidEmail,
       paidPhone,
       setPaidPhone,
+      paidNewsletterOptIn,
+      setPaidNewsletterOptIn,
       handlePaidEntry,
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,
@@ -1288,6 +1297,7 @@ export function EntryFlowProvider({ children }) {
       paidFullName,
       paidEmail,
       paidPhone,
+      paidNewsletterOptIn,
       handlePaidEntry,
       handlePaidQuizSubmit,
       markPaidCheckoutComplete,

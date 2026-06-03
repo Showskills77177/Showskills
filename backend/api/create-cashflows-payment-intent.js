@@ -52,6 +52,7 @@ export default async function handler(req, res) {
     return json(res, 400, { error: 'customerFullName required' })
   }
 
+  const newsletterOptIn = body.newsletterOptIn === true || body.newsletterOptIn === 'true'
   const customerPhone =
     typeof body.customerPhone === 'string'
       ? body.customerPhone
@@ -96,6 +97,7 @@ export default async function handler(req, res) {
         periodId: periodResult.period.id,
         competition,
         cashflowsIntentToken: intent.token,
+        newsletterOptIn,
       })
     } catch (pendingErr) {
       console.error('createPendingTicketCheckout (cashflows):', pendingErr)

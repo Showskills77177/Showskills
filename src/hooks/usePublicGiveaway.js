@@ -7,16 +7,24 @@ export function usePublishedGiveaways() {
 
   useEffect(() => {
     let cancelled = false
-    apiFetch('/api/giveaways')
+    const ac = new AbortController()
+    const timeout = window.setTimeout(() => ac.abort(), 20_000)
+    apiFetch('/api/giveaways', { signal: ac.signal })
       .then(async (res) => {
         const j = await res.json().catch(() => ({}))
         if (!cancelled) setGiveaways(j.giveaways || [])
       })
+      .catch(() => {
+        if (!cancelled) setGiveaways([])
+      })
       .finally(() => {
+        window.clearTimeout(timeout)
         if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
+      ac.abort()
+      window.clearTimeout(timeout)
     }
   }, [])
 

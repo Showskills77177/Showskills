@@ -63,6 +63,7 @@ export default async function handler(req, res) {
     typeof body.customerEmail === 'string' ? body.customerEmail.trim().slice(0, 320) : ''
   const customerFullName =
     typeof body.customerFullName === 'string' ? body.customerFullName.trim().slice(0, 200) : ''
+  const newsletterOptIn = body.newsletterOptIn === true || body.newsletterOptIn === 'true'
   const customerPhone =
     typeof body.customerPhone === 'string'
       ? body.customerPhone
@@ -138,6 +139,7 @@ export default async function handler(req, res) {
         customerPhone: phoneCheck.phone,
         periodId: periodResult.period.id,
         competition,
+        newsletterOptIn,
       })
     } catch (pendingErr) {
       console.error('createPendingTicketCheckout (paypal):', pendingErr)

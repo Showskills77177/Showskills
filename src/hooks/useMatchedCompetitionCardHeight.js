@@ -10,10 +10,14 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const shirtEl = shirtCardRef.current
     if (!paidEl || !shirtEl) return
 
+    let lastPaidHeight = 0
+
     function sync() {
       const paidCard = paidEl.querySelector('[data-competition-card]') || paidEl
       const h = Math.round(paidCard.getBoundingClientRect().height)
       if (h < 1) return
+      if (h === lastPaidHeight && shirtEl.style.height === `${h}px`) return
+      lastPaidHeight = h
       shirtEl.style.setProperty('--ss-matched-comp-card-h', `${h}px`)
       shirtEl.style.height = `${h}px`
       shirtEl.style.minHeight = `${h}px`
@@ -29,8 +33,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const ro = new ResizeObserver(() => sync())
     ro.observe(paidEl)
     const paidCard = paidEl.querySelector('[data-competition-card]')
-    if (paidCard) ro.observe(paidCard)
-    ro.observe(shirtEl)
+    if (paidCard && paidCard !== paidEl) ro.observe(paidCard)
 
     paidEl.querySelectorAll('img').forEach((img) => {
       if (!img.complete) img.addEventListener('load', sync, { once: true })

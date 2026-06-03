@@ -4,6 +4,7 @@ import {
   mergePageLayout,
 } from '../../../shared/sitePageLayout.mjs'
 import { mergeHomepageLayout, defaultHomepageLayout } from '../../../shared/homepageLayout.mjs'
+import { EMAIL_LAYOUT_PAGE_ID, mergeEmailLayout, defaultEmailLayout } from '../../../shared/emailLayout.mjs'
 import { ensureHomepageLayoutSchema } from './homepageLayout.mjs'
 
 export { ensureHomepageLayoutSchema as ensureSiteLayoutSchema }
@@ -11,14 +12,17 @@ export { ensureHomepageLayoutSchema as ensureSiteLayoutSchema }
 function parseRow(pageId, row) {
   if (!row?.config_json) {
     if (pageId === 'homepage') return defaultHomepageLayout()
+    if (pageId === EMAIL_LAYOUT_PAGE_ID) return defaultEmailLayout()
     return mergePageLayout(pageId, null)
   }
   try {
     const raw = typeof row.config_json === 'string' ? JSON.parse(row.config_json) : row.config_json
     if (pageId === 'homepage') return mergeHomepageLayout(raw)
+    if (pageId === EMAIL_LAYOUT_PAGE_ID) return mergeEmailLayout(raw)
     return mergePageLayout(pageId, raw)
   } catch {
     if (pageId === 'homepage') return defaultHomepageLayout()
+    if (pageId === EMAIL_LAYOUT_PAGE_ID) return defaultEmailLayout()
     return mergePageLayout(pageId, null)
   }
 }
@@ -28,6 +32,7 @@ export async function getSitePageLayout(pageId) {
   const r = await query(`SELECT config_json FROM site_layout_config WHERE id = $1 LIMIT 1`, [pageId])
   if (!r.rows?.length) {
     if (pageId === 'homepage') return defaultHomepageLayout()
+    if (pageId === EMAIL_LAYOUT_PAGE_ID) return defaultEmailLayout()
     return mergePageLayout(pageId, null)
   }
   return parseRow(pageId, r.rows[0])
@@ -36,7 +41,11 @@ export async function getSitePageLayout(pageId) {
 export async function saveSitePageLayout(pageId, config) {
   await ensureHomepageLayoutSchema()
   const merged =
-    pageId === 'homepage' ? mergeHomepageLayout(config) : mergePageLayout(pageId, config)
+    pageId === 'homepage'
+      ? mergeHomepageLayout(config)
+      : pageId === EMAIL_LAYOUT_PAGE_ID
+        ? mergeEmailLayout(config)
+        : mergePageLayout(pageId, config)
   const now = new Date().toISOString()
   const json = JSON.stringify(merged)
   if (dbIsPostgres()) {

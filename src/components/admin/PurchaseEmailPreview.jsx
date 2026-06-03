@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { EmailHtmlPreviewFrame } from './EmailHtmlPreviewFrame'
+import { NewsletterEmailPreview } from './NewsletterEmailPreview'
+import { defaultEmailLayout } from '../../../shared/emailLayout.mjs'
 import { AdminCompetitionSelect } from './AdminCompetitionSelect'
 import { defaultMainDrawCompetitionSlug, getMainDrawCompetitionLabel } from '../../../shared/adminCompetitions.mjs'
 import {
@@ -33,10 +36,18 @@ const EMAIL_TYPES = [
   },
 ]
 
-export function PurchaseEmailPreview() {
+const EMAIL_GROUPS = [
+  { id: 'tickets', label: 'Ticket & quiz emails' },
+  { id: 'newsletter', label: 'Newsletter emails' },
+]
+
+export function PurchaseEmailPreview({ newsletterLayout = null }) {
+  const [emailGroup, setEmailGroup] = useState('tickets')
+  const [newsletterKind, setNewsletterKind] = useState('welcome')
   const [emailType, setEmailType] = useState('quiz_pending')
   const [competition, setCompetition] = useState(defaultMainDrawCompetitionSlug())
   const [ticketCount, setTicketCount] = useState(5)
+  const layout = newsletterLayout || defaultEmailLayout()
 
   const siteUrl =
     typeof window !== 'undefined' ? window.location.origin : PURCHASE_EMAIL_SAMPLE.siteUrl
@@ -98,6 +109,44 @@ export function PurchaseEmailPreview() {
     }
   }, [emailType, siteUrl, ticketCount, ticketNumbers, completeQuizUrl])
 
+  if (emailGroup === 'newsletter') {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-stone-100">Email previews</h1>
+            <p className="mt-2 max-w-2xl text-sm text-stone-500">
+              Newsletter templates use the same branded layout as ticket emails. Edit copy in the{' '}
+              <Link to="/admin/editor?page=emails" className="text-teal-400/90 underline underline-offset-2">
+                site editor → Newsletter emails
+              </Link>
+              .
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-stone-400">
+            Group
+            <select
+              value={emailGroup}
+              onChange={(e) => setEmailGroup(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-stone-200"
+            >
+              {EMAIL_GROUPS.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <NewsletterEmailPreview
+          layout={layout}
+          emailKind={newsletterKind}
+          onEmailKindChange={setNewsletterKind}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -106,6 +155,20 @@ export function PurchaseEmailPreview() {
           <p className="mt-2 max-w-2xl text-sm text-stone-500">{description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-stone-400">
+            Group
+            <select
+              value={emailGroup}
+              onChange={(e) => setEmailGroup(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-stone-200"
+            >
+              {EMAIL_GROUPS.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <AdminCompetitionSelect
             kind="mainDraw"
             value={competition}

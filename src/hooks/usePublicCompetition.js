@@ -37,16 +37,24 @@ export function usePublishedCompetitions() {
 
   useEffect(() => {
     let cancelled = false
-    apiFetch('/api/competitions')
+    const ac = new AbortController()
+    const timeout = window.setTimeout(() => ac.abort(), 20_000)
+    apiFetch('/api/competitions', { signal: ac.signal })
       .then(async (res) => {
         const j = await res.json().catch(() => ({}))
         if (!cancelled) setCompetitions(j.competitions || [])
       })
+      .catch(() => {
+        if (!cancelled) setCompetitions([])
+      })
       .finally(() => {
+        window.clearTimeout(timeout)
         if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
+      ac.abort()
+      window.clearTimeout(timeout)
     }
   }, [])
 

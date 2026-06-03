@@ -9,8 +9,43 @@ export function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
+export const EMAIL_PUBLIC_SITE_URL = 'https://showskills.co.uk'
+
+/** True when a URL host is localhost or otherwise unreachable from email clients. */
+export function isLocalOrPrivateSiteUrl(url) {
+  try {
+    const u = new URL(String(url || 'http://localhost'))
+    const h = u.hostname.toLowerCase()
+    return (
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === '0.0.0.0' ||
+      h === '[::1]' ||
+      h.endsWith('.local')
+    )
+  } catch {
+    return true
+  }
+}
+
+/** Public https origin for images and links inside outbound email (never localhost). */
+export function resolvePublicSiteUrlForEmail(siteUrl) {
+  const envOverride = (
+    typeof process !== 'undefined' &&
+    (process.env.EMAIL_PUBLIC_SITE_URL || process.env.EMAIL_ASSET_BASE_URL)
+  )
+    ? String(process.env.EMAIL_PUBLIC_SITE_URL || process.env.EMAIL_ASSET_BASE_URL).trim()
+    : ''
+  if (envOverride && !isLocalOrPrivateSiteUrl(envOverride)) {
+    return envOverride.replace(/\/$/, '')
+  }
+  const candidate = String(siteUrl || '').replace(/\/$/, '')
+  if (candidate && !isLocalOrPrivateSiteUrl(candidate)) return candidate
+  return EMAIL_PUBLIC_SITE_URL
+}
+
 export function emailLogoUrl(siteUrl) {
-  const base = String(siteUrl || 'https://showskills.co.uk').replace(/\/$/, '')
+  const base = resolvePublicSiteUrlForEmail(siteUrl)
   return `${base}/email/showskills-logo.png`
 }
 

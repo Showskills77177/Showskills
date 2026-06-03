@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEntryFlow } from '../entry/entryContext'
-import { SHIRT_GIVEAWAY_QUESTION, isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
 import {
   SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS,
   SHIRT_GIVEAWAY_SOCIAL_PLATFORMS,
+  isShirtGiveawayRequirementMet,
 } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 
 const E2E_SIMULATE_CHECKOUT =
@@ -74,6 +75,8 @@ export function EntryModal() {
     setPaidEmail,
     paidPhone,
     setPaidPhone,
+    paidNewsletterOptIn,
+    setPaidNewsletterOptIn,
     kickPhone,
     setKickPhone,
     selectedTicketBundle,
@@ -681,6 +684,17 @@ export function EntryModal() {
                       />
                     </div>
                   ) : null}
+                  <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-teal-500/20 bg-teal-950/15 px-3 py-3 text-sm text-stone-300">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={paidNewsletterOptIn}
+                      onChange={(e) => setPaidNewsletterOptIn(e.target.checked)}
+                    />
+                    <span>
+                      Email me ShowSkills Rewards updates and competition news (optional — same address as above).
+                    </span>
+                  </label>
                   <EntryTermsConsent
                     checked={paidConsent}
                     onChange={setPaidConsent}
@@ -770,6 +784,7 @@ export function EntryModal() {
                             customerEmail={paidEmail}
                             customerFullName={paidFullName}
                             customerPhone={paidPhone}
+                            newsletterOptIn={paidNewsletterOptIn}
                             disabled={!paidFormReadyForPayment}
                             onPaid={markPaidCheckoutComplete}
                             onError={(msg) => setPaidError(msg)}
@@ -787,14 +802,14 @@ export function EntryModal() {
             <>
               <ul className="space-y-2 rounded-xl border border-lime-500/25 bg-lime-950/20 p-3" aria-label="Entry requirements">
                 {SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS.map((req) => {
-                  const done =
-                    req.id === 'skill_answer'
-                      ? isCorrectShirtGiveawayAnswer(kickAnswer)
-                      : req.id === 'newsletter'
-                        ? kickNewsletterOptIn
-                        : kickSocialPlatform &&
-                          kickSocialHandle.trim() &&
-                          kickSocialFollowConfirmed
+                  const done = isShirtGiveawayRequirementMet(req.id, {
+                    answer: kickAnswer,
+                    email: kickEmail,
+                    newsletterOptIn: kickNewsletterOptIn,
+                    socialPlatform: kickSocialPlatform,
+                    socialHandle: kickSocialHandle,
+                    socialFollowConfirmed: kickSocialFollowConfirmed,
+                  })
                   return (
                     <li key={req.id} className="flex gap-3 text-sm">
                       <span
@@ -814,7 +829,7 @@ export function EntryModal() {
                 })}
               </ul>
               <p className="mt-3 text-sm text-stone-500">
-                <strong className="text-lime-200/90">Free giveaway:</strong> complete all three requirements below.
+                <strong className="text-lime-200/90">Free giveaway:</strong> complete every requirement above, then fill in your details below.
                 Prize is the <strong className="text-stone-300">signed Ronaldo shirt only</strong> — not the Legacy Bundle.
                 One entry per device; VPNs are not permitted.
               </p>
@@ -879,8 +894,8 @@ export function EntryModal() {
                       className="mt-1"
                     />
                     <span>
-                      Subscribe me to ShowSkills Rewards updates and giveaway news by email (required for this free
-                      entry).
+                      Subscribe me to ShowSkills Rewards updates and giveaway news at the email address I entered above
+                      (required for this free entry).
                     </span>
                   </label>
                 </div>
@@ -1032,6 +1047,7 @@ export function EntryModal() {
         customerEmail={paidEmail}
         customerFullName={paidFullName}
         customerPhone={paidPhone}
+        newsletterOptIn={paidNewsletterOptIn}
         paidConsent={paidConsent}
         onPayPalPaid={(info) => {
           setPaymentSheetOpen(false)

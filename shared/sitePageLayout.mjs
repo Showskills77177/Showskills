@@ -2,6 +2,9 @@
 
 import { defaultOffset, mergeOffsets, offsetStyle } from './layoutOffsets.mjs'
 import { FAQ_PAGE_TITLE, FAQ_PAGE_SUBTITLE } from './faqContent.mjs'
+import { EMAIL_LAYOUT_PAGE_ID } from './emailLayout.mjs'
+
+export { EMAIL_LAYOUT_PAGE_ID }
 
 export const SITE_SHELL_ID = 'site'
 export const COMPETITIONS_PAGE_ID = 'competitions'
@@ -15,6 +18,7 @@ export const EDITABLE_PAGE_IDS = [
   FAQ_PAGE_ID,
   CONTACT_PAGE_ID,
   SHIRT_GIVEAWAY_PAGE_ID,
+  EMAIL_LAYOUT_PAGE_ID,
 ]
 
 export const PAGE_EDITOR_LABELS = {
@@ -24,6 +28,7 @@ export const PAGE_EDITOR_LABELS = {
   [FAQ_PAGE_ID]: 'FAQ',
   [CONTACT_PAGE_ID]: 'Contact',
   [SHIRT_GIVEAWAY_PAGE_ID]: 'Shirt giveaway',
+  [EMAIL_LAYOUT_PAGE_ID]: 'Newsletter emails',
 }
 
 export const SITE_PAGE_BACKGROUNDS = {
@@ -40,6 +45,7 @@ const DEFAULT_NAV = [
 
 const DEFAULT_FOOTER_LINKS = {
   competitions: { label: 'Competitions', path: '/competitions', visible: true },
+  newsletter: { label: 'Newsletter', path: '/newsletter', visible: true },
   contact: { label: 'Contact', path: '/contact', visible: true },
   faq: { label: 'FAQ', path: '/faq', visible: true },
   terms: { label: 'Full terms & privacy', action: 'terms', visible: true },
@@ -83,7 +89,7 @@ export function defaultSiteShell() {
         instagram: '',
         facebook: '',
       },
-      linkOrder: ['competitions', 'contact', 'faq', 'terms', 'ticketTerms'],
+      linkOrder: ['competitions', 'newsletter', 'contact', 'faq', 'terms', 'ticketTerms'],
       links: { ...DEFAULT_FOOTER_LINKS },
     },
   }

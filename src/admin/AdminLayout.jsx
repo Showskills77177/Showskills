@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: '/admin/submissions', label: 'Shirt giveaway', competition: 'shirt' },
   { to: '/admin/entry-attempts', label: 'Entry log', competition: 'shirt' },
   { to: '/admin/test-email', label: 'Test email', competition: 'both' },
+  { to: '/admin/newsletter', label: 'Newsletter', competition: 'both' },
 ]
 
 const COMPETITION_TAG = {

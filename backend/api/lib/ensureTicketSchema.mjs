@@ -60,6 +60,11 @@ export async function ensureTicketSchema() {
     } catch {
       /* already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS newsletter_opt_in BOOLEAN NOT NULL DEFAULT false`)
+    } catch {
+      /* already exists */
+    }
   } else {
     await query(`
       CREATE TABLE IF NOT EXISTS ticket_numbers (
@@ -115,6 +120,11 @@ export async function ensureTicketSchema() {
     }
     try {
       await query(`ALTER TABLE tickets ADD COLUMN competition TEXT`)
+    } catch {
+      /* column already exists */
+    }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN newsletter_opt_in INTEGER NOT NULL DEFAULT 0`)
     } catch {
       /* column already exists */
     }

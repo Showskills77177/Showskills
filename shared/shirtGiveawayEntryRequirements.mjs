@@ -1,5 +1,7 @@
 /** Mandatory steps for the free Ronaldo shirt giveaway entry flow. */
 
+import { isCorrectShirtGiveawayAnswer } from './shirtGiveaway.mjs'
+
 export const SHIRT_GIVEAWAY_SOCIAL_PLATFORMS = [
   { id: 'tiktok', label: 'TikTok' },
   { id: 'instagram', label: 'Instagram' },
@@ -13,14 +15,9 @@ export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
     detail: 'One Ronaldo qualification question — correct answer required.',
   },
   {
-    id: 'account_sign_in',
-    title: 'Sign in before you enter',
-    detail: 'Use the same email for your ShowSkills account and your entry so we can verify you.',
-  },
-  {
     id: 'newsletter',
     title: 'Subscribe to our newsletter',
-    detail: 'We use your entry email for ShowSkills updates and giveaway news.',
+    detail: 'Tick the box below using the same email address you enter on this form.',
   },
   {
     id: 'social_follow',
@@ -32,4 +29,28 @@ export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
 export function isValidShirtSocialPlatform(platform) {
   const id = typeof platform === 'string' ? platform.trim().toLowerCase() : ''
   return SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.some((p) => p.id === id)
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function isShirtGiveawayRequirementMet(reqId, fields = {}) {
+  switch (reqId) {
+    case 'skill_answer':
+      return isCorrectShirtGiveawayAnswer(fields.answer)
+    case 'newsletter':
+      return (
+        fields.newsletterOptIn === true &&
+        typeof fields.email === 'string' &&
+        EMAIL_RE.test(fields.email.trim())
+      )
+    case 'social_follow':
+      return (
+        isValidShirtSocialPlatform(fields.socialPlatform) &&
+        typeof fields.socialHandle === 'string' &&
+        fields.socialHandle.trim() &&
+        fields.socialFollowConfirmed === true
+      )
+    default:
+      return false
+  }
 }

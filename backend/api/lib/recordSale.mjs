@@ -8,6 +8,7 @@ import {
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { ensureAnalyticsSchema } from './ensureAnalyticsSchema.mjs'
 import { upsertUserContact } from './userContact.mjs'
+import { maybeSubscribeFromPaidPurchase } from './newsletter.mjs'
 
 function orderPublicId() {
   return `ORD-${randomBytes(4).toString('hex').toUpperCase()}`
@@ -100,6 +101,12 @@ async function finalizePendingTicket({
     ],
   )
 
+  if (row.newsletter_opt_in) {
+    await maybeSubscribeFromPaidPurchase(customerEmail, true).catch((e) => {
+      console.warn('[newsletter] paid subscribe failed:', e)
+    })
+  }
+
   return {
     ticketId: row.id,
     ticketPublicId: row.ticket_public_id,
@@ -128,7 +135,7 @@ export async function recordPayPalCapture({
   await ensureAnalyticsSchema()
 
   const existing = await query(
-    `SELECT id, ticket_public_id, quantity, payment_status, confirmation_email_sent_at FROM tickets WHERE paypal_order_id = $1`,
+    `SELECT id, ticket_public_id, quantity, payment_status, confirmation_email_sent_at, newsletter_opt_in FROM tickets WHERE paypal_order_id = $1`,
     [paypalOrderId],
   )
   if (existing.rows[0]) {
@@ -214,7 +221,7 @@ export async function recordCashflowsPaymentCompleted({
   await ensureAnalyticsSchema()
 
   const dup = await query(
-    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at FROM tickets WHERE cashflows_payment_job_reference = $1`,
+    `SELECT id, ticket_public_id, payment_status, quantity, confirmation_email_sent_at, newsletter_opt_in FROM tickets WHERE cashflows_payment_job_reference = $1`,
     [jobRef],
   )
   if (dup.rows[0]) {

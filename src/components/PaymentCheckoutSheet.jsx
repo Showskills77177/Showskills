@@ -37,6 +37,7 @@ export function PaymentCheckoutSheet({
   customerEmail,
   customerFullName,
   customerPhone,
+  newsletterOptIn,
   paidConsent,
   onPayPalPaid,
   onPayPalError,
@@ -183,6 +184,7 @@ export function PaymentCheckoutSheet({
                 customerEmail={customerEmail}
                 customerFullName={customerFullName}
                 customerPhone={customerPhone}
+                newsletterOptIn={newsletterOptIn}
                 disabled={payPalDisabled}
                 onPaid={onPayPalPaid}
                 onError={onPayPalError}
@@ -202,6 +204,7 @@ export function PaymentCheckoutSheet({
                 customerEmail={customerEmail}
                 customerFullName={customerFullName}
                 customerPhone={customerPhone}
+                newsletterOptIn={newsletterOptIn}
                 disabled={payPalDisabled}
                 onPaid={onPayPalPaid}
                 onError={onPayPalError}

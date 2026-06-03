@@ -10,7 +10,9 @@ import {
   FAQ_PAGE_ID,
   CONTACT_PAGE_ID,
   SHIRT_GIVEAWAY_PAGE_ID,
+  EMAIL_LAYOUT_PAGE_ID,
 } from '../../../shared/sitePageLayout.mjs'
+import { NewsletterEmailPreview } from './NewsletterEmailPreview'
 import { useEditorSectionDrag } from '../../pageEditor/useEditorSectionDrag.js'
 
 /**
@@ -29,6 +31,7 @@ export function PageLivePreview({
   shellHighlight,
   onShellHighlight,
   onOpenSettings,
+  emailPreviewKind = 'welcome',
 }) {
   const editorMode = !cleanPreview
   const blockOrder = pages.homepage?.blockOrder || []
@@ -86,9 +89,21 @@ export function PageLivePreview({
     )
   } else if (activePage === SHIRT_GIVEAWAY_PAGE_ID) {
     canvas = <KickupsArchivePage layout={pages.shirt_giveaway} editorMode={editorMode} />
+  } else if (activePage === EMAIL_LAYOUT_PAGE_ID) {
+    canvas = (
+      <div className="px-4 py-8 sm:px-6">
+        <NewsletterEmailPreview
+          layout={pages.emails}
+          emailKind={emailPreviewKind}
+          campaignBodyHtml={
+            emailPreviewKind === 'campaign' ? pages.emails?.campaign?.bodyHtml : undefined
+          }
+        />
+      </div>
+    )
   }
 
-  const showShellChrome = activePage !== SITE_SHELL_ID
+  const showShellChrome = activePage !== SITE_SHELL_ID && activePage !== EMAIL_LAYOUT_PAGE_ID
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">

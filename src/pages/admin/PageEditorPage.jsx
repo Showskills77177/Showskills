@@ -20,6 +20,7 @@ import {
   FAQ_PAGE_ID,
   CONTACT_PAGE_ID,
   SHIRT_GIVEAWAY_PAGE_ID,
+  EMAIL_LAYOUT_PAGE_ID,
   HOMEPAGE_BLOCK_LABELS,
   SITE_PAGE_BACKGROUNDS,
   defaultSiteShell,
@@ -34,6 +35,9 @@ import {
   mergeShirtGiveawayPageLayout,
 } from '../../../shared/sitePageLayout.mjs'
 import { DraggableSectionList, EditorField, editorInputClass } from '../../components/admin/DraggableSectionList'
+import { EmailEditorSettings } from '../../components/admin/EmailEditorSettings'
+import { NewsletterEmailPreview } from '../../components/admin/NewsletterEmailPreview'
+import { defaultEmailLayout, mergeEmailLayout } from '../../../shared/emailLayout.mjs'
 import { KICKUPS_GIVEAWAY_IMAGE } from '../../competitionVisuals'
 
 const PAGE_TABS = [
@@ -43,6 +47,7 @@ const PAGE_TABS = [
   { id: FAQ_PAGE_ID, path: '/faq', preview: '/faq' },
   { id: CONTACT_PAGE_ID, path: '/contact', preview: '/contact' },
   { id: SHIRT_GIVEAWAY_PAGE_ID, path: '/archive/ronaldo-shirt-giveaway', preview: '/archive/ronaldo-shirt-giveaway' },
+  { id: EMAIL_LAYOUT_PAGE_ID, path: null, preview: null },
 ]
 
 function HomeBlockVisibilityToggle({ blockId, block, onChange }) {
@@ -63,6 +68,7 @@ function mergeAllPages(raw) {
     faq: mergeFaqPageLayout(raw?.faq),
     contact: mergeContactPageLayout(raw?.contact),
     shirt_giveaway: mergeShirtGiveawayPageLayout(raw?.shirt_giveaway),
+    emails: mergeEmailLayout(raw?.emails),
   }
 }
 
@@ -74,6 +80,7 @@ function defaultAllPages() {
     faq: defaultFaqPageLayout(),
     contact: defaultContactPageLayout(),
     shirt_giveaway: defaultShirtGiveawayPageLayout(),
+    emails: defaultEmailLayout(),
   }
 }
 
@@ -98,6 +105,7 @@ export default function PageEditorPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTarget, setSettingsTarget] = useState('page')
   const [cleanPreview, setCleanPreview] = useState(false)
+  const [emailPreviewKind, setEmailPreviewKind] = useState('welcome')
 
   useEditorHistoryShortcuts({ undo, redo, enabled: !loading && !cleanPreview })
 
@@ -107,7 +115,12 @@ export default function PageEditorPage() {
     try {
       const res = await apiFetch('/api/admin/site-pages')
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.detail || j.error || 'Failed to load')
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('Session expired or not signed in — open /admin/login first, then return to the editor.')
+        }
+        throw new Error(j.detail || j.error || 'Failed to load')
+      }
       replacePages(mergeAllPages(j.pages))
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
@@ -127,6 +140,11 @@ export default function PageEditorPage() {
     if (tab === SHIRT_GIVEAWAY_PAGE_ID) {
       setSettingsTarget('page')
       setSettingsOpen(true)
+    }
+    if (tab === EMAIL_LAYOUT_PAGE_ID) {
+      setSettingsTarget('page')
+      setSettingsOpen(true)
+      setEmailPreviewKind('welcome')
     }
   }, [searchParams])
 
@@ -346,6 +364,10 @@ export default function PageEditorPage() {
                 setShellHighlight(null)
                 if (tab.id === 'homepage') setSelectedBlockId('hero_intro')
                 if (tab.id === SHIRT_GIVEAWAY_PAGE_ID) openSettings('page')
+                if (tab.id === EMAIL_LAYOUT_PAGE_ID) {
+                  openSettings('page')
+                  setEmailPreviewKind('welcome')
+                }
               }}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 activePage === tab.id
@@ -382,6 +404,7 @@ export default function PageEditorPage() {
               shellHighlight={shellHighlight}
               onShellHighlight={setShellHighlight}
               onOpenSettings={openSettings}
+              emailPreviewKind={emailPreviewKind}
             />
           </div>
 
@@ -778,6 +801,25 @@ export default function PageEditorPage() {
               { key: 'ctaButtonLabel', label: 'Form button label', type: 'text' },
             ]}
             onChange={(patch) => patchPage(SHIRT_GIVEAWAY_PAGE_ID, patch)}
+          />
+        </div>
+      ) : null}
+
+      {!loading && settingsTarget === 'page' && activePage === EMAIL_LAYOUT_PAGE_ID ? (
+        <div className="space-y-6">
+          <EmailEditorSettings
+            layout={pages.emails}
+            previewKind={emailPreviewKind}
+            onPreviewKindChange={setEmailPreviewKind}
+            onChange={(patch) => patchPage(EMAIL_LAYOUT_PAGE_ID, patch)}
+          />
+          <NewsletterEmailPreview
+            layout={pages.emails}
+            emailKind={emailPreviewKind}
+            onEmailKindChange={setEmailPreviewKind}
+            campaignBodyHtml={
+              emailPreviewKind === 'campaign' ? pages.emails?.campaign?.bodyHtml : undefined
+            }
           />
         </div>
       ) : null}

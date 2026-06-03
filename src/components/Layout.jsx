@@ -7,6 +7,8 @@ import { POSTAL_ENTRY_ADDRESS, FOOTER_NO_PURCHASE_NOTICE } from '../competitionD
 import { MobileNavDock } from './MobileNavDock'
 import { QuizPromptNav } from './QuizPromptNav'
 import { TrustpilotReviewCollector } from './TrustpilotFeedback'
+import { NewsletterSignupForm } from './NewsletterSignupForm'
+import { NEWSLETTER_SOURCES } from '../../shared/newsletter.mjs'
 import { useEntryFlow } from '../entry/entryContext'
 import { useSiteShell } from '../hooks/useSitePages'
 import { FooterSocialLinks } from './FooterSocialLinks'
@@ -239,6 +241,9 @@ export function Layout() {
               Skill-based paid draw — winner picked at random from correct entries only. Free postal entry — post to{' '}
               {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
             </p>
+            <div className="mx-auto mt-6 w-full max-w-md">
+              <NewsletterSignupForm source={NEWSLETTER_SOURCES.footer} compact />
+            </div>
             {shell.footer?.showTrustpilot !== false ? (
               <div className="mx-auto mt-4 w-full max-w-[12.75rem]">
                 <p className="mb-1 text-center text-[10px] font-medium text-stone-600">Trustpilot feedback</p>
