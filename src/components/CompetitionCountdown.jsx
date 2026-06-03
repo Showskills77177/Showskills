@@ -87,7 +87,7 @@ export function CompetitionCountdown({
 
   return (
     <p
-      className={`inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug sm:text-xs md:text-sm ${tone} ${className}`}
+      className={`inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug tabular-nums sm:text-xs md:text-sm ${tone} ${className}`}
       role="status"
     >
       {showDot ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 opacity-90" aria-hidden /> : null}

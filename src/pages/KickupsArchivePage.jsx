@@ -56,7 +56,7 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
                 </div>
               </div>
 
-              <div>
+              <div id="how-to-enter">
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/80">{layout.howToTitle}</p>
                 <ol className="mt-4 grid list-none gap-3">
                   {SHIRT_GIVEAWAY_PUBLIC_STEPS.map((step) => (

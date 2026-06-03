@@ -254,7 +254,7 @@ body {
     360px 380px,
     500px 440px;
   background-repeat: repeat;
-  animation: ss-drift-sparks 36s ease-in-out infinite;
+  animation: none;
 }
 
 @keyframes ss-drift-sparks {
@@ -283,11 +283,10 @@ body {
  */
 .ss-hero-photo-bg-img {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 110%;
-  height: 110%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
   object-fit: cover;
   object-position: 48% 88%;
   opacity: 1;
@@ -335,11 +334,10 @@ body {
 
 .ss-photo-page-bg-img {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 120%;
-  height: 120%;
-  transform: translate(-50%, -50%) scale(1.08);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
   object-fit: cover;
   object-position: center 42%;
   filter: blur(22px) saturate(0.82) brightness(0.62) contrast(1.05);
@@ -1212,7 +1210,12 @@ body {
 }
 
 .ss-prize-studio-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
   filter: brightness(0.98) contrast(1.06) saturate(0.94) sepia(0.04);
+  transform: none !important;
+  animation: none !important;
 }
 
 .ss-prize-studio-subgrid {
@@ -1220,9 +1223,9 @@ body {
   padding-top: 0.5rem;
 }
 
-/* Legacy phone/case tiles use bundled PNGs — avoid clipping scaled photos */
+/* Legacy phone/case tiles use bundled PNGs — keep photos clipped inside tiles */
 .ss-prize-studio-subgrid .ss-prize-studio-tile {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .ss-phone-prize-glow {
@@ -1231,25 +1234,6 @@ body {
     0 0 8px rgba(45, 212, 191, 0.7),
     0 0 20px rgba(52, 211, 153, 0.42),
     0 0 34px rgba(16, 185, 129, 0.2);
-  animation: ss-phone-prize-pulse 2.2s ease-in-out infinite;
-}
-
-@keyframes ss-phone-prize-pulse {
-  0%,
-  100% {
-    opacity: 0.86;
-    text-shadow:
-      0 0 7px rgba(45, 212, 191, 0.52),
-      0 0 18px rgba(52, 211, 153, 0.3),
-      0 0 30px rgba(16, 185, 129, 0.16);
-  }
-  50% {
-    opacity: 1;
-    text-shadow:
-      0 0 12px rgba(45, 212, 191, 0.95),
-      0 0 28px rgba(52, 211, 153, 0.58),
-      0 0 46px rgba(16, 185, 129, 0.28);
-  }
 }
 
 .ss-prize-studio-subgrid {
@@ -1294,6 +1278,18 @@ body {
 
 .ss-shirt-giveaway-card__body {
   font-size: 1em;
+  overflow: visible;
+}
+
+.ss-competition-enter-btn {
+  box-sizing: border-box;
+  min-height: 3.25rem;
+}
+
+@media (min-width: 640px) {
+  .ss-competition-enter-btn {
+    min-height: 3.5rem;
+  }
 }
 
 @media (min-width: 1024px) {

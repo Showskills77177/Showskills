@@ -7,6 +7,9 @@ export const SHIRT_GIVEAWAY_SEASON_LABEL = '2022/23 season'
 
 export const SHIRT_GIVEAWAY_PRIZE_TITLE = `Signed Ronaldo United shirt (${SHIRT_GIVEAWAY_SEASON_LABEL})`
 
+export const SHIRT_GIVEAWAY_DETAILS_PATH = '/archive/ronaldo-shirt-giveaway'
+export const SHIRT_GIVEAWAY_HOW_TO_HASH = '#how-to-enter'
+
 /** Rewrites legacy 2021–22 copy saved in the page editor to the current shirt season. */
 export function refreshShirtGiveawaySeasonInText(text) {
   if (typeof text !== 'string' || !text) return text

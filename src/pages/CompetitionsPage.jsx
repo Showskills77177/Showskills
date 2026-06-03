@@ -93,7 +93,7 @@ export default function CompetitionsPage({
         {layout.sections.paid?.title || 'Prize draw competitions'}
       </SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.paid?.subtitle}</p>
-      <ul className="mt-6 grid list-none gap-6">
+      <ul className="mt-4 grid list-none gap-6">
         {competitions.map((c, index) => (
           <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
             <div ref={index === 0 ? paidCardRef : undefined} className="ss-competition-paid-slot flex h-full min-h-0 w-full flex-col">
@@ -118,7 +118,7 @@ export default function CompetitionsPage({
     <div className="flex min-w-0 flex-col" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">{layout.sections.free?.title || 'Free giveaways'}</SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.free?.subtitle}</p>
-      <ul className="mt-6 grid list-none gap-6">
+      <ul className="mt-4 grid list-none gap-6">
         <li className="ss-competition-free-primary w-full">
           <div className="ss-competition-shirt-slot w-full [&_[data-editor-drag]]:h-full [&_[data-editor-drag]]:w-full">
             {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, { cssScaleOnly: true })}
@@ -183,7 +183,7 @@ export default function CompetitionsPage({
 
         <div
           className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
-            showPaid && showFree ? 'lg:grid-cols-2 lg:items-start' : 'max-w-xl'
+            showPaid && showFree ? 'lg:grid-cols-2 lg:items-stretch' : 'max-w-xl'
           }`}
         >
           {showPaid ? <div className="min-w-0">{dragWrap('comp_paid', 'Prize draws', 'paid', paidColumn)}</div> : null}
