@@ -8,7 +8,11 @@ import {
 import { UK_AVAILABILITY_NOTICE } from './siteAvailability.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from './competitionCopy.mjs'
-import { SHIRT_GIVEAWAY_SEASON, SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
+import {
+  buildShirtGiveawayFaqBlockedAnswer,
+  buildShirtGiveawayFaqRequirementsAnswer,
+} from './shirtGiveawayEntryRequirements.mjs'
 
 /** @typedef {{ id: string, question: string, answer: string, popular?: boolean }} FaqItem */
 /** @typedef {{ id: string, title: string, summary: string, items: FaqItem[] }} FaqSection */
@@ -219,25 +223,43 @@ export const FAQ_SECTIONS = [
   {
     id: 'shirt-giveaway',
     title: 'Free Ronaldo shirt giveaway',
-    summary: 'A separate free promotion — not the same draw as the Legacy Bundle.',
+    summary:
+      `Separate free promotion for a signed ${SHIRT_GIVEAWAY_SEASON_LABEL} Manchester United shirt — skill question, newsletter, and social follow required.`,
     items: [
       {
         id: 'shirt-separate',
         question: 'Is the shirt giveaway the same as the Legacy Bundle draw?',
         answer:
-          `No. The shirt giveaway is a separate free promotion. The prize is a signed Cristiano Ronaldo Manchester United home shirt from the ${SHIRT_GIVEAWAY_SEASON_LABEL} only — not the full Legacy Bundle. Entering the shirt giveaway does not automatically enter you into the paid bundle draw unless we state otherwise on the site.`,
+          `No. The shirt giveaway is a separate free promotion. The prize is a signed Cristiano Ronaldo Manchester United home shirt from the ${SHIRT_GIVEAWAY_SEASON_LABEL} only — not the full Legacy Bundle (2008 signed shirt, museum ball, iPhone, and case). Entering the shirt giveaway does not automatically enter you into the paid bundle draw unless we state otherwise on the site.`,
+      },
+      {
+        id: 'shirt-requirements',
+        question: 'What must I complete to enter the free shirt giveaway?',
+        answer: buildShirtGiveawayFaqRequirementsAnswer(),
+        popular: true,
       },
       {
         id: 'shirt-how',
-        question: 'How do I enter the shirt giveaway?',
+        question: 'Where do I enter the shirt giveaway?',
         answer:
-          `From Competitions or the dedicated Ronaldo shirt giveaway page, open the free entry form. Enter your full name, email, and mobile number. Answer the skill question correctly, subscribe to our newsletter (same email — tick the box), and follow ShowSkills on at least one of TikTok, Instagram, or Facebook — enter your username on that network and confirm you have followed us. Agree to the terms and submit. If everything is correct, you are entered into the random draw for the signed ${SHIRT_GIVEAWAY_SEASON} shirt. No payment or video upload is required.`,
+          'Open the free entry form from the Competitions page (free giveaways section) or go directly to the dedicated Ronaldo shirt giveaway page at /archive/ronaldo-shirt-giveaway. The form walks you through every requirement: skill question, your contact details, newsletter signup, social follow with username, and terms consent. See “What must I complete to enter the free shirt giveaway?” above for the full checklist.',
+      },
+      {
+        id: 'shirt-newsletter',
+        question: 'Why do I have to subscribe to the newsletter?',
+        answer:
+          'Newsletter signup is a required condition for every free shirt giveaway entry. Tick the box on the form using the same email address you enter — we use it to send giveaway updates and to verify that you opted in. You can manage preferences or unsubscribe later via the link in any email we send.',
+      },
+      {
+        id: 'shirt-social',
+        question: 'Why do I need to follow ShowSkills on social media?',
+        answer:
+          'Following us on TikTok, Instagram, or Facebook (your choice — at least one) is part of the free entry conditions. Select the network in the form, follow our profile, enter your username on that network, and tick to confirm you have followed us so we can verify engagement. This is separate from the Legacy Bundle paid draw.',
       },
       {
         id: 'shirt-limits',
         question: 'Why was my shirt entry blocked?',
-        answer:
-          'Common reasons: you already entered on this device (one entry per device), duplicate name or email, VPN or proxy detected (turn off your VPN and try again), or an incorrect qualification answer. The site will show a short message when an entry is blocked.',
+        answer: buildShirtGiveawayFaqBlockedAnswer(),
       },
     ],
   },

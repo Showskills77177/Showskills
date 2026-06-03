@@ -66,7 +66,7 @@ export function defaultHomepageLayout() {
         ctaButtonLabel: 'Enter Bundle Draw',
         prizeImages: {
           poster: { x: 0, y: 0, scale: 1 },
-          phone: { x: 0, y: 0, scale: 1.25 },
+          phone: { x: 0, y: 0, scale: 1 },
           case: { x: 0, y: 0, scale: 1 },
         },
         offsets: { ...DEFAULT_PRIZES_OFFSETS },

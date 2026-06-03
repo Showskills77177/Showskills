@@ -66,6 +66,33 @@ export const SHIRT_GIVEAWAY_PUBLIC_STEPS = [
   },
 ]
 
+/** FAQ answer — everything entrants must complete for the free shirt giveaway. */
+export function buildShirtGiveawayFaqRequirementsAnswer() {
+  const social = SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.map((p) => p.label).join(', ')
+  return (
+    'To enter the free Ronaldo shirt giveaway you must complete all of the following in one submission on the entry form ' +
+    '(open it from Competitions or the dedicated Ronaldo shirt giveaway page): ' +
+    `(1) Answer the skill question correctly — "${SHIRT_GIVEAWAY_QUESTION}" ` +
+    'Acceptable answers include Ronaldo R9 or Cristiano Ronaldo; wrong answers cannot be submitted. ' +
+    '(2) Enter your full name, email address, and UK mobile number. ' +
+    '(3) Subscribe to our newsletter — tick the required box using the same email you enter on the form. ' +
+    `(4) Follow ShowSkills on at least one of ${social}. Select the network in the form, enter your username on that network, and tick to confirm you have followed us. ` +
+    `(5) Agree to the promotion terms and submit. One entry per device; VPNs and proxies are not allowed. ` +
+    `If everything is correct and we can verify your newsletter signup and social follow, you are entered into the random draw for the signed ${SHIRT_GIVEAWAY_SEASON_LABEL} Manchester United shirt only — not the Legacy Bundle. No payment or video upload is required.`
+  )
+}
+
+/** FAQ answer — common reasons a shirt giveaway submission is rejected. */
+export function buildShirtGiveawayFaqBlockedAnswer() {
+  const social = SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.map((p) => p.label).join(', ')
+  return (
+    'Common reasons: incorrect qualification answer; newsletter box not ticked or email does not match; ' +
+    `social follow not confirmed or username missing (you must pick ${social} and confirm you followed us); ` +
+    'you already entered on this device (one entry per device); duplicate name or email; ' +
+    'VPN or proxy detected (turn off your VPN and try again). The site shows a short message when an entry is blocked.'
+  )
+}
+
 export function isValidShirtSocialPlatform(platform) {
   const id = typeof platform === 'string' ? platform.trim().toLowerCase() : ''
   return SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.some((p) => p.id === id)

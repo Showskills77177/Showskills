@@ -460,11 +460,8 @@ export function HomePageContent({
     const prizeImages = mergePrizeImages(prizes.prizeImages)
 
     function prizeFrame(key, label, node) {
+      if (!editorMode) return node
       const pos = prizeImages[key] || { x: 0, y: 0, scale: 1 }
-      if (!editorMode) {
-        const style = offsetStyle(pos, { scale: pos.scale ?? 1 })
-        return style ? <div style={style}>{node}</div> : node
-      }
       return (
         <EditableDragFrame
           id={`prize_${key}`}
@@ -489,7 +486,7 @@ export function HomePageContent({
       <div className="ss-prize-studio ss-prize-studio--hero p-2 sm:p-3">
           <div className="relative z-[1] grid gap-2">
             <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
-              <div className="ss-prize-studio-photo overflow-visible">
+              <div className="ss-prize-studio-photo overflow-hidden">
                 {prizeFrame(
                   'poster',
                   'Bundle poster',
@@ -507,7 +504,7 @@ export function HomePageContent({
             </div>
             <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
               <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-visible rounded-md">
+                <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-hidden rounded-md">
                   {prizeFrame(
                     'phone',
                     'Phone',
@@ -516,7 +513,7 @@ export function HomePageContent({
                       alt="iPhone 17 Pro Max prize photo."
                       width={768}
                       height={1024}
-                      loading="lazy"
+                      loading="eager"
                       decoding="async"
                       className="aspect-[3/4] h-auto w-full object-cover object-center"
                     />,
@@ -528,7 +525,7 @@ export function HomePageContent({
                 <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
               </div>
               <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-visible rounded-md">
+                <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-hidden rounded-md">
                   {prizeFrame(
                     'case',
                     'Gold case',
@@ -537,7 +534,7 @@ export function HomePageContent({
                       alt="24K gold case for iPhone 17 Pro Max prize photo."
                       width={960}
                       height={1024}
-                      loading="lazy"
+                      loading="eager"
                       decoding="async"
                       className="aspect-[3/4] h-auto w-full object-cover object-center"
                     />,
@@ -556,16 +553,18 @@ export function HomePageContent({
     return (
     <div className={`ss-hero-prize-stack flex flex-col gap-2 ${prizeCol} md:min-h-0 md:gap-2.5`}>
       <div id={editorMode ? undefined : 'prizes'} className="ss-hero-prize-column scroll-mt-24">
-        {dragWrap(
-          'prizes_studio',
-          'Prize studio panel',
-          'hero_prizes',
-          'studioPanel',
-          prizesOffsets,
-          studioPanel,
-          1,
-          { className: 'w-full', transformOrigin: 'top center' },
-        )}
+        {editorMode
+          ? dragWrap(
+              'prizes_studio',
+              'Prize studio panel',
+              'hero_prizes',
+              'studioPanel',
+              prizesOffsets,
+              studioPanel,
+              1,
+              { className: 'w-full', transformOrigin: 'top center' },
+            )
+          : studioPanel}
       </div>
 
       <div
