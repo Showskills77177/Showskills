@@ -20,8 +20,9 @@ import { LegacyBundleImageryCaption } from '../components/LegacyBundleImageryCap
 import { EditableSectionOverlay } from '../components/admin/EditableSectionOverlay'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { mergePrizeImages } from '../../shared/homepageLayout.mjs'
-import { liveOffsetStyle, offsetStyle } from '../../shared/layoutOffsets.mjs'
+import { liveOffsetStyle, offsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
 import { LiveLayoutOffset } from './LiveLayoutOffset'
+import { useLayoutViewport } from '../hooks/useLayoutViewport'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
@@ -162,6 +163,7 @@ function wrapEditorSection({
 export function HomePageContent({
   layout: layoutProp,
   editorMode = false,
+  editorViewport = 'desktop',
   selectedBlockId = null,
   onSelectBlock = () => {},
   dragId = null,
@@ -181,6 +183,7 @@ export function HomePageContent({
     legacyCompetitionLoading || (!legacyCountdownPeriod && featuredCompetitionLoading)
   const { layout: fetchedLayout } = useHomepageLayout()
   const layout = mergeHomepageLayout(layoutProp || fetchedLayout)
+  const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
   const winners = usePublicWinners()
   const enterPaid = editorMode ? () => {} : (slug) => openEntry('paid', slug ? { competitionSlug: slug } : undefined)
   const enterGiveaway = editorMode ? () => {} : () => openEntry('kickups')
@@ -224,8 +227,11 @@ export function HomePageContent({
     onNudgeSection,
   }
 
-  function dragWrap(id, label, blockId, offsetKey, offsets, node, scale = 1, opts = {}) {
-    const pos = offsets?.[offsetKey] || { x: 0, y: 0, scale }
+  function dragWrap(id, label, blockId, offsetKey, block, node, scale = 1, opts = {}) {
+    const desktopOffsets = block.offsets || {}
+    const mobileOffsets = block.mobileOffsets || {}
+    const resolvedOffsets = resolveLayoutOffsets(desktopOffsets, mobileOffsets, layoutViewport)
+    const pos = resolvedOffsets?.[offsetKey] || { x: 0, y: 0, scale }
     const panelScale = pos.scale ?? scale
     const frameScale = opts.cssScaleOnly ? 1 : panelScale
     const widthOnly = !opts.uniformScale
@@ -261,11 +267,13 @@ export function HomePageContent({
         widthOnly={widthOnly}
         scaleMin={opts.scaleMin}
         scaleMax={opts.scaleMax}
-        onChange={(patch) =>
+        onChange={(patch) => {
+          const bucket = layoutViewport === EDITOR_VIEWPORT_MOBILE ? 'mobileOffsets' : 'offsets'
+          const base = layoutViewport === EDITOR_VIEWPORT_MOBILE ? mobileOffsets : desktopOffsets
           onPatchHomeBlock?.(blockId, {
-            offsets: { ...offsets, [offsetKey]: { ...pos, ...patch } },
+            [bucket]: { ...base, [offsetKey]: { ...pos, ...patch } },
           })
-        }
+        }}
       >
         {node}
       </EditableDragFrame>
@@ -335,11 +343,10 @@ export function HomePageContent({
   ) : null
 
 
-  const promoOffsets = promo.offsets || {}
-  const introOffsets = intro.offsets || {}
-  const prizesOffsets = prizes.offsets || {}
-  const detailsOffsets = details.offsets || {}
-  const bundlesOffsets = bundles.offsets || {}
+  const introOffsets = resolveLayoutOffsets(intro.offsets || {}, intro.mobileOffsets || {}, layoutViewport)
+  const prizesOffsets = resolveLayoutOffsets(prizes.offsets || {}, prizes.mobileOffsets || {}, layoutViewport)
+  const detailsOffsets = resolveLayoutOffsets(details.offsets || {}, details.mobileOffsets || {}, layoutViewport)
+  const bundlesOffsets = resolveLayoutOffsets(bundles.offsets || {}, bundles.mobileOffsets || {}, layoutViewport)
   const detailsPanelScale = detailsOffsets.panel?.scale ?? 1
   const bundlesPanelScale = bundlesOffsets.panel?.scale ?? 1
 
@@ -353,7 +360,7 @@ export function HomePageContent({
     'Live badge',
     'promo_strip',
     'badge',
-    promoOffsets,
+    promo,
     <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
       <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
       {promo.livePromotionLabel || 'Live promotion'}
@@ -376,7 +383,7 @@ export function HomePageContent({
         'ShowSkills Rewards',
         'hero_intro',
         'brandTitle',
-        introOffsets,
+        intro,
         <div className="flex flex-wrap items-end gap-3 sm:gap-4">
           <h1 className="ss-hero-brand font-display text-[clamp(2.75rem,10vw,5.25rem)] leading-[0.92] tracking-tight sm:text-[clamp(3.25rem,11vw,5.75rem)]">
             {intro.brandTitle || 'ShowSkills Rewards'}
@@ -393,7 +400,7 @@ export function HomePageContent({
         'Headline',
         'hero_intro',
         'headline',
-        introOffsets,
+        intro,
         <p className="max-w-xl text-[clamp(1.35rem,4vw,2.1rem)] font-bold leading-snug tracking-tight text-white">
           <HeroHeadline text={intro.headline} highlight={intro.highlightPhrase} />
         </p>,
@@ -407,7 +414,7 @@ export function HomePageContent({
             'Helper text',
             'hero_intro',
             'helper',
-            introOffsets,
+            intro,
             <p className="ss-hero-helper-copy max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
               {intro.helperCopy}
             </p>,
@@ -418,7 +425,7 @@ export function HomePageContent({
         'CTA links',
         'hero_intro',
         'ctaRow',
-        introOffsets,
+        intro,
         <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 md:mt-auto md:border-t md:border-white/10 md:pt-4">
         <a
           href={editorMode ? undefined : '#prizes'}
@@ -554,7 +561,7 @@ export function HomePageContent({
           'Prize studio panel',
           'hero_prizes',
           'studioPanel',
-          prizesOffsets,
+          prizes,
           studioPanel,
           1,
           { className: 'w-full', transformOrigin: 'top center' },
@@ -572,7 +579,7 @@ export function HomePageContent({
             'Countdown timer',
             'hero_prizes',
             'countdown',
-            prizesOffsets,
+            prizes,
             <CompetitionCountdown
               opensAt={countdownPeriod?.entryOpensAt}
               closesAt={countdownPeriod?.entryClosesAt}
@@ -592,7 +599,7 @@ export function HomePageContent({
               'Ticket blurb',
               'hero_prizes',
               'ctaBlurb',
-              prizesOffsets,
+              prizes,
               <p className="ss-hero-bundle-cta-blurb mx-auto max-w-md text-center text-stone-500">{prizes.ctaBlurb}</p>,
               1,
               { className: 'w-full', transformOrigin: 'top center' },
@@ -603,7 +610,7 @@ export function HomePageContent({
           'Enter Bundle Draw',
           'hero_prizes',
           'ctaButton',
-          prizesOffsets,
+          prizes,
           <div className="ss-hero-bundle-cta-actions flex w-full justify-center md:border-t md:border-white/10 md:pt-3 lg:pt-4">
             <button
               type="button"
@@ -629,7 +636,7 @@ export function HomePageContent({
         'Legacy bundle details',
         'hero_details',
         'panel',
-        detailsOffsets,
+        details,
         <div
           className="ss-legacy-details-card ss-hero-panel-card flex w-full max-w-none flex-col rounded-lg"
           style={{ '--ss-panel-scale': detailsPanelScale }}
@@ -687,7 +694,7 @@ export function HomePageContent({
         'Ticket bundles',
         'ticket_bundles',
         'panel',
-        bundlesOffsets,
+        bundles,
         <TicketBundlePrice
           className="ss-hero-panel-card ss-hero-matched-panel h-full"
           style={{ '--ss-panel-scale': bundlesPanelScale }}

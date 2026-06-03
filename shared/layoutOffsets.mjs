@@ -2,6 +2,18 @@
 
 export const EDITOR_SNAP_GRID_PX = 8
 
+export const EDITOR_VIEWPORT_DESKTOP = 'desktop'
+export const EDITOR_VIEWPORT_MOBILE = 'mobile'
+export const PUBLIC_MOBILE_LAYOUT_MAX_PX = 767
+
+/** Resolved offsets for the active editor or public viewport. Mobile overrides desktop per key. */
+export function resolveLayoutOffsets(desktopOffsets = {}, mobileOffsets = {}, viewport = EDITOR_VIEWPORT_DESKTOP) {
+  if (viewport === EDITOR_VIEWPORT_MOBILE) {
+    return mergeOffsets(desktopOffsets, mobileOffsets)
+  }
+  return mergeOffsets({}, desktopOffsets)
+}
+
 export function defaultOffset(scale = 1) {
   return { x: 0, y: 0, scale }
 }

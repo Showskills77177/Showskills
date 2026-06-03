@@ -216,6 +216,14 @@ export function mergeShirtGiveawayCardLayout(base, input) {
       scale: clampTimerScale(mergedOffsets.timer.scale),
     }
   }
+  const mergedMobileOffsets = clampCardOffsetYs(mergeOffsets({}, input.mobileOffsets))
+  if (mergedMobileOffsets.timer) {
+    mergedMobileOffsets.timer = {
+      x: Number(mergedMobileOffsets.timer.x) || 0,
+      y: Number(mergedMobileOffsets.timer.y) || 0,
+      scale: clampTimerScale(mergedMobileOffsets.timer.scale),
+    }
+  }
   return {
     ...base,
     badgeLabel: typeof input.badgeLabel === 'string' ? input.badgeLabel : base.badgeLabel,
@@ -230,6 +238,7 @@ export function mergeShirtGiveawayCardLayout(base, input) {
     prizeImageUrl: typeof input.prizeImageUrl === 'string' ? input.prizeImageUrl : base.prizeImageUrl,
     headlineGapPx: Number.isFinite(gap) && gap >= 0 ? gap : base.headlineGapPx,
     offsets: clampCardOffsetYs(mergedOffsets),
+    mobileOffsets: clampCardOffsetYs(mergedMobileOffsets),
   }
 }
 
@@ -260,6 +269,14 @@ export function mergeLegacyBundleCardLayout(base, input) {
       scale: clampTimerScale(mergedOffsets.timer.scale),
     }
   }
+  const mergedMobileOffsets = clampCardOffsetYs(mergeOffsets({}, input.mobileOffsets))
+  if (mergedMobileOffsets.timer) {
+    mergedMobileOffsets.timer = {
+      x: Number(mergedMobileOffsets.timer.x) || 0,
+      y: Number(mergedMobileOffsets.timer.y) || 0,
+      scale: clampTimerScale(mergedMobileOffsets.timer.scale),
+    }
+  }
   return {
     ...base,
     metaFeaturedLabel: typeof input.metaFeaturedLabel === 'string' ? input.metaFeaturedLabel : base.metaFeaturedLabel,
@@ -268,6 +285,7 @@ export function mergeLegacyBundleCardLayout(base, input) {
     headlineGapPx: Number.isFinite(gap) && gap >= 0 ? gap : base.headlineGapPx,
     enterButtonLabel: typeof input.enterButtonLabel === 'string' ? input.enterButtonLabel : base.enterButtonLabel,
     offsets: clampCardOffsetYs(mergedOffsets),
+    mobileOffsets: clampCardOffsetYs(mergedMobileOffsets),
   }
 }
 
@@ -393,6 +411,7 @@ export function mergeCompetitionsPageLayout(input) {
     emptyFreeMessage:
       typeof input.emptyFreeMessage === 'string' ? input.emptyFreeMessage : base.emptyFreeMessage,
     offsets: mergeOffsets(base.offsets, input.offsets),
+    mobileOffsets: mergeOffsets({}, input.mobileOffsets),
     legacyBundleCard: mergeLegacyBundleCardLayout(base.legacyBundleCard, input.legacyBundleCard),
     shirtGiveawayCard: mergeShirtGiveawayCardLayout(base.shirtGiveawayCard, input.shirtGiveawayCard),
     sectionOrder: Array.isArray(input.sectionOrder)

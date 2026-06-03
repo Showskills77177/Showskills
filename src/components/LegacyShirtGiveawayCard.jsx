@@ -9,7 +9,7 @@ import {
 } from '../../shared/shirtGiveaway.mjs'
 import { SHIRT_GIVEAWAY_CARD_STEP_TITLES } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { defaultShirtGiveawayCardLayout } from '../../shared/sitePageLayout.mjs'
-import { liveOffsetStyle } from '../../shared/layoutOffsets.mjs'
+import { liveOffsetStyle, resolveLayoutOffsets } from '../../shared/layoutOffsets.mjs'
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { CompetitionCountdown } from './CompetitionCountdown'
 import { EditableDragFrame } from './admin/EditableDragFrame'
@@ -28,6 +28,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
     countdownPeriod = null,
     countdownPending = false,
     editorMode = false,
+    layoutViewport = 'desktop',
     selectedBlockId = null,
     onSelectBlock,
     onPatchCardLayout,
@@ -39,7 +40,11 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
     countdownPeriod ? { countdownPeriod, openPeriod: countdownPeriod } : null,
   )
   const cardLayout = { ...defaultShirtGiveawayCardLayout(), ...(cardLayoutProp || {}) }
-  const cardOffsets = cardLayout.offsets || {}
+  const cardOffsets = resolveLayoutOffsets(
+    cardLayout.offsets || {},
+    cardLayout.mobileOffsets || {},
+    layoutViewport,
+  )
   const headlineGapPx = cardLayout.headlineGapPx ?? 12
 
   const badgeLabel = cardLayout.badgeLabel?.trim() || 'Free giveaway'

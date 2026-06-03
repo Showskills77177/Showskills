@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ExternalLink, Eye, EyeOff, LayoutTemplate, Redo2, RotateCcw, SlidersHorizontal, Undo2 } from 'lucide-react'
+import { ExternalLink, Eye, EyeOff, LayoutTemplate, Monitor, Redo2, RotateCcw, SlidersHorizontal, Smartphone, Undo2 } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
 import { notifyLayoutUpdated } from '../../lib/publicDataCache.js'
 import { DEFAULT_SOCIAL_HANDLE } from '../../../shared/socialLinks.mjs'
 import { PageEditorPreviewProvider } from '../../pageEditor/PageEditorPreviewContext.jsx'
+import { MobileLayoutSettingsPanel } from '../../components/admin/MobileLayoutSettingsPanel'
+import { EDITOR_VIEWPORT_DESKTOP, EDITOR_VIEWPORT_MOBILE } from '../../../shared/layoutOffsets.mjs'
 import { useEditorHistoryShortcuts, usePageEditorHistory } from '../../pageEditor/usePageEditorHistory.js'
 import { PageLivePreview } from '../../components/admin/PageLivePreview'
 import { PageEditorSettingsDrawer } from '../../components/admin/EditableSectionOverlay'
@@ -111,6 +113,7 @@ export default function PageEditorPage() {
   const [settingsTarget, setSettingsTarget] = useState('page')
   const [cleanPreview, setCleanPreview] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
+  const [editorViewport, setEditorViewport] = useState(EDITOR_VIEWPORT_DESKTOP)
   const [emailPreviewKind, setEmailPreviewKind] = useState('welcome')
   const skipLayoutReloadRef = useRef(false)
 
@@ -376,6 +379,36 @@ export default function PageEditorPage() {
             >
               Grid
             </button>
+            <div className="inline-flex rounded-lg border border-white/15 p-0.5">
+              <button
+                type="button"
+                disabled={cleanPreview}
+                onClick={() => setEditorViewport(EDITOR_VIEWPORT_DESKTOP)}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm disabled:opacity-40 ${
+                  editorViewport === EDITOR_VIEWPORT_DESKTOP
+                    ? 'bg-teal-600/25 text-teal-100'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+                title="Edit desktop layout (768px and up)"
+              >
+                <Monitor className="h-3.5 w-3.5" aria-hidden />
+                Desktop
+              </button>
+              <button
+                type="button"
+                disabled={cleanPreview}
+                onClick={() => setEditorViewport(EDITOR_VIEWPORT_MOBILE)}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-sm disabled:opacity-40 ${
+                  editorViewport === EDITOR_VIEWPORT_MOBILE
+                    ? 'bg-amber-600/25 text-amber-100'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+                title="Edit mobile layout (under 768px)"
+              >
+                <Smartphone className="h-3.5 w-3.5" aria-hidden />
+                Mobile
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => openSettings(settingsTarget)}
@@ -443,7 +476,7 @@ export default function PageEditorPage() {
       {loading ? (
         <p className="px-4 py-8 text-sm text-stone-500 sm:px-6">Loading page settings…</p>
       ) : (
-        <PageEditorPreviewProvider pages={pages}>
+        <PageEditorPreviewProvider pages={pages} editorViewport={editorViewport}>
           <div className="relative min-h-0 flex-1">
             <PageLivePreview
               activePage={activePage}
@@ -480,6 +513,17 @@ export default function PageEditorPage() {
 
       {!loading && settingsTarget === 'page' && activePage === 'homepage' ? (
         <div className="space-y-6">
+          <MobileLayoutSettingsPanel
+            editorViewport={editorViewport}
+            onResetPageMobile={() => {
+              const heroBlockIds = ['promo_strip', 'hero_intro', 'hero_prizes', 'hero_details', 'ticket_bundles']
+              const blocks = { ...homepage.blocks }
+              for (const id of heroBlockIds) {
+                if (blocks[id]) blocks[id] = { ...blocks[id], mobileOffsets: {} }
+              }
+              patchPage('homepage', { blocks })
+            }}
+          />
           <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Section order</h2>
             <p className="mt-1 text-xs text-stone-500">
@@ -803,6 +847,7 @@ export default function PageEditorPage() {
         <CompetitionsPageEditor
           layout={comp}
           selectedBlockId={selectedBlockId}
+          editorViewport={editorViewport}
           onChange={(patch) => patchPage(COMPETITIONS_PAGE_ID, patch)}
         />
       ) : null}
@@ -1045,7 +1090,28 @@ function SiteShellEditor({ shell, onChange, setPages }) {
   )
 }
 
-function CompetitionsPageEditor({ layout, selectedBlockId, onChange }) {
+function CompetitionsPageEditor({ layout, selectedBlockId, editorViewport, onChange }) {
+  const editingMobile = editorViewport === EDITOR_VIEWPORT_MOBILE
+  const offsetBucket = editingMobile ? 'mobileOffsets' : 'offsets'
+  const LEGACY_PANEL_RESET = {
+    imagery: { x: 0, y: 0, scale: 1 },
+    meta: { x: 0, y: 0, scale: 1 },
+    timer: { x: 0, y: 0, scale: 1 },
+    title: { x: 0, y: 0, scale: 1 },
+    summary: { x: 0, y: 0, scale: 1 },
+    price: { x: 0, y: 0, scale: 1 },
+    enter: { x: 0, y: 0, scale: 1 },
+  }
+  const SHIRT_PANEL_RESET = {
+    imagery: { x: 0, y: 0, scale: 1 },
+    badge: { x: 0, y: 0, scale: 1 },
+    title: { x: 0, y: 0, scale: 1 },
+    prizeLine: { x: 0, y: 0, scale: 1 },
+    helper: { x: 0, y: 0, scale: 1 },
+    timer: { x: 0, y: 0, scale: 1 },
+    steps: { x: 0, y: 0, scale: 1 },
+    enter: { x: 0, y: 0, scale: 1 },
+  }
   const sectionItems = (layout.sectionOrder || ['paid', 'free']).map((id) => ({
     id,
     label: layout.sections[id]?.title || id,
@@ -1058,23 +1124,19 @@ function CompetitionsPageEditor({ layout, selectedBlockId, onChange }) {
     selectedBlockId === 'comp_shirt' || selectedBlockId?.startsWith('comp_shirt_card')
 
   function patchLegacyCard(patch) {
-    onChange({
-      legacyBundleCard: {
-        ...legacyCard,
-        ...patch,
-        offsets: patch.offsets ? { ...(legacyCard.offsets || {}), ...patch.offsets } : legacyCard.offsets,
-      },
-    })
+    const { offsets, mobileOffsets, ...rest } = patch
+    const next = { ...legacyCard, ...rest }
+    if (offsets) next.offsets = { ...(legacyCard.offsets || {}), ...offsets }
+    if (mobileOffsets) next.mobileOffsets = { ...(legacyCard.mobileOffsets || {}), ...mobileOffsets }
+    onChange({ legacyBundleCard: next })
   }
 
   function patchShirtCard(patch) {
-    onChange({
-      shirtGiveawayCard: {
-        ...shirtCard,
-        ...patch,
-        offsets: patch.offsets ? { ...(shirtCard.offsets || {}), ...patch.offsets } : shirtCard.offsets,
-      },
-    })
+    const { offsets, mobileOffsets, ...rest } = patch
+    const next = { ...shirtCard, ...rest }
+    if (offsets) next.offsets = { ...(shirtCard.offsets || {}), ...offsets }
+    if (mobileOffsets) next.mobileOffsets = { ...(shirtCard.mobileOffsets || {}), ...mobileOffsets }
+    onChange({ shirtGiveawayCard: next })
   }
 
   function patchShirtStepLabel(index, value) {
@@ -1094,12 +1156,27 @@ function CompetitionsPageEditor({ layout, selectedBlockId, onChange }) {
 
   return (
     <div className="space-y-6">
+      <MobileLayoutSettingsPanel
+        editorViewport={editorViewport}
+        onResetPageMobile={() => onChange({ mobileOffsets: {} })}
+        onResetLegacyMobile={() => patchLegacyCard({ [offsetBucket]: LEGACY_PANEL_RESET })}
+        onResetShirtMobile={() => patchShirtCard({ [offsetBucket]: SHIRT_PANEL_RESET })}
+      />
       <p className="text-xs leading-relaxed text-stone-500">
-        Click each text block in the preview — drag to move, Ctrl/Cmd+drag to resize. Alignment toolbar:{' '}
-        <strong className="text-stone-400">X/Y/·</strong> center in panel,{' '}
-        <strong className="text-stone-400">↔/↕/⊡</strong> center between neighbours,{' '}
-        <strong className="text-stone-400">≡</strong> match sibling centers. Then{' '}
-        <strong className="text-stone-300">Save Competitions</strong>.
+        {editingMobile ? (
+          <>
+            Mobile layout mode — drag blocks in the narrow preview. Positions save separately from desktop.{' '}
+            <strong className="text-stone-300">Save Competitions</strong> when done.
+          </>
+        ) : (
+          <>
+            Click each text block in the preview — drag to move, Ctrl/Cmd+drag to resize. Alignment toolbar:{' '}
+            <strong className="text-stone-400">X/Y/·</strong> center in panel,{' '}
+            <strong className="text-stone-400">↔/↕/⊡</strong> center between neighbours,{' '}
+            <strong className="text-stone-400">≡</strong> match sibling centers. Then{' '}
+            <strong className="text-stone-300">Save Competitions</strong>.
+          </>
+        )}
       </p>
 
       {showLegacyCardSettings ? (
@@ -1169,36 +1246,24 @@ function CompetitionsPageEditor({ layout, selectedBlockId, onChange }) {
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
-                onClick={() =>
-                  patchLegacyCard({
-                    offsets: {
-                      imagery: { x: 0, y: 0, scale: 1 },
-                      meta: { x: 0, y: 0, scale: 1 },
-                      timer: { x: 0, y: 0, scale: 1 },
-                      title: { x: 0, y: 0, scale: 1 },
-                      summary: { x: 0, y: 0, scale: 1 },
-                      price: { x: 0, y: 0, scale: 1 },
-                      enter: { x: 0, y: 0, scale: 1 },
-                    },
-                  })
-                }
+                onClick={() => patchLegacyCard({ [offsetBucket]: LEGACY_PANEL_RESET })}
                 className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
               >
-                Reset card panel positions
+                Reset card panel positions{editingMobile ? ' (mobile)' : ''}
               </button>
               <button
                 type="button"
                 onClick={() =>
                   onChange({
-                    offsets: {
-                      ...(layout.offsets || {}),
+                    [offsetBucket]: {
+                      ...(layout[offsetBucket] || layout.offsets || {}),
                       paidPrimaryCard: { x: 0, y: 0, scale: 1 },
                     },
                   })
                 }
                 className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
               >
-                Reset whole card position
+                Reset whole card position{editingMobile ? ' (mobile)' : ''}
               </button>
             </div>
           </div>
@@ -1311,37 +1376,24 @@ function CompetitionsPageEditor({ layout, selectedBlockId, onChange }) {
           <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"
-              onClick={() =>
-                patchShirtCard({
-                  offsets: {
-                    imagery: { x: 0, y: 0, scale: 1 },
-                    badge: { x: 0, y: 0, scale: 1 },
-                    title: { x: 0, y: 0, scale: 1 },
-                    prizeLine: { x: 0, y: 0, scale: 1 },
-                    helper: { x: 0, y: 0, scale: 1 },
-                    timer: { x: 0, y: 0, scale: 1 },
-                    steps: { x: 0, y: 0, scale: 1 },
-                    enter: { x: 0, y: 0, scale: 1 },
-                  },
-                })
-              }
+              onClick={() => patchShirtCard({ [offsetBucket]: SHIRT_PANEL_RESET })}
               className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
             >
-              Reset card panel positions
+              Reset card panel positions{editingMobile ? ' (mobile)' : ''}
             </button>
             <button
               type="button"
               onClick={() =>
                 onChange({
-                  offsets: {
-                    ...(layout.offsets || {}),
+                  [offsetBucket]: {
+                    ...(layout[offsetBucket] || layout.offsets || {}),
                     shirtCard: { x: 0, y: 0, scale: 1 },
                   },
                 })
               }
               className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
             >
-              Reset whole card position
+              Reset whole card position{editingMobile ? ' (mobile)' : ''}
             </button>
           </div>
         </div>

@@ -16,7 +16,8 @@ import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
 import { LegacyShirtGiveawayCard } from '../components/LegacyShirtGiveawayCard'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { LiveLayoutOffset } from '../components/LiveLayoutOffset'
-import { liveOffsetStyle } from '../../shared/layoutOffsets.mjs'
+import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
+import { useLayoutViewport } from '../hooks/useLayoutViewport'
 
 function SectionHeading({ id, children }) {
   return (
@@ -26,9 +27,9 @@ function SectionHeading({ id, children }) {
   )
 }
 
-function legacyCardLayoutKey(card) {
+function legacyCardLayoutKey(card, viewport) {
   if (!card || typeof card !== 'object') return ''
-  const o = card.offsets || {}
+  const o = resolveLayoutOffsets(card.offsets || {}, card.mobileOffsets || {}, viewport)
   return [
     card.headlineGapPx ?? 14,
     o.imagery?.y,
@@ -42,9 +43,9 @@ function legacyCardLayoutKey(card) {
   ].join(',')
 }
 
-function shirtCardLayoutKey(card) {
+function shirtCardLayoutKey(card, viewport) {
   if (!card || typeof card !== 'object') return ''
-  const o = card.offsets || {}
+  const o = resolveLayoutOffsets(card.offsets || {}, card.mobileOffsets || {}, viewport)
   return [
     card.headlineGapPx ?? 12,
     o.imagery?.y,
@@ -62,6 +63,7 @@ function shirtCardLayoutKey(card) {
 export default function CompetitionsPage({
   layout: layoutProp,
   editorMode = false,
+  editorViewport = 'desktop',
   selectedBlockId = null,
   onSelectBlock,
   onPatchLayout,
@@ -69,11 +71,14 @@ export default function CompetitionsPage({
   const { openEntry } = useEntryFlow()
   const { layout: fetchedLayout, loading: layoutLoading } = usePageLayout(COMPETITIONS_PAGE_ID)
   const layout = mergeCompetitionsPageLayout(layoutProp || fetchedLayout)
+  const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
   const loading = layoutLoading || loadingCompetitions || loadingGiveaways
 
-  const offsets = layout.offsets || {}
+  const desktopOffsets = layout.offsets || {}
+  const pageMobileOffsets = layout.mobileOffsets || {}
+  const offsets = resolveLayoutOffsets(desktopOffsets, pageMobileOffsets, layoutViewport)
   const shirtCardOffset = offsets.shirtCard || { x: 0, y: 0, scale: 1 }
   const paidPrimaryCardOffset = offsets.paidPrimaryCard || { x: 0, y: 0, scale: 1 }
   const legacyBundleCard = layout.legacyBundleCard || {}
@@ -95,10 +100,20 @@ export default function CompetitionsPage({
     showPaid,
     showFree,
     editorMode ? 'edit' : 'live',
-    legacyCardLayoutKey(legacyBundleCard),
-    shirtCardLayoutKey(shirtGiveawayCard),
+    layoutViewport,
+    legacyCardLayoutKey(legacyBundleCard, layoutViewport),
+    shirtCardLayoutKey(shirtGiveawayCard, layoutViewport),
   ].join('|')
   const { paidCardRef, shirtCardRef } = useMatchedCompetitionCardHeight(matchKey)
+
+  function patchPageOffset(offsetKey, pos, patch) {
+    const next = { ...pos, ...patch }
+    if (layoutViewport === EDITOR_VIEWPORT_MOBILE) {
+      onPatchLayout?.({ mobileOffsets: { ...pageMobileOffsets, [offsetKey]: next } })
+      return
+    }
+    onPatchLayout?.({ offsets: { ...desktopOffsets, [offsetKey]: next } })
+  }
 
   function dragWrap(id, label, offsetKey, node, opts = {}) {
     const pos = offsets?.[offsetKey] || { x: 0, y: 0, scale: 1 }
@@ -134,22 +149,29 @@ export default function CompetitionsPage({
           opts.className ||
           (opts.cssScaleOnly ? 'flex h-full min-h-0 w-full flex-col' : 'block w-full max-w-full')
         }
-        onChange={(patch) => onPatchLayout?.({ offsets: { ...offsets, [offsetKey]: { ...pos, ...patch } } })}
+        onChange={(patch) => patchPageOffset(offsetKey, pos, patch)}
       >
         {node}
       </EditableDragFrame>
     )
   }
 
+  function patchCardLayout(card, patch) {
+    const { offsets: offsetPatch, ...rest } = patch
+    const next = { ...card, ...rest }
+    if (offsetPatch) {
+      if (layoutViewport === EDITOR_VIEWPORT_MOBILE) {
+        next.mobileOffsets = { ...(card.mobileOffsets || {}), ...offsetPatch }
+      } else {
+        next.offsets = { ...(card.offsets || {}), ...offsetPatch }
+      }
+    }
+    return next
+  }
+
   function patchShirtGiveawayCard(patch) {
     onPatchLayout?.({
-      shirtGiveawayCard: {
-        ...shirtGiveawayCard,
-        ...patch,
-        offsets: patch.offsets
-          ? { ...(shirtGiveawayCard.offsets || {}), ...patch.offsets }
-          : shirtGiveawayCard.offsets,
-      },
+      shirtGiveawayCard: patchCardLayout(shirtGiveawayCard, patch),
     })
   }
 
@@ -162,6 +184,7 @@ export default function CompetitionsPage({
       countdownPeriod={shirtCountdownPeriod}
       countdownPending={shirtPeriodLoading}
       editorMode={editorMode}
+      layoutViewport={layoutViewport}
       selectedBlockId={selectedBlockId}
       onSelectBlock={onSelectBlock}
       onPatchCardLayout={patchShirtGiveawayCard}
@@ -170,13 +193,7 @@ export default function CompetitionsPage({
 
   function patchLegacyBundleCard(patch) {
     onPatchLayout?.({
-      legacyBundleCard: {
-        ...legacyBundleCard,
-        ...patch,
-        offsets: patch.offsets
-          ? { ...(legacyBundleCard.offsets || {}), ...patch.offsets }
-          : legacyBundleCard.offsets,
-      },
+      legacyBundleCard: patchCardLayout(legacyBundleCard, patch),
     })
   }
 
@@ -188,6 +205,7 @@ export default function CompetitionsPage({
         competition={competition}
         preview={false}
         editorMode={editorMode && isLegacy}
+        layoutViewport={layoutViewport}
         cardLayout={isLegacy ? legacyBundleCard : undefined}
         cardScale={isLegacy ? paidPrimaryCardOffset.scale ?? 1 : 1}
         selectedBlockId={selectedBlockId}

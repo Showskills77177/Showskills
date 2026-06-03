@@ -565,6 +565,22 @@ body {
   touch-action: manipulation;
 }
 
+.ss-page-editor-preview--mobile .ss-competitions-columns--paired {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.ss-page-editor-preview--mobile .md\:grid-cols-2 {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.ss-page-editor-preview--mobile .md\:col-start-1,
+.ss-page-editor-preview--mobile .md\:col-start-2,
+.ss-page-editor-preview--mobile .md\:row-start-1,
+.ss-page-editor-preview--mobile .md\:row-start-2 {
+  grid-column: auto;
+  grid-row: auto;
+}
+
 .ss-page-editor-preview.ss-editor-show-grid [data-editor-align-group],
 .ss-page-editor-preview.ss-editor-show-grid .ss-hero-merged-panel,
 .ss-page-editor-preview.ss-editor-show-grid [data-competition-card] > div:last-child {
@@ -2754,18 +2770,7 @@ input.ss-cf-pay-button.ss-pay-cta {
 }
 
 /* —— Mobile & tablet UX —— */
-@media (max-width: 767px) {
-  .ss-live-layout-offset,
-  .ss-live-panel-offset {
-    transform: none !important;
-  }
-}
-
 @media (max-width: 1023px) {
-  .ss-live-card-offset {
-    transform: none !important;
-  }
-
   .ss-competitions-columns {
     gap: 1.5rem;
   }

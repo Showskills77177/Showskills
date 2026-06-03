@@ -164,13 +164,17 @@ function mergeBlock(blockId, merged, base) {
   if (blockId === 'hero_prizes') {
     next.prizeImages = mergePrizeImages(m.prizeImages)
     next.offsets = sanitizeHeroPrizesOffsets(m.offsets)
+    if (m.mobileOffsets) next.mobileOffsets = sanitizeHeroPrizesOffsets(m.mobileOffsets)
   } else if (blockId === 'hero_details') {
     next.offsets = sanitizeHeroDetailsOffsets(m.offsets)
+    if (m.mobileOffsets) next.mobileOffsets = sanitizeHeroDetailsOffsets(m.mobileOffsets)
   } else if (blockId === 'hero_intro') {
     next.offsets = mergeOffsets(b.offsets, m.offsets)
     if (next.offsets.countdown) delete next.offsets.countdown
+    next.mobileOffsets = mergeOffsets({}, m.mobileOffsets)
   } else if (b.offsets) {
     next.offsets = mergeOffsets(b.offsets, m.offsets)
+    next.mobileOffsets = mergeOffsets({}, m.mobileOffsets)
   }
   if (blockId === 'competitions_hub' || blockId === 'winners_panel') {
     next.visible = m.visible === true

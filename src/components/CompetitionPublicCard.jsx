@@ -8,7 +8,7 @@ import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
 import { defaultLegacyBundleCardLayout } from '../../shared/sitePageLayout.mjs'
-import { liveOffsetStyle } from '../../shared/layoutOffsets.mjs'
+import { liveOffsetStyle, resolveLayoutOffsets } from '../../shared/layoutOffsets.mjs'
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { DRAW_COMPETITION_SLUG, formatPeriodMonthLabel, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 
@@ -54,6 +54,7 @@ export function CompetitionPublicCard({
   cardLayout: cardLayoutProp,
   cardScale = 1,
   editorMode = false,
+  layoutViewport = 'desktop',
   selectedBlockId = null,
   onSelectBlock,
   onPatchCardLayout,
@@ -65,7 +66,11 @@ export function CompetitionPublicCard({
   const cardLayout = isLegacyBundle
     ? { ...defaultLegacyBundleCardLayout(), ...(cardLayoutProp || {}) }
     : null
-  const cardOffsets = cardLayout?.offsets || {}
+  const cardOffsets = resolveLayoutOffsets(
+    cardLayout?.offsets || {},
+    cardLayout?.mobileOffsets || {},
+    layoutViewport,
+  )
   const headlineGapPx = cardLayout?.headlineGapPx ?? 14
   const countdownPeriod = pickCountdownPeriod(competition)
   const periodMonth = formatPeriodMonthLabel(countdownPeriod?.entryClosesAt)

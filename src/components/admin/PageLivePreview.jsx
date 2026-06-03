@@ -14,6 +14,7 @@ import {
 } from '../../../shared/sitePageLayout.mjs'
 import { NewsletterEmailPreview } from './NewsletterEmailPreview'
 import { useEditorSectionDrag } from '../../pageEditor/useEditorSectionDrag.js'
+import { usePageEditorViewport } from '../../pageEditor/PageEditorPreviewContext.jsx'
 
 /**
  * Live page canvas for the site editor (header + page + sticky footer).
@@ -35,9 +36,16 @@ export function PageLivePreview({
   emailPreviewKind = 'welcome',
 }) {
   const editorMode = !cleanPreview
+  const editorViewport = usePageEditorViewport()
   const previewClass = editorMode
-    ? `ss-page-editor-preview ${showGrid ? 'ss-editor-show-grid' : ''} [&_button:not([data-editor-ui])]:pointer-events-none`
+    ? `ss-page-editor-preview ${showGrid ? 'ss-editor-show-grid' : ''} [&_button:not([data-editor-ui])]:pointer-events-none${
+        editorViewport === 'mobile' ? ' ss-page-editor-preview--mobile' : ''
+      }`
     : ''
+  const viewportFrameClass =
+    editorMode && editorViewport === 'mobile'
+      ? 'mx-auto w-full max-w-[390px] border-x border-white/10 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]'
+      : 'w-full'
   const blockOrder = pages.homepage?.blockOrder || []
   const { dragId, dropTargetId, dropPosition, startDrag, nudgeSection } = useEditorSectionDrag({
     blockOrder,
@@ -54,26 +62,30 @@ export function PageLivePreview({
     )
   } else if (activePage === 'homepage') {
     canvas = (
-      <HomePageContent
-        layout={pages.homepage}
-        editorMode={editorMode}
-        showGrid={showGrid}
-        selectedBlockId={selectedBlockId}
-        onSelectBlock={onSelectBlock}
-        onPatchHomeBlock={onPatchHomeBlock}
-        dragId={dragId}
-        dropTargetId={dropTargetId}
-        dropPosition={dropPosition}
-        onStartDrag={startDrag}
-        onNudgeSection={nudgeSection}
-      />
+      <div className={`${previewClass} ${viewportFrameClass}`}>
+        <HomePageContent
+          layout={pages.homepage}
+          editorMode={editorMode}
+          editorViewport={editorViewport}
+          showGrid={showGrid}
+          selectedBlockId={selectedBlockId}
+          onSelectBlock={onSelectBlock}
+          onPatchHomeBlock={onPatchHomeBlock}
+          dragId={dragId}
+          dropTargetId={dropTargetId}
+          dropPosition={dropPosition}
+          onStartDrag={startDrag}
+          onNudgeSection={nudgeSection}
+        />
+      </div>
     )
   } else if (activePage === COMPETITIONS_PAGE_ID) {
     canvas = (
-      <div className={previewClass}>
+      <div className={`${previewClass} ${viewportFrameClass}`}>
         <CompetitionsPage
           layout={pages.competitions}
           editorMode={editorMode}
+          editorViewport={editorViewport}
           selectedBlockId={selectedBlockId}
           onSelectBlock={onSelectBlock}
           onPatchLayout={onPatchCompetitions}
