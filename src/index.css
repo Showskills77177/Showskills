@@ -1117,13 +1117,17 @@ body {
 
 .ss-competition-countdown {
   box-sizing: border-box;
+  contain: layout;
+}
+
+.ss-competition-countdown-slot {
   min-height: 2.625rem;
-  flex-wrap: nowrap;
+  display: flex;
+  align-items: center;
 }
 
 .ss-competition-countdown__text {
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .ss-prize-studio--hero .ss-prize-studio-tile--main {
@@ -1310,7 +1314,30 @@ body {
 
 @media (min-width: 1024px) {
   .ss-competitions-columns {
-    align-items: start;
+    align-items: stretch;
+  }
+
+  .ss-comp-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ss-competitions-columns .ss-competition-paid-primary,
+  .ss-competitions-columns .ss-competition-free-primary {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ss-competitions-columns [data-competition-card],
+  .ss-competition-card-skeleton {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .ss-competition-card-actions {
+    margin-top: auto;
   }
 }
 

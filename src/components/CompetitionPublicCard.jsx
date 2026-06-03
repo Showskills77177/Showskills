@@ -127,7 +127,7 @@ export function CompetitionPublicCard({
           ) : null}
         </div>
         {countdownPeriod ? (
-          <div className="mt-2.5">
+          <div className="ss-competition-countdown-slot mt-2.5">
             <CompetitionCountdown
               opensAt={countdownPeriod.entryOpensAt}
               closesAt={countdownPeriod.entryClosesAt}
@@ -135,7 +135,9 @@ export function CompetitionPublicCard({
             />
           </div>
         ) : (
-          <p className="mt-2.5 text-xs text-amber-200/80">No entry period dates yet — set them in admin.</p>
+          <div className="ss-competition-countdown-slot mt-2.5" aria-hidden>
+            <CompetitionCountdown pending showDot={false} live={false} />
+          </div>
         )}
         <h2 className="mt-2 font-display text-2xl uppercase tracking-wide text-white sm:text-3xl">{competition.title}</h2>
         <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-500 sm:text-base">{summary}</p>

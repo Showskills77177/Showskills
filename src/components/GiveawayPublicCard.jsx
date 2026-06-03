@@ -94,7 +94,7 @@ export function GiveawayPublicCard({
       <div className="flex flex-1 flex-col p-6 pt-5 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-lime-300/90">Free giveaway</p>
         {giveaway.openPeriod ? (
-          <div className="mt-2 space-y-1">
+          <div className="ss-competition-countdown-slot mt-2 space-y-1">
             {formatPeriodMonthLabel(giveaway.openPeriod.entryClosesAt) ? (
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lime-400/80">
                 {formatPeriodMonthLabel(giveaway.openPeriod.entryClosesAt)} draw
@@ -107,7 +107,9 @@ export function GiveawayPublicCard({
             />
           </div>
         ) : (
-          <p className="mt-2 text-xs text-amber-200/80">No open entry period — update dates in admin and open a period.</p>
+          <div className="ss-competition-countdown-slot mt-2" aria-hidden>
+            <CompetitionCountdown pending showDot={false} live={false} />
+          </div>
         )}
         <h2 className="mt-2 font-display text-2xl text-white sm:text-3xl">{giveaway.title}</h2>
         <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-500 sm:text-base">
