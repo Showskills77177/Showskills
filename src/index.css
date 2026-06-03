@@ -685,15 +685,17 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100%;
-    align-items: stretch;
+    align-items: center;
   }
 
   .ss-hero-prize-stack .ss-hero-prize-column {
     border-top: 0;
-    padding-top: 2.4rem;
+    padding-top: 0;
     padding-left: 0;
     flex-shrink: 0;
     width: 100%;
+    max-width: min(100%, 22rem);
+    margin-inline: auto;
   }
 
   .ss-hero-bundle-cta {
@@ -725,6 +727,8 @@ body {
 
   .ss-prize-studio--hero {
     width: 100%;
+    max-width: min(100%, 22rem);
+    margin-inline: auto;
     box-sizing: border-box;
   }
 
@@ -1097,6 +1101,29 @@ body {
 
 .ss-prize-studio--hero {
   padding: 0.55rem 0.7rem 0.95rem;
+  max-width: min(100%, 21rem);
+  margin-inline: auto;
+}
+
+.ss-hero-prize-stack--centered {
+  align-items: center;
+}
+
+.ss-hero-prize-stack--centered .ss-hero-prize-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ss-competition-countdown {
+  box-sizing: border-box;
+  min-height: 2.625rem;
+  flex-wrap: nowrap;
+}
+
+.ss-competition-countdown__text {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .ss-prize-studio--hero .ss-prize-studio-tile--main {
@@ -1282,38 +1309,8 @@ body {
 }
 
 @media (min-width: 1024px) {
-  .ss-competitions-columns .ss-competition-paid-primary,
-  .ss-competitions-columns .ss-competition-free-primary {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .ss-competition-paid-slot,
-  .ss-competition-shirt-slot {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    min-height: 0;
-    flex: 1;
-  }
-
-  .ss-competition-shirt-slot > [data-editor-drag],
-  .ss-competition-shirt-slot > div > [data-editor-drag] {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    width: 100%;
-    min-height: 0;
-  }
-
-  .ss-shirt-giveaway-card {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .ss-competition-card-actions {
-    margin-top: auto;
+  .ss-competitions-columns {
+    align-items: start;
   }
 }
 
