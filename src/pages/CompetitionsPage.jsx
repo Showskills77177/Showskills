@@ -31,6 +31,7 @@ export default function CompetitionsPage({
   const layout = layoutProp || fetchedLayout
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
+  const loading = loadingCompetitions || loadingGiveaways
 
   const offsets = layout?.offsets || {}
   const shirtCardOffset = offsets.shirtCard || { x: 0, y: 0, scale: 1 }
@@ -83,31 +84,22 @@ export default function CompetitionsPage({
   )
 
   const paidColumn = (
-    <div className="ss-comp-col flex min-h-0 min-w-0 flex-col lg:h-full">
+    <div className="flex min-w-0 flex-col">
       <SectionHeading id="paid-competitions-heading">
         {layout.sections.paid?.title || 'Prize draw competitions'}
       </SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.paid?.subtitle}</p>
-      <ul className="mt-6 flex flex-1 flex-col gap-6">
-        {loadingCompetitions && competitions.length === 0 ? (
-          <li className="ss-competition-paid-primary flex min-h-0 flex-1 flex-col" aria-busy="true">
-            <div className="ss-competition-card-skeleton flex h-full min-h-0 flex-1 flex-col rounded-2xl border border-teal-500/20 bg-stone-950/50" />
-          </li>
-        ) : null}
+      <ul className="mt-6 grid list-none gap-6">
         {competitions.map((c, index) => (
-          <li
-            key={c.slug}
-            className={index === 0 ? 'ss-competition-paid-primary flex min-h-0 flex-col lg:flex-1' : ''}
-          >
+          <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
             <CompetitionPublicCard
-              className={index === 0 ? 'h-full min-h-0' : ''}
               competition={c}
               onEnter={() => openEntry('paid', { competitionSlug: c.slug })}
             />
           </li>
         ))}
       </ul>
-      {!loadingCompetitions && competitions.length === 0 ? (
+      {!loading && competitions.length === 0 ? (
         <p className="mt-6 text-sm text-stone-500">
           No extra paid prize draws published yet — the Ronaldo Legacy Bundle is on the homepage.
         </p>
@@ -116,11 +108,11 @@ export default function CompetitionsPage({
   )
 
   const freeColumn = (
-    <div className="ss-comp-col flex min-h-0 min-w-0 flex-col lg:h-full" id="free-giveaways">
+    <div className="flex min-w-0 flex-col" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">{layout.sections.free?.title || 'Free giveaways'}</SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.free?.subtitle}</p>
-      <ul className="mt-6 flex flex-1 flex-col gap-6">
-        <li className="ss-competition-free-primary flex min-h-0 w-full flex-col lg:flex-1">
+      <ul className="mt-6 grid list-none gap-6">
+        <li className="ss-competition-free-primary w-full">
           {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, {
             cssScaleOnly: true,
             liveStatic: true,
@@ -177,9 +169,15 @@ export default function CompetitionsPage({
           </p>,
         )}
 
+        {loading ? (
+          <p className="mt-10 text-sm text-stone-500" role="status">
+            Loading competitions…
+          </p>
+        ) : null}
+
         <div
-          className={`ss-competitions-columns mt-12 grid gap-8 ${
-            showPaid && showFree ? 'lg:grid-cols-2 lg:items-stretch' : 'max-w-xl'
+          className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
+            showPaid && showFree ? 'lg:grid-cols-2 lg:items-start' : 'max-w-xl'
           }`}
         >
           {showPaid ? <div className="min-w-0">{dragWrap('comp_paid', 'Prize draws', 'paid', paidColumn)}</div> : null}

@@ -571,7 +571,7 @@ export function HomePageContent({
         className="ss-hero-bundle-cta mt-1 flex w-full max-w-[min(100%,21rem)] flex-col items-center gap-2.5 text-center sm:max-w-[min(100%,22rem)] md:mt-auto md:gap-3"
         data-editor-center-root
       >
-        <div className="ss-competition-countdown-slot flex w-full justify-center px-1">
+        <div className="flex w-full justify-center px-1">
           {dragWrap(
             'prizes_countdown',
             'Countdown timer',
