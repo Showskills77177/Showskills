@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEntryFlow } from '../entry/entryContext'
-import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import {
   SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS,
   SHIRT_GIVEAWAY_SOCIAL_PLATFORMS,
@@ -830,7 +830,7 @@ export function EntryModal() {
               </ul>
               <p className="mt-3 text-sm text-stone-500">
                 <strong className="text-lime-200/90">Free giveaway:</strong> complete every requirement above, then fill in your details below.
-                Prize is the <strong className="text-stone-300">signed Ronaldo shirt only</strong> — not the Legacy Bundle.
+                Prize is the <strong className="text-stone-300">signed Ronaldo United shirt ({SHIRT_GIVEAWAY_SEASON_LABEL})</strong> — not the Legacy Bundle.
                 One entry per device; VPNs are not permitted.
               </p>
               {kickCheckingVpn ? (

@@ -1,6 +1,10 @@
 /** Mandatory steps for the free Ronaldo shirt giveaway entry flow. */
 
-import { isCorrectShirtGiveawayAnswer } from './shirtGiveaway.mjs'
+import {
+  isCorrectShirtGiveawayAnswer,
+  SHIRT_GIVEAWAY_QUESTION,
+  SHIRT_GIVEAWAY_SEASON_LABEL,
+} from './shirtGiveaway.mjs'
 
 export const SHIRT_GIVEAWAY_SOCIAL_PLATFORMS = [
   { id: 'tiktok', label: 'TikTok' },
@@ -12,7 +16,7 @@ export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
   {
     id: 'skill_answer',
     title: 'Answer the skill question correctly',
-    detail: 'One Ronaldo qualification question — correct answer required.',
+    detail: `${SHIRT_GIVEAWAY_QUESTION} Ronaldo R9 or Cristiano Ronaldo qualifies you.`,
   },
   {
     id: 'newsletter',
@@ -22,7 +26,43 @@ export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
   {
     id: 'social_follow',
     title: 'Follow us on social media',
-    detail: 'Follow ShowSkills on TikTok, Instagram, or Facebook (at least one).',
+    detail:
+      'Follow ShowSkills on TikTok, Instagram, or Facebook (pick one), enter your username on that network, and confirm you have followed us.',
+  },
+]
+
+/** Public-facing step list — shirt giveaway card and dedicated archive page. */
+export const SHIRT_GIVEAWAY_PUBLIC_STEPS = [
+  {
+    num: '1',
+    title: 'Answer the skill question correctly',
+    detail: `${SHIRT_GIVEAWAY_QUESTION} Wrong answers cannot be submitted.`,
+  },
+  {
+    num: '2',
+    title: 'Enter your details',
+    detail: 'Full name, email address, and UK mobile number in the giveaway form.',
+  },
+  {
+    num: '3',
+    title: 'Subscribe to our newsletter',
+    detail: 'Required for every free shirt entry — tick the box with the same email you enter.',
+  },
+  {
+    num: '4',
+    title: 'Follow us on social media',
+    detail:
+      'Follow ShowSkills on TikTok, Instagram, or Facebook (at least one). Enter your username on that network and confirm you have followed us.',
+  },
+  {
+    num: '5',
+    title: 'Agree to the terms and submit',
+    detail: `One entry per device; VPNs and proxies are not allowed. Prize: signed Ronaldo United shirt (${SHIRT_GIVEAWAY_SEASON_LABEL}) — not the Legacy Bundle.`,
+  },
+  {
+    num: '6',
+    title: 'We verify eligible entries',
+    detail: 'Correct submissions with verified newsletter and social follow go into the random draw. No payment or video upload.',
   },
 ]
 

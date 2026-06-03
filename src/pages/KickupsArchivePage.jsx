@@ -1,7 +1,8 @@
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
 import { useEntryFlow } from '../entry/entryContext'
 import { ShirtGiveawayCtaButton } from '../components/siteChrome'
-import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL, SHIRT_GIVEAWAY_PRIZE_TITLE } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_PUBLIC_STEPS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { usePageLayout } from '../hooks/useSitePages'
 import { SHIRT_GIVEAWAY_PAGE_ID, mergeShirtGiveawayPageLayout } from '../../shared/sitePageLayout.mjs'
 
@@ -34,7 +35,7 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
                 <div className="ss-kickups-prize-thumb mx-auto shrink-0 sm:mx-0">
                   <img
                     src={prizeImage}
-                    alt="Prize: signed Cristiano Ronaldo Manchester United number 7 shirt."
+                    alt={`Prize: signed Cristiano Ronaldo Manchester United number 7 shirt, ${SHIRT_GIVEAWAY_SEASON_LABEL}.`}
                     width={771}
                     height={1024}
                     loading="lazy"
@@ -45,10 +46,12 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
                 <div className="min-w-0 text-center sm:text-left">
                   <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/95">What you win</p>
                   <p className="mt-2 text-sm font-semibold leading-snug text-white sm:text-base">
-                    Signed Ronaldo United shirt
+                    {SHIRT_GIVEAWAY_PRIZE_TITLE}
                   </p>
+                  <p className="mt-1 text-xs font-medium text-emerald-100/60">{SHIRT_GIVEAWAY_SEASON_LABEL}</p>
                   <p className="mt-2 text-sm leading-relaxed text-emerald-100/75">
-                    Shirt only — the full-kit bundle is a different competition on this site.
+                    Shirt only — the full Legacy Bundle (phone, ball, 2008 signed shirt) is a separate paid competition on
+                    this site.
                   </p>
                 </div>
               </div>
@@ -56,38 +59,20 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/80">{layout.howToTitle}</p>
                 <ol className="mt-4 grid list-none gap-3">
-                  {[
-                    ['1', 'Answer the skill question', SHIRT_GIVEAWAY_QUESTION],
-                    [
-                      '2',
-                      'Correct answer required',
-                      'Ronaldo R9 or Cristiano Ronaldo qualifies you — wrong answers cannot be submitted.',
-                    ],
-                    [
-                      '3',
-                      'Subscribe to our newsletter',
-                      'Required for every free shirt entry — tick the box in the form with the same email you enter.',
-                    ],
-                    [
-                      '4',
-                      'Follow us on social media',
-                      'Follow ShowSkills on TikTok, Instagram, or Facebook (at least one), then enter your username.',
-                    ],
-                    ['5', 'We review entries', 'Manual check before a winner is confirmed. No payment or video upload.'],
-                  ].map(([num, title, desc]) => (
+                  {SHIRT_GIVEAWAY_PUBLIC_STEPS.map((step) => (
                     <li
-                      key={title}
+                      key={step.num}
                       className="ss-rules-step flex gap-3 rounded-xl border-2 border-lime-400/30 bg-gradient-to-br from-emerald-950/80 via-[#052e24]/70 to-black/40 p-3.5 shadow-[0_3px_0_0_rgba(0,0,0,0.3)] transition hover:border-lime-300/45 sm:gap-4 sm:p-4"
                     >
                       <span
                         className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-black bg-lime-400 text-base font-black leading-none text-black shadow-[2px_2px_0_0_rgba(0,0,0,0.85)] sm:h-10 sm:w-10 sm:text-lg"
                         aria-hidden
                       >
-                        {num}
+                        {step.num}
                       </span>
                       <div className="min-w-0">
-                        <p className="font-display text-base tracking-tight text-white sm:text-lg">{title}</p>
-                        <p className="mt-0.5 text-sm leading-relaxed text-emerald-100/70">{desc}</p>
+                        <p className="font-display text-base tracking-tight text-white sm:text-lg">{step.title}</p>
+                        <p className="mt-0.5 text-sm leading-relaxed text-emerald-100/70">{step.detail}</p>
                       </div>
                     </li>
                   ))}
@@ -103,7 +88,8 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90">Question</p>
               <p className="mt-3 text-lg font-semibold leading-snug text-white">{SHIRT_GIVEAWAY_QUESTION}</p>
               <p className="mt-3 text-sm leading-relaxed text-lime-200/70">
-                Type the answer in the giveaway form. Correct entries go into the free shirt draw.
+                Type your answer in the giveaway form. You must also subscribe to the newsletter, follow us on TikTok,
+                Instagram, or Facebook (enter your username and confirm), then agree to the terms before you submit.
               </p>
               <button
                 type="button"

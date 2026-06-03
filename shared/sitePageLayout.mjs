@@ -3,6 +3,7 @@
 import { defaultOffset, mergeOffsets, offsetStyle } from './layoutOffsets.mjs'
 import { FAQ_PAGE_TITLE, FAQ_PAGE_SUBTITLE } from './faqContent.mjs'
 import { EMAIL_LAYOUT_PAGE_ID } from './emailLayout.mjs'
+import { SHIRT_GIVEAWAY_SEASON, refreshShirtGiveawaySeasonInText } from './shirtGiveaway.mjs'
 
 export { EMAIL_LAYOUT_PAGE_ID }
 
@@ -159,7 +160,7 @@ export function defaultShirtGiveawayPageLayout() {
     badge: 'Free giveaway · Not the paid bundle',
     title: 'Ronaldo shirt giveaway',
     intro:
-      'Separate from the paid bundle: answer one simple Ronaldo qualification question for free. Winner gets the shirt in the panel below — not the phone, ball, or Legacy Bundle.',
+      `Separate from the paid Legacy Bundle: enter free online to win the signed ${SHIRT_GIVEAWAY_SEASON} Manchester United home shirt shown below. Answer the skill question, enter your details, subscribe to our newsletter, follow us on social media, and submit the form — no payment or video upload.`,
     ctaButtonLabel: 'Open free giveaway form',
     howToTitle: 'How to qualify',
     prizeImageRef: null,
@@ -277,9 +278,12 @@ export function mergeContactPageLayout(input) {
 export function mergeShirtGiveawayPageLayout(input) {
   const base = defaultShirtGiveawayPageLayout()
   if (!input || typeof input !== 'object') return base
+  const intro =
+    input.intro != null ? refreshShirtGiveawaySeasonInText(String(input.intro)) : base.intro
   return {
     ...base,
     ...input,
+    intro,
     prizeImageRef: input.prizeImageRef || null,
     prizeImageUrl: input.prizeImageUrl || null,
   }

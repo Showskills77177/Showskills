@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
-import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 
@@ -322,7 +322,8 @@ export function TermsModal({ open, onClose }) {
             is <strong>free</strong> (no payment). You answer one simple qualification question; subscribe to the
             ShowSkills newsletter; follow us on <strong>TikTok, Instagram, or Facebook</strong> (your choice — you only
             need one); and provide your social handle so we can verify engagement. The prize is a{' '}
-            <strong>Ronaldo signed shirt only</strong> (not the full bundle). It does <strong>not</strong> form part of
+            <strong>signed Cristiano Ronaldo Manchester United home shirt from the {SHIRT_GIVEAWAY_SEASON_LABEL}</strong>{' '}
+            (not the full bundle). It does <strong>not</strong> form part of
             the paid Ronaldo Legacy Bundle competition unless expressly stated. Legacy Bundle entrants who get the three skill
             questions wrong may receive <strong>automatic consolation entries</strong> into this shirt draw — see section 2a above.
           </p>

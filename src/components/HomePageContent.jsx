@@ -445,7 +445,7 @@ export function HomePageContent({
           {intro.prizeLineupLabel || 'Prize lineup'}
         </a>
         <Link
-          to={editorMode ? '.' : '/competitions#free-giveaways'}
+          to={editorMode ? '.' : '/archive/ronaldo-shirt-giveaway'}
           className="ss-hero-cta-shirt-link inline-flex w-full items-center justify-center self-center rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:w-auto sm:py-2.5"
           onClick={editorMode ? (e) => e.preventDefault() : undefined}
         >

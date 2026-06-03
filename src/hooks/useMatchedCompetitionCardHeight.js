@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 
-/** Locks the shirt giveaway card to the same pixel height as the paid competition card. */
+/** Locks paid and shirt giveaway cards to the same height so action buttons align. */
 export function useMatchedCompetitionCardHeight(syncKey = 0) {
   const paidCardRef = useRef(null)
   const shirtCardRef = useRef(null)
@@ -10,14 +10,35 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const shirtEl = shirtCardRef.current
     if (!paidEl || !shirtEl) return
 
-    let lastPaidHeight = 0
+    let lastTargetHeight = 0
+
+    function measure(el) {
+      const card = el.querySelector('[data-competition-card]') || el
+      return Math.round(card.getBoundingClientRect().height)
+    }
+
+    function clearHeights() {
+      paidEl.style.removeProperty('height')
+      paidEl.style.removeProperty('minHeight')
+      shirtEl.style.removeProperty('height')
+      shirtEl.style.removeProperty('minHeight')
+      shirtEl.style.removeProperty('maxHeight')
+      shirtEl.style.removeProperty('--ss-matched-comp-card-h')
+    }
 
     function sync() {
-      const paidCard = paidEl.querySelector('[data-competition-card]') || paidEl
-      const h = Math.round(paidCard.getBoundingClientRect().height)
-      if (h < 1) return
-      if (h === lastPaidHeight && shirtEl.style.height === `${h}px`) return
-      lastPaidHeight = h
+      clearHeights()
+
+      const paidH = measure(paidEl)
+      const shirtH = measure(shirtEl)
+      const h = Math.max(paidH, shirtH, 1)
+      if (h === lastTargetHeight && paidEl.style.height === `${h}px`) return
+      lastTargetHeight = h
+
+      paidEl.style.height = `${h}px`
+      paidEl.style.minHeight = `${h}px`
+      paidEl.style.boxSizing = 'border-box'
+
       shirtEl.style.setProperty('--ss-matched-comp-card-h', `${h}px`)
       shirtEl.style.height = `${h}px`
       shirtEl.style.minHeight = `${h}px`
@@ -32,6 +53,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
 
     const ro = new ResizeObserver(() => sync())
     ro.observe(paidEl)
+    ro.observe(shirtEl)
     const paidCard = paidEl.querySelector('[data-competition-card]')
     if (paidCard && paidCard !== paidEl) ro.observe(paidCard)
 
@@ -43,16 +65,13 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     })
 
     window.addEventListener('resize', sync)
-  return () => {
+    return () => {
       cancelAnimationFrame(raf)
       window.clearTimeout(t1)
       window.clearTimeout(t2)
       ro.disconnect()
       window.removeEventListener('resize', sync)
-      shirtEl.style.removeProperty('height')
-      shirtEl.style.removeProperty('minHeight')
-      shirtEl.style.removeProperty('maxHeight')
-      shirtEl.style.removeProperty('--ss-matched-comp-card-h')
+      clearHeights()
     }
   }, [syncKey])
 

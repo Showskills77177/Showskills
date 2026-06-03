@@ -8,6 +8,7 @@ import {
 import { UK_AVAILABILITY_NOTICE } from './siteAvailability.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from './competitionCopy.mjs'
+import { SHIRT_GIVEAWAY_SEASON, SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
 
 /** @typedef {{ id: string, question: string, answer: string, popular?: boolean }} FaqItem */
 /** @typedef {{ id: string, title: string, summary: string, items: FaqItem[] }} FaqSection */
@@ -224,13 +225,13 @@ export const FAQ_SECTIONS = [
         id: 'shirt-separate',
         question: 'Is the shirt giveaway the same as the Legacy Bundle draw?',
         answer:
-          'No. The shirt giveaway is a separate free promotion. The prize is a Ronaldo signed shirt only — not the full Legacy Bundle. Entering the shirt giveaway does not automatically enter you into the paid bundle draw unless we state otherwise on the site.',
+          `No. The shirt giveaway is a separate free promotion. The prize is a signed Cristiano Ronaldo Manchester United home shirt from the ${SHIRT_GIVEAWAY_SEASON_LABEL} only — not the full Legacy Bundle. Entering the shirt giveaway does not automatically enter you into the paid bundle draw unless we state otherwise on the site.`,
       },
       {
         id: 'shirt-how',
         question: 'How do I enter the shirt giveaway?',
         answer:
-          'From Competitions, open the Ronaldo shirt giveaway entry. Enter your full name, email, and mobile number. You must answer the skill question correctly, subscribe to our newsletter (same email), and follow ShowSkills on at least one of TikTok, Instagram, or Facebook — enter your username and confirm you have followed us. Agree to the terms and submit. If everything is correct, you are entered into the random draw for the signed shirt. No payment or video upload is required.',
+          `From Competitions or the dedicated Ronaldo shirt giveaway page, open the free entry form. Enter your full name, email, and mobile number. Answer the skill question correctly, subscribe to our newsletter (same email — tick the box), and follow ShowSkills on at least one of TikTok, Instagram, or Facebook — enter your username on that network and confirm you have followed us. Agree to the terms and submit. If everything is correct, you are entered into the random draw for the signed ${SHIRT_GIVEAWAY_SEASON} shirt. No payment or video upload is required.`,
       },
       {
         id: 'shirt-limits',

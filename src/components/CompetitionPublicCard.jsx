@@ -149,13 +149,15 @@ export function CompetitionPublicCard({
           </p>
         ) : null}
         {!preview && onEnter ? (
-          <button
-            type="button"
-            onClick={onEnter}
-            className="mt-6 w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 sm:py-4 sm:text-base"
-          >
-            Enter this competition
-          </button>
+          <div className="mt-auto pt-6">
+            <button
+              type="button"
+              onClick={onEnter}
+              className="w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 sm:py-4 sm:text-base"
+            >
+              Enter this competition
+            </button>
+          </div>
         ) : null}
       </div>
     </article>

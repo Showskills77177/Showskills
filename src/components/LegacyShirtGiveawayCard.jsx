@@ -1,7 +1,8 @@
 import { forwardRef } from 'react'
 import { Link } from 'react-router-dom'
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
-import { SHIRT_GIVEAWAY_QUESTION } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL, SHIRT_GIVEAWAY_PRIZE_TITLE } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_PUBLIC_STEPS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 
 /**
  * Legacy Ronaldo shirt giveaway — kickups submission flow (not catalog main draw).
@@ -17,7 +18,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
       ref={ref}
       data-competition-card
       data-shirt-giveaway-card
-      className={`ss-shirt-giveaway-card flex w-full max-w-none flex-col overflow-hidden rounded-2xl border border-lime-400/30 bg-stone-950/80 shadow-[0_16px_48px_rgba(0,0,0,0.4)] ${className}`}
+      className={`ss-shirt-giveaway-card flex h-full w-full max-w-none flex-col overflow-hidden rounded-2xl border border-lime-400/30 bg-stone-950/80 shadow-[0_16px_48px_rgba(0,0,0,0.4)] ${className}`}
       style={{
         ...style,
         '--ss-shirt-card-scale': scale,
@@ -27,7 +28,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
         <div className="w-full max-w-[min(100%,19rem)] shrink-0 overflow-hidden rounded-lg border border-lime-400/35 bg-black shadow-inner sm:max-w-[min(100%,21rem)]">
           <img
             src={KICKUPS_GIVEAWAY_IMAGE}
-            alt="Prize: signed Cristiano Ronaldo Manchester United number 7 shirt."
+            alt={`Prize: signed Cristiano Ronaldo Manchester United number 7 shirt, ${SHIRT_GIVEAWAY_SEASON_LABEL}.`}
             width={771}
             height={1024}
             className="h-auto w-full object-cover object-top"
@@ -37,9 +38,8 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
         </div>
         <p className="mt-3 shrink-0 text-[10px] font-bold uppercase tracking-[0.26em] text-lime-300/90">Free giveaway</p>
         <p className="mt-1 shrink-0 font-display text-xl font-bold leading-tight text-white sm:text-2xl">
-          Ronaldo signed shirt
+          {SHIRT_GIVEAWAY_PRIZE_TITLE}
         </p>
-        <p className="mt-0.5 shrink-0 text-xs font-medium text-stone-400">2021–22 season</p>
 
         <p className="mt-5 shrink-0 text-[10px] font-bold uppercase tracking-[0.22em] text-lime-300/85 sm:mt-6">
           Free · Shirt prize
@@ -48,16 +48,30 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
           Ronaldo Shirt Giveaway
         </h2>
         <p className="mt-3 max-w-[28rem] shrink-0 text-sm leading-relaxed text-stone-500 sm:mt-4">
-          No payment. No video upload. Answer one qualification question and, if correct, you enter the random draw for
-          the signed Ronaldo shirt only.
+          No payment or video upload. Complete every step below in the entry form to qualify for the random draw.
         </p>
 
         <div className="mt-4 w-full max-w-[28rem] shrink-0 rounded-xl border border-lime-400/25 bg-lime-950/20 px-4 py-3.5 text-left sm:mt-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lime-300/80">Question</p>
-          <p className="mt-2 text-sm font-bold leading-snug text-white">{SHIRT_GIVEAWAY_QUESTION}</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lime-300/80">What you need to do</p>
+          <ol className="mt-3 list-none space-y-2.5">
+            {SHIRT_GIVEAWAY_PUBLIC_STEPS.slice(0, 5).map((step) => (
+              <li key={step.num} className="flex gap-2.5 text-sm">
+                <span
+                  className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-lime-400/15 text-[10px] font-bold text-lime-200"
+                  aria-hidden
+                >
+                  {step.num}
+                </span>
+                <span className="min-w-0">
+                  <span className="font-semibold text-stone-200">{step.title}</span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-stone-500">{step.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        <div className="mt-auto w-full max-w-[28rem] shrink-0 pt-4 sm:pt-5">
+        <div className="ss-competition-card-actions mt-auto w-full max-w-[28rem] shrink-0 pt-4 sm:pt-5">
           <button
             type="button"
             onClick={onEnter}

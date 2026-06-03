@@ -5,6 +5,7 @@ import {
   CONSOLATION_MIN_SPEND_PENCE,
   CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD,
 } from './consolationShirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
 
 const LABEL_STYLE = 'color:#fafaf9;font-size:12px;font-weight:600'
 const VALUE_STYLE = 'color:#ecfdf5;font-size:13px'
@@ -67,8 +68,8 @@ function buildConsolationBlock({
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;background:rgba(113,63,18,0.28);border-radius:14px;border:1px solid rgba(250,204,21,0.28)">
     <tr><td style="padding:16px">
       <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24">Consolation prize — Free Ronaldo Shirt Giveaway</p>
-      <img src="${escapeHtml(shirtImg)}" alt="Signed Ronaldo Manchester United shirt" width="160" style="display:block;width:100%;max-width:160px;height:auto;margin:0 auto 14px;border-radius:12px;border:1px solid rgba(250,204,21,0.25)" />
-      <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#d6d3d1">You received <strong style="color:#fcd34d">${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'}</strong> into the separate Free Ronaldo Shirt Giveaway. Prize: <strong style="color:#fde68a">signed Ronaldo shirt only</strong> — not the full Legacy Bundle.</p>
+      <img src="${escapeHtml(shirtImg)}" alt="Signed Ronaldo Manchester United shirt, ${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)}" width="160" style="display:block;width:100%;max-width:160px;height:auto;margin:0 auto 14px;border-radius:12px;border:1px solid rgba(250,204,21,0.25)" />
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#d6d3d1">You received <strong style="color:#fcd34d">${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'}</strong> into the separate Free Ronaldo Shirt Giveaway. Prize: <strong style="color:#fde68a">signed Ronaldo United shirt (${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)})</strong> — not the full Legacy Bundle.</p>
       ${numbersBlock}
     </td></tr>
   </table>`
@@ -194,7 +195,7 @@ export function buildQuizResultText(props) {
     lines.push('Payment is not refunded.')
     if (consolationShirtEntries > 0) {
       lines.push(
-        `Consolation prize: ${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'} into the separate Free Ronaldo Shirt Giveaway (signed Ronaldo shirt only).`,
+        `Consolation prize: ${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'} into the separate Free Ronaldo Shirt Giveaway (signed Ronaldo United shirt, ${SHIRT_GIVEAWAY_SEASON_LABEL}).`,
       )
       if (consolationShirtEntryNumbers.length) {
         lines.push('', '--- Shirt giveaway entry numbers ---', ...consolationShirtEntryNumbers.map((n) => `  • ${n}`))

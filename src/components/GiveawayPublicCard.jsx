@@ -36,7 +36,7 @@ export function GiveawayPublicCard({
 
   return (
     <article
-      className={`flex flex-col overflow-hidden rounded-2xl border border-lime-400/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ${
+      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-lime-400/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ${
         isPageLayout ? 'ss-competition-page-card' : ''
       } ${preview ? 'pointer-events-none select-none' : ''}`}
     >
@@ -124,13 +124,15 @@ export function GiveawayPublicCard({
           </p>
         ) : null}
         {!preview && onEnter ? (
-          <button
-            type="button"
-            onClick={onEnter}
-            className="mt-6 w-full rounded-xl bg-gradient-to-r from-lime-500 to-emerald-600 py-3.5 text-sm font-bold text-emerald-950 shadow-lg transition hover:brightness-110 sm:py-4 sm:text-base"
-          >
-            Enter this giveaway
-          </button>
+          <div className="mt-auto pt-6">
+            <button
+              type="button"
+              onClick={onEnter}
+              className="w-full rounded-xl bg-gradient-to-r from-lime-500 to-emerald-600 py-3.5 text-sm font-bold text-emerald-950 shadow-lg transition hover:brightness-110 sm:py-4 sm:text-base"
+            >
+              Enter this giveaway
+            </button>
+          </div>
         ) : null}
       </div>
     </article>

@@ -96,8 +96,9 @@ export default function CompetitionsPage({
       <ul className="mt-6 grid list-none gap-6">
         {competitions.map((c, index) => (
           <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
-            <div ref={index === 0 ? paidCardRef : undefined} className="w-full">
+            <div ref={index === 0 ? paidCardRef : undefined} className="ss-competition-paid-slot flex h-full min-h-0 w-full flex-col">
               <CompetitionPublicCard
+                className="h-full min-h-0"
                 competition={c}
                 onEnter={() => openEntry('paid', { competitionSlug: c.slug })}
               />
