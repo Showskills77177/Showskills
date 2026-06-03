@@ -4,6 +4,7 @@ import { useEntryFlow } from '../entry/entryContext'
 import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
 import { usePublishedGiveaways } from '../hooks/usePublicGiveaway'
 import { usePageLayout } from '../hooks/useSitePages'
+import { useMatchedCompetitionCardHeight } from '../hooks/useMatchedCompetitionCardHeight'
 import { COMPETITIONS_PAGE_ID } from '../../shared/sitePageLayout.mjs'
 import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
@@ -34,14 +35,16 @@ export default function CompetitionsPage({
   const loading = loadingCompetitions || loadingGiveaways
 
   const offsets = layout?.offsets || {}
-  const shirtCardOffset = offsets.shirtCard || { x: 0, y: 0, scale: 1 }
+  const shirtCardOffset = offsets.shirtCard || { x: 0, y: 0, scale: 1.1 }
   const showPaid = layout.sections.paid?.visible !== false
   const showFree = layout.sections.free?.visible !== false
+
+  const matchKey = `${competitions.length}-${giveaways.length}-${loading}-${shirtCardOffset.scale}-${showPaid}-${showFree}`
+  const { paidCardRef, shirtCardRef } = useMatchedCompetitionCardHeight(matchKey)
 
   function dragWrap(id, label, offsetKey, node, opts = {}) {
     const pos = offsets?.[offsetKey] || { x: 0, y: 0, scale: 1 }
     if (!editorMode) {
-      if (opts.liveStatic) return node
       if (opts.cssScaleOnly) {
         if (!pos.x && !pos.y) return node
         return (
@@ -78,24 +81,22 @@ export default function CompetitionsPage({
 
   const shirtCard = (
     <LegacyShirtGiveawayCard
+      ref={shirtCardRef}
       onEnter={() => openEntry('kickups')}
-      cardScale={editorMode ? (shirtCardOffset.scale ?? 1) : 1}
+      cardScale={shirtCardOffset.scale ?? 1.1}
     />
   )
 
   const paidColumn = (
-    <div className="flex min-h-0 min-w-0 flex-col lg:h-full">
+    <div className="flex min-w-0 flex-col">
       <SectionHeading id="paid-competitions-heading">
         {layout.sections.paid?.title || 'Prize draw competitions'}
       </SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.paid?.subtitle}</p>
-      <ul className="mt-6 flex flex-1 flex-col gap-6">
+      <ul className="mt-6 grid list-none gap-6">
         {competitions.map((c, index) => (
-          <li
-            key={c.slug}
-            className={index === 0 ? 'ss-competition-paid-primary flex min-h-0 flex-col lg:flex-1' : ''}
-          >
-            <div className="ss-competition-paid-slot flex min-h-0 w-full flex-1 flex-col">
+          <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
+            <div ref={index === 0 ? paidCardRef : undefined} className="ss-competition-paid-slot flex h-full min-h-0 w-full flex-col">
               <CompetitionPublicCard
                 className="h-full min-h-0"
                 competition={c}
@@ -114,16 +115,13 @@ export default function CompetitionsPage({
   )
 
   const freeColumn = (
-    <div className="flex min-h-0 min-w-0 flex-col lg:h-full" id="free-giveaways">
+    <div className="flex min-w-0 flex-col" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">{layout.sections.free?.title || 'Free giveaways'}</SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.free?.subtitle}</p>
-      <ul className="mt-6 flex flex-1 flex-col gap-6">
-        <li className="ss-competition-free-primary flex min-h-0 w-full flex-col lg:flex-1">
-          <div className="ss-competition-shirt-slot flex min-h-0 w-full flex-1 flex-col [&_[data-editor-drag]]:h-full [&_[data-editor-drag]]:w-full">
-            {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, {
-              cssScaleOnly: true,
-              liveStatic: true,
-            })}
+      <ul className="mt-6 grid list-none gap-6">
+        <li className="ss-competition-free-primary w-full">
+          <div className="ss-competition-shirt-slot w-full [&_[data-editor-drag]]:h-full [&_[data-editor-drag]]:w-full">
+            {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, { cssScaleOnly: true })}
           </div>
         </li>
         {giveaways.map((g) => (
@@ -185,7 +183,7 @@ export default function CompetitionsPage({
 
         <div
           className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
-            showPaid && showFree ? 'lg:grid-cols-2 lg:items-stretch' : 'max-w-xl'
+            showPaid && showFree ? 'lg:grid-cols-2 lg:items-start' : 'max-w-xl'
           }`}
         >
           {showPaid ? <div className="min-w-0">{dragWrap('comp_paid', 'Prize draws', 'paid', paidColumn)}</div> : null}

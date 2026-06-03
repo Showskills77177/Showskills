@@ -11,7 +11,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
   { onEnter, className = '', style, cardScale = 1.1 },
   ref,
 ) {
-  const scale = cardScale ?? style?.['--ss-shirt-card-scale'] ?? 1
+  const scale = cardScale ?? style?.['--ss-shirt-card-scale'] ?? 1.1
 
   return (
     <article
@@ -24,7 +24,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
         '--ss-shirt-card-scale': scale,
       }}
     >
-      <div className="ss-shirt-giveaway-card__body flex min-h-0 flex-1 flex-col items-center overflow-visible px-5 pb-6 pt-6 text-center sm:px-6 sm:pb-7 sm:pt-7">
+      <div className="ss-shirt-giveaway-card__body flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-5 pb-6 pt-6 text-center sm:px-6 sm:pb-7 sm:pt-7">
         <div className="w-full max-w-[min(100%,19rem)] shrink-0 overflow-hidden rounded-lg border border-lime-400/35 bg-black shadow-inner sm:max-w-[min(100%,21rem)]">
           <img
             src={KICKUPS_GIVEAWAY_IMAGE}
