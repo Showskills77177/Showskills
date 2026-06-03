@@ -1,4 +1,4 @@
-import { parseJsonBody, json } from '../lib/http.mjs'
+import { readJsonBody, json } from '../lib/http.mjs'
 import { unsubscribeByToken } from '../lib/newsletter.mjs'
 
 /** GET ?token= — unsubscribe (JSON). POST { token } — same. */
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     (typeof req.body?.token === 'string' ? req.body.token : '')
 
   if (req.method === 'POST' && !token) {
-    const body = parseJsonBody(req)
+    const body = await readJsonBody(req)
     token = typeof body.token === 'string' ? body.token : ''
   }
 

@@ -1,4 +1,4 @@
-import { parseJsonBody, json } from '../lib/http.mjs'
+import { readJsonBody, json } from '../lib/http.mjs'
 import { getSubscriberByToken, updateSubscriberPreferences } from '../lib/newsletter.mjs'
 
 /** GET ?token= — load preferences. PATCH/POST { token, preferences } — save. */
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST' || req.method === 'PATCH') {
-    const body = parseJsonBody(req)
+    const body = await readJsonBody(req)
     const t = typeof body.token === 'string' ? body.token : token
     const result = await updateSubscriberPreferences(String(t).trim(), body.preferences)
     if (!result.ok) return json(res, 400, { error: result.error })

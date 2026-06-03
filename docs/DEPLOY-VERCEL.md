@@ -2,7 +2,7 @@
 
 ## Serverless function limit (12 max)
 
-API routing uses **four** serverless functions (under the Hobby 12-function limit), all dispatching via `lib/vercelApiDispatch.mjs`:
+API routing uses **five** serverless functions (under the Hobby 12-function limit), all dispatching via `lib/vercelApiDispatch.mjs`:
 
 | File | Paths |
 |------|--------|
@@ -10,6 +10,7 @@ API routing uses **four** serverless functions (under the Hobby 12-function limi
 | `api/entries/[...slug].js` | `/api/entries/paid-quiz`, resume quiz, etc. |
 | `api/admin/[...slug].js` | `/api/admin/login`, tickets, draw, … |
 | `api/submissions/[...slug].js` | `/api/submissions/kickups`, upload |
+| `api/newsletter/[...slug].js` | `/api/newsletter/subscribe`, unsubscribe, preferences |
 
 Do **not** add other `.js` files under `api/` without checking the function count. Handler logic lives in `backend/api/` and the route table in `lib/vercelApiDispatch.mjs`. The `archive/` folder is excluded via `.vercelignore`.
 

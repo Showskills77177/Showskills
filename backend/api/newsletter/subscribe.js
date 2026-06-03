@@ -1,4 +1,5 @@
-import { parseJsonBody, json } from '../lib/http.mjs'
+import { readJsonBody, json } from '../lib/http.mjs'
+import { isDbConfigured } from '../lib/db.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 import { subscribeNewsletter, sendWelcomeEmail } from '../lib/newsletter.mjs'
 import { NEWSLETTER_SOURCES } from '../../../shared/newsletter.mjs'
@@ -21,7 +22,11 @@ export default async function handler(req, res) {
     return json(res, 429, { error: 'Too many attempts. Please wait and try again.' })
   }
 
-  const body = parseJsonBody(req)
+  if (!isDbConfigured()) {
+    return json(res, 503, { error: 'Newsletter signup is temporarily unavailable. Please try again later.' })
+  }
+
+  const body = await readJsonBody(req)
   const email = typeof body.email === 'string' ? body.email.trim() : ''
   const sourceRaw = typeof body.source === 'string' ? body.source.trim() : NEWSLETTER_SOURCES.footer
   const source = Object.values(NEWSLETTER_SOURCES).includes(sourceRaw) ? sourceRaw : NEWSLETTER_SOURCES.footer

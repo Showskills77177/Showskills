@@ -33,7 +33,14 @@ export function NewsletterSignupForm({
         body: JSON.stringify({ email: em, source }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Could not subscribe')
+      if (!res.ok) {
+        throw new Error(
+          data.error ||
+            (res.status === 404
+              ? 'Newsletter signup is not available right now. Please try again in a few minutes.'
+              : 'Could not subscribe'),
+        )
+      }
       setMessage(data.message || 'You are subscribed. Check your inbox for updates.')
       setEmail('')
     } catch (err) {
