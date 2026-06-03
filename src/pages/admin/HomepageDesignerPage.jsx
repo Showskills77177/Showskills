@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
+import { notifyLayoutUpdated } from '../../lib/publicDataCache.js'
 import {
   HOMEPAGE_BLOCK_IDS,
   HOMEPAGE_HERO_BACKGROUNDS,
@@ -88,7 +89,8 @@ export default function HomepageDesignerPage() {
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Save failed')
       setLayout(mergeHomepageLayout(j.layout))
-      setMsg('Homepage saved — refresh the public site to see changes.')
+      notifyLayoutUpdated('homepage')
+      setMsg('Homepage saved — open the live site to see your changes.')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Save failed')
     } finally {

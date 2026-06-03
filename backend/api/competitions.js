@@ -8,6 +8,10 @@ import {
   listPublishedMainDrawCompetitions,
 } from './lib/competitionCatalog.mjs'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
+import {
+  getLegacyShirtGiveawayPublicDetail,
+  isLegacyShirtGiveawaySlug,
+} from './lib/legacyShirtGiveaway.mjs'
 
 function siteOriginFromReq(req) {
   const proto = req.headers['x-forwarded-proto'] || 'http'
@@ -44,6 +48,10 @@ export default async function handler(req, res) {
     }
 
     if (slug) {
+      if (isLegacyShirtGiveawaySlug(slug)) {
+        const shirt = await getLegacyShirtGiveawayPublicDetail()
+        return json(res, 200, { ok: true, competition: shirt })
+      }
       let detail = await getPublicCompetitionDetail(slug, { siteOrigin })
       if (!detail) detail = await getPublicGiveawayDetail(slug, { siteOrigin })
       if (!detail) return json(res, 404, { error: 'Competition not found or not published.' })

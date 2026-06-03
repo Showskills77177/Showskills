@@ -852,10 +852,22 @@ export async function getPublicGiveawayDetail(slug, { siteOrigin = '' } = {}) {
   if (competition.kind !== COMPETITION_KIND.giveaway) return null
 
   const { listCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
-  const [openPeriod, skillQuestions] = await Promise.all([
+  const [openPeriod, countdownPeriod, skillQuestions] = await Promise.all([
     getOpenCompetitionPeriod(slug),
+    getCountdownPeriodForDisplay(slug),
     listCompetitionSkillQuestions(slug, { includeAnswers: false }),
   ])
+
+  const mapPeriod = (period) =>
+    period
+      ? {
+          id: period.id,
+          title: period.title,
+          entryOpensAt: period.entryOpensAt,
+          entryClosesAt: period.entryClosesAt,
+          status: period.status,
+        }
+      : null
 
   return {
     slug: competition.slug,
@@ -869,15 +881,8 @@ export async function getPublicGiveawayDetail(slug, { siteOrigin = '' } = {}) {
     allowPostalEntry: competition.allowPostalEntry,
     postalCompetitionName: competition.postalCompetitionName,
     skillQuestions,
-    openPeriod: openPeriod
-      ? {
-          id: openPeriod.id,
-          title: openPeriod.title,
-          entryOpensAt: openPeriod.entryOpensAt,
-          entryClosesAt: openPeriod.entryClosesAt,
-          status: openPeriod.status,
-        }
-      : null,
+    openPeriod: mapPeriod(openPeriod),
+    countdownPeriod: mapPeriod(countdownPeriod),
   }
 }
 

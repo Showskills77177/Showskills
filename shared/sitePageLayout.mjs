@@ -2,6 +2,7 @@
 
 import { defaultOffset, mergeOffsets, offsetStyle } from './layoutOffsets.mjs'
 import { FAQ_PAGE_TITLE, FAQ_PAGE_SUBTITLE } from './faqContent.mjs'
+import { DEFAULT_SOCIAL_LINKS, mergeSocialLinks } from './socialLinks.mjs'
 import { EMAIL_LAYOUT_PAGE_ID } from './emailLayout.mjs'
 import { SHIRT_GIVEAWAY_SEASON, refreshShirtGiveawaySeasonInText } from './shirtGiveaway.mjs'
 
@@ -85,11 +86,7 @@ export function defaultSiteShell() {
       disclaimer: 'Not a lottery. Not affiliated with any athlete, club, or brand in prize imagery.',
       showTrustpilot: true,
       showSocial: true,
-      socialLinks: {
-        tiktok: '',
-        instagram: '',
-        facebook: '',
-      },
+      socialLinks: { ...DEFAULT_SOCIAL_LINKS },
       linkOrder: ['competitions', 'newsletter', 'contact', 'faq', 'terms', 'ticketTerms'],
       links: { ...DEFAULT_FOOTER_LINKS },
     },
@@ -221,10 +218,10 @@ export function mergeSiteShell(input) {
       ...footerBase,
       ...footerIn,
       showSocial: footerIn.showSocial !== false,
-      socialLinks: {
+      socialLinks: mergeSocialLinks({
         ...footerBase.socialLinks,
         ...(footerIn.socialLinks && typeof footerIn.socialLinks === 'object' ? footerIn.socialLinks : {}),
-      },
+      }),
       links: {
         ...footerBase.links,
         ...(footerIn.links && typeof footerIn.links === 'object' ? footerIn.links : {}),

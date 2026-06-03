@@ -1,6 +1,7 @@
 /** Editable homepage layout — stored in DB, applied on the public home page. */
 
 import { defaultOffset, mergeOffsets } from './layoutOffsets.mjs'
+import { mergeSocialLinks } from './socialLinks.mjs'
 
 export const HOMEPAGE_BLOCK_IDS = [
   'promo_strip',
@@ -101,11 +102,7 @@ export function defaultHomepageLayout() {
         manualWinners: [],
       },
     },
-    socialLinks: {
-      tiktok: '',
-      instagram: '',
-      facebook: '',
-    },
+    socialLinks: mergeSocialLinks(null),
   }
 }
 
@@ -204,10 +201,10 @@ export function mergeHomepageLayout(input) {
         ]
       : base.blockOrder,
     blocks: mergedBlocks,
-    socialLinks: {
+    socialLinks: mergeSocialLinks({
       ...base.socialLinks,
       ...(input.socialLinks && typeof input.socialLinks === 'object' ? input.socialLinks : {}),
-    },
+    }),
   }
 }
 

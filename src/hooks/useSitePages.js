@@ -18,6 +18,11 @@ import {
   SHIRT_GIVEAWAY_PAGE_ID,
 } from '../../shared/sitePageLayout.mjs'
 import { usePageEditorDraftPages } from '../pageEditor/PageEditorPreviewContext.jsx'
+import {
+  getCachedSitePages,
+  layoutUpdateAffectsPage,
+  setCachedSitePages,
+} from '../lib/publicDataCache.js'
 
 const PAGE_LOADERS = {
   [SITE_SHELL_ID]: () => mergeSiteShell(null),
@@ -35,6 +40,18 @@ const PAGE_MERGERS = {
   [SHIRT_GIVEAWAY_PAGE_ID]: mergeShirtGiveawayPageLayout,
 }
 
+function applyPagesPayload(j) {
+  if (!j.pages) return null
+  return {
+    site: mergeSiteShell(j.pages.site),
+    competitions: mergeCompetitionsPageLayout(j.pages.competitions),
+    faq: mergeFaqPageLayout(j.pages.faq),
+    contact: mergeContactPageLayout(j.pages.contact),
+    shirt_giveaway: mergeShirtGiveawayPageLayout(j.pages.shirt_giveaway),
+    source: j.source || 'unknown',
+  }
+}
+
 export function useSitePages() {
   const [pages, setPages] = useState(() => ({
     site: defaultSiteShell(),
@@ -44,30 +61,49 @@ export function useSitePages() {
     shirt_giveaway: defaultShirtGiveawayPageLayout(),
   }))
   const [loading, setLoading] = useState(true)
+  const [source, setSource] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    apiFetch('/api/site-pages')
-      .then(async (res) => {
-        const j = await res.json().catch(() => ({}))
-        if (cancelled || !j.pages) return
-        setPages({
-          site: mergeSiteShell(j.pages.site),
-          competitions: mergeCompetitionsPageLayout(j.pages.competitions),
-          faq: mergeFaqPageLayout(j.pages.faq),
-          contact: mergeContactPageLayout(j.pages.contact),
-          shirt_giveaway: mergeShirtGiveawayPageLayout(j.pages.shirt_giveaway),
+
+    function apply(next) {
+      if (!next) return
+      const { source: src, ...pageData } = next
+      setCachedSitePages(pageData)
+      setPages(pageData)
+      setSource(src)
+    }
+
+    function loadFromApi() {
+      setLoading(true)
+      return apiFetch('/api/site-pages')
+        .then(async (res) => {
+          const j = await res.json().catch(() => ({}))
+          if (!cancelled) apply(applyPagesPayload(j))
         })
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }
+
+    const cached = getCachedSitePages()
+    if (cached) {
+      setPages(cached)
+      setLoading(false)
+    }
+    loadFromApi()
+
+    function onLayoutUpdated(e) {
+      if (layoutUpdateAffectsPage(e.detail?.pageId, SITE_SHELL_ID)) loadFromApi()
+    }
+    window.addEventListener('ss-layout-updated', onLayoutUpdated)
     return () => {
       cancelled = true
+      window.removeEventListener('ss-layout-updated', onLayoutUpdated)
     }
   }, [])
 
-  return { pages, loading }
+  return { pages, loading, source }
 }
 
 export function usePageLayout(pageId) {
@@ -99,8 +135,21 @@ export function usePageLayout(pageId) {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
+    function onLayoutUpdated(e) {
+      if (layoutUpdateAffectsPage(e.detail?.pageId, pageId)) {
+        apiFetch('/api/site-pages')
+          .then(async (res) => {
+            const j = await res.json().catch(() => ({}))
+            if (!cancelled) setLayout(merger(j.pages?.[pageId]))
+          })
+          .catch(() => {})
+      }
+    }
+    window.addEventListener('ss-layout-updated', onLayoutUpdated)
     return () => {
       cancelled = true
+      window.removeEventListener('ss-layout-updated', onLayoutUpdated)
     }
   }, [pageId, merger, draftLayout])
 
@@ -113,9 +162,9 @@ export function usePageLayout(pageId) {
 
 export function useSiteShell() {
   const draftPages = usePageEditorDraftPages()
-  const { pages, loading } = useSitePages()
+  const { pages, loading, source } = useSitePages()
   if (draftPages?.site) {
-    return { shell: mergeSiteShell(draftPages.site), loading: false }
+    return { shell: mergeSiteShell(draftPages.site), loading: false, source: 'editor-draft' }
   }
-  return { shell: pages.site, loading }
+  return { shell: pages.site, loading, source }
 }

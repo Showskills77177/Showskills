@@ -4,6 +4,9 @@ import { ShirtGiveawayCtaButton } from '../components/siteChrome'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL, SHIRT_GIVEAWAY_PRIZE_TITLE } from '../../shared/shirtGiveaway.mjs'
 import { SHIRT_GIVEAWAY_PUBLIC_STEPS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { usePageLayout } from '../hooks/useSitePages'
+import { useShirtGiveawayCompetition } from '../hooks/useShirtGiveawayCompetition'
+import { CompetitionCountdown } from '../components/CompetitionCountdown'
+import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import { SHIRT_GIVEAWAY_PAGE_ID, mergeShirtGiveawayPageLayout } from '../../shared/sitePageLayout.mjs'
 
 /** Free Ronaldo shirt giveaway (direct URL / footer links). */
@@ -12,6 +15,8 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
   const { layout: fetchedLayout } = usePageLayout(SHIRT_GIVEAWAY_PAGE_ID)
   const layout = mergeShirtGiveawayPageLayout(layoutProp || fetchedLayout)
   const prizeImage = layout.prizeImageUrl || KICKUPS_GIVEAWAY_IMAGE
+  const { competition: shirtCompetition, loading: shirtPeriodLoading } = useShirtGiveawayCompetition()
+  const countdownPeriod = pickCountdownPeriod(shirtCompetition)
 
   return (
     <main
@@ -27,6 +32,18 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
               {layout.title}
             </h1>
             <p className="mt-4 text-base font-medium leading-relaxed text-sky-100/85 sm:text-lg">{layout.intro}</p>
+            {countdownPeriod || shirtPeriodLoading ? (
+              <div className="mt-5">
+                <CompetitionCountdown
+                  opensAt={countdownPeriod?.entryOpensAt}
+                  closesAt={countdownPeriod?.entryClosesAt}
+                  label="Giveaway ends"
+                  showDot={false}
+                  pending={shirtPeriodLoading}
+                  theme="lime"
+                />
+              </div>
+            ) : null}
           </header>
 
           <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start lg:gap-14">

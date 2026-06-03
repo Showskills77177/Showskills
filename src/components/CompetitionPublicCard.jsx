@@ -43,7 +43,6 @@ export function CompetitionPublicCard({
   if (!competition) return null
 
   const isPageLayout = layout === 'page'
-  const isCardLayout = !isPageLayout
   const isLegacyBundle = competition.slug === DRAW_COMPETITION_SLUG
   const countdownPeriod = pickCountdownPeriod(competition)
   const periodMonth = formatPeriodMonthLabel(countdownPeriod?.entryClosesAt)
@@ -113,20 +112,15 @@ export function CompetitionPublicCard({
           </div>
         </div>
       </div>
-      <div
-        className={`flex flex-1 flex-col p-6 pt-5 sm:p-8 ${isCardLayout ? 'items-center text-center' : ''}`}
-      >
-        <div
-          className={`flex w-full flex-col gap-1 ${
-            isCardLayout ? 'items-center' : 'sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5'
-          }`}
-        >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col px-6 pt-5 pb-0 sm:px-8 sm:pt-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
           <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">
             {competition.featuredOnHomepage ? 'Featured · Main prize' : 'Main prize draw'}
           </p>
           {periodMonth ? (
             <>
-              <span className={`text-teal-600/40 ${isCardLayout ? 'inline' : 'hidden sm:inline'}`} aria-hidden>
+              <span className="hidden text-teal-600/40 sm:inline" aria-hidden>
                 ·
               </span>
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{periodMonth} draw</p>
@@ -134,48 +128,34 @@ export function CompetitionPublicCard({
           ) : null}
         </div>
         {countdownPeriod ? (
-          <div className={`mt-2.5 flex w-full ${isCardLayout ? 'justify-center' : ''}`}>
+          <div className="mt-2.5">
             <CompetitionCountdown
               opensAt={countdownPeriod.entryOpensAt}
               closesAt={countdownPeriod.entryClosesAt}
               showDot={false}
-              className={isCardLayout ? 'mx-auto max-w-full text-center tabular-nums' : ''}
             />
           </div>
         ) : (
-          <p className={`mt-2.5 text-xs text-amber-200/80 ${isCardLayout ? 'text-center' : ''}`}>
-            No entry period dates yet — set them in admin.
-          </p>
+          <p className="mt-2.5 text-xs text-amber-200/80">No entry period dates yet — set them in admin.</p>
         )}
-        <h2
-          className={`mt-2 font-display text-2xl uppercase tracking-wide text-white sm:text-3xl ${
-            isCardLayout ? 'w-full' : ''
-          }`}
-        >
-          {competition.title}
-        </h2>
-        <p className={`mt-3 flex-1 text-sm leading-relaxed text-stone-500 sm:text-base ${isCardLayout ? 'max-w-md' : ''}`}>
-          {summary}
-        </p>
-        <p
-          className={`mt-4 inline-flex w-fit rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-3 py-1.5 text-sm font-display text-emerald-50 sm:text-base ${
-            isCardLayout ? 'mx-auto' : ''
-          }`}
-        >
+        <h2 className="mt-2 font-display text-2xl uppercase tracking-wide text-white sm:text-3xl">{competition.title}</h2>
+        <p className="mt-3 flex-1 text-sm leading-relaxed text-stone-500 sm:text-base">{summary}</p>
+        <p className="mt-4 inline-flex w-fit rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-3 py-1.5 text-sm font-display text-emerald-50 sm:text-base">
           {bundlePriceLine(competition)}
         </p>
         {competition.allowPostalEntry ? (
-          <p className={`mt-2 text-xs text-stone-600 sm:text-sm ${isCardLayout ? 'max-w-md' : ''}`}>
+          <p className="mt-2 text-xs text-stone-600 sm:text-sm">
             Postal entries: write <span className="text-stone-400">{competition.postalCompetitionName}</span> on your
             envelope → {POSTAL_ENTRY_ADDRESS}
           </p>
         ) : null}
+        </div>
         {!preview && onEnter ? (
-          <div className={`ss-competition-card-actions mt-auto w-full pt-6 ${isCardLayout ? 'max-w-none' : ''}`}>
+          <div className="ss-competition-card-actions ss-competition-card-footer">
             <button
               type="button"
               onClick={onEnter}
-              className="ss-competition-enter-btn w-full rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 sm:py-4 sm:text-base"
+              className="ss-competition-enter-btn ss-competition-enter-btn--paid"
             >
               Enter this competition
             </button>

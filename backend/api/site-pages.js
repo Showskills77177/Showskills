@@ -36,6 +36,8 @@ export default async function handler(req, res) {
     return json(res, 405, { error: 'Method not allowed' })
   }
 
+  res.setHeader('Cache-Control', 'private, no-store, must-revalidate')
+
   try {
     if (!isDbConfigured()) {
       return json(res, 200, { ok: true, pages: defaultsFallback(), source: 'defaults' })
@@ -44,6 +46,7 @@ export default async function handler(req, res) {
     return json(res, 200, { ok: true, pages, source: 'database' })
   } catch (e) {
     console.error(e)
+    console.error('[site-pages] Falling back to defaults:', e)
     return json(res, 200, { ok: true, pages: defaultsFallback(), source: 'defaults' })
   }
 }

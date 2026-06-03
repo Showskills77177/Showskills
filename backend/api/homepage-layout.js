@@ -13,14 +13,16 @@ export default async function handler(req, res) {
     return json(res, 405, { error: 'Method not allowed' })
   }
 
+  res.setHeader('Cache-Control', 'private, no-store, must-revalidate')
+
   if (!isDbConfigured()) {
     const { defaultHomepageLayout } = await import('../../shared/homepageLayout.mjs')
-    return json(res, 200, { ok: true, layout: defaultHomepageLayout() })
+    return json(res, 200, { ok: true, layout: defaultHomepageLayout(), source: 'defaults' })
   }
 
   try {
     const layout = await getHomepageLayout()
-    return json(res, 200, { ok: true, layout })
+    return json(res, 200, { ok: true, layout, source: 'database' })
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not load homepage layout.' })

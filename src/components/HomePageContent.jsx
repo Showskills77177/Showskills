@@ -13,7 +13,6 @@ import { useFeaturedHomepageCompetition } from '../hooks/useFeaturedHomepageComp
 import { usePublicCompetition } from '../hooks/usePublicCompetition'
 import { useHomepageLayout } from '../hooks/useHomepageLayout'
 import { usePublicWinners } from '../hooks/usePublicWinners'
-import { HomeFeaturedPromotion } from '../components/HomeFeaturedPromotion'
 import { HomeWinnersPanel } from '../components/HomeWinnersPanel'
 import { HomeCompetitionsHub } from '../components/HomeCompetitionsHub'
 import { EditableSectionOverlay } from '../components/admin/EditableSectionOverlay'
@@ -179,25 +178,8 @@ export function HomePageContent({
   const { layout: fetchedLayout } = useHomepageLayout()
   const layout = mergeHomepageLayout(layoutProp || fetchedLayout)
   const winners = usePublicWinners()
-  const showDynamicFeatured =
-    !editorMode &&
-    featuredCompetition &&
-    featuredCompetition.slug !== DRAW_COMPETITION_SLUG &&
-    featuredCompetition.featuredOnHomepage
-
   const enterPaid = editorMode ? () => {} : (slug) => openEntry('paid', slug ? { competitionSlug: slug } : undefined)
   const enterGiveaway = editorMode ? () => {} : () => openEntry('kickups')
-
-  if (showDynamicFeatured) {
-    return (
-      <main className="m-0 p-0">
-        <HomeFeaturedPromotion
-          competition={featuredCompetition}
-          onEnter={() => openEntry('paid', { competitionSlug: featuredCompetition.slug })}
-        />
-      </main>
-    )
-  }
 
   const intro = layout.blocks.hero_intro
   const prizes = layout.blocks.hero_prizes
@@ -239,36 +221,10 @@ export function HomePageContent({
   }
 
   function dragWrap(id, label, blockId, offsetKey, offsets, node, scale = 1, opts = {}) {
+    if (!editorMode) return node
+
     const pos = offsets?.[offsetKey] || { x: 0, y: 0, scale }
     const panelScale = pos.scale ?? scale
-
-    if (!editorMode) {
-      if (opts.cssScaleOnly) {
-        if (!pos.x && !pos.y) return node
-        return (
-          <div
-            className={opts.className || ''}
-            style={{
-              transform: `translate(${pos.x || 0}px, ${pos.y || 0}px)`,
-              transformOrigin: opts.transformOrigin || 'center center',
-            }}
-          >
-            {node}
-          </div>
-        )
-      }
-      const style = offsetStyle(pos, {
-        scale: panelScale,
-        transformOrigin: opts.transformOrigin,
-        widthOnly: !opts.uniformScale,
-      })
-      if (!style) return node
-      return (
-        <div className={opts.className || ''} style={style}>
-          {node}
-        </div>
-      )
-    }
 
     const frameScale = opts.cssScaleOnly ? 1 : panelScale
     return (
@@ -367,7 +323,9 @@ export function HomePageContent({
   const bundlesPanelScale = bundlesOffsets.panel?.scale ?? 1
 
   const matchedPanelKey = `${detailsPanelScale}-${bundlesPanelScale}-${details.visible}-${bundles.visible}`
-  const { referenceRef: bundlesMeasureRef, targetRef: detailsMeasureRef } = useMatchedPanelHeight(matchedPanelKey)
+  const { referenceRef: bundlesMeasureRef, targetRef: detailsMeasureRef } = useMatchedPanelHeight(matchedPanelKey, {
+    enabled: editorMode,
+  })
 
   const promoBlock = dragWrap(
     'promo_badge',
@@ -569,7 +527,7 @@ export function HomePageContent({
         className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center gap-2.5 text-center md:mt-auto md:gap-3"
         data-editor-center-root
       >
-        <div className="flex w-full justify-center px-1">
+        <div className="ss-hero-countdown-slot flex min-h-[2.85rem] w-full items-center justify-center px-1 sm:min-h-[3rem]">
           {dragWrap(
             'prizes_countdown',
             'Countdown timer',

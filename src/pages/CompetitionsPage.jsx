@@ -5,6 +5,8 @@ import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
 import { usePublishedGiveaways } from '../hooks/usePublicGiveaway'
 import { usePageLayout } from '../hooks/useSitePages'
 import { useMatchedCompetitionCardHeight } from '../hooks/useMatchedCompetitionCardHeight'
+import { useShirtGiveawayCompetition } from '../hooks/useShirtGiveawayCompetition'
+import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import { COMPETITIONS_PAGE_ID } from '../../shared/sitePageLayout.mjs'
 import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
@@ -35,11 +37,14 @@ export default function CompetitionsPage({
   const loading = loadingCompetitions || loadingGiveaways
 
   const offsets = layout?.offsets || {}
-  const shirtCardOffset = offsets.shirtCard || { x: 0, y: 0, scale: 1.1 }
+  const shirtCardOffset = offsets.shirtCard || { x: 0, y: 0, scale: 1 }
   const showPaid = layout.sections.paid?.visible !== false
   const showFree = layout.sections.free?.visible !== false
 
-  const matchKey = `${competitions.length}-${giveaways.length}-${loading}-${shirtCardOffset.scale}-${showPaid}-${showFree}`
+  const { competition: shirtCompetition, loading: shirtPeriodLoading } = useShirtGiveawayCompetition()
+  const shirtCountdownPeriod = pickCountdownPeriod(shirtCompetition)
+
+  const matchKey = `${competitions.length}-${giveaways.length}-${loading}-${shirtPeriodLoading}-${shirtCardOffset.scale}-${showPaid}-${showFree}`
   const { paidCardRef, shirtCardRef } = useMatchedCompetitionCardHeight(matchKey)
 
   function dragWrap(id, label, offsetKey, node, opts = {}) {
@@ -81,14 +86,16 @@ export default function CompetitionsPage({
 
   const shirtCard = (
     <LegacyShirtGiveawayCard
-      ref={shirtCardRef}
+      className="h-full min-h-0"
       onEnter={() => openEntry('kickups')}
-      cardScale={shirtCardOffset.scale ?? 1.1}
+      cardScale={shirtCardOffset.scale ?? 1}
+      countdownPeriod={shirtCountdownPeriod}
+      countdownPending={shirtPeriodLoading}
     />
   )
 
   const paidColumn = (
-    <div className="flex min-w-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <SectionHeading id="paid-competitions-heading">
         {layout.sections.paid?.title || 'Prize draw competitions'}
       </SectionHeading>
@@ -115,12 +122,15 @@ export default function CompetitionsPage({
   )
 
   const freeColumn = (
-    <div className="flex min-w-0 flex-col" id="free-giveaways">
+    <div className="flex min-h-0 flex-1 flex-col" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">{layout.sections.free?.title || 'Free giveaways'}</SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.free?.subtitle}</p>
       <ul className="mt-4 grid list-none gap-6">
         <li className="ss-competition-free-primary w-full">
-          <div className="ss-competition-shirt-slot w-full [&_[data-editor-drag]]:h-full [&_[data-editor-drag]]:w-full">
+          <div
+            ref={shirtCardRef}
+            className="ss-competition-shirt-slot flex h-full min-h-0 w-full flex-col [&_[data-editor-drag]]:flex [&_[data-editor-drag]]:h-full [&_[data-editor-drag]]:min-h-0 [&_[data-editor-drag]]:w-full [&_[data-editor-drag]]:flex-col"
+          >
             {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, { cssScaleOnly: true })}
           </div>
         </li>
@@ -183,7 +193,7 @@ export default function CompetitionsPage({
 
         <div
           className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
-            showPaid && showFree ? 'lg:grid-cols-2 lg:items-stretch' : 'max-w-xl'
+            showPaid && showFree ? 'ss-competitions-columns--paired lg:grid-cols-2 lg:items-stretch' : 'max-w-xl'
           }`}
         >
           {showPaid ? <div className="min-w-0">{dragWrap('comp_paid', 'Prize draws', 'paid', paidColumn)}</div> : null}

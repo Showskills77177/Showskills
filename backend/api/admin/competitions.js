@@ -2,7 +2,6 @@ import { requireAdmin } from '../lib/adminAuth.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import {
-  assertMainDrawCompetitionSlug,
   createCompetition,
   deleteCompetitionBundle,
   ensureCompetitionCatalogSchema,
@@ -29,6 +28,11 @@ import {
   listCompetitionSkillQuestions,
   replaceCompetitionSkillQuestions,
 } from '../lib/competitionSkillQuestions.mjs'
+import {
+  assertPeriodCompetitionSlug,
+  getLegacyShirtGiveawayAdminDetail,
+  isLegacyShirtGiveawaySlug,
+} from '../lib/legacyShirtGiveaway.mjs'
 
 async function enrichCompetition(row, siteOrigin) {
   if (!row) return null
@@ -87,6 +91,9 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       if (slug) {
+        if (isLegacyShirtGiveawaySlug(slug)) {
+          return json(res, 200, { ok: true, competition: await getLegacyShirtGiveawayAdminDetail() })
+        }
         const row = await getCompetitionBySlug(slug)
         if (!row) return json(res, 404, { error: 'Competition not found.' })
         return json(res, 200, { ok: true, competition: await enrichCompetition(row, siteOrigin) })
@@ -142,11 +149,14 @@ export default async function handler(req, res) {
           entryClosesAt: body.entryClosesAt,
         })
         if (!updated.ok) return json(res, 400, { error: updated.error })
-        const row = await getCompetitionBySlug(updated.period.competition)
+        const compSlug = updated.period.competition
+        const competition = isLegacyShirtGiveawaySlug(compSlug)
+          ? await getLegacyShirtGiveawayAdminDetail()
+          : await enrichCompetition(await getCompetitionBySlug(compSlug), siteOrigin)
         return json(res, 200, {
           ok: true,
           period: updated.period,
-          competition: await enrichCompetition(row, siteOrigin),
+          competition,
         })
       }
       if (body.action === 'saveSkillQuestions') {
@@ -163,7 +173,7 @@ export default async function handler(req, res) {
       }
       if (body.action === 'createPeriod') {
         const compSlug = typeof body.competition === 'string' ? body.competition.trim() : ''
-        const check = await assertMainDrawCompetitionSlug(compSlug)
+        const check = await assertPeriodCompetitionSlug(compSlug)
         if (!check.ok) return json(res, 400, { error: check.error })
         const title = typeof body.title === 'string' ? body.title.trim() : ''
         const summary = typeof body.summary === 'string' ? body.summary.trim() : ''
@@ -185,7 +195,10 @@ export default async function handler(req, res) {
           status,
         })
         if (!created.ok) return json(res, 400, { error: created.error })
-        return json(res, 201, created)
+        const competition = check.legacyShirt
+          ? await getLegacyShirtGiveawayAdminDetail()
+          : await enrichCompetition(check.competition, siteOrigin)
+        return json(res, 201, { ok: true, period: created.period || null, competition })
       }
 
       const title = typeof body.title === 'string' ? body.title.trim() : ''
@@ -228,7 +241,10 @@ export default async function handler(req, res) {
         if (!periodId || !status) return json(res, 400, { error: 'periodId and status required' })
         const updated = await updateCompetitionPeriodStatus(periodId, status)
         if (!updated.ok) return json(res, 400, { error: updated.error })
-        return json(res, 200, updated)
+        const competition = isLegacyShirtGiveawaySlug(compSlug)
+          ? await getLegacyShirtGiveawayAdminDetail()
+          : await enrichCompetition(await getCompetitionBySlug(compSlug), siteOrigin)
+        return json(res, 200, { ...updated, competition })
       }
 
       const updated = await updateCompetition(compSlug, body)

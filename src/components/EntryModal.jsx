@@ -35,6 +35,7 @@ import { TicketBundlePicker } from './TicketBundlePicker'
 import { CashflowsPaymentForm } from './CashflowsPaymentForm'
 import { PHONE_COLLECTION_NOTICE } from '../../shared/contactPhone.mjs'
 import { useHomepageLayout } from '../hooks/useHomepageLayout'
+import { resolvedSocialLinks } from '../../shared/socialLinks.mjs'
 
 export function EntryModal() {
   const {
@@ -141,7 +142,7 @@ export function EntryModal() {
     handleFreeQuizSubmit,
   } = useEntryFlow()
   const { layout: homepageLayout } = useHomepageLayout()
-  const socialLinks = homepageLayout.socialLinks || {}
+  const socialLinks = resolvedSocialLinks(homepageLayout.socialLinks)
 
   const panelRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)

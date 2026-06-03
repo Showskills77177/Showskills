@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ExternalLink, Shirt } from 'lucide-react'
 import AdminCompetitionCatalogPage from './CompetitionsAdminPage'
+import ShirtGiveawayPeriodsAdmin from '../../components/admin/ShirtGiveawayPeriodsAdmin'
 import { SHIRT_GIVEAWAY_PAGE_ID } from '../../../shared/sitePageLayout.mjs'
 
 export default function GiveawaysAdminPage() {
@@ -46,6 +47,8 @@ export default function GiveawaysAdminPage() {
           </div>
         </div>
       </section>
+
+      <ShirtGiveawayPeriodsAdmin />
 
       <AdminCompetitionCatalogPage catalogKind="giveaway" />
     </div>

@@ -2,16 +2,11 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
 import { EntryModal } from './EntryModal'
 import { TermsModal } from './TermsModal'
-import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
-import { POSTAL_ENTRY_ADDRESS, FOOTER_NO_PURCHASE_NOTICE } from '../competitionData'
 import { MobileNavDock } from './MobileNavDock'
 import { QuizPromptNav } from './QuizPromptNav'
-import { TrustpilotReviewCollector } from './TrustpilotFeedback'
-import { NewsletterSignupForm } from './NewsletterSignupForm'
-import { NEWSLETTER_SOURCES } from '../../shared/newsletter.mjs'
 import { useEntryFlow } from '../entry/entryContext'
 import { useSiteShell } from '../hooks/useSitePages'
-import { FooterSocialLinks } from './FooterSocialLinks'
+import { SiteFooter } from './SiteFooter'
 import { offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { SITE_PAGE_BACKGROUNDS } from '../../shared/sitePageLayout.mjs'
 
@@ -61,46 +56,6 @@ function DesktopNavLink({ item, openTerms }) {
   )
 }
 
-function FooterLink({ link, openTerms }) {
-  if (link.visible === false) return null
-  if (link.action === 'terms') {
-    return (
-      <button
-        type="button"
-        onClick={() => openTerms()}
-        className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-stone-200"
-      >
-        {link.label}
-      </button>
-    )
-  }
-  if (link.action === 'ticketTerms') {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          openTerms()
-          window.setTimeout(() => {
-            document.getElementById('ss-terms-ticket-payments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }, 200)
-        }}
-        className="text-xs font-medium text-stone-500 underline decoration-stone-700 underline-offset-2 hover:text-stone-300"
-      >
-        {link.label}
-      </button>
-    )
-  }
-  return (
-    <Link
-      to={link.path || '/'}
-      className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2 hover:text-stone-200"
-      title={link.label}
-    >
-      {link.label}
-    </Link>
-  )
-}
-
 export function Layout() {
   const { termsOpen, setTermsOpen, openTerms, paidQuizNavStatus } = useEntryFlow()
   const { shell } = useSiteShell()
@@ -115,8 +70,6 @@ export function Layout() {
     .map((id) => shell.footer?.links?.[id])
     .filter(Boolean)
   const headerOffsets = shell.headerOffsets || {}
-  const footerOffsets = shell.footerOffsets || {}
-  const footerSocial = shell.footer?.socialLinks || {}
 
   function withOffset(offsets, key, node) {
     const style = offsetStyle(offsets?.[key], { scale: 1, widthOnly: true })
@@ -206,62 +159,7 @@ export function Layout() {
 
       <Outlet />
 
-      {shell.footer?.visible !== false ? (
-        <footer className="ss-footer-bg relative overflow-hidden border-t border-white/[0.06]">
-          <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-7">
-            <div className="flex flex-col items-center gap-3">
-              {shell.footer?.showLogo !== false
-                ? withOffset(
-                    footerOffsets,
-                    'logo',
-                    <LogoMark className="h-7 sm:h-8" />,
-                  )
-                : null}
-              {withOffset(
-                footerOffsets,
-                'links',
-                <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-                  {footerLinks.map((link) => (
-                    <FooterLink key={link.label} link={link} openTerms={openTerms} />
-                  ))}
-                </nav>,
-              )}
-              {shell.footer?.showSocial !== false ? (
-                <FooterSocialLinks links={footerSocial} className="mt-1" />
-              ) : null}
-            </div>
-            {withOffset(
-              footerOffsets,
-              'legal',
-              <p className="mx-auto mt-3 max-w-2xl text-center text-xs leading-relaxed text-stone-400">
-                {shell.footer?.legalNotice?.trim() || FOOTER_NO_PURCHASE_NOTICE}
-              </p>,
-            )}
-            <p className="mx-auto mt-2 max-w-lg text-center text-xs leading-snug text-stone-500">
-              Skill-based paid draw — winner picked at random from correct entries only. Free postal entry — post to{' '}
-              {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
-            </p>
-            <div className="mx-auto mt-6 w-full max-w-md">
-              <NewsletterSignupForm source={NEWSLETTER_SOURCES.footer} compact />
-            </div>
-            {shell.footer?.showTrustpilot !== false ? (
-              <div className="mx-auto mt-4 w-full max-w-[12.75rem]">
-                <p className="mb-1 text-center text-[10px] font-medium text-stone-600">Trustpilot feedback</p>
-                <TrustpilotReviewCollector centered compact />
-              </div>
-            ) : null}
-            {shell.footer?.disclaimer
-              ? withOffset(
-                  footerOffsets,
-                  'disclaimer',
-                  <p className="mt-5 border-t border-white/[0.06] pt-4 text-center text-[11px] leading-snug text-stone-600">
-                    {shell.footer.disclaimer}
-                  </p>,
-                )
-              : null}
-          </div>
-        </footer>
-      ) : null}
+      <SiteFooter shell={shell} footerLinks={footerLinks} openTerms={openTerms} />
     </div>
   )
 }

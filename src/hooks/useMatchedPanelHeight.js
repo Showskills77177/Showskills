@@ -2,13 +2,14 @@ import { useLayoutEffect, useRef } from 'react'
 
 /**
  * Locks legacy details card height to the ticket bundles panel and sets
- * --ss-details-fill-scale so content fits (grows or shrinks) in editor, preview, and live.
+ * --ss-details-fill-scale so content fits (grows or shrinks) in editor and preview.
  */
-export function useMatchedPanelHeight(syncKey = 0) {
+export function useMatchedPanelHeight(syncKey = 0, { enabled = true } = {}) {
   const referenceRef = useRef(null)
   const targetRef = useRef(null)
 
   useLayoutEffect(() => {
+    if (!enabled) return undefined
     const reference = referenceRef.current
     const target = targetRef.current
     if (!reference || !target) return
@@ -90,7 +91,7 @@ export function useMatchedPanelHeight(syncKey = 0) {
         card.style.removeProperty('--ss-details-fill-scale')
       }
     }
-  }, [syncKey])
+  }, [syncKey, enabled])
 
   return { referenceRef, targetRef }
 }

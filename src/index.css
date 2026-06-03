@@ -1218,6 +1218,33 @@ body {
   animation: none !important;
 }
 
+/* Homepage Legacy Bundle studio — fixed aspect slots so images never reflow on route change */
+.ss-hero-prize-column .ss-prize-studio--hero {
+  contain: layout style;
+}
+
+.ss-hero-prize-column .ss-prize-studio-tile--main .ss-prize-studio-photo {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.ss-hero-prize-column .ss-prize-studio-subgrid .ss-prize-studio-photo {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  max-width: 7.5rem;
+  margin-inline: auto;
+}
+
+.ss-hero-prize-column .ss-prize-studio-photo img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.ss-hero-countdown-slot {
+  box-sizing: border-box;
+}
+
 .ss-prize-studio-subgrid {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 0.5rem;
@@ -1282,26 +1309,124 @@ body {
 }
 
 .ss-competition-enter-btn {
+  display: block;
+  width: 100%;
   box-sizing: border-box;
   min-height: 3.25rem;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.2),
+    0 4px 6px -4px rgba(0, 0, 0, 0.15);
+  transition:
+    filter 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ss-competition-enter-btn:hover {
+  filter: brightness(1.1);
+}
+
+.ss-competition-enter-btn--paid {
+  background-image: linear-gradient(to right, #0d9488, #059669);
+  color: #fff;
+}
+
+.ss-competition-enter-btn--free {
+  background-image: linear-gradient(to right, #65a30d, #16a34a);
+  color: #fff;
+  box-shadow:
+    0 10px 15px -3px rgba(34, 197, 94, 0.28),
+    0 4px 6px -4px rgba(34, 197, 94, 0.2);
 }
 
 @media (min-width: 640px) {
   .ss-competition-enter-btn {
     min-height: 3.5rem;
+    padding: 1rem 1rem;
+    font-size: 1rem;
   }
 }
 
+/* Competitions page — matched card footers and enter buttons share one layout */
+.ss-competitions-columns .ss-competition-card-footer {
+  margin-top: auto;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1.5rem 1.5rem 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .ss-competitions-columns .ss-competition-card-footer {
+    padding: 1.5rem 2rem 2rem;
+  }
+}
+
+.ss-competitions-columns .ss-competition-card-footer .ss-competition-enter-btn {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ss-competitions-columns .ss-shirt-giveaway-card {
+  font-size: 0.9375rem;
+}
+
+.ss-competitions-columns .ss-shirt-giveaway-card__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.ss-competitions-columns--paired > .min-w-0 {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 @media (min-width: 1024px) {
-  .ss-competitions-columns .ss-competition-paid-primary,
-  .ss-competitions-columns .ss-competition-free-primary {
+  .ss-competitions-columns--paired {
+    align-items: stretch;
+  }
+
+  .ss-competitions-columns--paired > .min-w-0 {
+    height: 100%;
+  }
+
+  .ss-competitions-columns--paired > .min-w-0 > div {
     display: flex;
+    flex: 1;
     flex-direction: column;
+    min-height: 0;
+  }
+
+  .ss-competitions-columns--paired > .min-w-0 > div > ul {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ss-competitions-columns--paired .ss-competition-paid-primary,
+  .ss-competitions-columns--paired .ss-competition-free-primary {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .ss-competition-paid-slot,
   .ss-competition-shirt-slot {
     display: flex;
+    flex: 1;
     flex-direction: column;
     width: 100%;
     min-height: 0;
@@ -1316,23 +1441,18 @@ body {
     min-height: 0;
   }
 
-  .ss-shirt-giveaway-card {
+  .ss-competitions-columns--paired [data-competition-card] {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
+    width: 100%;
   }
 
-  .ss-competition-card-actions {
+  .ss-competitions-columns--paired .ss-competition-card-footer {
     margin-top: auto;
+    flex-shrink: 0;
   }
-}
-
-.ss-shirt-giveaway-enter-btn {
-  background: linear-gradient(180deg, #84cc16 0%, #4ade80 45%, #22c55e 100%);
-  color: #052e1a;
-  border: 1px solid rgba(190, 242, 100, 0.45);
-  box-shadow:
-    0 4px 20px rgba(34, 197, 94, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .ss-mobile-nav-label {

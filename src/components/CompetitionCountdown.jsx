@@ -25,8 +25,21 @@ function formatEndDate(iso) {
   }
 }
 
+const THEME_TONES = {
+  teal: {
+    pending: 'border-emerald-400/20 bg-emerald-950/30',
+    live: 'border-emerald-400/35 bg-emerald-950/50 text-emerald-100',
+    dot: 'bg-emerald-400',
+  },
+  lime: {
+    pending: 'border-lime-400/25 bg-lime-950/35',
+    live: 'border-lime-400/40 bg-lime-950/45 text-lime-100',
+    dot: 'bg-lime-400',
+  },
+}
+
 /**
- * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean, pending?: boolean }} props
+ * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean, pending?: boolean, theme?: 'teal' | 'lime' }} props
  */
 export function CompetitionCountdown({
   closesAt,
@@ -36,7 +49,9 @@ export function CompetitionCountdown({
   live = true,
   showDot = true,
   pending = false,
+  theme = 'teal',
 }) {
+  const palette = THEME_TONES[theme] || THEME_TONES.teal
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -70,7 +85,7 @@ export function CompetitionCountdown({
   if (pending) {
     return (
       <p
-        className={`inline-flex w-fit max-w-full items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold leading-snug sm:text-xs md:text-sm animate-pulse ${className}`}
+        className={`inline-flex min-h-[2.85rem] w-fit max-w-full items-center justify-center rounded-full border px-3 py-1.5 text-[11px] font-semibold leading-snug sm:min-h-[3rem] sm:text-xs md:text-sm ${palette.pending} ${className}`}
         aria-hidden
       >
         <span className="invisible whitespace-nowrap">Competition ends 1 Jan 2026, 00:00 · 30d 0h 0m left</span>
@@ -83,14 +98,14 @@ export function CompetitionCountdown({
       ? 'border-stone-600/40 bg-stone-950/60 text-stone-400'
       : state.kind === 'upcoming'
         ? 'border-amber-500/30 bg-amber-950/30 text-amber-100'
-        : 'border-emerald-400/35 bg-emerald-950/50 text-emerald-100'
+        : palette.live
 
   return (
     <p
-      className={`inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug tabular-nums sm:text-xs md:text-sm ${tone} ${className}`}
+      className={`inline-flex min-h-[2.85rem] w-fit max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug tabular-nums sm:min-h-[3rem] sm:text-xs md:text-sm ${tone} ${className}`}
       role="status"
     >
-      {showDot ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 opacity-90" aria-hidden /> : null}
+      {showDot ? <span className={`h-2 w-2 shrink-0 rounded-full opacity-90 ${palette.dot}`} aria-hidden /> : null}
       <span className="min-w-0">{state.text}</span>
     </p>
   )

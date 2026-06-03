@@ -726,7 +726,9 @@ export default function AdminCompetitionCatalogPage({ catalogKind = 'main_draw' 
                   onChange={(e) => setNewForm((f) => ({ ...f, featuredOnHomepage: e.target.checked }))}
                   className="mt-1"
                 />
-                <span>Feature on homepage live promotion panel (only one at a time; Legacy is featured by default)</span>
+                <span>
+                  Highlight on Competitions page (homepage layout is controlled in Site editor, not this flag)
+                </span>
               </label>
             </div>
           ) : null}
@@ -878,10 +880,10 @@ export default function AdminCompetitionCatalogPage({ catalogKind = 'main_draw' 
                       className="mt-1"
                     />
                     <span>
-                      <span className="font-medium text-stone-100">Feature on homepage (live promotion panel)</span>
+                      <span className="font-medium text-stone-100">Featured competition</span>
                       <span className="mt-0.5 block text-xs text-stone-500">
-                        Replaces the main ShowSkills homepage hero with this competition (like Ronaldo Legacy Bundle
-                        today). Only one competition can be featured at a time.
+                        Marks this draw on the Competitions page. The public homepage hero is edited under Admin → Site
+                        editor → Homepage.
                       </span>
                     </span>
                   </label>

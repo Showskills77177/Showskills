@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ExternalLink, Eye, EyeOff, LayoutTemplate, Redo2, RotateCcw, SlidersHorizontal, Undo2 } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
+import { notifyLayoutUpdated } from '../../lib/publicDataCache.js'
+import { DEFAULT_SOCIAL_HANDLE } from '../../../shared/socialLinks.mjs'
 import { PageEditorPreviewProvider } from '../../pageEditor/PageEditorPreviewContext.jsx'
 import { useEditorHistoryShortcuts, usePageEditorHistory } from '../../pageEditor/usePageEditorHistory.js'
 import { PageLivePreview } from '../../components/admin/PageLivePreview'
@@ -154,7 +156,8 @@ export default function PageEditorPage() {
   }
 
   async function saveCurrentPage() {
-    const savePageId = activePage
+    const savePageId =
+      settingsOpen && settingsTarget === 'shell' ? SITE_SHELL_ID : activePage
     const layoutToSave = pages[savePageId]
     if (!layoutToSave) return
 
@@ -171,8 +174,9 @@ export default function PageEditorPage() {
       if (!res.ok) throw new Error(j.detail || j.error || 'Save failed')
       const merged = mergeAllPages({ ...pages, [savePageId]: j.layout })
       replacePages(merged)
+      notifyLayoutUpdated(savePageId)
       setMsg(
-        `${PAGE_EDITOR_LABELS[savePageId] || savePageId} saved. Open Preview to check the clean layout, or visit the public page after refresh.`,
+        `${PAGE_EDITOR_LABELS[savePageId] || savePageId} saved to the database. Open the live site (or refresh) to see it — preview in the editor is draft until you save.`,
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Save failed')
@@ -256,7 +260,9 @@ export default function PageEditorPage() {
           ? HOMEPAGE_BLOCK_LABELS[selectedBlockId] || selectedBlockId
           : PAGE_EDITOR_LABELS[activePage] || activePage
 
-  const saveLabel = `Save ${PAGE_EDITOR_LABELS[activePage] || activePage}`
+  const savePageIdForLabel =
+    settingsOpen && settingsTarget === 'shell' ? SITE_SHELL_ID : activePage
+  const saveLabel = `Save ${PAGE_EDITOR_LABELS[savePageIdForLabel] || savePageIdForLabel}`
 
   return (
     <div className="ss-page-editor-workspace flex min-h-0 flex-1 flex-col">
@@ -269,8 +275,8 @@ export default function PageEditorPage() {
             </div>
             <h1 className="mt-1 text-lg font-semibold text-stone-100">Design your site</h1>
             <p className="mt-1 max-w-2xl text-xs text-stone-500">
-              Drag to move · Ctrl/Cmd+drag to resize width · Selected items: tiny X/Y/0 in the top-right corner · Preview
-              = clean view · Save writes the active tab to the database · Undo ⌘Z
+              Drag to move · Ctrl/Cmd+drag to resize width · Preview = clean view · Save writes to the database (footer/header
+              settings save Site header and footer, not the page tab) · Undo ⌘Z
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -729,7 +735,7 @@ export default function PageEditorPage() {
                         socialLinks: { ...homepage.socialLinks, [key]: e.target.value },
                       })
                     }
-                    placeholder="https://..."
+                    placeholder={`@${DEFAULT_SOCIAL_HANDLE} or full URL`}
                     className={editorInputClass()}
                   />
                 </EditorField>
@@ -970,7 +976,7 @@ function SiteShellEditor({ shell, onChange, setPages }) {
                     },
                   })
                 }
-                placeholder="https://..."
+                placeholder={`@${DEFAULT_SOCIAL_HANDLE} or full URL`}
                 className={editorInputClass()}
               />
             </EditorField>

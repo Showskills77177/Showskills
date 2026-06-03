@@ -66,6 +66,9 @@ export const SHIRT_GIVEAWAY_PUBLIC_STEPS = [
   },
 ]
 
+/** Short step titles for the competitions page shirt card — full detail on the archive page. */
+export const SHIRT_GIVEAWAY_CARD_STEP_TITLES = SHIRT_GIVEAWAY_PUBLIC_STEPS.slice(0, 5).map((step) => step.title)
+
 export function isValidShirtSocialPlatform(platform) {
   const id = typeof platform === 'string' ? platform.trim().toLowerCase() : ''
   return SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.some((p) => p.id === id)

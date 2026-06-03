@@ -181,7 +181,7 @@ export function PagePreviewChrome({
       {shell.footer?.visible !== false ? (
         <div
           data-editor-section="site_footer"
-          className={`ss-footer-bg sticky bottom-0 z-10 shrink-0 border-t border-white/[0.06] bg-[#071512] px-4 py-5 transition ${
+          className={`ss-footer-bg sticky bottom-0 z-10 shrink-0 border-t border-white/[0.06] bg-[#071512] transition ${
             highlight === 'footer' ? 'ring-2 ring-inset ring-teal-400/60' : ''
           }`}
           onClick={() => onHighlight?.('footer')}
@@ -194,66 +194,48 @@ export function PagePreviewChrome({
             }
           }}
         >
-          <div className="mx-auto max-w-5xl">
-            <div className="flex flex-col items-center gap-3">
-              {shell.footer?.showLogo !== false
-                ? drag(
-                    'footer_logo',
-                    'Footer logo',
-                    'logo',
-                    'footerOffsets',
-                    <LogoMark className="h-7" />,
-                  )
-                : null}
-              {drag(
-                'footer_links',
-                'Footer links',
-                'links',
-                'footerOffsets',
-                <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-                  {footerLinks
-                    .filter((link) => link.visible !== false)
-                    .map((link) => (
-                      <span
-                        key={link.label}
-                        className="font-medium text-stone-400 underline decoration-stone-600 underline-offset-2"
-                      >
-                        {link.label}
-                      </span>
-                    ))}
-                </nav>,
-              )}
-              {shell.footer?.showSocial !== false
-                ? drag(
-                    'footer_social',
-                    'Social links',
-                    'social',
-                    'footerOffsets',
-                    <FooterSocialLinks links={socialLinks} preview={Boolean(onHighlight)} />,
-                  )
-                : null}
-            </div>
+          <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-4 text-center">
+            {shell.footer?.showLogo !== false
+              ? drag('footer_logo', 'Footer logo', 'logo', 'footerOffsets', <LogoMark className="h-7" />)
+              : null}
+            {drag(
+              'footer_links',
+              'Footer links',
+              'links',
+              'footerOffsets',
+              <nav className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-stone-400">
+                {footerLinks
+                  .filter((link) => link.visible !== false)
+                  .map((link) => (
+                    <span key={link.label}>{link.label}</span>
+                  ))}
+              </nav>,
+            )}
+            {shell.footer?.showSocial !== false
+              ? drag(
+                  'footer_social',
+                  'Social links',
+                  'social',
+                  'footerOffsets',
+                  <FooterSocialLinks links={socialLinks} preview={Boolean(onHighlight)} className="mt-2" />,
+                )
+              : null}
             {drag(
               'footer_legal',
               'Legal notice',
               'legal',
               'footerOffsets',
-              <p className="mx-auto mt-3 max-w-2xl text-center text-xs leading-relaxed text-stone-400">
+              <p className="mt-3 max-w-2xl text-xs leading-relaxed text-stone-500">
                 {shell.footer?.legalNotice?.trim() || FOOTER_NO_PURCHASE_NOTICE}
               </p>,
             )}
-            <p className="mx-auto mt-2 max-w-lg text-center text-xs leading-snug text-stone-500">
-              Skill-based paid draw — post to {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
-            </p>
             {shell.footer?.disclaimer
               ? drag(
                   'footer_disclaimer',
                   'Disclaimer',
                   'disclaimer',
                   'footerOffsets',
-                  <p className="mt-4 border-t border-white/[0.06] pt-3 text-center text-[11px] leading-snug text-stone-600">
-                    {shell.footer.disclaimer}
-                  </p>,
+                  <p className="mt-3 text-xs text-stone-600">{shell.footer.disclaimer}</p>,
                 )
               : null}
           </div>
