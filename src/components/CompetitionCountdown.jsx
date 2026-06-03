@@ -70,12 +70,10 @@ export function CompetitionCountdown({
   if (pending) {
     return (
       <p
-        className={`ss-competition-countdown inline-flex w-fit max-w-full items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold leading-snug sm:text-xs md:text-sm animate-pulse ${className}`}
+        className={`inline-flex w-fit max-w-full items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold leading-snug sm:text-xs md:text-sm animate-pulse ${className}`}
         aria-hidden
       >
-        <span className="invisible whitespace-nowrap tabular-nums">
-          Competition ends 1 Jan 2026, 00:00 · 30d 0h 0m 0s left
-        </span>
+        <span className="invisible whitespace-nowrap">Competition ends 1 Jan 2026, 00:00 · 30d 0h 0m left</span>
       </p>
     )
   }
@@ -89,11 +87,11 @@ export function CompetitionCountdown({
 
   return (
     <p
-      className={`ss-competition-countdown inline-flex w-fit max-w-full items-center justify-center gap-x-2 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug sm:text-xs md:text-sm ${tone} ${className}`}
+      className={`inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug sm:text-xs md:text-sm ${tone} ${className}`}
       role="status"
     >
       {showDot ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 opacity-90" aria-hidden /> : null}
-      <span className="ss-competition-countdown__text min-w-0 tabular-nums">{state.text}</span>
+      <span className="min-w-0">{state.text}</span>
     </p>
   )
 }

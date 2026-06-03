@@ -551,8 +551,8 @@ export function HomePageContent({
     )
 
     return (
-    <div className={`ss-hero-prize-stack ss-hero-prize-stack--centered flex flex-col items-center gap-2 ${prizeCol} md:min-h-0 md:gap-2.5`}>
-      <div id={editorMode ? undefined : 'prizes'} className="ss-hero-prize-column scroll-mt-24 w-full">
+    <div className={`ss-hero-prize-stack flex flex-col gap-2 ${prizeCol} md:min-h-0 md:gap-2.5`}>
+      <div id={editorMode ? undefined : 'prizes'} className="ss-hero-prize-column scroll-mt-24">
         {editorMode
           ? dragWrap(
               'prizes_studio',
@@ -568,7 +568,7 @@ export function HomePageContent({
       </div>
 
       <div
-        className="ss-hero-bundle-cta mt-1 flex w-full max-w-[min(100%,21rem)] flex-col items-center gap-2.5 text-center sm:max-w-[min(100%,22rem)] md:mt-auto md:gap-3"
+        className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center gap-2.5 text-center md:mt-auto md:gap-3"
         data-editor-center-root
       >
         <div className="flex w-full justify-center px-1">
