@@ -26,7 +26,7 @@ function formatEndDate(iso) {
 }
 
 /**
- * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean }} props
+ * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean, pending?: boolean }} props
  */
 export function CompetitionCountdown({
   closesAt,
@@ -35,16 +35,18 @@ export function CompetitionCountdown({
   className = '',
   live = true,
   showDot = true,
+  pending = false,
 }) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!live) return
+    if (!live || pending) return
     const id = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(id)
-  }, [live])
+  }, [live, pending])
 
   const state = useMemo(() => {
+    if (pending) return { kind: 'pending', text: '' }
     const openMs = opensAt ? new Date(opensAt).getTime() : null
     const closeMs = closesAt ? new Date(closesAt).getTime() : null
     if (closeMs && now >= closeMs) {
@@ -63,7 +65,18 @@ export function CompetitionCountdown({
       }
     }
     return { kind: 'unknown', text: 'Entry dates not set yet' }
-  }, [closesAt, opensAt, label, now])
+  }, [closesAt, opensAt, label, now, pending])
+
+  if (pending) {
+    return (
+      <p
+        className={`inline-flex w-fit max-w-full items-center justify-center rounded-full border border-emerald-400/20 bg-emerald-950/30 px-3 py-1.5 text-[11px] font-semibold leading-snug sm:text-xs md:text-sm animate-pulse ${className}`}
+        aria-hidden
+      >
+        <span className="invisible whitespace-nowrap">Competition ends 1 Jan 2026, 00:00 · 30d 0h 0m left</span>
+      </p>
+    )
+  }
 
   const tone =
     state.kind === 'ended'

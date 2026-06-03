@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
 import { useMatchedPanelHeight } from '../hooks/useMatchedPanelHeight'
 import kickupsHeroBg from '../assets/kickups-hero-bg.png'
@@ -169,14 +170,20 @@ export function HomePageContent({
   onPatchHomeBlock,
 }) {
   const { openEntry } = useEntryFlow()
-  const { competition } = useFeaturedHomepageCompetition()
-  const { competition: legacyCompetition } = usePublicCompetition(DRAW_COMPETITION_SLUG)
-  const countdownPeriod = pickCountdownPeriod(legacyCompetition) || pickCountdownPeriod(competition)
+  const { competition: featuredCompetition, loading: featuredCompetitionLoading } = useFeaturedHomepageCompetition()
+  const { competition: legacyCompetition, loading: legacyCompetitionLoading } = usePublicCompetition(DRAW_COMPETITION_SLUG)
+  const legacyCountdownPeriod = pickCountdownPeriod(legacyCompetition)
+  const countdownPeriod = legacyCountdownPeriod || pickCountdownPeriod(featuredCompetition)
+  const countdownPending =
+    legacyCompetitionLoading || (!legacyCountdownPeriod && featuredCompetitionLoading)
   const { layout: fetchedLayout } = useHomepageLayout()
   const layout = mergeHomepageLayout(layoutProp || fetchedLayout)
   const winners = usePublicWinners()
   const showDynamicFeatured =
-    !editorMode && competition && competition.slug !== DRAW_COMPETITION_SLUG && competition.featuredOnHomepage
+    !editorMode &&
+    featuredCompetition &&
+    featuredCompetition.slug !== DRAW_COMPETITION_SLUG &&
+    featuredCompetition.featuredOnHomepage
 
   const enterPaid = editorMode ? () => {} : (slug) => openEntry('paid', slug ? { competitionSlug: slug } : undefined)
   const enterGiveaway = editorMode ? () => {} : () => openEntry('kickups')
@@ -185,8 +192,8 @@ export function HomePageContent({
     return (
       <main className="m-0 p-0">
         <HomeFeaturedPromotion
-          competition={competition}
-          onEnter={() => openEntry('paid', { competitionSlug: competition.slug })}
+          competition={featuredCompetition}
+          onEnter={() => openEntry('paid', { competitionSlug: featuredCompetition.slug })}
         />
       </main>
     )
@@ -437,13 +444,13 @@ export function HomePageContent({
         >
           {intro.prizeLineupLabel || 'Prize lineup'}
         </a>
-        <a
-          href={editorMode ? undefined : '#home-competitions'}
+        <Link
+          to={editorMode ? '.' : '/competitions#free-giveaways'}
           className="ss-hero-cta-shirt-link inline-flex w-full items-center justify-center self-center rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:w-auto sm:py-2.5"
           onClick={editorMode ? (e) => e.preventDefault() : undefined}
         >
           {intro.shirtLinkLabel || 'Free shirt giveaway'}
-        </a>
+        </Link>
         </div>,
       )}
     </div>
@@ -578,6 +585,7 @@ export function HomePageContent({
               label="Competition ends"
               live={!editorMode}
               showDot={false}
+              pending={countdownPending}
               className="max-w-[min(100%,22rem)] text-center sm:max-w-xl"
             />,
             1,
