@@ -11,11 +11,11 @@ SRC = ROOT / 'scripts/assets/shirt-giveaway-source.png'
 OUT_ASSET = ROOT / 'src/assets/kickups-giveaway-jersey.png'
 OUT_EMAIL = ROOT / 'public/email/ronaldo-shirt-giveaway-jersey.png'
 
-# (x0, y0, x1, y1) as fractions of width/height — tuned for 804×1024 source.
+# (x0, y0, x1, y1, radius) — tight boxes, light blur only on the marks themselves.
 BLUR_BOXES = [
-    (0.00, 0.20, 0.20, 0.46, 14),  # left sleeve — DXC
-    (0.78, 0.20, 1.00, 0.46, 14),  # right sleeve — Premier League patch
-    (0.44, 0.54, 0.58, 0.66, 10),  # small PL mark on the number
+    (0.02, 0.26, 0.16, 0.40, 3),  # left sleeve — DXC
+    (0.82, 0.26, 0.98, 0.40, 3),  # right sleeve — Premier League patch
+    (0.47, 0.58, 0.55, 0.64, 2),  # small PL mark on the number
 ]
 
 
