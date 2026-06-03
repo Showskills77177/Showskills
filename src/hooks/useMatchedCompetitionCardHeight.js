@@ -20,7 +20,9 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     function measure(slot) {
       const card = cardIn(slot)
       const el = card || slot
-      return Math.round(el.getBoundingClientRect().height)
+      const rectH = Math.round(el.getBoundingClientRect().height)
+      const offsetH = el.offsetHeight ? Math.round(el.offsetHeight) : 0
+      return Math.max(rectH, offsetH, 1)
     }
 
     function clearHeights() {
@@ -119,6 +121,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const raf = requestAnimationFrame(sync)
     const t1 = window.setTimeout(sync, 120)
     const t2 = window.setTimeout(sync, 450)
+    const t3 = window.setTimeout(sync, 1000)
 
     const ro = new ResizeObserver(() => sync())
     ro.observe(paidSlot)
@@ -140,6 +143,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
       cancelAnimationFrame(raf)
       window.clearTimeout(t1)
       window.clearTimeout(t2)
+      window.clearTimeout(t3)
       ro.disconnect()
       mq.removeEventListener('change', sync)
       window.removeEventListener('resize', sync)

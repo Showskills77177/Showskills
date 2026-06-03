@@ -15,7 +15,7 @@ OUT_EMAIL = ROOT / 'public/email/ronaldo-shirt-giveaway-jersey.png'
 BLUR_BOXES = [
     (0.02, 0.26, 0.16, 0.40, 3),  # left sleeve — DXC
     (0.82, 0.26, 0.98, 0.40, 3),  # right sleeve — Premier League patch
-    (0.47, 0.58, 0.55, 0.64, 2),  # small PL mark on the number
+    (0.435, 0.572, 0.495, 0.608, 4),  # Premier League lion at base of the number 7
 ]
 
 

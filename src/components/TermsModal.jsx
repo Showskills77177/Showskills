@@ -4,6 +4,8 @@ import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNo
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
+import { LegalDisclaimerNotice } from './LegalDisclaimerNotice'
+import { PrizeAuthenticityNotice } from './PrizeAuthenticityNotice'
 
 function PaidTicketNonRefundCallout() {
   return (
@@ -34,6 +36,22 @@ function PrivacyPolicySection() {
         <p className="mt-4 rounded-lg border border-teal-800/40 bg-teal-950/30 px-3 py-2.5 text-zinc-200">
           {NO_PURCHASE_ENTRY_NOTICE} Paid ticket purchase is optional where free postal or free online entry is offered
           for the same draw, subject to the same skill requirements.
+        </p>
+        <p className="mt-4 rounded-lg border border-stone-700/50 bg-stone-900/40 px-3 py-2.5 text-zinc-200">
+          <strong>Third parties &amp; imagery:</strong> ShowSkills Rewards is{' '}
+          <strong>
+            not affiliated with, endorsed by, sponsored by, or officially connected to Cristiano Ronaldo, CR7,
+            Manchester United Football Club, or Apple Inc.
+          </strong>{' '}
+          We may use <strong>AI-generated or edited images for illustration only</strong> and do{' '}
+          <strong>not use official promotional imagery</strong> from those parties. See the{' '}
+          <a
+            href="#ss-terms-legal-disclaimer"
+            className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+          >
+            Legal disclaimer in the Terms above
+          </a>{' '}
+          for full details.
         </p>
       </div>
 
@@ -168,7 +186,13 @@ function PrivacyPolicySection() {
         appropriate safeguards such as UK adequacy regulations or contractual protections offered by those providers.
       </p>
 
-      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.9 Changes to this policy</h3>
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.9 Prize authenticity</h3>
+      <PrizeAuthenticityNotice headingLevel="h4" id="ss-privacy-prize-authenticity" showHeading={false} />
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.10 Intellectual property &amp; illustrative content</h3>
+      <LegalDisclaimerNotice headingLevel="h4" id="ss-privacy-legal-disclaimer" />
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.11 Changes to this policy</h3>
       <p className="mb-3">
         We may update this Privacy Policy from time to time. The &quot;Last updated&quot; date above will change when we
         do. Significant changes may also be noted on the website where appropriate.
@@ -255,6 +279,23 @@ export function TermsModal({ open, onClose }) {
             solutions. <strong>You have one attempt at the three questions per entry</strong> — answers cannot be changed after submission.
             Multiple ticket purchases are allowed where shown on the entry page; each purchase starts a new entry (subject to the rules below).
           </p>
+
+          <div className="mb-3 rounded-lg border border-stone-700/50 bg-stone-900/50 px-3 py-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
+              Ronaldo Legacy Bundle — legal notice
+            </p>
+            <p className="mb-2 text-zinc-200">
+              The <strong>Ronaldo Legacy Bundle</strong> prizes (signed memorabilia, museum football, iPhone, and case)
+              are <strong>genuine, legally purchased rare collectibles</strong> — not official licensed merchandise from
+              Cristiano Ronaldo, CR7, Manchester United, or Apple.
+            </p>
+            <p className="text-zinc-300">
+              <strong>ShowSkills Rewards is not affiliated with, endorsed by, sponsored by, or officially connected to</strong>{' '}
+              Cristiano Ronaldo, CR7, Manchester United Football Club, or Apple Inc. Bundle imagery may be{' '}
+              <strong>AI-generated or edited for illustration</strong>; see section 13 and the Privacy Policy for the
+              full intellectual property notice.
+            </p>
+          </div>
 
           <h3 className="mb-2 mt-4 font-semibold text-stone-200">2a. Consolation prize (Free Ronaldo Shirt Giveaway)</h3>
           <p className="mb-3">
@@ -357,9 +398,21 @@ export function TermsModal({ open, onClose }) {
             we agree otherwise; no cash alternative is guaranteed; we may substitute items of similar value if needed.
           </p>
           <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
-            Some product images shown are representative or AI-enhanced for privacy and security reasons, as the items
-            are extremely rare collectibles. The actual physical items will only be revealed after they have been won.
+            <strong>Authenticity:</strong> Legacy Bundle prizes are{' '}
+            <strong>genuine, legally purchased rare collectibles</strong> acquired on the open market.{' '}
+            <strong>Illustrative images</strong> on the site may be{' '}
+            <strong>AI-generated or heavily edited</strong> — see section 13 for the full disclaimer. Actual physical
+            items are as described when awarded to the winner. See also the{' '}
+            <a
+              href="#ss-prize-authenticity"
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              Prize authenticity
+            </a>{' '}
+            section below.
           </p>
+
+          <PrizeAuthenticityNotice headingLevel="h4" id="ss-prize-authenticity" />
 
           <h3 className="mb-2 mt-6 scroll-mt-4 font-semibold text-stone-200" id="ss-terms-ticket-payments">
             10. Payments (paid tickets)
@@ -396,11 +449,10 @@ export function TermsModal({ open, onClose }) {
             Nothing limits statutory consumer rights in the UK.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">13. Disclaimer / third parties</h3>
-          <p className="mb-3">
-            Promotions are <strong>not affiliated with, endorsed by, or sponsored by</strong> Cristiano Ronaldo,
-            Manchester United FC, Apple Inc., or other third parties referenced. Trademarks belong to their owners.
-          </p>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200" id="ss-terms-legal-disclaimer">
+            13. Legal disclaimer &amp; intellectual property
+          </h3>
+          <LegalDisclaimerNotice headingLevel="h4" id="ss-legal-disclaimer-body" />
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">14. General</h3>
           <p className="mb-3">

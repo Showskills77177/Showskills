@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { offsetStyle } from '../../../shared/layoutOffsets.mjs'
+import { offsetStyle, snapOffset, EDITOR_SNAP_GRID_PX } from '../../../shared/layoutOffsets.mjs'
+import {
+  alignBetweenSiblings,
+  alignWithSiblingsCenterX,
+  centerInRoot,
+  centerRootFor,
+  contentBoundsFor,
+} from '../../../shared/editorAlign.mjs'
+import { EditableDragToolbar } from './EditableDragToolbar'
 
 /** Editor-only draggable frame — saves x/y/scale offset to layout JSON. */
 export function EditableDragFrame({
@@ -18,6 +26,10 @@ export function EditableDragFrame({
   cssScaleOnly = false,
   /** Ctrl/Cmd+drag adjusts horizontal scale only (default). */
   widthOnly = true,
+  /** Position only — no resize; scale is always 1. */
+  moveOnly = false,
+  scaleMin: scaleMinProp = 0.55,
+  scaleMax: scaleMaxProp = 1.85,
 }) {
   const frameRef = useRef(null)
   const dragging = useRef(false)
@@ -33,64 +45,87 @@ export function EditableDragFrame({
   })
   const [live, setLive] = useState(null)
   const [contextMenu, setContextMenu] = useState(null)
+  const [snapEnabled, setSnapEnabled] = useState(true)
   const removeWindowListeners = useRef(null)
 
   const offsetX = live?.x ?? x
   const offsetY = live?.y ?? y
-  const activeScale = scale || 1
+  const activeScale = moveOnly ? 1 : scale || 1
   const style = cssScaleOnly
     ? offsetX || offsetY
       ? { transform: `translate(${offsetX}px, ${offsetY}px)`, transformOrigin }
       : undefined
-    : offsetStyle({ x: offsetX, y: offsetY, scale: activeScale }, { scale: activeScale, transformOrigin, widthOnly })
+    : offsetStyle(
+        { x: offsetX, y: offsetY, scale: activeScale },
+        { scale: activeScale, transformOrigin, widthOnly: moveOnly ? true : widthOnly },
+      )
+
+  function applyPosition(next, snap = snapEnabled) {
+    const snapped = snapOffset(
+      { x: next.x, y: next.y, scale: activeScale },
+      { grid: EDITOR_SNAP_GRID_PX, snap },
+    )
+    setLive(null)
+    onChange?.({ x: snapped.x, y: snapped.y, scale: snapped.scale })
+  }
 
   function centerAxis(axis) {
     const el = frameRef.current
     if (!el) return
+    const content = contentBoundsFor(el)
+    if (!content) return
 
-    const next = {
-      x: offsetX,
-      y: offsetY,
-      scale: activeScale,
-    }
-
+    let next = { x: offsetX, y: offsetY }
     if (axis === 'x' || axis === 'both') {
-      const rootX = el.closest('[data-editor-center-root]') || el.parentElement
-      if (rootX) {
-        const r = rootX.getBoundingClientRect()
-        const e = el.getBoundingClientRect()
-        next.x = Math.round(offsetX + (r.left + r.width / 2 - (e.left + e.width / 2)))
-      }
+      const rootX = centerRootFor(el, 'x')
+      next = centerInRoot(content, rootX, next.x, next.y, 'x')
     }
-
     if (axis === 'y' || axis === 'both') {
-      const rootY =
-        el.closest('[data-editor-center-y-root]') ||
-        el.closest('[data-editor-center-root]') ||
-        el.parentElement
-      if (rootY) {
-        const r = rootY.getBoundingClientRect()
-        const e = el.getBoundingClientRect()
-        next.y = Math.round(offsetY + (r.top + r.height / 2 - (e.top + e.height / 2)))
-      }
+      const rootY = centerRootFor(el, 'y')
+      next = centerInRoot(content, rootY, next.x, next.y, 'y')
     }
+    applyPosition(next)
+  }
 
-    onChange?.(next)
+  function betweenSiblings(axis) {
+    const el = frameRef.current
+    if (!el) return
+    const content = contentBoundsFor(el)
+    if (!content) return
+    const next = alignBetweenSiblings(el, content, offsetX, offsetY, axis)
+    applyPosition(next)
+  }
+
+  function matchSiblings() {
+    const el = frameRef.current
+    if (!el) return
+    const content = contentBoundsFor(el)
+    if (!content) return
+    const next = alignWithSiblingsCenterX(el, content, offsetX, offsetY)
+    applyPosition(next)
+  }
+
+  function resetPosition() {
+    onChange?.({ x: 0, y: 0, scale: activeScale })
+    setLive(null)
   }
 
   function shouldIgnoreDragTarget(t) {
     if (!(t instanceof Element)) return true
-    if (t.closest('button,a,input,textarea,select,[contenteditable="true"],[data-editor-ui]')) return true
+    if (t.closest('[data-editor-ui]')) return true
+    if (t.closest('button,a,input,textarea,select,[contenteditable="true"]')) return true
     return false
   }
 
   function onPointerDown(e) {
     if (e.button !== 0) return
+    const nestedDrag = e.target instanceof Element ? e.target.closest('[data-editor-drag]') : null
+    if (nestedDrag && nestedDrag !== frameRef.current) return
     if (shouldIgnoreDragTarget(e.target)) return
     e.preventDefault()
     e.stopPropagation()
     setContextMenu(null)
-    const resizeMode = e.ctrlKey || e.metaKey
+    const resizeMode = !moveOnly && (e.ctrlKey || e.metaKey)
     dragging.current = !resizeMode
     resizing.current = resizeMode
     start.current = { px: e.clientX, py: e.clientY, x: offsetX, y: offsetY }
@@ -115,6 +150,8 @@ export function EditableDragFrame({
     const move = (ev) => {
       if (ev.pointerId !== e.pointerId) return
       ev.preventDefault?.()
+      const fine = ev.shiftKey
+      setSnapEnabled(!fine)
       if (resizing.current) {
         const dx = ev.clientX - resizeStart.current.px
         const delta = dx / (widthOnly ? 280 : 420)
@@ -124,7 +161,13 @@ export function EditableDragFrame({
       if (!dragging.current) return
       const dx = ev.clientX - start.current.px
       const dy = ev.clientY - start.current.py
-      setLive({ x: Math.round(start.current.x + dx), y: Math.round(start.current.y + dy) })
+      const rawX = Math.round(start.current.x + dx)
+      const rawY = Math.round(start.current.y + dy)
+      const snapped = snapOffset(
+        { x: rawX, y: rawY },
+        { grid: EDITOR_SNAP_GRID_PX, snap: !fine },
+      )
+      setLive({ x: snapped.x, y: snapped.y })
     }
 
     const up = (ev) => {
@@ -151,18 +194,24 @@ export function EditableDragFrame({
     removeWindowListeners.current = null
     const dx = e.clientX - start.current.px
     const dy = e.clientY - start.current.py
-    const nextX = Math.round(start.current.x + dx)
-    const nextY = Math.round(start.current.y + dy)
+    const rawX = Math.round(start.current.x + dx)
+    const rawY = Math.round(start.current.y + dy)
+    const fine = e.shiftKey
+    const snapped = snapOffset(
+      { x: rawX, y: rawY },
+      { grid: EDITOR_SNAP_GRID_PX, snap: !fine },
+    )
     setLive(null)
+    setSnapEnabled(true)
     if (wasResizing) {
       onChange?.({ scale: resizeStart.current.lastScale || activeScale })
-    } else if (nextX !== start.current.x || nextY !== start.current.y) {
-      onChange?.({ x: nextX, y: nextY, scale: activeScale })
+    } else if (snapped.x !== start.current.x || snapped.y !== start.current.y) {
+      onChange?.({ x: snapped.x, y: snapped.y, scale: activeScale })
     }
   }
 
-  const scaleMin = 0.55
-  const scaleMax = 1.85
+  const scaleMin = scaleMinProp ?? 0.55
+  const scaleMax = scaleMaxProp ?? 1.85
   function updateScale(nextScale) {
     const clamped = Math.min(scaleMax, Math.max(scaleMin, nextScale))
     const rounded = Math.round(clamped * 100) / 100
@@ -227,7 +276,7 @@ export function EditableDragFrame({
       ref={frameRef}
       data-editor-drag={id}
       data-editor-label={label}
-      className={`relative ${selected ? 'z-[4]' : ''} ${className}`}
+      className={`relative ${selected ? 'z-[20]' : ''} ${className}`}
       style={style}
       onPointerDown={onPointerDown}
       onContextMenu={(e) => {
@@ -237,111 +286,59 @@ export function EditableDragFrame({
         setContextMenu({ x: e.clientX, y: e.clientY })
       }}
     >
+      {selected ? (
+        <EditableDragToolbar
+          onCenter={centerAxis}
+          onBetween={betweenSiblings}
+          onMatchSiblings={matchSiblings}
+          onReset={resetPosition}
+        />
+      ) : null}
+
       <div
         className={`relative ${selected ? 'ring-2 ring-teal-400/90 ring-offset-1 ring-offset-[#050807]' : 'ring-1 ring-transparent hover:ring-teal-400/20'}`}
       >
         {children}
-
-        {selected ? (
-          <div
-            className="absolute right-0.5 top-0.5 z-[8] flex items-center gap-px rounded border border-white/15 bg-stone-950/90 p-px shadow-md"
-            data-editor-ui
-          >
-            <button
-              type="button"
-              data-editor-ui
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                centerAxis('x')
-              }}
-              className="min-w-[1.35rem] rounded px-0.5 py-px text-[8px] font-bold leading-none text-stone-300 hover:bg-white/10 hover:text-teal-200"
-              title="Center horizontally"
-            >
-              X
-            </button>
-            <button
-              type="button"
-              data-editor-ui
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                centerAxis('y')
-              }}
-              className="min-w-[1.35rem] rounded px-0.5 py-px text-[8px] font-bold leading-none text-stone-300 hover:bg-white/10 hover:text-teal-200"
-              title="Center vertically"
-            >
-              Y
-            </button>
-            <button
-              type="button"
-              data-editor-ui
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                centerAxis('both')
-              }}
-              className="min-w-[1.35rem] rounded px-0.5 py-px text-[8px] font-bold leading-none text-teal-300 hover:bg-white/10 hover:text-teal-100"
-              title="Center horizontally and vertically"
-            >
-              ·
-            </button>
-            <button
-              type="button"
-              data-editor-ui
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                onChange?.({ x: 0, y: 0, scale: activeScale })
-              }}
-              className="min-w-[1.35rem] rounded px-0.5 py-px text-[8px] font-bold leading-none text-stone-500 hover:bg-white/10 hover:text-stone-200"
-              title="Reset position"
-            >
-              0
-            </button>
-          </div>
-        ) : null}
       </div>
 
       {contextMenu ? (
         <div
-          className="fixed z-[9999] min-w-[9rem] rounded-lg border border-white/15 bg-stone-950/95 p-1 shadow-2xl"
+          className="fixed z-[9999] min-w-[11rem] rounded-lg border border-white/15 bg-stone-950/95 p-1 shadow-2xl"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onContextMenu={(e) => e.preventDefault()}
           role="menu"
           aria-label="Element actions"
+          data-editor-ui
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            data-editor-ui
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              centerAxis('x')
-              setContextMenu(null)
-            }}
-            className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs text-stone-200 hover:bg-white/5"
-            role="menuitem"
-          >
-            Center width
-          </button>
-          <button
-            type="button"
-            data-editor-ui
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              centerAxis('y')
-              setContextMenu(null)
-            }}
-            className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs text-stone-200 hover:bg-white/5"
-            role="menuitem"
-          >
-            Center height
-          </button>
+          <MenuItem onClick={() => { centerAxis('x'); setContextMenu(null) }}>Center in panel (width)</MenuItem>
+          <MenuItem onClick={() => { centerAxis('y'); setContextMenu(null) }}>Center in panel (height)</MenuItem>
+          <MenuItem onClick={() => { centerAxis('both'); setContextMenu(null) }}>Center in panel (both)</MenuItem>
+          <MenuItem onClick={() => { betweenSiblings('x'); setContextMenu(null) }}>Between neighbours ↔</MenuItem>
+          <MenuItem onClick={() => { betweenSiblings('y'); setContextMenu(null) }}>Between neighbours ↕</MenuItem>
+          <MenuItem onClick={() => { betweenSiblings('both'); setContextMenu(null) }}>Between neighbours ⊡</MenuItem>
+          <MenuItem onClick={() => { matchSiblings(); setContextMenu(null) }}>Match sibling centers ≡</MenuItem>
         </div>
       ) : null}
     </div>
+  )
+}
+
+function MenuItem({ children, onClick }) {
+  return (
+    <button
+      type="button"
+      data-editor-ui
+      onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onClick?.()
+      }}
+      className="block w-full rounded-md px-2.5 py-1.5 text-left text-xs text-stone-200 hover:bg-white/5"
+      role="menuitem"
+    >
+      {children}
+    </button>
   )
 }
 

@@ -15,10 +15,12 @@ import { useHomepageLayout } from '../hooks/useHomepageLayout'
 import { usePublicWinners } from '../hooks/usePublicWinners'
 import { HomeWinnersPanel } from '../components/HomeWinnersPanel'
 import { HomeCompetitionsHub } from '../components/HomeCompetitionsHub'
+import { LegacyBundleImageryDisclaimer } from '../components/LegacyBundleImageryDisclaimer'
+import { LegacyBundleImageryCaption } from '../components/LegacyBundleImageryCaption'
 import { EditableSectionOverlay } from '../components/admin/EditableSectionOverlay'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { mergePrizeImages } from '../../shared/homepageLayout.mjs'
-import { offsetStyle } from '../../shared/layoutOffsets.mjs'
+import { liveOffsetStyle, offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
@@ -166,6 +168,7 @@ export function HomePageContent({
   dropPosition = 'before',
   onStartDrag,
   onNudgeSection,
+  showGrid = false,
   onPatchHomeBlock,
 }) {
   const { openEntry } = useEntryFlow()
@@ -221,12 +224,23 @@ export function HomePageContent({
   }
 
   function dragWrap(id, label, blockId, offsetKey, offsets, node, scale = 1, opts = {}) {
-    if (!editorMode) return node
-
     const pos = offsets?.[offsetKey] || { x: 0, y: 0, scale }
     const panelScale = pos.scale ?? scale
-
     const frameScale = opts.cssScaleOnly ? 1 : panelScale
+    const widthOnly = !opts.uniformScale
+    const transformOrigin = opts.transformOrigin || (opts.cssScaleOnly ? 'center top' : 'center center')
+
+    if (!editorMode) {
+      const style = liveOffsetStyle(pos, {
+        cssScaleOnly: opts.cssScaleOnly,
+        transformOrigin,
+        widthOnly,
+        scale: panelScale,
+      })
+      if (!style) return node
+      return <div style={style}>{node}</div>
+    }
+
     return (
       <EditableDragFrame
         id={id}
@@ -236,10 +250,12 @@ export function HomePageContent({
         scale={frameScale}
         selected={selectedBlockId === id}
         onSelect={onSelectBlock}
-        className={opts.className || ''}
-        transformOrigin={opts.transformOrigin || 'center center'}
+        className={opts.className || 'block w-full max-w-full'}
+        transformOrigin={transformOrigin}
         cssScaleOnly={opts.cssScaleOnly}
-        widthOnly={!opts.uniformScale}
+        widthOnly={widthOnly}
+        scaleMin={opts.scaleMin}
+        scaleMax={opts.scaleMax}
         onChange={(patch) =>
           onPatchHomeBlock?.(blockId, {
             offsets: { ...offsets, [offsetKey]: { ...pos, ...patch } },
@@ -324,7 +340,7 @@ export function HomePageContent({
 
   const matchedPanelKey = `${detailsPanelScale}-${bundlesPanelScale}-${details.visible}-${bundles.visible}`
   const { referenceRef: bundlesMeasureRef, targetRef: detailsMeasureRef } = useMatchedPanelHeight(matchedPanelKey, {
-    enabled: editorMode,
+    enabled: details.visible !== false && bundles.visible !== false,
   })
 
   const promoBlock = dragWrap(
@@ -340,7 +356,11 @@ export function HomePageContent({
   )
 
   const introBlock = (
-    <div className={`ss-hero-intro flex flex-col gap-4 text-left ${introCol} md:row-start-1`}>
+    <div
+      className={`ss-hero-intro flex flex-col gap-4 text-left ${introCol} md:row-start-1`}
+      data-editor-align-group
+      data-editor-center-root
+    >
       {promo.visible !== false
         ? editorMode
           ? wrapBlock('promo_strip', HOMEPAGE_BLOCK_LABELS.promo_strip, promoBlock)
@@ -418,8 +438,12 @@ export function HomePageContent({
     const prizeImages = mergePrizeImages(prizes.prizeImages)
 
     function prizeFrame(key, label, node) {
-      if (!editorMode) return node
       const pos = prizeImages[key] || { x: 0, y: 0, scale: 1 }
+      if (!editorMode) {
+        const style = liveOffsetStyle(pos, { widthOnly: true, scale: pos.scale ?? 1 })
+        if (!style) return node
+        return <div style={style}>{node}</div>
+      }
       return (
         <EditableDragFrame
           id={`prize_${key}`}
@@ -429,9 +453,10 @@ export function HomePageContent({
           scale={pos.scale}
           selected={selectedBlockId === `prize_${key}`}
           onSelect={onSelectBlock}
+          className="block w-full max-w-full"
           onChange={(patch) =>
             onPatchHomeBlock?.('hero_prizes', {
-              prizeImages: { ...prizeImages, [key]: { ...patch } },
+              prizeImages: { ...prizeImages, [key]: { ...pos, ...patch } },
             })
           }
         >
@@ -442,21 +467,24 @@ export function HomePageContent({
 
     const studioPanel = (
       <div className="ss-prize-studio ss-prize-studio--hero p-2 sm:p-3">
-          <div className="relative z-[1] grid gap-2">
+          <div className="relative z-[1] grid gap-2" data-editor-align-group data-editor-center-root>
             <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
               <div className="ss-prize-studio-photo overflow-hidden">
                 {prizeFrame(
                   'poster',
                   'Bundle poster',
-                  <img
-                    src={legacyBundlePoster}
-                    alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
-                    width={1024}
-                    height={576}
-                    loading="eager"
-                    decoding="async"
-                    className="h-auto w-full"
-                  />,
+                  <>
+                    <img
+                      src={legacyBundlePoster}
+                      alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+                      width={1024}
+                      height={576}
+                      loading="eager"
+                      decoding="async"
+                      className="h-auto w-full"
+                    />
+                    <LegacyBundleImageryCaption />
+                  </>,
                 )}
               </div>
             </div>
@@ -504,6 +532,7 @@ export function HomePageContent({
                 <p className="mt-0.5 text-sm font-semibold text-stone-100">24K gold case</p>
               </div>
             </div>
+            <LegacyBundleImageryDisclaimer />
           </div>
         </div>
     )
@@ -525,6 +554,7 @@ export function HomePageContent({
 
       <div
         className="ss-hero-bundle-cta mt-1 flex w-full flex-col items-center gap-2.5 text-center md:mt-auto md:gap-3"
+        data-editor-align-group
         data-editor-center-root
       >
         <div className="ss-hero-countdown-slot flex min-h-[2.85rem] w-full items-center justify-center px-1 sm:min-h-[3rem]">
@@ -699,7 +729,7 @@ export function HomePageContent({
 
   return (
     <main
-      className={`m-0 p-0 ${editorMode ? 'ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none' : ''}`}
+      className={`m-0 p-0 ${editorMode ? 'ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none' : ''} ${editorMode && showGrid ? 'ss-editor-show-grid' : ''}`}
       onClick={
         editorMode
           ? (e) => {

@@ -22,6 +22,7 @@ export function PageLivePreview({
   activePage,
   pages,
   cleanPreview = false,
+  showGrid = false,
   selectedBlockId,
   onSelectBlock,
   onPatchHomepage,
@@ -34,6 +35,9 @@ export function PageLivePreview({
   emailPreviewKind = 'welcome',
 }) {
   const editorMode = !cleanPreview
+  const previewClass = editorMode
+    ? `ss-page-editor-preview ${showGrid ? 'ss-editor-show-grid' : ''} [&_button:not([data-editor-ui])]:pointer-events-none`
+    : ''
   const blockOrder = pages.homepage?.blockOrder || []
   const { dragId, dropTargetId, dropPosition, startDrag, nudgeSection } = useEditorSectionDrag({
     blockOrder,
@@ -53,6 +57,7 @@ export function PageLivePreview({
       <HomePageContent
         layout={pages.homepage}
         editorMode={editorMode}
+        showGrid={showGrid}
         selectedBlockId={selectedBlockId}
         onSelectBlock={onSelectBlock}
         onPatchHomeBlock={onPatchHomeBlock}
@@ -65,7 +70,7 @@ export function PageLivePreview({
     )
   } else if (activePage === COMPETITIONS_PAGE_ID) {
     canvas = (
-      <div className={editorMode ? 'ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none' : ''}>
+      <div className={previewClass}>
         <CompetitionsPage
           layout={pages.competitions}
           editorMode={editorMode}
@@ -77,18 +82,22 @@ export function PageLivePreview({
     )
   } else if (activePage === FAQ_PAGE_ID) {
     canvas = (
-      <div className="ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none">
+      <div className={previewClass}>
         <FaqPage />
       </div>
     )
   } else if (activePage === CONTACT_PAGE_ID) {
     canvas = (
-      <div className="ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none">
+      <div className={previewClass}>
         <ContactPage />
       </div>
     )
   } else if (activePage === SHIRT_GIVEAWAY_PAGE_ID) {
-    canvas = <KickupsArchivePage layout={pages.shirt_giveaway} editorMode={editorMode} />
+    canvas = (
+      <div className={previewClass}>
+        <KickupsArchivePage layout={pages.shirt_giveaway} editorMode={editorMode} />
+      </div>
+    )
   } else if (activePage === EMAIL_LAYOUT_PAGE_ID) {
     canvas = (
       <div className="px-4 py-8 sm:px-6">

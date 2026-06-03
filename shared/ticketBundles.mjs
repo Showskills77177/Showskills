@@ -14,21 +14,7 @@ export const MEGA_BUNDLE_BASE_TICKET_QTY = Math.floor(
 export const MEGA_BUNDLE_BONUS_TICKETS = 1
 export const MEGA_BUNDLE_TICKET_QTY = MEGA_BUNDLE_BASE_TICKET_QTY + MEGA_BUNDLE_BONUS_TICKETS
 
-/** £0.05 — live payment smoke test (hidden unless dev or VITE_LIVE_TEST_BUNDLE=1). */
-export const LIVE_TEST_BUNDLE_ID = 'liveTest5'
-
 export const TICKET_BUNDLES = [
-  {
-    id: LIVE_TEST_BUNDLE_ID,
-    qty: 1,
-    totalPence: 5,
-    title: 'Live test',
-    line1: '1 ticket = £0.05',
-    line2: 'Payment testing only',
-    bullets: [],
-    featured: false,
-    testOnly: true,
-  },
   {
     id: 'single',
     qty: 1,
@@ -98,16 +84,8 @@ export function getTicketBundleById(id) {
   return TICKET_BUNDLES.find((b) => b.id === s) ?? null
 }
 
-function showLiveTestBundle(env = {}) {
-  const flag = String(env.VITE_LIVE_TEST_BUNDLE ?? '').trim().toLowerCase()
-  if (flag === '1' || flag === 'true' || flag === 'yes') return true
-  if (env.DEV === true || env.MODE === 'development') return true
-  return false
-}
-
-export function getVisibleTicketBundles(env = {}) {
-  if (showLiveTestBundle(env)) return TICKET_BUNDLES
-  return TICKET_BUNDLES.filter((b) => !b.testOnly)
+export function getVisibleTicketBundles() {
+  return TICKET_BUNDLES
 }
 
 export function formatBundlePriceGBP(totalPence) {
@@ -117,9 +95,9 @@ export function formatBundlePriceGBP(totalPence) {
   return `£${pounds.toFixed(2)}`
 }
 
-/** Default paid bundle tiers for a new admin-created competition (excludes live test bundle). */
+/** Default paid bundle tiers for a new admin-created competition. */
 export function getStandardCompetitionBundleTemplates() {
-  return TICKET_BUNDLES.filter((b) => !b.testOnly).map((b) => ({
+  return TICKET_BUNDLES.map((b) => ({
     bundleKey: b.id,
     title: b.title,
     qty: b.qty,

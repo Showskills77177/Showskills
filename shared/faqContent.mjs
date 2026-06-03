@@ -9,6 +9,7 @@ import { UK_AVAILABILITY_NOTICE } from './siteAvailability.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from './competitionCopy.mjs'
 import { SHIRT_GIVEAWAY_SEASON, SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
+import { PRIZE_AUTHENTICITY_FAQ_ANSWER } from './prizeAuthenticityCopy.mjs'
 
 /** @typedef {{ id: string, question: string, answer: string, popular?: boolean }} FaqItem */
 /** @typedef {{ id: string, title: string, summary: string, items: FaqItem[] }} FaqSection */
@@ -27,6 +28,7 @@ export const FAQ_POPULAR_IDS = [
   'how-winner-chosen',
   'when-quiz',
   'consolation-prize',
+  'prize-authenticity',
   'refunds',
 ]
 
@@ -69,7 +71,13 @@ export const FAQ_SECTIONS = [
         id: 'affiliation',
         question: 'Are you affiliated with Cristiano Ronaldo or any club?',
         answer:
-          'No. ShowSkills Rewards is not affiliated with Cristiano Ronaldo, any football club, or brands shown in prize imagery. Prizes are described on our website and in the terms.',
+          'No. ShowSkills Rewards is not affiliated with Cristiano Ronaldo, CR7, Manchester United Football Club, or Apple Inc. Prizes are independently acquired rare collectibles — see our Prize authenticity FAQ and the Terms & Privacy Policy for full detail.',
+      },
+      {
+        id: 'prize-authenticity',
+        question: 'Are the prizes genuine? How do you verify authenticity?',
+        answer: PRIZE_AUTHENTICITY_FAQ_ANSWER,
+        popular: true,
       },
     ],
   },
@@ -257,7 +265,7 @@ export const FAQ_SECTIONS = [
         id: 'what-prizes',
         question: 'What rewards can I win in the Legacy Bundle draw?',
         answer:
-          'The Ronaldo Legacy Bundle prize stack includes a 2008 Cristiano Ronaldo signed shirt, a Cristiano Ronaldo Museum signed football, an iPhone 17 Pro Max (512GB, unlocked), and a 24K gold-style case for the phone. Exact specifications and substitution rules (for example phone colour) are listed on the home page and in the full terms.',
+          'The Ronaldo Legacy Bundle prize stack includes a 2008 Cristiano Ronaldo signed shirt, a Cristiano Ronaldo Museum signed football, an iPhone 17 Pro Max (512GB, unlocked), and a 24K gold-style case for the phone. Exact specifications and substitution rules (for example phone colour) are listed on the home page and in the full terms. For how we source and verify items, see the Prize authenticity section in our FAQs.',
       },
       {
         id: 'winner-contact',

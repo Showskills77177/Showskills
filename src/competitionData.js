@@ -1,23 +1,17 @@
 import {
   TICKET_BUNDLES,
   DEFAULT_TICKET_BUNDLE_ID,
-  LIVE_TEST_BUNDLE_ID,
   getTicketBundleById,
-  getVisibleTicketBundles as getVisibleTicketBundlesShared,
+  getVisibleTicketBundles,
   formatBundlePriceGBP,
 } from '../shared/ticketBundles.mjs'
 
 export {
   TICKET_BUNDLES,
   DEFAULT_TICKET_BUNDLE_ID,
-  LIVE_TEST_BUNDLE_ID,
   getTicketBundleById,
+  getVisibleTicketBundles,
   formatBundlePriceGBP,
-}
-
-/** Hides £0.05 test bundle in production unless VITE_LIVE_TEST_BUNDLE=1. */
-export function getVisibleTicketBundles() {
-  return getVisibleTicketBundlesShared(import.meta.env)
 }
 export { PAID_SKILL_QUESTIONS, validatePaidSkillAnswers } from '../shared/paidSkillQuestions.mjs'
 

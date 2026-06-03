@@ -32,6 +32,21 @@ export const COMPETITION_KIND = {
 
 let schemaEnsured = false
 
+async function retireLiveTestBundle() {
+  const now = new Date().toISOString()
+  if (dbIsPostgres()) {
+    await query(
+      `UPDATE competition_bundles SET active = false, updated_at = $1 WHERE bundle_key = 'liveTest5'`,
+      [now],
+    )
+  } else {
+    await query(
+      `UPDATE competition_bundles SET active = 0, updated_at = ? WHERE bundle_key = 'liveTest5'`,
+      [now],
+    )
+  }
+}
+
 export async function ensureCompetitionCatalogSchema() {
   if (schemaEnsured) return
 
@@ -111,6 +126,8 @@ export async function ensureCompetitionCatalogSchema() {
   await query(`CREATE INDEX IF NOT EXISTS idx_comp_bundles_comp ON competition_bundles (competition, sort_order)`)
 
   await ensureCompetitionEntryMethodColumns()
+
+  await retireLiveTestBundle()
 
   schemaEnsured = true
   await ensureBuiltinCompetitions()

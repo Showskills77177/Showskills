@@ -106,7 +106,10 @@ export function defaultCompetitionsPageLayout() {
       paid: defaultOffset(),
       free: defaultOffset(),
       shirtCard: defaultOffset(1.1),
+      paidPrimaryCard: defaultOffset(),
     },
+    legacyBundleCard: defaultLegacyBundleCardLayout(),
+    shirtGiveawayCard: defaultShirtGiveawayCardLayout(),
     sectionOrder: ['paid', 'free'],
     sections: {
       paid: {
@@ -126,6 +129,134 @@ export function defaultCompetitionsPageLayout() {
     showFaqLink: true,
     jumpLinkLabel: 'Jump to free giveaways',
     showJumpLink: true,
+    emptyPaidMessage:
+      'No extra paid prize draws published yet — the Ronaldo Legacy Bundle is on the homepage.',
+    emptyFreeMessage: '',
+  }
+}
+
+export function defaultLegacyBundleCardLayout() {
+  return {
+    metaFeaturedLabel: '',
+    title: '',
+    summary: '',
+    headlineGapPx: 14,
+    enterButtonLabel: '',
+    offsets: {
+      imagery: defaultOffset(),
+      meta: defaultOffset(),
+      timer: defaultOffset(),
+      title: defaultOffset(),
+      summary: defaultOffset(),
+      price: defaultOffset(),
+      enter: defaultOffset(),
+    },
+  }
+}
+
+const TIMER_SCALE_MIN = 0.75
+const TIMER_SCALE_MAX = 1.35
+
+function clampTimerScale(scale) {
+  const s = Number(scale) || 1
+  return Math.min(TIMER_SCALE_MAX, Math.max(TIMER_SCALE_MIN, Math.round(s * 100) / 100))
+}
+
+export function defaultShirtGiveawayCardLayout() {
+  return {
+    badgeLabel: '',
+    title: '',
+    prizeLine: '',
+    helperLine: '',
+    stepsHeading: '',
+    stepLabels: ['', '', '', '', ''],
+    stepsLinkLabel: '',
+    enterButtonLabel: '',
+    prizeImageUrl: '',
+    headlineGapPx: 12,
+    offsets: {
+      imagery: defaultOffset(),
+      badge: defaultOffset(),
+      title: defaultOffset(),
+      prizeLine: defaultOffset(),
+      helper: defaultOffset(),
+      timer: defaultOffset(),
+      steps: defaultOffset(),
+      enter: defaultOffset(),
+    },
+  }
+}
+
+function mergeStepLabels(base, input) {
+  if (!Array.isArray(input)) return base
+  return base.map((fallback, index) =>
+    typeof input[index] === 'string' ? input[index] : fallback,
+  )
+}
+
+export function mergeShirtGiveawayCardLayout(base, input) {
+  if (!input || typeof input !== 'object') return base
+  const gap = Number(input.headlineGapPx)
+  const mergedOffsets = mergeOffsets(base.offsets, input.offsets)
+  if (mergedOffsets.timer) {
+    mergedOffsets.timer = {
+      x: Number(mergedOffsets.timer.x) || 0,
+      y: Number(mergedOffsets.timer.y) || 0,
+      scale: clampTimerScale(mergedOffsets.timer.scale),
+    }
+  }
+  return {
+    ...base,
+    badgeLabel: typeof input.badgeLabel === 'string' ? input.badgeLabel : base.badgeLabel,
+    title: typeof input.title === 'string' ? input.title : base.title,
+    prizeLine: typeof input.prizeLine === 'string' ? input.prizeLine : base.prizeLine,
+    helperLine: typeof input.helperLine === 'string' ? input.helperLine : base.helperLine,
+    stepsHeading: typeof input.stepsHeading === 'string' ? input.stepsHeading : base.stepsHeading,
+    stepLabels: mergeStepLabels(base.stepLabels, input.stepLabels),
+    stepsLinkLabel: typeof input.stepsLinkLabel === 'string' ? input.stepsLinkLabel : base.stepsLinkLabel,
+    enterButtonLabel:
+      typeof input.enterButtonLabel === 'string' ? input.enterButtonLabel : base.enterButtonLabel,
+    prizeImageUrl: typeof input.prizeImageUrl === 'string' ? input.prizeImageUrl : base.prizeImageUrl,
+    headlineGapPx: Number.isFinite(gap) && gap >= 0 ? gap : base.headlineGapPx,
+    offsets: mergedOffsets,
+  }
+}
+
+export function mergeLegacyBundleCardLayout(base, input) {
+  if (!input || typeof input !== 'object') return base
+  const gap = Number(input.headlineGapPx)
+  const mergedOffsets = mergeOffsets(base.offsets, input.offsets)
+  // Migrate old single "headline" panel offset onto text blocks if present.
+  const legacyHeadline = input.offsets?.headline
+  if (legacyHeadline && typeof legacyHeadline === 'object') {
+    for (const key of ['meta', 'timer', 'title', 'summary', 'price']) {
+      if (input.offsets?.[key] == null) {
+        mergedOffsets[key] = {
+          x: Number(legacyHeadline.x) || 0,
+          y: Number(legacyHeadline.y) || 0,
+          scale:
+            key === 'timer'
+              ? clampTimerScale(legacyHeadline.scale)
+              : Number(legacyHeadline.scale) || 1,
+        }
+      }
+    }
+  }
+  if (mergedOffsets.timer) {
+    mergedOffsets.timer = {
+      x: Number(mergedOffsets.timer.x) || 0,
+      y: Number(mergedOffsets.timer.y) || 0,
+      scale: clampTimerScale(mergedOffsets.timer.scale),
+    }
+  }
+  return {
+    ...base,
+    metaFeaturedLabel: typeof input.metaFeaturedLabel === 'string' ? input.metaFeaturedLabel : base.metaFeaturedLabel,
+    title: typeof input.title === 'string' ? input.title : base.title,
+    summary: typeof input.summary === 'string' ? input.summary : base.summary,
+    headlineGapPx: Number.isFinite(gap) && gap >= 0 ? gap : base.headlineGapPx,
+    enterButtonLabel: typeof input.enterButtonLabel === 'string' ? input.enterButtonLabel : base.enterButtonLabel,
+    offsets: mergedOffsets,
   }
 }
 
@@ -236,16 +367,32 @@ export function mergeSiteShell(input) {
 export function mergeCompetitionsPageLayout(input) {
   const base = defaultCompetitionsPageLayout()
   if (!input || typeof input !== 'object') return base
+  const sectionsIn = input.sections && typeof input.sections === 'object' ? input.sections : {}
   return {
     ...base,
     ...input,
+    title: typeof input.title === 'string' ? input.title : base.title,
+    intro: typeof input.intro === 'string' ? input.intro : base.intro,
+    faqLinkLabel: typeof input.faqLinkLabel === 'string' ? input.faqLinkLabel : base.faqLinkLabel,
+    jumpLinkLabel: typeof input.jumpLinkLabel === 'string' ? input.jumpLinkLabel : base.jumpLinkLabel,
+    showFaqLink: input.showFaqLink !== false,
+    showJumpLink: input.showJumpLink !== false,
+    emptyPaidMessage:
+      typeof input.emptyPaidMessage === 'string' ? input.emptyPaidMessage : base.emptyPaidMessage,
+    emptyFreeMessage:
+      typeof input.emptyFreeMessage === 'string' ? input.emptyFreeMessage : base.emptyFreeMessage,
     offsets: mergeOffsets(base.offsets, input.offsets),
+    legacyBundleCard: mergeLegacyBundleCardLayout(base.legacyBundleCard, input.legacyBundleCard),
+    shirtGiveawayCard: mergeShirtGiveawayCardLayout(base.shirtGiveawayCard, input.shirtGiveawayCard),
     sectionOrder: Array.isArray(input.sectionOrder)
-      ? input.sectionOrder.filter((id) => base.sections[id])
+      ? [
+          ...input.sectionOrder.filter((id) => base.sections[id]),
+          ...Object.keys(base.sections).filter((id) => !input.sectionOrder.includes(id)),
+        ]
       : base.sectionOrder,
     sections: {
-      ...base.sections,
-      ...(input.sections && typeof input.sections === 'object' ? input.sections : {}),
+      paid: { ...base.sections.paid, ...(sectionsIn.paid || {}) },
+      free: { ...base.sections.free, ...(sectionsIn.free || {}) },
     },
   }
 }
@@ -312,4 +459,30 @@ export const HOMEPAGE_BLOCK_LABELS = {
   ticket_bundles: 'Ticket bundle prices',
   winners_panel: 'Recent winners',
   competitions_hub: 'Competitions hub (paid + free)',
+}
+
+/** Human labels for competitions page blocks (Page Editor). */
+export const COMPETITIONS_BLOCK_LABELS = {
+  comp_title: 'Page title',
+  comp_intro: 'Intro paragraph',
+  comp_links: 'Links under intro',
+  comp_paid: 'Prize draws column',
+  comp_free: 'Free giveaways column',
+  comp_shirt: 'Shirt giveaway card',
+  comp_paid_card: 'Legacy Bundle card',
+  comp_paid_card_image: 'Bundle prize images',
+  comp_paid_card_meta: 'Meta labels',
+  comp_paid_card_timer: 'Countdown timer',
+  comp_paid_card_title: 'Competition title',
+  comp_paid_card_summary: 'Summary text',
+  comp_paid_card_price: 'Price badge',
+  comp_paid_card_enter: 'Enter button',
+  comp_shirt_card_image: 'Shirt prize image',
+  comp_shirt_card_badge: 'Free giveaway badge',
+  comp_shirt_card_title: 'Giveaway title',
+  comp_shirt_card_prize: 'Prize line',
+  comp_shirt_card_helper: 'Helper line',
+  comp_shirt_card_timer: 'Countdown timer',
+  comp_shirt_card_steps: 'Entry steps box',
+  comp_shirt_card_enter: 'Enter button',
 }

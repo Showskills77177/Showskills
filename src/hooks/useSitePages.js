@@ -125,26 +125,24 @@ export function usePageLayout(pageId) {
       return
     }
     let cancelled = false
-    setLoading(true)
-    apiFetch('/api/site-pages')
-      .then(async (res) => {
-        const j = await res.json().catch(() => ({}))
-        if (cancelled) return
-        setLayout(merger(j.pages?.[pageId]))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    function loadFromApi() {
+      setLoading(true)
+      return apiFetch('/api/site-pages')
+        .then(async (res) => {
+          const j = await res.json().catch(() => ({}))
+          if (cancelled) return
+          setLayout(merger(j.pages?.[pageId]))
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }
+
+    loadFromApi()
 
     function onLayoutUpdated(e) {
-      if (layoutUpdateAffectsPage(e.detail?.pageId, pageId)) {
-        apiFetch('/api/site-pages')
-          .then(async (res) => {
-            const j = await res.json().catch(() => ({}))
-            if (!cancelled) setLayout(merger(j.pages?.[pageId]))
-          })
-          .catch(() => {})
-      }
+      if (layoutUpdateAffectsPage(e.detail?.pageId, pageId)) loadFromApi()
     }
     window.addEventListener('ss-layout-updated', onLayoutUpdated)
     return () => {

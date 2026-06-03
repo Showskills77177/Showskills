@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ExternalLink, Eye, EyeOff, LayoutTemplate, Redo2, RotateCcw, SlidersHorizontal, Undo2 } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
@@ -24,11 +24,14 @@ import {
   SHIRT_GIVEAWAY_PAGE_ID,
   EMAIL_LAYOUT_PAGE_ID,
   HOMEPAGE_BLOCK_LABELS,
+  COMPETITIONS_BLOCK_LABELS,
   SITE_PAGE_BACKGROUNDS,
   defaultSiteShell,
   mergeSiteShell,
   defaultCompetitionsPageLayout,
   mergeCompetitionsPageLayout,
+  defaultLegacyBundleCardLayout,
+  defaultShirtGiveawayCardLayout,
   defaultFaqPageLayout,
   mergeFaqPageLayout,
   defaultContactPageLayout,
@@ -107,7 +110,9 @@ export default function PageEditorPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTarget, setSettingsTarget] = useState('page')
   const [cleanPreview, setCleanPreview] = useState(false)
+  const [showGrid, setShowGrid] = useState(true)
   const [emailPreviewKind, setEmailPreviewKind] = useState('welcome')
+  const skipLayoutReloadRef = useRef(false)
 
   useEditorHistoryShortcuts({ undo, redo, enabled: !loading && !cleanPreview })
 
@@ -133,6 +138,26 @@ export default function PageEditorPage() {
 
   useEffect(() => {
     load()
+  }, [load])
+
+  /** Keep editor draft aligned with saved layout on the live site (other tabs / after save). */
+  useEffect(() => {
+    function reloadFromServer() {
+      if (skipLayoutReloadRef.current) {
+        skipLayoutReloadRef.current = false
+        return
+      }
+      load()
+    }
+    function onVisible() {
+      if (document.visibilityState === 'visible') reloadFromServer()
+    }
+    window.addEventListener('ss-layout-updated', reloadFromServer)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('ss-layout-updated', reloadFromServer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [load])
 
   useEffect(() => {
@@ -174,6 +199,7 @@ export default function PageEditorPage() {
       if (!res.ok) throw new Error(j.detail || j.error || 'Save failed')
       const merged = mergeAllPages({ ...pages, [savePageId]: j.layout })
       replacePages(merged)
+      skipLayoutReloadRef.current = true
       notifyLayoutUpdated(savePageId)
       setMsg(
         `${PAGE_EDITOR_LABELS[savePageId] || savePageId} saved to the database. Open the live site (or refresh) to see it — preview in the editor is draft until you save.`,
@@ -196,6 +222,14 @@ export default function PageEditorPage() {
     if (activePage !== 'homepage' || !selectedBlockId) return
     const el = document.getElementById(`editor-block-${selectedBlockId}`)
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [activePage, selectedBlockId])
+
+  useEffect(() => {
+    if (activePage !== COMPETITIONS_PAGE_ID || !selectedBlockId) return
+    document.querySelector(`[data-editor-drag="${selectedBlockId}"]`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    })
   }, [activePage, selectedBlockId])
 
   useEffect(() => {
@@ -256,7 +290,9 @@ export default function PageEditorPage() {
         : 'Site header'
       : PRIZE_IMAGE_LABELS[selectedBlockId]
         ? PRIZE_IMAGE_LABELS[selectedBlockId]
-        : activePage === 'homepage' && selectedBlockId
+        : activePage === COMPETITIONS_PAGE_ID && COMPETITIONS_BLOCK_LABELS[selectedBlockId]
+          ? COMPETITIONS_BLOCK_LABELS[selectedBlockId]
+          : activePage === 'homepage' && selectedBlockId
           ? HOMEPAGE_BLOCK_LABELS[selectedBlockId] || selectedBlockId
           : PAGE_EDITOR_LABELS[activePage] || activePage
 
@@ -275,8 +311,8 @@ export default function PageEditorPage() {
             </div>
             <h1 className="mt-1 text-lg font-semibold text-stone-100">Design your site</h1>
             <p className="mt-1 max-w-2xl text-xs text-stone-500">
-              Drag to move · Ctrl/Cmd+drag to resize width · Preview = clean view · Save writes to the database (footer/header
-              settings save Site header and footer, not the page tab) · Undo ⌘Z
+              Same components as the live site — what you see is what saves. Drag moves (8px grid, hold Shift for fine
+              control) · Ctrl/Cmd+drag resizes · Toolbar aligns to panel or neighbours · Save per tab · Undo ⌘Z
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -329,6 +365,19 @@ export default function PageEditorPage() {
             </button>
             <button
               type="button"
+              onClick={() => setShowGrid((v) => !v)}
+              disabled={cleanPreview}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40 ${
+                showGrid && !cleanPreview
+                  ? 'border-teal-500/40 bg-teal-950/30 text-teal-100'
+                  : 'border-white/15 text-stone-300 hover:bg-white/5'
+              }`}
+              title="Toggle 8px alignment grid"
+            >
+              Grid
+            </button>
+            <button
+              type="button"
               onClick={() => openSettings(settingsTarget)}
               disabled={cleanPreview}
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm text-stone-300 hover:bg-white/5 disabled:opacity-40"
@@ -369,6 +418,10 @@ export default function PageEditorPage() {
                 setSettingsTarget('page')
                 setShellHighlight(null)
                 if (tab.id === 'homepage') setSelectedBlockId('hero_intro')
+                if (tab.id === COMPETITIONS_PAGE_ID) {
+                  setSelectedBlockId('comp_title')
+                  openSettings('page')
+                }
                 if (tab.id === SHIRT_GIVEAWAY_PAGE_ID) openSettings('page')
                 if (tab.id === EMAIL_LAYOUT_PAGE_ID) {
                   openSettings('page')
@@ -396,6 +449,7 @@ export default function PageEditorPage() {
               activePage={activePage}
               pages={pages}
               cleanPreview={cleanPreview}
+              showGrid={showGrid}
               selectedBlockId={selectedBlockId}
               onSelectBlock={(id) => {
                 if (cleanPreview) return
@@ -746,7 +800,11 @@ export default function PageEditorPage() {
       ) : null}
 
       {!loading && settingsTarget === 'page' && activePage === COMPETITIONS_PAGE_ID ? (
-        <CompetitionsPageEditor layout={comp} onChange={(patch) => patchPage(COMPETITIONS_PAGE_ID, patch)} />
+        <CompetitionsPageEditor
+          layout={comp}
+          selectedBlockId={selectedBlockId}
+          onChange={(patch) => patchPage(COMPETITIONS_PAGE_ID, patch)}
+        />
       ) : null}
 
       {!loading && settingsTarget === 'page' && activePage === FAQ_PAGE_ID ? (
@@ -987,30 +1045,372 @@ function SiteShellEditor({ shell, onChange, setPages }) {
   )
 }
 
-function CompetitionsPageEditor({ layout, onChange }) {
-  const sectionItems = layout.sectionOrder.map((id) => ({
+function CompetitionsPageEditor({ layout, selectedBlockId, onChange }) {
+  const sectionItems = (layout.sectionOrder || ['paid', 'free']).map((id) => ({
     id,
     label: layout.sections[id]?.title || id,
   }))
+  const legacyCard = { ...defaultLegacyBundleCardLayout(), ...(layout.legacyBundleCard || {}) }
+  const shirtCard = { ...defaultShirtGiveawayCardLayout(), ...(layout.shirtGiveawayCard || {}) }
+  const showLegacyCardSettings = true
+  const legacyBlockSelected = selectedBlockId?.startsWith('comp_paid_card')
+  const shirtBlockSelected =
+    selectedBlockId === 'comp_shirt' || selectedBlockId?.startsWith('comp_shirt_card')
+
+  function patchLegacyCard(patch) {
+    onChange({
+      legacyBundleCard: {
+        ...legacyCard,
+        ...patch,
+        offsets: patch.offsets ? { ...(legacyCard.offsets || {}), ...patch.offsets } : legacyCard.offsets,
+      },
+    })
+  }
+
+  function patchShirtCard(patch) {
+    onChange({
+      shirtGiveawayCard: {
+        ...shirtCard,
+        ...patch,
+        offsets: patch.offsets ? { ...(shirtCard.offsets || {}), ...patch.offsets } : shirtCard.offsets,
+      },
+    })
+  }
+
+  function patchShirtStepLabel(index, value) {
+    const next = [...(shirtCard.stepLabels || defaultShirtGiveawayCardLayout().stepLabels)]
+    next[index] = value
+    patchShirtCard({ stepLabels: next })
+  }
+
+  function patchSection(id, patch) {
+    onChange({
+      sections: {
+        ...layout.sections,
+        [id]: { ...layout.sections[id], ...patch },
+      },
+    })
+  }
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
-        <EditorField label="Page title">
-          <input value={layout.title} onChange={(e) => onChange({ title: e.target.value })} className={editorInputClass()} />
-        </EditorField>
-        <EditorField label="Intro">
-          <textarea
-            rows={3}
-            value={layout.intro}
-            onChange={(e) => onChange({ intro: e.target.value })}
-            className={editorInputClass()}
-          />
-        </EditorField>
+      <p className="text-xs leading-relaxed text-stone-500">
+        Click each text block in the preview — drag to move, Ctrl/Cmd+drag to resize. Alignment toolbar:{' '}
+        <strong className="text-stone-400">X/Y/·</strong> center in panel,{' '}
+        <strong className="text-stone-400">↔/↕/⊡</strong> center between neighbours,{' '}
+        <strong className="text-stone-400">≡</strong> match sibling centers. Then{' '}
+        <strong className="text-stone-300">Save Competitions</strong>.
+      </p>
+
+      {showLegacyCardSettings ? (
+        <section
+          id="editor-block-legacy_bundle_card"
+          className={`rounded-xl border bg-stone-900/40 p-4 ${
+            legacyBlockSelected ? 'border-teal-500/40 ring-1 ring-teal-500/20' : 'border-white/10'
+          }`}
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Legacy Bundle card</h2>
+          {legacyBlockSelected && COMPETITIONS_BLOCK_LABELS[selectedBlockId] ? (
+            <p className="mt-1 text-xs font-medium text-teal-400/90">
+              Selected in preview: {COMPETITIONS_BLOCK_LABELS[selectedBlockId]} — drag to move, Ctrl/Cmd+drag to resize,
+              toolbar above block for panel + neighbour alignment.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-stone-500">
+              Click a block in the preview to select it. Toolbar appears above the selection — use ↔/↕/⊡ to center
+              between neighbouring blocks (e.g. timer between meta and title).
+            </p>
+          )}
+          <div className="mt-3 grid gap-3">
+            <EditorField label="Meta label (above timer)">
+              <input
+                value={legacyCard.metaFeaturedLabel || ''}
+                onChange={(e) => patchLegacyCard({ metaFeaturedLabel: e.target.value })}
+                placeholder="Featured · Main prize"
+                className={editorInputClass()}
+              />
+            </EditorField>
+            <EditorField label="Title (leave blank for competition name)">
+              <input
+                value={legacyCard.title || ''}
+                onChange={(e) => patchLegacyCard({ title: e.target.value })}
+                placeholder="Ronaldo Legacy Bundle"
+                className={editorInputClass()}
+              />
+            </EditorField>
+            <EditorField label="Summary (below title)">
+              <textarea
+                rows={3}
+                value={legacyCard.summary || ''}
+                onChange={(e) => patchLegacyCard({ summary: e.target.value })}
+                placeholder="Pay for ticket bundles or use free entry routes…"
+                className={editorInputClass()}
+              />
+            </EditorField>
+            <EditorField label="Space between timer, title & summary (px)">
+              <input
+                type="number"
+                min={0}
+                max={48}
+                step={1}
+                value={legacyCard.headlineGapPx ?? 14}
+                onChange={(e) => patchLegacyCard({ headlineGapPx: Number(e.target.value) || 0 })}
+                className={editorInputClass()}
+              />
+            </EditorField>
+            <EditorField label="Enter button label">
+              <input
+                value={legacyCard.enterButtonLabel || ''}
+                onChange={(e) => patchLegacyCard({ enterButtonLabel: e.target.value })}
+                placeholder="Enter this competition"
+                className={editorInputClass()}
+              />
+            </EditorField>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() =>
+                  patchLegacyCard({
+                    offsets: {
+                      imagery: { x: 0, y: 0, scale: 1 },
+                      meta: { x: 0, y: 0, scale: 1 },
+                      timer: { x: 0, y: 0, scale: 1 },
+                      title: { x: 0, y: 0, scale: 1 },
+                      summary: { x: 0, y: 0, scale: 1 },
+                      price: { x: 0, y: 0, scale: 1 },
+                      enter: { x: 0, y: 0, scale: 1 },
+                    },
+                  })
+                }
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
+              >
+                Reset card panel positions
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    offsets: {
+                      ...(layout.offsets || {}),
+                      paidPrimaryCard: { x: 0, y: 0, scale: 1 },
+                    },
+                  })
+                }
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
+              >
+                Reset whole card position
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section
+        id="editor-block-shirt_giveaway_card"
+        className={`rounded-xl border bg-stone-900/40 p-4 ${
+          shirtBlockSelected ? 'border-lime-500/40 ring-1 ring-lime-500/20' : 'border-white/10'
+        }`}
+      >
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Shirt giveaway card</h2>
+        {shirtBlockSelected && COMPETITIONS_BLOCK_LABELS[selectedBlockId] ? (
+          <p className="mt-1 text-xs font-medium text-lime-400/90">
+            Selected in preview: {COMPETITIONS_BLOCK_LABELS[selectedBlockId]} — drag to move, Ctrl/Cmd+drag to resize,
+            toolbar above block for panel + neighbour alignment.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-stone-500">
+            Click a block in the free giveaways card to select it. Edit copy here or drag blocks in the preview.
+          </p>
+        )}
+        <div className="mt-3 grid gap-3">
+          <EditorField label="Prize image URL (leave blank for default)">
+            <input
+              value={shirtCard.prizeImageUrl || ''}
+              onChange={(e) => patchShirtCard({ prizeImageUrl: e.target.value })}
+              placeholder="/uploads/… or https://…"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Badge label">
+            <input
+              value={shirtCard.badgeLabel || ''}
+              onChange={(e) => patchShirtCard({ badgeLabel: e.target.value })}
+              placeholder="Free giveaway"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Title">
+            <input
+              value={shirtCard.title || ''}
+              onChange={(e) => patchShirtCard({ title: e.target.value })}
+              placeholder="Ronaldo Shirt Giveaway"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Prize line">
+            <input
+              value={shirtCard.prizeLine || ''}
+              onChange={(e) => patchShirtCard({ prizeLine: e.target.value })}
+              placeholder="Signed Ronaldo United shirt…"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Helper line (under prize)">
+            <input
+              value={shirtCard.helperLine || ''}
+              onChange={(e) => patchShirtCard({ helperLine: e.target.value })}
+              placeholder="No payment or video upload."
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Steps box heading">
+            <input
+              value={shirtCard.stepsHeading || ''}
+              onChange={(e) => patchShirtCard({ stepsHeading: e.target.value })}
+              placeholder="What you need to do"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          {(shirtCard.stepLabels || defaultShirtGiveawayCardLayout().stepLabels).map((step, index) => (
+            <EditorField key={index} label={`Step ${index + 1} title`}>
+              <input
+                value={step || ''}
+                onChange={(e) => patchShirtStepLabel(index, e.target.value)}
+                placeholder={['Answer the skill question correctly', 'Subscribe to our newsletter', 'Follow us on social media', 'Enter your details', 'Submit your entry'][index] || ''}
+                className={editorInputClass()}
+              />
+            </EditorField>
+          ))}
+          <EditorField label="Full steps link label">
+            <input
+              value={shirtCard.stepsLinkLabel || ''}
+              onChange={(e) => patchShirtCard({ stepsLinkLabel: e.target.value })}
+              placeholder="Full entry steps"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Space between card blocks (px)">
+            <input
+              type="number"
+              min={0}
+              max={48}
+              step={1}
+              value={shirtCard.headlineGapPx ?? 12}
+              onChange={(e) => patchShirtCard({ headlineGapPx: Number(e.target.value) || 0 })}
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Enter button label">
+            <input
+              value={shirtCard.enterButtonLabel || ''}
+              onChange={(e) => patchShirtCard({ enterButtonLabel: e.target.value })}
+              placeholder="Enter free giveaway"
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() =>
+                patchShirtCard({
+                  offsets: {
+                    imagery: { x: 0, y: 0, scale: 1 },
+                    badge: { x: 0, y: 0, scale: 1 },
+                    title: { x: 0, y: 0, scale: 1 },
+                    prizeLine: { x: 0, y: 0, scale: 1 },
+                    helper: { x: 0, y: 0, scale: 1 },
+                    timer: { x: 0, y: 0, scale: 1 },
+                    steps: { x: 0, y: 0, scale: 1 },
+                    enter: { x: 0, y: 0, scale: 1 },
+                  },
+                })
+              }
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
+            >
+              Reset card panel positions
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onChange({
+                  offsets: {
+                    ...(layout.offsets || {}),
+                    shirtCard: { x: 0, y: 0, scale: 1 },
+                  },
+                })
+              }
+              className="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-stone-400 hover:bg-white/5"
+            >
+              Reset whole card position
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Section order</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Page header</h2>
+        <div className="mt-3 grid gap-3">
+          <EditorField label="Page title">
+            <input
+              value={layout.title || ''}
+              onChange={(e) => onChange({ title: e.target.value })}
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="Intro paragraph">
+            <textarea
+              rows={3}
+              value={layout.intro || ''}
+              onChange={(e) => onChange({ intro: e.target.value })}
+              className={editorInputClass()}
+            />
+          </EditorField>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Links under intro</h2>
+        <div className="mt-3 grid gap-3">
+          <label className="flex items-center gap-2 text-sm text-stone-400">
+            <input
+              type="checkbox"
+              checked={layout.showFaqLink !== false}
+              onChange={(e) => onChange({ showFaqLink: e.target.checked })}
+            />
+            Show FAQ link
+          </label>
+          {layout.showFaqLink !== false ? (
+            <EditorField label="FAQ link label">
+              <input
+                value={layout.faqLinkLabel || ''}
+                onChange={(e) => onChange({ faqLinkLabel: e.target.value })}
+                className={editorInputClass()}
+              />
+            </EditorField>
+          ) : null}
+          <label className="flex items-center gap-2 text-sm text-stone-400">
+            <input
+              type="checkbox"
+              checked={layout.showJumpLink !== false}
+              onChange={(e) => onChange({ showJumpLink: e.target.checked })}
+            />
+            Show jump link to free giveaways
+          </label>
+          {layout.showJumpLink !== false ? (
+            <EditorField label="Jump link label">
+              <input
+                value={layout.jumpLinkLabel || ''}
+                onChange={(e) => onChange({ jumpLinkLabel: e.target.value })}
+                className={editorInputClass()}
+              />
+            </EditorField>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Columns</h2>
+        <p className="mt-1 text-xs text-stone-500">Reorder paid vs free columns. Toggle visibility per section.</p>
         <div className="mt-3">
           <DraggableSectionList
             items={sectionItems}
@@ -1020,14 +1420,7 @@ function CompetitionsPageEditor({ layout, onChange }) {
                 <input
                   type="checkbox"
                   checked={layout.sections[item.id]?.visible !== false}
-                  onChange={(e) =>
-                    onChange({
-                      sections: {
-                        ...layout.sections,
-                        [item.id]: { ...layout.sections[item.id], visible: e.target.checked },
-                      },
-                    })
-                  }
+                  onChange={(e) => patchSection(item.id, { visible: e.target.checked })}
                 />
                 Show
               </label>
@@ -1036,40 +1429,50 @@ function CompetitionsPageEditor({ layout, onChange }) {
         </div>
         {layout.sectionOrder.map((id) => (
           <div key={id} className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3">
-            <p className="text-xs font-semibold uppercase text-stone-500">{id} section</p>
+            <p className="text-xs font-semibold uppercase text-stone-500">{id} column</p>
             <div className="mt-2 grid gap-2">
-              <EditorField label="Heading">
+              <EditorField label="Section heading">
                 <input
                   value={layout.sections[id]?.title || ''}
-                  onChange={(e) =>
-                    onChange({
-                      sections: {
-                        ...layout.sections,
-                        [id]: { ...layout.sections[id], title: e.target.value },
-                      },
-                    })
-                  }
+                  onChange={(e) => patchSection(id, { title: e.target.value })}
                   className={editorInputClass()}
                 />
               </EditorField>
-              <EditorField label="Subtitle">
+              <EditorField label="Section subtitle">
                 <textarea
                   rows={2}
                   value={layout.sections[id]?.subtitle || ''}
-                  onChange={(e) =>
-                    onChange({
-                      sections: {
-                        ...layout.sections,
-                        [id]: { ...layout.sections[id], subtitle: e.target.value },
-                      },
-                    })
-                  }
+                  onChange={(e) => patchSection(id, { subtitle: e.target.value })}
                   className={editorInputClass()}
                 />
               </EditorField>
             </div>
           </div>
         ))}
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Empty states</h2>
+        <p className="mt-1 text-xs text-stone-500">Shown when no published competitions or giveaways exist in that column.</p>
+        <div className="mt-3 grid gap-3">
+          <EditorField label="No paid competitions message">
+            <textarea
+              rows={2}
+              value={layout.emptyPaidMessage || ''}
+              onChange={(e) => onChange({ emptyPaidMessage: e.target.value })}
+              className={editorInputClass()}
+            />
+          </EditorField>
+          <EditorField label="No extra giveaways message (optional)">
+            <textarea
+              rows={2}
+              value={layout.emptyFreeMessage || ''}
+              onChange={(e) => onChange({ emptyFreeMessage: e.target.value })}
+              className={editorInputClass()}
+              placeholder="Leave blank to show nothing"
+            />
+          </EditorField>
+        </div>
       </section>
     </div>
   )

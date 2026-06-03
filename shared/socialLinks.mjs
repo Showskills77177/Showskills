@@ -5,7 +5,7 @@ export const DEFAULT_SOCIAL_HANDLE = 'showskills.rewards'
 export const DEFAULT_SOCIAL_LINKS = {
   tiktok: `https://www.tiktok.com/@${DEFAULT_SOCIAL_HANDLE}`,
   instagram: `https://www.instagram.com/${DEFAULT_SOCIAL_HANDLE}/`,
-  facebook: '',
+  facebook: 'https://www.facebook.com/share/1ap8Ud8p8X/?mibextid=wwXIfr',
 }
 
 const PROFILE_BASE = {

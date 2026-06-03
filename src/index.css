@@ -505,8 +505,42 @@ body {
 /* Editor: allow dragged elements to be positioned beyond panel clipping. */
 .ss-page-editor-preview .ss-hero-merged-panel,
 .ss-page-editor-preview .ss-prize-panel,
-.ss-page-editor-preview .ss-hero-copy-panel {
-  overflow: visible;
+.ss-page-editor-preview .ss-hero-copy-panel,
+.ss-page-editor-preview [data-competition-card],
+.ss-page-editor-preview .ss-competition-paid-slot {
+  overflow: visible !important;
+}
+
+.ss-page-editor-preview [data-editor-drag] {
+  touch-action: none;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.ss-page-editor-preview [data-editor-drag]:not([data-editor-ui]) {
+  cursor: grab;
+}
+
+.ss-page-editor-preview [data-editor-drag]:not([data-editor-ui]):active {
+  cursor: grabbing;
+}
+
+.ss-page-editor-preview [data-editor-ui],
+.ss-page-editor-preview .ss-editor-drag-toolbar,
+.ss-page-editor-preview .ss-editor-drag-toolbar button {
+  pointer-events: auto !important;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ss-page-editor-preview.ss-editor-show-grid [data-editor-align-group],
+.ss-page-editor-preview.ss-editor-show-grid .ss-hero-merged-panel,
+.ss-page-editor-preview.ss-editor-show-grid [data-competition-card] > div:last-child {
+  background-image:
+    linear-gradient(to right, rgb(45 212 191 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(45 212 191 / 0.07) 1px, transparent 1px);
+  background-size: 8px 8px;
+  background-position: 0 0;
 }
 
 /* Cross-browser visual consistency fallback where blend mode support/perf is weak. */
@@ -1204,9 +1238,59 @@ body {
 }
 
 .ss-prize-studio-photo {
+  position: relative;
   overflow: hidden;
   border-radius: 0.55rem;
   background: #050505;
+}
+
+.ss-legacy-bundle-stamp-overlay {
+  position: absolute;
+  top: 24%;
+  left: 77%;
+  z-index: 2;
+  transform: translateY(calc(-50% + 1px));
+  pointer-events: none;
+}
+
+@media (min-width: 640px) {
+  .ss-legacy-bundle-stamp-overlay {
+    top: 24.5%;
+    left: 78%;
+  }
+}
+
+[data-competition-card] {
+  --ss-competition-headline-gap: 14px;
+}
+
+/* Timer → title → summary: fixed spacers (immune to margin collapse / display font metrics) */
+.ss-competition-card-focus {
+  display: block;
+}
+
+.ss-competition-card-focus__spacer {
+  flex-shrink: 0;
+  height: var(--ss-competition-headline-gap);
+  margin: 0;
+  padding: 0;
+}
+
+.ss-competition-card-focus__timer,
+.ss-competition-card-focus__title,
+.ss-competition-card-focus__summary {
+  margin: 0;
+  padding: 0;
+}
+
+.ss-competition-card-focus__timer > *,
+.ss-competition-card-focus__title > *,
+.ss-competition-card-focus__summary > * {
+  margin: 0 !important;
+}
+
+.ss-competition-card-focus__title h2 {
+  display: block;
 }
 
 .ss-prize-studio-photo img {
@@ -1432,8 +1516,19 @@ body {
     min-height: 0;
   }
 
+  .ss-competition-paid-slot > [data-editor-drag],
+  .ss-competition-paid-slot > div > [data-editor-drag],
   .ss-competition-shirt-slot > [data-editor-drag],
   .ss-competition-shirt-slot > div > [data-editor-drag] {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .ss-competition-paid-slot [data-editor-drag] > div,
+  .ss-competition-shirt-slot [data-editor-drag] > div {
     display: flex;
     flex: 1;
     flex-direction: column;

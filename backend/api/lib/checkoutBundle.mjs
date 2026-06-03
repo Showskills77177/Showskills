@@ -6,14 +6,6 @@ import {
   resolveTicketBundle,
 } from './competitionCatalog.mjs'
 
-function showLiveTestBundle() {
-  const flag = String(process.env.VITE_LIVE_TEST_BUNDLE ?? process.env.LIVE_TEST_BUNDLE ?? '').trim().toLowerCase()
-  if (flag === '1' || flag === 'true' || flag === 'yes') return true
-  if (process.env.NODE_ENV !== 'production') return true
-  if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') return true
-  return false
-}
-
 export async function parseCheckoutCompetition(body) {
   const raw = typeof body?.competition === 'string' ? body.competition.trim() : ''
   if (raw && isValidCompetitionSlug(raw)) {
@@ -27,7 +19,7 @@ export async function resolveCheckoutBundle(competition, bundleId) {
   const check = await assertMainDrawCompetitionSlug(competition)
   if (!check.ok) return { ok: false, error: check.error }
 
-  const bundle = await resolveTicketBundle(competition, bundleId, { includeTest: showLiveTestBundle() })
+  const bundle = await resolveTicketBundle(competition, bundleId, { includeTest: false })
   if (!bundle) return { ok: false, error: 'Invalid or missing bundleId' }
 
   const catalog = check.competition

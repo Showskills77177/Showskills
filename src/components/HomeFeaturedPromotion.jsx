@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { CompetitionCountdown } from './CompetitionCountdown'
 import { LegacyBundlePhonePrizes } from './LegacyBundlePhonePrizes'
+import { LegacyBundleImageryDisclaimer } from './LegacyBundleImageryDisclaimer'
+import { LegacyBundleImageryCaption } from './LegacyBundleImageryCaption'
 import { GlowingFootballIcon } from './siteChrome'
 import { formatBundlePriceGBP } from '../competitionData'
 import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
@@ -91,7 +93,10 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
               <div className="ss-prize-studio-tile ss-prize-studio-tile--main text-center">
                 <div className="ss-prize-studio-photo">
                   {hero ? (
-                    <img src={hero} alt="" className="h-auto w-full object-cover" loading="lazy" />
+                    <>
+                      <img src={hero} alt="" className="h-auto w-full object-cover" loading="lazy" />
+                      {isLegacy ? <LegacyBundleImageryCaption /> : null}
+                    </>
                   ) : (
                     <div className="flex aspect-video items-center justify-center text-sm text-stone-500">
                       Hero image
@@ -100,7 +105,10 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
                 </div>
               </div>
               {isLegacy ? (
-                <LegacyBundlePhonePrizes />
+                <>
+                  <LegacyBundlePhonePrizes />
+                  <LegacyBundleImageryDisclaimer />
+                </>
               ) : gallery.length ? (
                 <div className="grid grid-cols-2 gap-1.5">
                   {gallery.slice(0, 2).map((url) => (
