@@ -92,7 +92,9 @@ export function CompetitionPublicCard({
     const widthOnly = opts.uniformScale ? false : opts.widthOnly !== false
     const raw = cardOffsets[offsetKey] || { x: 0, y: 0, scale: 1 }
     let pos = moveOnly ? { ...raw, scale: 1 } : raw
-    if (!editorMode && (offsetKey === 'enter' || offsetKey === 'price')) {
+    if (!editorMode && offsetKey === 'price') {
+      pos = { x: 0, y: 0, scale: 1 }
+    } else if (!editorMode && offsetKey === 'enter') {
       pos = { ...pos, y: Math.max(0, Number(pos.y) || 0) }
     }
     if (!editorMode || !isLegacyBundle) {
@@ -206,7 +208,9 @@ export function CompetitionPublicCard({
 
   const headlinePanel = (
     <div
-      className={`ss-competition-card-headline flex min-h-0 flex-1 flex-col px-6 pt-2 pb-2 sm:px-8 sm:pt-2.5 sm:pb-3 ${editorMode && isLegacyBundle ? 'overflow-visible' : ''}`}
+      className={`ss-competition-card-headline flex min-h-0 flex-1 flex-col px-6 pt-2 sm:px-8 sm:pt-2.5 ${
+        isLegacyBundle ? 'pb-0' : 'pb-2 sm:pb-3'
+      } ${editorMode && isLegacyBundle ? 'overflow-visible' : ''}`}
     >
       {cardDragWrap(
         'comp_paid_card_meta',
@@ -281,9 +285,9 @@ export function CompetitionPublicCard({
   const enterButton =
     isLegacyBundle && (editorMode || (!preview && onEnter))
       ? (
-          <div className="ss-competition-card-actions ss-competition-card-footer">
-            {priceBadge}
-            {postalLine}
+          <div className="ss-competition-card-actions ss-competition-card-footer ss-competition-card-action-stack">
+            <div className="ss-competition-card-action-stack__price">{priceBadge}</div>
+            {postalLine ? <div className="ss-competition-card-action-stack__postal">{postalLine}</div> : null}
             {cardDragWrap(
               'comp_paid_card_enter',
               'Enter button',

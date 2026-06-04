@@ -1310,6 +1310,7 @@ body {
 
 [data-competition-card] {
   --ss-competition-headline-gap: 14px;
+  --ss-competition-stack-gap: 0.875rem;
 }
 
 /* Timer → title → summary: fixed spacers (immune to margin collapse / display font metrics) */
@@ -1490,21 +1491,37 @@ body {
 .ss-competitions-columns .ss-competition-card-footer {
   position: relative;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
   flex-shrink: 0;
   margin-top: auto;
   box-sizing: border-box;
   width: 100%;
-  padding: 1rem 1.5rem 1.5rem;
-  background: linear-gradient(to bottom, rgb(12 10 9 / 0) 0%, rgb(12 10 9 / 92%) 12%, rgb(12 10 9 / 98%) 100%);
+}
+
+.ss-competition-card-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ss-competition-stack-gap);
+  padding: var(--ss-competition-stack-gap) 1.5rem 1.5rem;
+  background: rgb(12 10 9 / 98%);
+}
+
+.ss-competitions-columns .ss-competition-card-footer:not(.ss-competition-card-action-stack) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ss-competition-stack-gap);
+  padding: var(--ss-competition-stack-gap) 1.5rem 1.5rem;
+  background: rgb(12 10 9 / 98%);
+}
+
+.ss-competition-card-action-stack__price,
+.ss-competition-card-action-stack__postal {
+  flex-shrink: 0;
 }
 
 .ss-competition-card-footer__price {
   position: relative;
   z-index: 1;
-  flex-shrink: 0;
+  margin: 0;
   align-self: flex-start;
 }
 
@@ -1513,9 +1530,9 @@ body {
 }
 
 @media (min-width: 640px) {
-  .ss-competitions-columns .ss-competition-card-footer {
-    gap: 0.875rem;
-    padding: 1.125rem 2rem 2rem;
+  .ss-competition-card-action-stack,
+  .ss-competitions-columns .ss-competition-card-footer:not(.ss-competition-card-action-stack) {
+    padding: var(--ss-competition-stack-gap) 2rem 2rem;
   }
 }
 
