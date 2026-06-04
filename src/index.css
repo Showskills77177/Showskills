@@ -1505,6 +1505,12 @@ body {
   background: rgb(12 10 9 / 98%);
 }
 
+.ss-competition-card-legacy-stack {
+  flex-shrink: 0;
+  margin-top: 0 !important;
+  padding-top: 0.5rem;
+}
+
 .ss-competitions-columns .ss-competition-card-footer:not(.ss-competition-card-action-stack) {
   display: flex;
   flex-direction: column;
@@ -2819,6 +2825,10 @@ input.ss-cf-pay-button.ss-pay-cta {
 
   [data-competition-card] {
     overflow: hidden;
+  }
+
+  [data-competition-card]:has(.ss-competition-card-legacy-stack) {
+    overflow: visible;
   }
 }
 

@@ -87,7 +87,10 @@ export function CompetitionPublicCard({
     (competition.featuredOnHomepage ? 'Featured · Main prize' : 'Main prize draw')
   const enterLabel = cardLayout?.enterButtonLabel?.trim() || 'Enter this competition'
 
+  const liveLegacyLayout = isLegacyBundle && !editorMode
+
   function cardDragWrap(id, label, offsetKey, node, opts = {}) {
+    if (liveLegacyLayout) return node
     const moveOnly = opts.moveOnly === true
     const widthOnly = opts.uniformScale ? false : opts.widthOnly !== false
     const raw = cardOffsets[offsetKey] || { x: 0, y: 0, scale: 1 }
@@ -276,14 +279,81 @@ export function CompetitionPublicCard({
   )
 
   const postalLine = competition.allowPostalEntry ? (
-    <p className="text-xs leading-relaxed text-stone-600 sm:text-sm">
+    <p className="text-xs leading-relaxed text-stone-500 sm:text-sm">
       Postal entries: write <span className="text-stone-400">{competition.postalCompetitionName}</span> on your
       envelope → {POSTAL_ENTRY_ADDRESS}
     </p>
   ) : null
 
+  const legacyLiveStack =
+    liveLegacyLayout
+      ? (
+          <div className="ss-competition-card-legacy-stack ss-competition-card-action-stack ss-competition-card-actions ss-competition-card-footer">
+            {cardDragWrap(
+              'comp_paid_card_meta',
+              'Meta labels',
+              'meta',
+              <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{metaFeaturedLabel}</p>
+                {periodMonth ? (
+                  <>
+                    <span className="hidden text-teal-600/40 sm:inline" aria-hidden>
+                      ·
+                    </span>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{periodMonth} draw</p>
+                  </>
+                ) : null}
+              </div>,
+            )}
+            {cardDragWrap(
+              'comp_paid_card_timer',
+              'Countdown timer',
+              'timer',
+              countdownPeriod ? (
+                <CompetitionCountdown
+                  opensAt={countdownPeriod.entryOpensAt}
+                  closesAt={countdownPeriod.entryClosesAt}
+                  showDot={false}
+                  live
+                  className="!m-0 max-w-[min(100%,22rem)] text-center sm:max-w-xl"
+                />
+              ) : (
+                <p className="text-xs text-amber-200/80">No entry period dates yet — set them in admin.</p>
+              ),
+              {
+                uniformScale: true,
+                transformOrigin: 'top center',
+                scaleMin: 0.75,
+                scaleMax: 1.35,
+              },
+            )}
+            {cardDragWrap(
+              'comp_paid_card_title',
+              'Competition title',
+              'title',
+              <h2 className="font-display text-2xl uppercase leading-[0.88] tracking-wide text-white sm:text-3xl">{titleText}</h2>,
+              { widthOnly: false },
+            )}
+            {cardDragWrap(
+              'comp_paid_card_summary',
+              'Summary text',
+              'summary',
+              <p className="text-sm leading-relaxed text-stone-400 sm:text-base">{summary}</p>,
+              { widthOnly: false },
+            )}
+            {priceBadge}
+            {postalLine}
+            {!preview && onEnter ? (
+              <button type="button" onClick={onEnter} className="ss-competition-enter-btn ss-competition-enter-btn--paid">
+                {enterLabel}
+              </button>
+            ) : null}
+          </div>
+        )
+      : null
+
   const enterButton =
-    isLegacyBundle && (editorMode || (!preview && onEnter))
+    isLegacyBundle && editorMode
       ? (
           <div className="ss-competition-card-actions ss-competition-card-footer ss-competition-card-action-stack">
             <div className="ss-competition-card-action-stack__price">{priceBadge}</div>
@@ -295,7 +365,7 @@ export function CompetitionPublicCard({
               <button
                 type="button"
                 onClick={onEnter}
-                tabIndex={editorMode ? -1 : undefined}
+                tabIndex={-1}
                 className="ss-competition-enter-btn ss-competition-enter-btn--paid"
               >
                 {enterLabel}
@@ -309,9 +379,9 @@ export function CompetitionPublicCard({
   return (
     <article
       data-competition-card
-      className={`flex h-full flex-col rounded-2xl border border-teal-500/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ${
-        editorMode && isLegacyBundle ? 'overflow-visible' : 'overflow-hidden'
-      } ${isPageLayout ? 'ss-competition-page-card' : ''} ${preview ? 'pointer-events-none select-none' : ''} ${className}`}
+      className={`flex flex-col rounded-2xl border border-teal-500/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ${
+        liveLegacyLayout || (editorMode && isLegacyBundle) ? 'overflow-visible' : 'overflow-hidden'
+      } ${liveLegacyLayout ? '' : 'h-full'} ${isPageLayout ? 'ss-competition-page-card' : ''} ${preview ? 'pointer-events-none select-none' : ''} ${className}`}
       style={{
         ...(isLegacyBundle && cardScale !== 1 ? { '--ss-competition-card-scale': cardScale } : undefined),
         ...(isLegacyBundle ? { '--ss-competition-headline-gap': `${headlineGapPx}px` } : undefined),
@@ -326,12 +396,22 @@ export function CompetitionPublicCard({
         ? cardDragWrap('comp_paid_card_image', 'Bundle prize images', 'imagery', imageryPanel)
         : imageryPanel}
       <div
-        className={`flex min-h-0 flex-1 flex-col ${editorMode && isLegacyBundle ? 'overflow-visible' : 'overflow-hidden'}`}
+        className={`flex flex-col ${
+          liveLegacyLayout
+            ? 'flex-shrink-0 overflow-visible'
+            : `min-h-0 flex-1 ${editorMode && isLegacyBundle ? 'overflow-visible' : 'overflow-hidden'}`
+        }`}
         data-editor-align-group
         data-editor-center-root
       >
-        {headlinePanel}
-        {enterButton}
+        {liveLegacyLayout ? (
+          legacyLiveStack
+        ) : (
+          <>
+            {headlinePanel}
+            {enterButton}
+          </>
+        )}
         {!isLegacyBundle && !preview && onEnter ? (
           <div className="ss-competition-card-actions ss-competition-card-footer">
             {postalLine}
