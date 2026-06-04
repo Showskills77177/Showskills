@@ -6,6 +6,7 @@ import {
   latestCompetitionEntryByEmail,
   paidTicketMetaForEmail,
 } from '../support/db.mjs'
+import { emailPreviewTemplateSelect } from '../support/selectors.mjs'
 
 test.describe('Quiz session & email stress', () => {
   test.use({ viewport: { width: 1400, height: 900 } })
@@ -17,7 +18,7 @@ test.describe('Quiz session & email stress', () => {
   test('dev email preview shows unanswered ticket template', async ({ page }) => {
     await page.goto('/dev/email-preview')
     await expect(page.getByRole('heading', { name: /Email previews/i })).toBeVisible()
-    await page.locator('select').first().selectOption('quiz_pending')
+    await emailPreviewTemplateSelect(page).selectOption('quiz_pending')
     const frame = page.frameLocator('iframe[title="Purchase email HTML preview"]')
     await expect(frame.getByText(/Your questions are not answered/i)).toBeVisible({ timeout: 20_000 })
     await expect(frame.getByText(/Answer your questions now/i)).toBeVisible()
@@ -37,11 +38,11 @@ test.describe('Quiz session & email stress', () => {
 
     await page.goto('/admin/test-email')
     await expect(page.getByRole('heading', { name: /Email previews/i })).toBeVisible()
-    await page.locator('select').first().selectOption('quiz_pending')
-    await expect(page.getByText(/Your questions are not answered/i)).toBeVisible()
+    await emailPreviewTemplateSelect(page).selectOption('quiz_pending')
     const frame = page.frameLocator('iframe[title="Purchase email HTML preview"]')
+    await expect(frame.getByText(/Your questions are not answered/i)).toBeVisible({ timeout: 20_000 })
     await expect(frame.getByText(/Answer your questions now/i)).toBeVisible({ timeout: 20_000 })
-    await expect(frame.getByText(/SS-/)).toBeVisible()
+    await expect(frame.getByText('SS-1A2B3C4D')).toBeVisible({ timeout: 20_000 })
   })
 
   test('pay → answer in modal → green header, no unanswered email on close', async ({ page }) => {

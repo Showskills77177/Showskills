@@ -2,7 +2,7 @@
 export async function fillShirtGiveawayForm(page, { name, email, answer = 'Ronaldo R9', phone = '07123456789' }) {
   await page.getByLabel(/Full name/i).first().fill(name)
   await page.getByLabel(/Qualification question/i).fill(answer)
-  await page.getByLabel(/^Email$/i).fill(email)
+  await page.locator('#modal-kick-email').fill(email)
   await page.locator('#modal-kick-phone').fill(phone)
   await page.getByRole('checkbox', { name: /Subscribe me to ShowSkills/i }).check()
   await page.locator('label:has(input[name="kick-social-platform"][value="tiktok"])').click()

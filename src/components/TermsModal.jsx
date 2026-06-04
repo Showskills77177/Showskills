@@ -297,7 +297,9 @@ export function TermsModal({ open, onClose }) {
             </p>
           </div>
 
-          <h3 className="mb-2 mt-4 font-semibold text-stone-200">2a. Consolation prize (Free Ronaldo Shirt Giveaway)</h3>
+          <h3 id="ss-terms-consolation-prize" className="mb-2 mt-4 font-semibold text-stone-200">
+            2a. Consolation prize (Free Ronaldo Shirt Giveaway)
+          </h3>
           <p className="mb-3">
             The main Legacy Bundle draw remains strictly skill-based: incorrect answers do <strong>not</strong> qualify for
             the bundle prize, and <strong>tickets are not refunded</strong> if your skill answers are wrong.

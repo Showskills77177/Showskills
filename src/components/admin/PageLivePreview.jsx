@@ -131,7 +131,6 @@ export function PageLivePreview({
       <PagePreviewChrome
         shell={pages.site}
         highlight={shellHighlight}
-        editorMode={editorMode}
         selectedBlockId={selectedBlockId}
         onSelectBlock={onSelectBlock}
         onPatchShell={onPatchSite}

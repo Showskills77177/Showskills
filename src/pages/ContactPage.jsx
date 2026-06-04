@@ -195,6 +195,7 @@ export default function ContactPage() {
               <label className={labelClass}>
                 Your email (so we can reply)
                 <input
+                  id="contact-form-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

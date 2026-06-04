@@ -1488,10 +1488,14 @@ body {
 
 /* Competitions page — matched card footers and enter buttons share one layout */
 .ss-competitions-columns .ss-competition-card-footer {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
   margin-top: auto;
   box-sizing: border-box;
   width: 100%;
   padding: 1.5rem 1.5rem 1.5rem;
+  background: linear-gradient(to bottom, rgb(12 10 9 / 0) 0%, rgb(12 10 9 / 92%) 12%, rgb(12 10 9 / 98%) 100%);
 }
 
 @media (min-width: 640px) {

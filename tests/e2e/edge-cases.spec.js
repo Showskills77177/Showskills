@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { openShirtGiveawayEntry } from '../support/entry.mjs'
 import { completeE2eMockCheckout } from '../support/paymentFlow.mjs'
+import { shirtGiveawayEmailInput } from '../support/selectors.mjs'
 
 test.describe('Edge cases & errors', () => {
   test('shirt giveaway rejects incorrect qualification answer', async ({ page }) => {
     await openShirtGiveawayEntry(page)
     await page.getByLabel(/Full name/i).first().fill('Edge Case')
     await page.getByLabel(/Qualification question/i).fill('wrong answer')
-    await page.getByLabel(/^Email$/i).fill('edge@example.test')
+    await shirtGiveawayEmailInput(page).fill('edge@example.test')
     await page.locator('#modal-kick-phone').fill('07123456789')
     await page.getByRole('checkbox', { name: /Subscribe me to ShowSkills/i }).check()
     await page.locator('label:has(input[name="kick-social-platform"][value="tiktok"])').click()
@@ -39,7 +40,7 @@ test.describe('Edge cases & errors', () => {
     await qInputs.nth(1).fill('wrong')
     await qInputs.nth(2).fill('wrong')
     await page.getByRole('button', { name: 'Submit answers' }).click()
-    await expect(page.getByText(/do not qualify for the prize/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/do not qualify for the main Legacy Bundle draw/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('unknown path falls back to home route', async ({ page }) => {

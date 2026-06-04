@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { installPageErrorAsserter } from '../support/console.mjs'
 import { openLegacyBundleEntry } from '../support/entry.mjs'
+import { expectCompetitionsPage } from '../support/selectors.mjs'
 
 const CORRECT = {
   q1: 'Bolton 4-0',
@@ -15,7 +16,7 @@ test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
     const name = 'E2E Legacy User'
 
     await page.goto('/competitions')
-    await expect(page.getByRole('heading', { name: 'Competitions' })).toBeVisible()
+    await expectCompetitionsPage(page)
     await openLegacyBundleEntry(page)
 
     await page.locator('#modal-paid-fullname').fill(name)

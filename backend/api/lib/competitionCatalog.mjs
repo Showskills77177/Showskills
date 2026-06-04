@@ -41,7 +41,7 @@ async function retireLiveTestBundle() {
     )
   } else {
     await query(
-      `UPDATE competition_bundles SET active = 0, updated_at = ? WHERE bundle_key = 'liveTest5'`,
+      `UPDATE competition_bundles SET active = 0, updated_at = $1 WHERE bundle_key = 'liveTest5'`,
       [now],
     )
   }
@@ -573,7 +573,6 @@ export async function createCompetition({
   const paidVal = dbIsPostgres() ? entryMethods.allowPaidEntry : entryMethods.allowPaidEntry ? 1 : 0
   const freeVal = dbIsPostgres() ? entryMethods.allowFreeOnline : entryMethods.allowFreeOnline ? 1 : 0
   const postalVal = dbIsPostgres() ? entryMethods.allowPostalEntry : entryMethods.allowPostalEntry ? 1 : 0
-  const featuredVal = dbIsPostgres() ? Boolean(featuredOnHomepage) : featuredOnHomepage ? 1 : 0
   const featuredForInsert = kind === COMPETITION_KIND.giveaway ? false : featuredOnHomepage
   const featuredInsertVal = dbIsPostgres() ? Boolean(featuredForInsert) : featuredForInsert ? 1 : 0
   try {

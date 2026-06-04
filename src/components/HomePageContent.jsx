@@ -20,7 +20,7 @@ import { LegacyBundleImageryCaption } from '../components/LegacyBundleImageryCap
 import { EditableSectionOverlay } from '../components/admin/EditableSectionOverlay'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { mergePrizeImages } from '../../shared/homepageLayout.mjs'
-import { liveOffsetStyle, offsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
+import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
@@ -343,8 +343,6 @@ export function HomePageContent({
   ) : null
 
 
-  const introOffsets = resolveLayoutOffsets(intro.offsets || {}, intro.mobileOffsets || {}, layoutViewport)
-  const prizesOffsets = resolveLayoutOffsets(prizes.offsets || {}, prizes.mobileOffsets || {}, layoutViewport)
   const detailsOffsets = resolveLayoutOffsets(details.offsets || {}, details.mobileOffsets || {}, layoutViewport)
   const bundlesOffsets = resolveLayoutOffsets(bundles.offsets || {}, bundles.mobileOffsets || {}, layoutViewport)
   const detailsPanelScale = detailsOffsets.panel?.scale ?? 1

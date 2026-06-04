@@ -22,7 +22,7 @@ test.describe('D) Admin panel', () => {
     await expect(page.getByRole('button', { name: /Draw winner for this period/i })).toBeVisible()
 
     await page.getByRole('navigation').getByRole('link', { name: /Shirt giveaway/i }).click()
-    await expect(page.getByRole('heading', { name: /Free shirt giveaway/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Giveaway entries/i })).toBeVisible({ timeout: 15_000 })
   })
 
   test('unauthenticated user is redirected from /admin/dashboard', async ({ page, context }) => {

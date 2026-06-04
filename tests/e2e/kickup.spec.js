@@ -44,7 +44,7 @@ test.describe('C) Free shirt giveaway', () => {
     await openShirtGiveawayEntry(page)
     await page.getByLabel(/Full name/i).first().fill('Incomplete Entry')
     await page.getByLabel(/Qualification question/i).fill('Ronaldo R9')
-    await page.getByLabel(/^Email$/i).fill('incomplete@example.test')
+    await page.locator('#modal-kick-email').fill('incomplete@example.test')
     await page.locator('#modal-kick-phone').fill('07123456789')
     await page.getByRole('checkbox', { name: /I agree to the/i }).check()
     await page.getByRole('button', { name: /Submit giveaway entry/i }).click()

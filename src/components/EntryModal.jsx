@@ -16,15 +16,14 @@ import {
 } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
 import {
-  CONSOLATION_PRIZE_FREE_APPLIES,
-  CONSOLATION_PRIZE_PAID_THRESHOLD,
-  CONSOLATION_PRIZE_SUMMARY,
   CONSOLATION_NOT_AWARDED_GENERIC,
   CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD,
+  CONSOLATION_PRIZE_SUMMARY,
   formatConsolationAwardMessage,
   LEGACY_SKILL_ONE_ATTEMPT_NOTICE,
   paidSpendQualifiesForConsolation,
 } from '../../shared/consolationShirtGiveaway.mjs'
+import { ConsolationTermsLink } from './ConsolationTermsLink'
 import { PromoterAddress } from './PromoterAddress'
 import { ErrorBanner } from './ErrorBanner'
 import { ModalPortal } from './ModalPortal'
@@ -304,10 +303,7 @@ export function EntryModal() {
                 for the main draw — you have <strong className="text-stone-400">one attempt</strong> per entry. The winner
                 is picked at random from correct entries only.
               </p>
-              <p className="mt-2 rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-xs leading-relaxed text-stone-400">
-                <strong className="text-stone-300">Consolation prize:</strong> {CONSOLATION_PRIZE_SUMMARY}{' '}
-                {CONSOLATION_PRIZE_PAID_THRESHOLD} {CONSOLATION_PRIZE_FREE_APPLIES} {TICKET_PURCHASE_NON_REFUND_NOTICE}
-              </p>
+              <ConsolationTermsLink onOpenTerms={openTerms} className="mt-2" />
               {paidPostCheckout && paidQuizSubmitted ? (
                 <div className="mt-4 flex flex-col gap-4 text-center">
                   <div className="rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-emerald-950/50 to-stone-950/80 px-5 py-8">
@@ -485,6 +481,7 @@ export function EntryModal() {
                     entryMethods={paidEntryMethods}
                     postalCompetitionName={postalCompetitionName}
                     competitionTitle={paidCompetitionTitle}
+                    onOpenTerms={openTerms}
                   />
                   {paidEntryRoute === 'free_online' ? (
                     <>
@@ -575,17 +572,21 @@ export function EntryModal() {
                       </div>
                       <p className="text-xs leading-relaxed text-stone-500">
                         Max 3 free online entries per name and address. Verify your card first (£0.00 authorisation, no
-                        charge), then answer the {skillQuestionLabel}. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}{' '}
-                        {CONSOLATION_PRIZE_SUMMARY} {CONSOLATION_PRIZE_FREE_APPLIES}
+                        charge), then answer the {skillQuestionLabel}. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
                       </p>
+                      <ConsolationTermsLink onOpenTerms={openTerms} />
                       {freeCardVerified ? (
                         <form className="flex flex-col gap-4" onSubmit={handleFreeQuizSubmit}>
                           <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
                             <p className="font-medium text-teal-50">Card verified</p>
                             <p className="mt-1 text-teal-100/90">
                             Answer all {skillQuestionLabel} below. You only qualify for the main draw if every answer is
-                              correct. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE} If you get them wrong, you receive 2 automatic entries into the separate Free Ronaldo Shirt Giveaway.
+                              correct. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
                             </p>
+                            <ConsolationTermsLink
+                              onOpenTerms={openTerms}
+                              className="mt-2 text-xs leading-relaxed text-teal-200/80"
+                            />
                           </div>
                           {paidSkillQuestions.map((q, i) => {
                             const questionKey = q.questionKey || q.id
@@ -734,8 +735,7 @@ export function EntryModal() {
                         {TICKET_PURCHASE_NON_REFUND_NOTICE}
                       </p>
                       <p className="rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-center text-[11px] leading-snug text-stone-400">
-                        <strong className="text-stone-300">Skill quiz:</strong> {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}{' '}
-                        {CONSOLATION_PRIZE_PAID_THRESHOLD}
+                        <strong className="text-stone-300">Skill quiz:</strong> {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
                       </p>
                       {E2E_SIMULATE_CHECKOUT ? (
                         <button

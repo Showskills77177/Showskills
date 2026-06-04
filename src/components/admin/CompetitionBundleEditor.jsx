@@ -42,7 +42,7 @@ function gbpInputToPence(value) {
  *   competitionTitle?: string,
  * }} props
  */
-export function CompetitionBundleEditor({ bundles, onChange, compact = false, competitionTitle = '' }) {
+export function CompetitionBundleEditor({ bundles, onChange, compact = false }) {
   function updateRow(index, patch) {
     onChange(bundles.map((row, i) => (i === index ? { ...row, ...patch } : row)))
   }

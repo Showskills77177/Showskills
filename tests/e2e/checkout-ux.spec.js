@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { installPageErrorAsserter } from '../support/console.mjs'
 import { openLegacyBundleEntry } from '../support/entry.mjs'
 import { fillPaidEntryForm } from '../support/paymentFlow.mjs'
+import { contactFormEmailInput, expectCompetitionsPage } from '../support/selectors.mjs'
 
 test.describe('Checkout & site UX (cross-browser)', () => {
   test('home and competitions load without console errors', async ({ page }) => {
@@ -9,7 +10,7 @@ test.describe('Checkout & site UX (cross-browser)', () => {
     await page.goto('/')
     await expect(page.getByRole('button', { name: 'Enter Bundle Draw' })).toBeVisible()
     await page.goto('/competitions')
-    await expect(page.getByRole('heading', { name: 'Competitions' })).toBeVisible()
+    await expectCompetitionsPage(page)
     await assertClean()
   })
 
@@ -75,7 +76,7 @@ test.describe('Checkout & site UX (cross-browser)', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/contact')
 
-    const email = page.getByLabel(/^Email$/i)
+    const email = contactFormEmailInput(page)
     await email.fill('contact@example.test')
     const fontPx = await email.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
     expect(fontPx).toBeGreaterThanOrEqual(16)

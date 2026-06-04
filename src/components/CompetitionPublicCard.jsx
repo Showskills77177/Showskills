@@ -91,7 +91,10 @@ export function CompetitionPublicCard({
     const moveOnly = opts.moveOnly === true
     const widthOnly = opts.uniformScale ? false : opts.widthOnly !== false
     const raw = cardOffsets[offsetKey] || { x: 0, y: 0, scale: 1 }
-    const pos = moveOnly ? { ...raw, scale: 1 } : raw
+    let pos = moveOnly ? { ...raw, scale: 1 } : raw
+    if (!editorMode && offsetKey === 'enter') {
+      pos = { ...pos, y: Math.max(0, Number(pos.y) || 0) }
+    }
     if (!editorMode || !isLegacyBundle) {
       const style = liveOffsetStyle(moveOnly ? { x: pos.x, y: pos.y, scale: 1 } : pos, {
         transformOrigin: opts.transformOrigin || 'center top',
@@ -259,32 +262,36 @@ export function CompetitionPublicCard({
         </p>,
         { widthOnly: false },
       )}
-      {competition.allowPostalEntry ? (
-        <p className="mt-2 text-xs text-stone-600 sm:text-sm">
-          Postal entries: write <span className="text-stone-400">{competition.postalCompetitionName}</span> on your
-          envelope → {POSTAL_ENTRY_ADDRESS}
-        </p>
-      ) : null}
     </div>
   )
 
+  const postalLine = competition.allowPostalEntry ? (
+    <p className="mb-3 text-xs leading-relaxed text-stone-600 sm:mb-4 sm:text-sm">
+      Postal entries: write <span className="text-stone-400">{competition.postalCompetitionName}</span> on your
+      envelope → {POSTAL_ENTRY_ADDRESS}
+    </p>
+  ) : null
+
   const enterButton =
     isLegacyBundle && (editorMode || (!preview && onEnter))
-      ? cardDragWrap(
-          'comp_paid_card_enter',
-          'Enter button',
-          'enter',
+      ? (
           <div className="ss-competition-card-actions ss-competition-card-footer">
-            <button
-              type="button"
-              onClick={onEnter}
-              tabIndex={editorMode ? -1 : undefined}
-              className="ss-competition-enter-btn ss-competition-enter-btn--paid"
-            >
-              {enterLabel}
-            </button>
-          </div>,
-          { widthOnly: false },
+            {postalLine}
+            {cardDragWrap(
+              'comp_paid_card_enter',
+              'Enter button',
+              'enter',
+              <button
+                type="button"
+                onClick={onEnter}
+                tabIndex={editorMode ? -1 : undefined}
+                className="ss-competition-enter-btn ss-competition-enter-btn--paid"
+              >
+                {enterLabel}
+              </button>,
+              { widthOnly: false },
+            )}
+          </div>
         )
       : null
 
@@ -308,7 +315,7 @@ export function CompetitionPublicCard({
         ? cardDragWrap('comp_paid_card_image', 'Bundle prize images', 'imagery', imageryPanel)
         : imageryPanel}
       <div
-        className={`flex min-h-0 flex-1 flex-col ${editorMode && isLegacyBundle ? 'overflow-visible' : ''}`}
+        className={`flex min-h-0 flex-1 flex-col ${editorMode && isLegacyBundle ? 'overflow-visible' : 'overflow-hidden'}`}
         data-editor-align-group
         data-editor-center-root
       >
@@ -316,6 +323,7 @@ export function CompetitionPublicCard({
         {enterButton}
         {!isLegacyBundle && !preview && onEnter ? (
           <div className="ss-competition-card-actions ss-competition-card-footer">
+            {postalLine}
             <button
               type="button"
               onClick={onEnter}

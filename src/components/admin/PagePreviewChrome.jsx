@@ -74,7 +74,6 @@ export function PagePreviewChrome({
   highlight,
   onHighlight,
   fullscreen = false,
-  editorMode = false,
   selectedBlockId = null,
   onSelectBlock,
   onPatchShell,

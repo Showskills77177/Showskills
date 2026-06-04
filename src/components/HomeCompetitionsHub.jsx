@@ -7,7 +7,8 @@ import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
 import { usePublishedGiveaways } from '../hooks/usePublicGiveaway'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
 
-function SectionLabel({ icon: Icon, tone, children }) {
+function SectionLabel({ icon, tone, children }) {
+  const IconMark = icon
   const tones = {
     paid: 'border-emerald-400/35 bg-emerald-950/45 text-emerald-200',
     free: 'border-lime-400/35 bg-lime-950/40 text-lime-200',
@@ -16,7 +17,7 @@ function SectionLabel({ icon: Icon, tone, children }) {
     <p
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${tones[tone]}`}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+      <IconMark className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
       {children}
     </p>
   )

@@ -176,9 +176,10 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
             allowAll={false}
             label="Competition context"
           />
-          <label className="flex items-center gap-2 text-sm text-stone-400">
+          <label htmlFor="admin-email-template" className="flex items-center gap-2 text-sm text-stone-400">
             Template
             <select
+              id="admin-email-template"
               value={emailType}
               onChange={(e) => setEmailType(e.target.value)}
               className="max-w-[20rem] rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-stone-200"
