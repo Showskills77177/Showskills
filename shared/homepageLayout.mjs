@@ -51,11 +51,11 @@ export function defaultHomepageLayout() {
         visible: true,
         brandTitle: 'ShowSkills Rewards',
         headline:
-          'Ronaldo Legacy Bundle — pay online or enter by post, then answer 3 hard skill questions for the full kit draw. One attempt per entry — all correct to qualify.',
+          'Signed Football Legend Bundle — pay online or enter by post, then answer 3 hard skill questions for the full kit draw. One attempt per entry — all correct to qualify.',
         highlightPhrase: '3 hard skill questions',
         consolationCopy:
           'Get the questions wrong? You automatically receive 2 entries into the separate Free Ronaldo Shirt Giveaway (consolation prize). Tickets are not refunded.',
-        helperCopy: 'Enter the Legacy Bundle draw below or visit Competitions for more ways to play.',
+        helperCopy: 'Enter the Signed Football Legend Bundle draw below or visit Competitions for more ways to play.',
         prizeLineupLabel: 'Prize lineup',
         shirtLinkLabel: 'Free shirt giveaway',
         offsets: { ...DEFAULT_INTRO_OFFSETS },
@@ -74,7 +74,7 @@ export function defaultHomepageLayout() {
       },
       hero_details: {
         visible: true,
-        title: 'Ronaldo Legacy Bundle details',
+        title: 'Signed Football Legend Bundle details',
         offsets: { ...DEFAULT_DETAILS_OFFSETS },
       },
       ticket_bundles: {
@@ -88,7 +88,7 @@ export function defaultHomepageLayout() {
           'Two ways to play on ShowSkills Rewards — paid prize draws with ticket bundles, and separate free giveaways.',
         paidTitle: 'Main paid competitions',
         paidSubtitle:
-          'Ronaldo Legacy Bundle and other main draws — buy tickets or enter by post, then answer three skill questions.',
+          'Signed Football Legend Bundle and other main draws — buy tickets or enter by post, then answer three skill questions.',
         freeTitle: 'Free giveaways',
         freeSubtitle:
           'No payment — qualify with a simple question and enter the shirt draw and other free promotions.',

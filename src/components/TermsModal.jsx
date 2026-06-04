@@ -6,6 +6,8 @@ import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { LegalDisclaimerNotice } from './LegalDisclaimerNotice'
 import { PrizeAuthenticityNotice } from './PrizeAuthenticityNotice'
+import { WinnerPhotographyConsentTerms } from './WinnerPhotographyConsentTerms'
+import { WINNER_PHOTOGRAPHY_BUNDLE_TERMS_SUMMARY } from '../../shared/winnerPhotographyConsent.mjs'
 
 function PaidTicketNonRefundCallout() {
   return (
@@ -27,7 +29,7 @@ function PrivacyPolicySection() {
         <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
           Privacy Policy
         </h2>
-        <p className="mt-2 text-xs text-zinc-500">Last updated: 26 May 2026</p>
+        <p className="mt-2 text-xs text-zinc-500">Last updated: 2 June 2026</p>
         <p className="mt-4 text-zinc-300">
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
@@ -65,7 +67,7 @@ function PrivacyPolicySection() {
           on our servers)
         </li>
         <li>
-          For <strong>free online entry</strong> to the Ronaldo Legacy Bundle, we may ask you to complete a{' '}
+          For <strong>free online entry</strong> to the Signed Football Legend Bundle, we may ask you to complete a{' '}
           <strong>£0.00 card authorisation</strong> (verification only — you are not charged). Your card details are
           entered only into <strong>Cashflows&apos; secure payment fields</strong>.{' '}
           <strong>ShowSkills Rewards does not receive, store, or retain your card details</strong> from that £0
@@ -101,7 +103,29 @@ function PrivacyPolicySection() {
         <li>Verifying skill answers and qualifying entries</li>
         <li>Responding to enquiries via our contact form or email</li>
         <li>Improving our website (anonymous analytics, e.g. Vercel Analytics)</li>
+        <li>
+          <strong>Winner announcements:</strong> if you win, we may photograph or film you with the prize and use
+          those images or videos on our website, social media, and promotional materials — see{' '}
+          <a
+            href="#ss-privacy-winner-photography"
+            className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+          >
+            winner photography &amp; promotional consent
+          </a>{' '}
+          below and in the Terms above
+        </li>
       </ul>
+
+      <WinnerPhotographyConsentTerms
+        id="ss-privacy-winner-photography"
+        headingLevel="h3"
+        showTitle
+      />
+      <p className="mb-3 text-zinc-300">
+        Where we rely on your agreement to this use, you may withdraw consent for future promotional use by contacting
+        us; this does not affect content already published in good faith before withdrawal, and refusing photography
+        when you win is subject to the valid-reason rules in our Terms.
+      </p>
 
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.3 Legal basis for processing</h3>
       <ul className="mb-3 list-inside list-disc space-y-1">
@@ -110,6 +134,10 @@ function PrivacyPolicySection() {
         </li>
         <li>
           <strong>Legitimate interests</strong> — to run, secure, and improve our service
+        </li>
+        <li>
+          <strong>Consent</strong> — where you agree to winner photography and promotional use (see winner photography
+          section above)
         </li>
         <li>
           <strong>Legal obligation</strong> — where required by law (e.g. prize winner verification or tax records)
@@ -141,6 +169,11 @@ function PrivacyPolicySection() {
         </li>
         <li>
           <strong>Winner data:</strong> basic details may be kept longer for legal, tax, and record-keeping purposes
+        </li>
+        <li>
+          <strong>Winner photos and videos:</strong> retained for as long as needed for winner announcements and
+          reasonable promotional use on ShowSkills Rewards channels, unless you ask us to remove specific content and
+          we can do so without undermining records of a completed draw
         </li>
         <li>
           <strong>Payment data:</strong> handled by our payment providers under their own retention policies — we do not
@@ -246,7 +279,7 @@ export function TermsModal({ open, onClose }) {
         <div className="overflow-y-auto px-6 py-5 text-left text-sm leading-relaxed text-zinc-400">
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
-            promotions in the United Kingdom, including the paid <strong>Ronaldo Legacy Bundle</strong> skill competition
+            promotions in the United Kingdom, including the paid <strong>Signed Football Legend Bundle</strong> skill competition
             and the separate <strong>free Ronaldo shirt giveaway</strong>. By entering, you agree to these terms.
           </p>
 
@@ -270,7 +303,7 @@ export function TermsModal({ open, onClose }) {
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">2. Paid competition — skill-based (not a lottery)</h3>
           <p className="mb-3">
-            The <strong>Ronaldo Legacy Bundle</strong> draw is a <strong>skill-based competition</strong>, not a lottery.
+            The <strong>Signed Football Legend Bundle</strong> draw is a <strong>skill-based competition</strong>, not a lottery.
             Each competition runs for a defined <strong>entry period</strong>; only qualifying entries received within that
             period are included in the draw for that period. When a period closes, the winner is drawn only from that
             period&apos;s pool — entries from earlier or later periods are not mixed in. After purchasing ticket(s), you must submit <strong>three free-text answers</strong> about
@@ -282,34 +315,35 @@ export function TermsModal({ open, onClose }) {
 
           <div className="mb-3 rounded-lg border border-stone-700/50 bg-stone-900/50 px-3 py-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Ronaldo Legacy Bundle — legal notice
+              Signed Football Legend Bundle — legal notice
             </p>
             <p className="mb-2 text-zinc-200">
-              The <strong>Ronaldo Legacy Bundle</strong> prizes (signed memorabilia, museum football, iPhone, and case)
+              The <strong>Signed Football Legend Bundle</strong> prizes (signed memorabilia, museum football, iPhone, and case)
               are <strong>genuine, legally purchased rare collectibles</strong> — not official licensed merchandise from
               Cristiano Ronaldo, CR7, Manchester United, or Apple.
             </p>
-            <p className="text-zinc-300">
+            <p className="mb-2 text-zinc-300">
               <strong>ShowSkills Rewards is not affiliated with, endorsed by, sponsored by, or officially connected to</strong>{' '}
               Cristiano Ronaldo, CR7, Manchester United Football Club, or Apple Inc. Bundle imagery may be{' '}
               <strong>AI-generated or edited for illustration</strong>; see section 13 and the Privacy Policy for the
               full intellectual property notice.
             </p>
+            <p className="text-zinc-300">{WINNER_PHOTOGRAPHY_BUNDLE_TERMS_SUMMARY}</p>
           </div>
 
           <h3 id="ss-terms-consolation-prize" className="mb-2 mt-4 font-semibold text-stone-200">
             2a. Consolation prize (Free Ronaldo Shirt Giveaway)
           </h3>
           <p className="mb-3">
-            The main Legacy Bundle draw remains strictly skill-based: incorrect answers do <strong>not</strong> qualify for
+            The main Signed Football Legend Bundle draw remains strictly skill-based: incorrect answers do <strong>not</strong> qualify for
             the bundle prize, and <strong>tickets are not refunded</strong> if your skill answers are wrong.
           </p>
           <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
             <strong>Consolation prize:</strong> If you get the three skill questions wrong, you automatically receive{' '}
             <strong>2 entries</strong> into the separate <strong>Free Ronaldo Shirt Giveaway</strong> (consolation prize).
-            This applies equally to <strong>free online Legacy Bundle entrants</strong> and to{' '}
+            This applies equally to <strong>free online Signed Football Legend Bundle entrants</strong> and to{' '}
             <strong>paid ticket buyers who spend £10 or more on tickets in a single purchase</strong>. Consolation entries
-            do <strong>not</strong> enter you into the main Legacy Bundle draw and do <strong>not</strong> replace a
+            do <strong>not</strong> enter you into the main Signed Football Legend Bundle draw and do <strong>not</strong> replace a
             qualifying entry. They are recorded automatically — you do not need to complete the separate shirt giveaway form
             again for these consolation entries.
           </p>
@@ -323,7 +357,9 @@ export function TermsModal({ open, onClose }) {
             verify answers and eligibility before confirming a winner.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Ronaldo Legacy Bundle)</h3>
+          <WinnerPhotographyConsentTerms id="ss-terms-winner-photography-consent" headingLevel="h3" />
+
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Signed Football Legend Bundle)</h3>
           <p className="mb-3">
             <strong>No purchase necessary.</strong> You may enter the same draw <strong>without payment</strong> by post.
             Send your <strong>full name</strong>, <strong>full postal address</strong>, <strong>email address</strong>, and
@@ -336,10 +372,10 @@ export function TermsModal({ open, onClose }) {
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">
-            5. Free online entry — £0 card verification (Ronaldo Legacy Bundle)
+            5. Free online entry — £0 card verification (Signed Football Legend Bundle)
           </h3>
           <p className="mb-3">
-            Where offered on the site, you may enter the Ronaldo Legacy Bundle draw <strong>online without paying</strong>{' '}
+            Where offered on the site, you may enter the Signed Football Legend Bundle draw <strong>online without paying</strong>{' '}
             subject to entry limits shown at checkout. This is part of our <strong>no purchase necessary</strong> free entry
             route alongside postal entry. Before you submit your skill answers, we may require{' '}
             <strong>£0 debit card verification</strong> — a <strong>zero-pound authorisation only</strong> (you are{' '}
@@ -367,7 +403,7 @@ export function TermsModal({ open, onClose }) {
             need one); and provide your social handle so we can verify engagement. The prize is a{' '}
             <strong>signed Cristiano Ronaldo Manchester United home shirt from the {SHIRT_GIVEAWAY_SEASON_LABEL}</strong>{' '}
             (not the full bundle). It does <strong>not</strong> form part of
-            the paid Ronaldo Legacy Bundle competition unless expressly stated. Legacy Bundle entrants who get the three skill
+            the paid Signed Football Legend Bundle competition unless expressly stated. Signed Football Legend Bundle entrants who get the three skill
             questions wrong may receive <strong>automatic consolation entries</strong> into this shirt draw — see section 2a above.
           </p>
           <p className="mb-3">
@@ -385,6 +421,14 @@ export function TermsModal({ open, onClose }) {
             By entering, you grant the promoter a <strong>non-exclusive, royalty-free, worldwide licence</strong> to use
             your entry (including name, voice, image, and likeness as in your submission) to run the promotions,
             announce results, and reasonable related marketing, unless you withdraw consent in writing where applicable.
+            If you <strong>win</strong>, additional rules apply to photography and video with the prize — see{' '}
+            <a
+              href="#ss-terms-winner-photography-consent"
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              Winner Photography &amp; Promotional Consent
+            </a>{' '}
+            above.
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">8. Winner verification</h3>
@@ -400,7 +444,7 @@ export function TermsModal({ open, onClose }) {
             we agree otherwise; no cash alternative is guaranteed; we may substitute items of similar value if needed.
           </p>
           <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
-            <strong>Authenticity:</strong> Legacy Bundle prizes are{' '}
+            <strong>Authenticity:</strong> Signed Football Legend Bundle prizes are{' '}
             <strong>genuine, legally purchased rare collectibles</strong> acquired on the open market.{' '}
             <strong>Illustrative images</strong> on the site may be{' '}
             <strong>AI-generated or heavily edited</strong> — see section 13 for the full disclaimer. Actual physical

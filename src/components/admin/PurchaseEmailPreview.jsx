@@ -12,6 +12,8 @@ import {
   purchaseConfirmationSubjectQuizPending,
 } from '../../../shared/purchaseConfirmationEmail.mjs'
 import { buildCompleteQuizUrl } from '../../../shared/quizLinks.mjs'
+import { buildPrizeRevealUrl } from '../../../shared/prizeReveal.mjs'
+import { DEV_PREVIEW_RESUME_TOKEN } from '../../../shared/devEmailPreview.mjs'
 import {
   buildQuizResultHtml,
   buildQuizResultText,
@@ -57,8 +59,11 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
     [ticketCount],
   )
 
-  const resumeToken = 'PREVIEW_RESUME_TOKEN_SAMPLE_32chars_ok'
+  const resumeToken = DEV_PREVIEW_RESUME_TOKEN
   const completeQuizUrl = buildCompleteQuizUrl(siteUrl, resumeToken)
+  const prizeRevealUrl =
+    emailType === 'quiz_ok' ? buildPrizeRevealUrl(siteUrl, resumeToken) : ''
+  const forBrowserPreview = true
 
   const { html, text, subject, description } = useMemo(() => {
     if (emailType === 'quiz_pending') {
@@ -72,6 +77,7 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
         siteUrl,
         quizPending: true,
         completeQuizUrl,
+        forBrowserPreview,
       }
       return {
         html: buildPurchaseConfirmationHtml(props),
@@ -96,18 +102,20 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
       ticketNumbers: underTen ? [ticketNumbers[0] || 'SS-12345678'] : ticketNumbers,
       consolationShirtEntries: withConsolation ? 2 : 0,
       consolationShirtEntryNumbers: withConsolation ? SHIRT_ENTRY_SAMPLE : [],
+      prizeRevealUrl,
+      forBrowserPreview,
     }
     return {
       html: buildQuizResultHtml(sample),
       text: buildQuizResultText(sample),
       subject: quizResultSubject(sample.orderRef, sample.allCorrect),
       description: allCorrect
-        ? 'Sent after correct skill answers. Legacy Bundle ticket numbers enter the main draw pool.'
+        ? 'Sent after correct skill answers. Signed Football Legend Bundle ticket numbers enter the main draw pool.'
         : withConsolation
           ? 'Sent after wrong answers on a £10+ purchase. Includes Legacy ticket numbers (not in draw), shirt photo, and 2 SG- entry numbers for the Free Ronaldo Shirt Giveaway.'
           : 'Sent after wrong answers when spend is under £10 in one purchase. No consolation shirt entries — explains the £10 threshold.',
     }
-  }, [emailType, siteUrl, ticketCount, ticketNumbers, completeQuizUrl])
+  }, [emailType, siteUrl, ticketCount, ticketNumbers, completeQuizUrl, prizeRevealUrl])
 
   if (emailGroup === 'newsletter') {
     return (
@@ -214,7 +222,7 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
         {competition !== defaultMainDrawCompetitionSlug() ? (
           <span className="text-stone-600">
             {' '}
-            — copy still reflects Legacy Bundle until MJ templates are added.
+            — copy still reflects Signed Football Legend Bundle until MJ templates are added.
           </span>
         ) : null}
       </p>

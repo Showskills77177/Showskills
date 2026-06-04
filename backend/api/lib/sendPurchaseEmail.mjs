@@ -21,6 +21,7 @@ export async function sendPurchaseConfirmationEmail({
   purchaseRef,
   quizPending = false,
   completeQuizUrl = '',
+  prizeRevealUrl = '',
 }) {
   const apiKey = getResendApiKey()
   if (!apiKey) {
@@ -47,6 +48,7 @@ export async function sendPurchaseConfirmationEmail({
     siteUrl,
     quizPending: Boolean(quizPending),
     completeQuizUrl: typeof completeQuizUrl === 'string' ? completeQuizUrl : '',
+    prizeRevealUrl: typeof prizeRevealUrl === 'string' ? prizeRevealUrl : '',
   }
 
   const payload = {

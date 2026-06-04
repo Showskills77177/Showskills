@@ -84,7 +84,7 @@ export async function ensureDefaultCompetitionPeriod(competition = DRAW_COMPETIT
     typeof title === 'string' && title.trim()
       ? `${title.trim()} — Inaugural period`
       : competition === DRAW_COMPETITION_SLUG
-        ? 'Ronaldo Legacy Bundle — Inaugural Competition'
+        ? 'Signed Football Legend Bundle — Inaugural Competition'
         : competition === MJ_COMPETITION_SLUG
           ? 'Michael Jackson Signed Album — Inaugural Competition'
           : `${competition} — Inaugural period`

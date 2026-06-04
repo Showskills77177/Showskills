@@ -8,6 +8,7 @@ import {
   resolvePublicSiteUrlForEmail,
 } from './purchaseConfirmationEmail.mjs'
 import { buildCompleteQuizUrl } from './quizLinks.mjs'
+import { buildPrizeRevealUrl } from './prizeReveal.mjs'
 import { buildQuizResultHtml } from './quizResultEmail.mjs'
 import { buildWelcomeEmailHtml, buildCampaignEmailHtml, normalizeCampaignBodyHtml } from './newsletterEmail.mjs'
 
@@ -26,6 +27,8 @@ describe('email templates', () => {
       completeQuizUrl: url,
     })
     assert.match(html, /Your questions are not answered/i)
+    assert.doesNotMatch(html, /View full bundle imagery/i)
+    assert.doesNotMatch(html, /\/prize-reveal/)
     assert.match(html, /Answer your questions now/i)
     assert.match(html, /SS-12345678/)
     assert.ok(html.includes(url.replace(/&/g, '&amp;')) || html.includes(url))
@@ -49,6 +52,7 @@ describe('email templates', () => {
   })
 
   it('completed quiz email has no resume link', () => {
+    const revealUrl = buildPrizeRevealUrl('https://showskills.co.uk', 'b'.repeat(32))
     const html = buildQuizResultHtml({
       customerFullName: 'Test',
       allCorrect: true,
@@ -58,10 +62,27 @@ describe('email templates', () => {
       quantity: 1,
       amountPence: 75,
       ticketNumbers: ['SS-ABCDEF00'],
+      prizeRevealUrl: revealUrl,
     })
     assert.match(html, /qualify/i)
+    assert.match(html, /View full bundle imagery/i)
+    assert.ok(html.includes('/prize-reveal'))
+    assert.match(html, /one time only/i)
     assert.doesNotMatch(html, /complete-quiz=1/i)
     assert.doesNotMatch(html, /Your questions are not answered/i)
+  })
+
+  it('not qualified quiz email has no prize preview', () => {
+    const html = buildQuizResultHtml({
+      customerFullName: 'Test',
+      allCorrect: false,
+      siteUrl: 'https://showskills.co.uk',
+      orderRef: 'ORD-2',
+      ticketNumbers: ['SS-11111111'],
+      prizeRevealUrl: buildPrizeRevealUrl('https://showskills.co.uk', 'b'.repeat(32)),
+    })
+    assert.doesNotMatch(html, /View full bundle imagery/i)
+    assert.doesNotMatch(html, /\/prize-reveal/)
   })
 
   it('not qualified quiz email mentions consolation entries when awarded', () => {

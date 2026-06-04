@@ -30,6 +30,7 @@ import NewsletterPreferencesPage from './pages/NewsletterPreferencesPage'
 import NewsletterUnsubscribePage from './pages/NewsletterUnsubscribePage'
 import AdminNewsletterPage from './pages/admin/NewsletterPage'
 import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
+import PrizeRevealPage from './pages/PrizeRevealPage'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -43,6 +44,7 @@ export default function App() {
       <EntryFlowProvider>
         <SiteAnalytics />
         <Routes>
+          <Route path="/prize-reveal" element={<PrizeRevealPage />} />
           {import.meta.env.DEV ? (
             <Route
               path="/dev/email-preview"

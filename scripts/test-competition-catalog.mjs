@@ -18,6 +18,7 @@ const {
   createCompetition,
 } = await import('../backend/api/lib/competitionCatalog.mjs')
 const { DRAW_COMPETITION_SLUG } = await import('../shared/competitionPeriods.mjs')
+const { TICKET_BUNDLES } = await import('../shared/ticketBundles.mjs')
 const { listCompetitionPeriods } = await import('../backend/api/lib/competitionPeriods.mjs')
 const { resolveAdminMainDrawCompetition } = await import('../backend/api/lib/checkoutBundle.mjs')
 
@@ -43,16 +44,29 @@ assert.ok(medium)
 assert.equal(medium.qty, 10)
 
 const updated = await upsertCompetitionBundle(DRAW_COMPETITION_SLUG, {
-  bundleKey: 'medium10',
-  title: 'Medium bundle (admin test)',
+  bundleKey: 'catalogTestMedium',
+  title: 'Medium bundle (catalog test)',
   qty: 10,
   totalPence: 599,
   line1: '10 tickets = £5.99',
   active: true,
 })
 assert.ok(updated.ok)
-const medium2 = await resolveTicketBundle(DRAW_COMPETITION_SLUG, 'medium10')
+const medium2 = await resolveTicketBundle(DRAW_COMPETITION_SLUG, 'catalogTestMedium')
 assert.equal(medium2.totalPence, 599)
+
+const canonicalMedium = TICKET_BUNDLES.find((b) => b.id === 'medium10')
+assert.ok(canonicalMedium)
+await upsertCompetitionBundle(DRAW_COMPETITION_SLUG, {
+  bundleKey: canonicalMedium.id,
+  title: canonicalMedium.title,
+  qty: canonicalMedium.qty,
+  totalPence: canonicalMedium.totalPence,
+  line1: canonicalMedium.line1,
+  line2: canonicalMedium.line2,
+  featured: canonicalMedium.featured,
+  active: true,
+})
 
 await updateCompetition(DRAW_COMPETITION_SLUG, {
   summary: 'Updated from catalog test',

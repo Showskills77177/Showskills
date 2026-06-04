@@ -1,5 +1,7 @@
+import { DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
+
 /** Competition names shown on entry forms, postal instructions, and FAQs. */
-export const COMPETITION_NAME_POSTAL = 'Ronaldo Legacy Bundle — ShowSkills Rewards'
+export const COMPETITION_NAME_POSTAL = `${DRAW_COMPETITION_LABEL} — ShowSkills Rewards`
 
 /** Promoter / postal entry address (UK). */
 export const PROMOTER_NAME = 'ShowSkills Rewards'

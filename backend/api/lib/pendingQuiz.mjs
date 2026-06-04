@@ -2,8 +2,10 @@ import { query } from './db.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 import { getTicketNumbersForPurchase } from './ticketNumbers.mjs'
 import { buildCompleteQuizUrl } from '../../../shared/quizLinks.mjs'
+import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
 import { resolveSiteUrl, getResendApiKey } from './resendConfig.mjs'
 import { ensureQuizResumeToken } from './quizResumeToken.mjs'
+import { DEV_PREVIEW_RESUME_TOKEN } from '../../../shared/devEmailPreview.mjs'
 import { sendPurchaseConfirmationEmail } from './sendPurchaseEmail.mjs'
 
 const COMPETITION = 'ronaldo_legacy_bundle'
@@ -53,6 +55,26 @@ async function getLatestPaidQuizOutcomeForTicket(userId, ticketId) {
 export async function getPendingPaidQuizByResumeToken(resumeToken) {
   const token = typeof resumeToken === 'string' ? resumeToken.trim() : ''
   if (token.length < 20) return null
+
+  if (
+    token === DEV_PREVIEW_RESUME_TOKEN &&
+    !process.env.VERCEL &&
+    !process.env.VERCEL_ENV &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    return {
+      pending: true,
+      alreadyAnswered: false,
+      ticketId: 'dev-preview-ticket',
+      orderRef: 'ORD-PREVIEW',
+      bundleId: 'medium10',
+      quantity: 10,
+      ticketNumbers: ['SS-PREVIEW01', 'SS-PREVIEW02'],
+      customerEmail: 'preview@local.test',
+      customerFullName: 'Preview User',
+      resumeToken: token,
+    }
+  }
 
   await ensureTicketSchema()
   const t = await query(
@@ -192,7 +214,6 @@ export async function maybeSendUnansweredQuizTicketEmail({
   const resumeToken = await ensureQuizResumeToken(ticketId)
   const siteUrl = resolveSiteUrl()
   const completeQuizUrl = buildCompleteQuizUrl(siteUrl, resumeToken)
-
   const sent = await sendPurchaseConfirmationEmail({
     to,
     customerFullName,

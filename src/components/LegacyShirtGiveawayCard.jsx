@@ -9,8 +9,7 @@ import {
 } from '../../shared/shirtGiveaway.mjs'
 import { SHIRT_GIVEAWAY_CARD_STEP_TITLES } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { defaultShirtGiveawayCardLayout } from '../../shared/sitePageLayout.mjs'
-import { liveOffsetStyle, resolveLayoutOffsets } from '../../shared/layoutOffsets.mjs'
-import { LiveLayoutOffset } from './LiveLayoutOffset'
+import { resolveLayoutOffsets } from '../../shared/layoutOffsets.mjs'
 import { CompetitionCountdown } from './CompetitionCountdown'
 import { EditableDragFrame } from './admin/EditableDragFrame'
 import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
@@ -64,19 +63,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
     const widthOnly = opts.uniformScale ? false : opts.widthOnly !== false
     const raw = cardOffsets[offsetKey] || { x: 0, y: 0, scale: 1 }
     const pos = moveOnly ? { ...raw, scale: 1 } : raw
-    if (!editorMode) {
-      const style = liveOffsetStyle(moveOnly ? { x: pos.x, y: pos.y, scale: 1 } : pos, {
-        transformOrigin: opts.transformOrigin || 'center top',
-        widthOnly: moveOnly ? true : widthOnly,
-        scale: moveOnly ? 1 : (pos.scale ?? 1),
-      })
-      if (!style) return node
-      return (
-        <LiveLayoutOffset style={style} variant="card" className={opts.className}>
-          {node}
-        </LiveLayoutOffset>
-      )
-    }
+    if (!editorMode) return node
     return (
       <EditableDragFrame
         id={id}

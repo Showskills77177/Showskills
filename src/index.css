@@ -1351,7 +1351,7 @@ body {
   animation: none !important;
 }
 
-/* Homepage Legacy Bundle studio — fixed aspect slots so images never reflow on route change */
+/* Homepage Signed Football Legend Bundle studio — fixed aspect slots so images never reflow on route change */
 .ss-hero-prize-column .ss-prize-studio--hero {
   contain: layout style;
 }
@@ -1497,18 +1497,40 @@ body {
   width: 100%;
 }
 
+.ss-competition-card-legacy-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex-shrink: 0;
+  margin: 0;
+  margin-top: 0 !important;
+  padding: 0.75rem 1.5rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.ss-competition-card-legacy-stack > *,
+.ss-competition-card-legacy-stack__meta > * {
+  margin: 0;
+}
+
+.ss-competition-card-legacy-stack .ss-competition-enter-btn {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .ss-competition-card-legacy-stack {
+    padding: 0.75rem 2rem 2rem;
+  }
+}
+
 .ss-competition-card-action-stack {
   display: flex;
   flex-direction: column;
   gap: var(--ss-competition-stack-gap);
   padding: var(--ss-competition-stack-gap) 1.5rem 1.5rem;
   background: rgb(12 10 9 / 98%);
-}
-
-.ss-competition-card-legacy-stack {
-  flex-shrink: 0;
-  margin-top: 0 !important;
-  padding-top: 0.5rem;
 }
 
 .ss-competitions-columns .ss-competition-card-footer:not(.ss-competition-card-action-stack) {
@@ -1953,7 +1975,7 @@ body {
   transform: scale(0.98);
 }
 
-/* Hero cue → Ronaldo Legacy Bundle: motion + glow (honours reduced motion) */
+/* Hero cue → Signed Football Legend Bundle: motion + glow (honours reduced motion) */
 .ss-bundle-arrow {
   display: flex;
   align-items: center;
@@ -2874,5 +2896,169 @@ input.ss-cf-pay-button.ss-pay-cta {
 
   .ss-entry-modal-panel {
     max-height: min(88dvh, 720px);
+  }
+}
+
+/* Paid purchaser prize reveal — timed full bundle preview (email link only) */
+.ss-prize-reveal-page {
+  -webkit-touch-callout: none;
+}
+
+.ss-prize-reveal-panel {
+  padding: 1.5rem 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  background: linear-gradient(180deg, rgba(15, 41, 34, 0.9) 0%, rgba(5, 10, 9, 0.95) 100%);
+}
+
+.ss-prize-reveal-stage {
+  position: relative;
+  margin: 0 auto;
+  max-width: min(100%, 44rem);
+}
+
+.ss-prize-reveal-studio-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: linear-gradient(180deg, rgba(15, 41, 34, 0.95) 0%, rgba(5, 10, 9, 0.98) 100%);
+}
+
+.ss-prize-reveal-studio-wrap .ss-prize-studio {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ss-prize-reveal-studio-wrap img {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.ss-prize-reveal-timer {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 20;
+  margin: 0 auto 1rem;
+  width: fit-content;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0c0a09;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.ss-prize-reveal-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: #000;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ss-prize-reveal-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.ss-prize-reveal-image--poster {
+  max-height: min(52dvh, 560px);
+}
+
+.ss-prize-reveal-frame--poster .ss-prize-reveal-image {
+  max-height: min(52dvh, 560px);
+}
+
+.ss-prize-reveal-frame--phone,
+.ss-prize-reveal-frame--case {
+  padding: 0.65rem 0.5rem 0.5rem;
+}
+
+.ss-prize-reveal-tile-kicker {
+  margin: 0 0 0.15rem;
+  text-align: center;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(251, 191, 36, 0.85);
+}
+
+.ss-prize-reveal-frame--phone .ss-prize-reveal-tile-kicker {
+  color: rgba(167, 243, 208, 0.9);
+}
+
+.ss-prize-reveal-tile-label {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #f5f5f4;
+}
+
+.ss-prize-reveal-frame--phone .ss-prize-reveal-image,
+.ss-prize-reveal-frame--case .ss-prize-reveal-image {
+  max-height: min(28dvh, 280px);
+  margin: 0 auto;
+}
+
+.ss-prize-reveal-watermark--tile {
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  font-size: 0.6rem;
+}
+
+.ss-prize-reveal-watermark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-content: center;
+  justify-items: center;
+  pointer-events: none;
+  opacity: 0.22;
+  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fef3c7;
+  transform: rotate(-18deg);
+}
+
+.ss-prize-reveal-watermark span {
+  white-space: nowrap;
+}
+
+.ss-prize-reveal-guard-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fef3c7;
+  background: rgba(12, 10, 9, 0.92);
+}
+
+@media print {
+  .ss-prize-reveal-page,
+  .ss-prize-reveal-stage,
+  .ss-prize-reveal-image {
+    display: none !important;
   }
 }

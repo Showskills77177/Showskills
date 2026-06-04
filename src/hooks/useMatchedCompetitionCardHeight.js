@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 
-/** Locks paid and shirt giveaway cards (and enter buttons) to the same size on the competitions page. */
+/** Sync enter button sizes on the competitions page (desktop). Cards keep natural height. */
 export function useMatchedCompetitionCardHeight(syncKey = 0) {
   const paidCardRef = useRef(null)
   const shirtCardRef = useRef(null)
@@ -13,26 +13,13 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const editorPreview = typeof syncKey === 'string' && syncKey.split('|').pop() === 'edit'
 
     const mq = window.matchMedia('(min-width: 768px)')
-    let lastTargetHeight = 0
-
-    function cardIn(slot) {
-      return slot.querySelector('[data-competition-card]')
-    }
-
-    function measure(slot) {
-      const card = cardIn(slot)
-      const el = card || slot
-      const rectH = Math.round(el.getBoundingClientRect().height)
-      const offsetH = el.offsetHeight ? Math.round(el.offsetHeight) : 0
-      return Math.max(rectH, offsetH, 1)
-    }
 
     function clearHeights() {
       for (const slot of [paidSlot, shirtSlot]) {
         slot.style.removeProperty('height')
         slot.style.removeProperty('minHeight')
         slot.style.removeProperty('maxHeight')
-        const card = cardIn(slot)
+        const card = slot.querySelector('[data-competition-card]')
         if (card) {
           card.style.removeProperty('height')
           card.style.removeProperty('minHeight')
@@ -53,22 +40,6 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
           btn.style.removeProperty('marginInline')
         })
       }
-    }
-
-    function applyPanelHeights(h) {
-      for (const slot of [paidSlot, shirtSlot]) {
-        slot.style.height = `${h}px`
-        slot.style.minHeight = `${h}px`
-        slot.style.boxSizing = 'border-box'
-        const card = cardIn(slot)
-        if (card) {
-          card.style.height = '100%'
-          card.style.minHeight = '0'
-          card.style.width = '100%'
-          card.style.boxSizing = 'border-box'
-        }
-      }
-      shirtSlot.style.setProperty('--ss-matched-comp-card-h', `${h}px`)
     }
 
     function syncEnterButtons() {
@@ -104,18 +75,6 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
       }
 
       clearHeights()
-
-      const paidH = measure(paidSlot)
-      const shirtH = measure(shirtSlot)
-      const h = Math.max(paidH, shirtH, 1)
-
-      if (h === lastTargetHeight && paidSlot.style.height === `${h}px`) {
-        syncEnterButtons()
-        return
-      }
-      lastTargetHeight = h
-
-      applyPanelHeights(h)
       syncEnterButtons()
     }
 
@@ -128,16 +87,6 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const ro = new ResizeObserver(() => sync())
     ro.observe(paidSlot)
     ro.observe(shirtSlot)
-    const paidCard = cardIn(paidSlot)
-    const shirtCard = cardIn(shirtSlot)
-    if (paidCard) ro.observe(paidCard)
-    if (shirtCard) ro.observe(shirtCard)
-
-    for (const slot of [paidSlot, shirtSlot]) {
-      slot.querySelectorAll('img').forEach((img) => {
-        if (!img.complete) img.addEventListener('load', sync, { once: true })
-      })
-    }
 
     mq.addEventListener('change', sync)
     window.addEventListener('resize', sync)

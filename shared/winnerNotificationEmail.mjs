@@ -1,5 +1,6 @@
 import { escapeHtml, emailLogoUrl } from './purchaseConfirmationEmail.mjs'
 import { DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
+import { WINNER_PHOTOGRAPHY_BUNDLE_TERMS_SUMMARY } from './winnerPhotographyConsent.mjs'
 import { EMAIL_ICONS, emailIconImg } from './emailIcons.mjs'
 
 /**
@@ -123,6 +124,9 @@ export function buildWinnerEmailHtml(props) {
                 <tr><td style="padding:9px 0 9px 14px;border-left:2px solid rgba(212,175,55,0.35);font-size:13px;line-height:1.55;color:#d6d3d1">
                   Our team will contact you to arrange your prize and any required documentation.
                 </td></tr>
+                <tr><td style="padding:9px 0 9px 14px;border-left:2px solid rgba(212,175,55,0.35);font-size:13px;line-height:1.55;color:#d6d3d1">
+                  ${escapeHtml(WINNER_PHOTOGRAPHY_BUNDLE_TERMS_SUMMARY)}
+                </td></tr>
               </table>
               <p style="margin:0 0 12px;font-size:12px;line-height:1.5;color:#78716c">
                 If you did not enter, contact us immediately:
@@ -178,6 +182,8 @@ export function buildWinnerEmailText(props) {
     '1. Reply within 14 days to confirm receipt, your legal name, and contact number.',
     '2. Provide proof of identity and eligibility as required under our terms.',
     '3. We will arrange prize delivery with you directly.',
+    '',
+    WINNER_PHOTOGRAPHY_BUNDLE_TERMS_SUMMARY,
     '',
     'If you did not enter this competition, contact contact@showskills.co.uk immediately.',
     '',

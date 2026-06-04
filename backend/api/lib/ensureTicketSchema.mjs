@@ -128,6 +128,11 @@ export async function ensureTicketSchema() {
     } catch {
       /* column already exists */
     }
+    try {
+      await query(`ALTER TABLE tickets ADD COLUMN prize_reveal_viewed_at TEXT`)
+    } catch {
+      /* column already exists */
+    }
   }
 
   await backfillTicketCompetition()

@@ -67,7 +67,7 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
                   </p>
                   <p className="mt-1 text-xs font-medium text-emerald-100/60">{SHIRT_GIVEAWAY_SEASON_LABEL}</p>
                   <p className="mt-2 text-sm leading-relaxed text-emerald-100/75">
-                    Shirt only — the full Legacy Bundle (phone, ball, 2008 signed shirt) is a separate paid competition on
+                    Shirt only — the full Signed Football Legend Bundle (phone, ball, 2008 signed shirt) is a separate paid competition on
                     this site.
                   </p>
                 </div>
@@ -105,8 +105,9 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90">Question</p>
               <p className="mt-3 text-lg font-semibold leading-snug text-white">{SHIRT_GIVEAWAY_QUESTION}</p>
               <p className="mt-3 text-sm leading-relaxed text-lime-200/70">
-                Type your answer in the giveaway form. You must also subscribe to the newsletter, follow us on TikTok,
-                Instagram, or Facebook (enter your username and confirm), then agree to the terms before you submit.
+                Type your answer in the giveaway form. Pick TikTok, Instagram, or Facebook, open our profile in a new tab to
+                follow us, enter your handle, tick to confirm, subscribe to the newsletter, agree to the terms, then
+                submit.
               </p>
               <button
                 type="button"

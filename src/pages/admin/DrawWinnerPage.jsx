@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../../lib/api'
-import { PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
+import { DRAW_COMPETITION_LABEL, PERIOD_STATUS } from '../../../shared/competitionPeriods.mjs'
 import { AdminCompetitionSelect } from '../../components/admin/AdminCompetitionSelect'
 import { defaultMainDrawCompetitionSlug } from '../../../shared/adminCompetitions.mjs'
 
@@ -159,7 +159,7 @@ export default function DrawWinnerPage() {
       <div>
         <h1 className="text-2xl font-semibold text-stone-100">Draw winner</h1>
         <p className="mt-2 text-sm leading-relaxed text-stone-400">
-          {data?.label || 'Ronaldo Legacy Bundle'} — fair random draw from a{' '}
+          {data?.label || DRAW_COMPETITION_LABEL} — fair random draw from a{' '}
           <strong className="text-stone-300">time-scoped competition period</strong>. Entries outside the
           selected window are never included, so separate competition cycles cannot mix.
         </p>
@@ -260,7 +260,7 @@ export default function DrawWinnerPage() {
           <form onSubmit={createPeriod} className="space-y-3 border-t border-white/10 pt-4">
             <input
               required
-              placeholder="Period title (e.g. Ronaldo Legacy Bundle — Summer 2026)"
+              placeholder={`Period title (e.g. ${DRAW_COMPETITION_LABEL} — Summer 2026)`}
               value={newPeriod.title}
               onChange={(e) => setNewPeriod((s) => ({ ...s, title: e.target.value }))}
               className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-stone-200"

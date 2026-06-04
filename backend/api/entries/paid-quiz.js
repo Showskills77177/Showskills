@@ -8,9 +8,10 @@ import { DRAW_COMPETITION_SLUG } from '../../../shared/competitionPeriods.mjs'
 import { resolveTicketBundle } from '../lib/competitionCatalog.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 import { awardConsolationShirtEntries } from '../lib/awardConsolationShirtEntries.mjs'
+import { prizeRevealUrlForTicket } from '../lib/prizeRevealEmailContext.mjs'
 
 /**
- * Public endpoint: persist Legacy Bundle quiz answers (paid or free entry_type).
+ * Public endpoint: persist Signed Football Legend Bundle quiz answers (paid or free entry_type).
  * Postal entries are not recorded here.
  */
 export default async function handler(req, res) {
@@ -126,6 +127,13 @@ export default async function handler(req, res) {
         alreadySent = Boolean(sentRow.rows[0]?.confirmation_email_sent_at)
       }
       if (purchase && !alreadySent) {
+        const prizeRevealUrl =
+          allCorrect && purchase.ticketId
+            ? await prizeRevealUrlForTicket(
+                purchase.ticketId,
+                purchase.competition || competition || DRAW_COMPETITION_SLUG,
+              )
+            : ''
         const emailResult = await sendQuizResultEmail({
           to: email,
           customerFullName: fullName,
@@ -137,6 +145,7 @@ export default async function handler(req, res) {
           ticketNumbers: purchase.ticketNumbers ?? [],
           consolationShirtEntries,
           consolationShirtEntryNumbers,
+          prizeRevealUrl,
         })
         quizEmailSent = Boolean(emailResult?.ok)
         if (quizEmailSent && purchase.ticketId) {

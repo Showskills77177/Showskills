@@ -18,6 +18,7 @@ export async function sendQuizResultEmail({
   ticketNumbers,
   consolationShirtEntries = 0,
   consolationShirtEntryNumbers = [],
+  prizeRevealUrl = '',
 }) {
   const apiKey = getResendApiKey()
   if (!apiKey) {
@@ -44,6 +45,7 @@ export async function sendQuizResultEmail({
     consolationShirtEntryNumbers: Array.isArray(consolationShirtEntryNumbers)
       ? consolationShirtEntryNumbers.filter(Boolean)
       : [],
+    prizeRevealUrl: typeof prizeRevealUrl === 'string' ? prizeRevealUrl : '',
   }
 
   const res = await fetch('https://api.resend.com/emails', {

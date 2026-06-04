@@ -23,7 +23,7 @@ export const BUNDLE_OFFER_ITEMS = [
 ]
 
 export const GRAND_PRIZE_BUNDLE = {
-  title: 'Ronaldo Legacy Bundle',
+  title: 'Signed Football Legend Bundle',
 }
 
 export {

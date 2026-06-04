@@ -1,19 +1,19 @@
 import { expect } from '@playwright/test'
 
-/** Open Legacy Bundle paid entry from the homepage hero. */
+/** Open Signed Football Legend Bundle paid entry from the homepage hero. */
 export async function openLegacyBundleEntryFromHome(page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Enter Bundle Draw' }).click()
-  await expect(page.getByRole('heading', { name: /Enter — Ronaldo Legacy Bundle/i })).toBeVisible({
+  await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeVisible({
     timeout: 15_000,
   })
 }
 
-/** Open Legacy Bundle paid entry modal (stable vs home layout changes). */
+/** Open Signed Football Legend Bundle paid entry modal (stable vs home layout changes). */
 export async function openLegacyBundleEntry(page) {
   await page.goto('/competitions')
   await page.getByRole('button', { name: /Enter this competition/i }).click()
-  await expect(page.getByRole('heading', { name: /Enter — Ronaldo Legacy Bundle/i })).toBeVisible({
+  await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeVisible({
     timeout: 15_000,
   })
 }

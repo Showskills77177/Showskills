@@ -490,7 +490,7 @@ export function HomePageContent({
                   <>
                     <img
                       src={legacyBundlePoster}
-                      alt="Ronaldo Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+                      alt="Signed Football Legend Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
                       width={1024}
                       height={576}
                       loading="eager"
@@ -619,7 +619,7 @@ export function HomePageContent({
     <div ref={detailsMeasureRef} className={`ss-hero-copy-footer flex w-full ${detailsCol}`}>
       {dragWrap(
         'details_panel',
-        'Legacy bundle details',
+        'Signed Football Legend Bundle details',
         'hero_details',
         'panel',
         details,
@@ -628,7 +628,7 @@ export function HomePageContent({
           style={{ '--ss-panel-scale': detailsPanelScale }}
         >
           <div className="ss-legacy-details-inner flex min-h-0 flex-1 flex-col">
-          <h2 className="ss-legacy-details-title">{details.title || 'Ronaldo Legacy Bundle details'}</h2>
+          <h2 className="ss-legacy-details-title">{details.title || 'Signed Football Legend Bundle details'}</h2>
           <section className="ss-legacy-details-block" aria-labelledby="ss-legacy-prize-stack-heading">
             <h3 id="ss-legacy-prize-stack-heading" className="ss-legacy-details-kicker">
               Prize stack

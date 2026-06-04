@@ -8,8 +8,8 @@ import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
 import { defaultLegacyBundleCardLayout } from '../../shared/sitePageLayout.mjs'
-import { liveOffsetStyle, resolveLayoutOffsets } from '../../shared/layoutOffsets.mjs'
-import { LiveLayoutOffset } from './LiveLayoutOffset'
+import { resolveLayoutOffsets } from '../../shared/layoutOffsets.mjs'
+import { LegacyBundleLiveCardCopy } from './LegacyBundleLiveCardCopy'
 import { DRAW_COMPETITION_SLUG, formatPeriodMonthLabel, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 
 const DEFAULT_SUMMARY =
@@ -90,29 +90,11 @@ export function CompetitionPublicCard({
   const liveLegacyLayout = isLegacyBundle && !editorMode
 
   function cardDragWrap(id, label, offsetKey, node, opts = {}) {
-    if (liveLegacyLayout) return node
+    if (!editorMode) return node
     const moveOnly = opts.moveOnly === true
     const widthOnly = opts.uniformScale ? false : opts.widthOnly !== false
     const raw = cardOffsets[offsetKey] || { x: 0, y: 0, scale: 1 }
-    let pos = moveOnly ? { ...raw, scale: 1 } : raw
-    if (!editorMode && offsetKey === 'price') {
-      pos = { x: 0, y: 0, scale: 1 }
-    } else if (!editorMode && offsetKey === 'enter') {
-      pos = { ...pos, y: Math.max(0, Number(pos.y) || 0) }
-    }
-    if (!editorMode || !isLegacyBundle) {
-      const style = liveOffsetStyle(moveOnly ? { x: pos.x, y: pos.y, scale: 1 } : pos, {
-        transformOrigin: opts.transformOrigin || 'center top',
-        widthOnly: moveOnly ? true : widthOnly,
-        scale: moveOnly ? 1 : (pos.scale ?? 1),
-      })
-      if (!style) return node
-      return (
-        <LiveLayoutOffset style={style} variant="card" className={opts.className}>
-          {node}
-        </LiveLayoutOffset>
-      )
-    }
+    const pos = moveOnly ? { ...raw, scale: 1 } : raw
     return (
       <EditableDragFrame
         id={id}
@@ -288,67 +270,16 @@ export function CompetitionPublicCard({
   const legacyLiveStack =
     liveLegacyLayout
       ? (
-          <div className="ss-competition-card-legacy-stack ss-competition-card-action-stack ss-competition-card-actions ss-competition-card-footer">
-            {cardDragWrap(
-              'comp_paid_card_meta',
-              'Meta labels',
-              'meta',
-              <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{metaFeaturedLabel}</p>
-                {periodMonth ? (
-                  <>
-                    <span className="hidden text-teal-600/40 sm:inline" aria-hidden>
-                      ·
-                    </span>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{periodMonth} draw</p>
-                  </>
-                ) : null}
-              </div>,
-            )}
-            {cardDragWrap(
-              'comp_paid_card_timer',
-              'Countdown timer',
-              'timer',
-              countdownPeriod ? (
-                <CompetitionCountdown
-                  opensAt={countdownPeriod.entryOpensAt}
-                  closesAt={countdownPeriod.entryClosesAt}
-                  showDot={false}
-                  live
-                  className="!m-0 max-w-[min(100%,22rem)] text-center sm:max-w-xl"
-                />
-              ) : (
-                <p className="text-xs text-amber-200/80">No entry period dates yet — set them in admin.</p>
-              ),
-              {
-                uniformScale: true,
-                transformOrigin: 'top center',
-                scaleMin: 0.75,
-                scaleMax: 1.35,
-              },
-            )}
-            {cardDragWrap(
-              'comp_paid_card_title',
-              'Competition title',
-              'title',
-              <h2 className="font-display text-2xl uppercase leading-[0.88] tracking-wide text-white sm:text-3xl">{titleText}</h2>,
-              { widthOnly: false },
-            )}
-            {cardDragWrap(
-              'comp_paid_card_summary',
-              'Summary text',
-              'summary',
-              <p className="text-sm leading-relaxed text-stone-400 sm:text-base">{summary}</p>,
-              { widthOnly: false },
-            )}
-            {priceBadge}
-            {postalLine}
-            {!preview && onEnter ? (
-              <button type="button" onClick={onEnter} className="ss-competition-enter-btn ss-competition-enter-btn--paid">
-                {enterLabel}
-              </button>
-            ) : null}
-          </div>
+          <LegacyBundleLiveCardCopy
+            metaFeaturedLabel={metaFeaturedLabel}
+            periodMonth={periodMonth}
+            countdownPeriod={countdownPeriod}
+            titleText={titleText}
+            summary={summary}
+            competition={competition}
+            enterLabel={enterLabel}
+            onEnter={preview ? undefined : onEnter}
+          />
         )
       : null
 
@@ -392,7 +323,7 @@ export function CompetitionPublicCard({
           Draft preview — publish to go live on site
         </div>
       ) : null}
-      {isLegacyBundle
+      {isLegacyBundle && !liveLegacyLayout
         ? cardDragWrap('comp_paid_card_image', 'Bundle prize images', 'imagery', imageryPanel)
         : imageryPanel}
       <div

@@ -16,7 +16,7 @@ export const PERIOD_STATUS_LABELS = {
 
 export const DRAW_COMPETITION_SLUG = 'ronaldo_legacy_bundle'
 
-export const DRAW_COMPETITION_LABEL = 'Ronaldo Legacy Bundle'
+export const DRAW_COMPETITION_LABEL = 'Signed Football Legend Bundle'
 
 export const PERIOD_COPY = {
   isolation:

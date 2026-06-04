@@ -9,7 +9,7 @@ const CORRECT = {
   q3: '47',
 }
 
-test.describe('A) User flow — Legacy Bundle quiz after E2E checkout', () => {
+test.describe('A) User flow — Signed Football Legend Bundle quiz after E2E checkout', () => {
   test('competitions → paid entry → simulated checkout → quiz → success', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
     const email = `e2e-user-${Date.now()}@example.test`

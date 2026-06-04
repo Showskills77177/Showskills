@@ -56,3 +56,18 @@ export function resolvedSocialLinks(links) {
   }
   return out
 }
+
+/**
+ * Footer + shirt giveaway “Open profile” links. Footer values override homepage per platform.
+ * @param {{ footerSocialLinks?: Record<string, string>, homepageSocialLinks?: Record<string, string> }} [sources]
+ */
+export function resolvePublicSocialLinks({ footerSocialLinks, homepageSocialLinks } = {}) {
+  const merged = mergeSocialLinks(homepageSocialLinks)
+  const footer = footerSocialLinks && typeof footerSocialLinks === 'object' ? footerSocialLinks : null
+  if (!footer) return resolvedSocialLinks(merged)
+  for (const key of Object.keys(DEFAULT_SOCIAL_LINKS)) {
+    if (!(key in footer)) continue
+    merged[key] = typeof footer[key] === 'string' ? footer[key].trim() : ''
+  }
+  return resolvedSocialLinks(merged)
+}

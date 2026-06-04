@@ -6,6 +6,11 @@ import {
   CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD,
 } from './consolationShirtGiveaway.mjs'
 import { SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
+import { DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
+import {
+  buildPrizeRevealEmailHtmlBlock,
+  buildPrizeRevealEmailTextLines,
+} from './prizeRevealEmailBlock.mjs'
 
 const LABEL_STYLE = 'color:#fafaf9;font-size:12px;font-weight:600'
 const VALUE_STYLE = 'color:#ecfdf5;font-size:13px'
@@ -69,7 +74,7 @@ function buildConsolationBlock({
     <tr><td style="padding:16px">
       <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24">Consolation prize — Free Ronaldo Shirt Giveaway</p>
       <img src="${escapeHtml(shirtImg)}" alt="Signed Ronaldo Manchester United shirt, ${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)}" width="160" style="display:block;width:100%;max-width:160px;height:auto;margin:0 auto 14px;border-radius:12px;border:1px solid rgba(250,204,21,0.25)" />
-      <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#d6d3d1">You received <strong style="color:#fcd34d">${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'}</strong> into the separate Free Ronaldo Shirt Giveaway. Prize: <strong style="color:#fde68a">signed Ronaldo United shirt (${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)})</strong> — not the full Legacy Bundle.</p>
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#d6d3d1">You received <strong style="color:#fcd34d">${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'}</strong> into the separate Free Ronaldo Shirt Giveaway. Prize: <strong style="color:#fde68a">signed Ronaldo United shirt (${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)})</strong> — not the full Signed Football Legend Bundle.</p>
       ${numbersBlock}
     </td></tr>
   </table>`
@@ -102,8 +107,9 @@ export function buildQuizResultHtml(props) {
     ticketNumbers = [],
     consolationShirtEntries = 0,
     consolationShirtEntryNumbers = [],
+    prizeRevealUrl = '',
   } = props
-  const logoSrc = emailLogoUrl(siteUrl)
+  const logoSrc = emailLogoUrl(siteUrl, { forBrowserPreview: Boolean(props.forBrowserPreview) })
   const receiptBlock = buildReceiptBlock({ orderRef, bundleTitle, quantity, amountPence })
   const ticketsHtml = ticketNumbers.length ? buildTicketGridHtml(ticketNumbers) : ''
   const ticketLabel = ticketNumbers.length === 1 ? 'Your ticket number' : 'Your ticket numbers'
@@ -113,7 +119,7 @@ export function buildQuizResultHtml(props) {
   const borderColor = allCorrect ? 'rgba(52,211,153,0.45)' : 'rgba(248,113,113,0.55)'
 
   const resultHtml = allCorrect
-    ? `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#d6d3d1">Your three skill answers were <strong style="color:#6ee7b7">all correct</strong>. You are entered in the random winner selection for the Ronaldo Legacy Bundle draw.</p>`
+    ? `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#d6d3d1">Your three skill answers were <strong style="color:#6ee7b7">all correct</strong>. You are entered in the random winner selection for the ${DRAW_COMPETITION_LABEL} draw.</p>`
     : `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#d6d3d1">Your three skill answers were checked: <strong style="color:#f87171">one or more were incorrect</strong>. You <strong style="color:#f87171">do not qualify</strong> for the prize draw on this entry. Your payment is not refunded.</p>`
 
   const noConsolationHtml =
@@ -141,7 +147,7 @@ export function buildQuizResultHtml(props) {
         <tr><td style="padding:0 0 20px;text-align:center">
           <img src="${escapeHtml(logoSrc)}" alt="ShowSkills Rewards" width="156" style="display:block;margin:0 auto 12px;max-width:156px;height:auto;border:0" />
           <div style="font-size:22px;font-weight:700;color:${headlineColor};line-height:1.25">${escapeHtml(headline)}</div>
-          <div style="margin-top:6px;font-size:14px;color:#a8a29e">Ronaldo Legacy Bundle</div>
+          <div style="margin-top:6px;font-size:14px;color:#a8a29e">${DRAW_COMPETITION_LABEL}</div>
         </td></tr>
         <tr><td style="background:linear-gradient(180deg,#0f2922 0%,#0a1f19 100%);border:1px solid ${borderColor};border-radius:16px;padding:28px 24px">
           <p style="margin:0 0 14px;font-size:16px;color:#e7e5e4">Hi ${escapeHtml(customerFullName || 'there')},</p>
@@ -150,7 +156,8 @@ export function buildQuizResultHtml(props) {
           ${resultHtml}
           ${noConsolationHtml}
           ${consolationHtml}
-          ${ticketsHtml ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table><p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email for your records.${allCorrect ? '' : ' Ticket numbers are shown for your purchase; they do not enter the Legacy Bundle draw unless all answers are correct.'}</p>` : ''}
+          ${ticketsHtml ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table><p style="margin:14px 0 ${allCorrect && prizeRevealUrl ? '20px' : '0'};font-size:13px;line-height:1.5;color:#a8a29e">Keep this email for your records.${allCorrect ? '' : ' Ticket numbers are shown for your purchase; they do not enter the Signed Football Legend Bundle draw unless all answers are correct.'}</p>` : ''}
+          ${allCorrect ? buildPrizeRevealEmailHtmlBlock({ prizeRevealUrl }) : ''}
           ${buildTrustpilotEmailHtmlBlock()}
         </td></tr>
         <tr><td style="padding:28px 12px 0;text-align:center;font-size:11px;line-height:1.5;color:#57534e">
@@ -174,12 +181,13 @@ export function buildQuizResultText(props) {
     ticketNumbers = [],
     consolationShirtEntries = 0,
     consolationShirtEntryNumbers = [],
+    prizeRevealUrl = '',
   } = props
   const price = amountPence != null ? formatBundlePriceGBP(amountPence) : ''
   const lines = [
     `Hi ${customerFullName || 'there'},`,
     '',
-    'Ronaldo Legacy Bundle — entry confirmation',
+    `${DRAW_COMPETITION_LABEL} — entry confirmation`,
     '',
     '--- Payment receipt ---',
   ]
@@ -205,7 +213,10 @@ export function buildQuizResultText(props) {
     }
   }
   if (ticketNumbers.length) {
-    lines.push('', '--- Legacy Bundle ticket numbers ---', ...ticketNumbers.map((n) => `  • ${n}`))
+    lines.push('', '--- Signed Football Legend Bundle ticket numbers ---', ...ticketNumbers.map((n) => `  • ${n}`))
+  }
+  if (allCorrect) {
+    lines.push(...buildPrizeRevealEmailTextLines({ prizeRevealUrl }))
   }
   lines.push(...buildTrustpilotEmailTextLines(), '', siteUrl)
   return lines.join('\n')

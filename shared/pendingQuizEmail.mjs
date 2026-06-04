@@ -1,6 +1,11 @@
 import { escapeHtml, emailLogoUrl, buildTicketGridHtml } from './purchaseConfirmationEmail.mjs'
 import { buildCompleteQuizUrl } from './quizLinks.mjs'
 import { formatBundlePriceGBP } from './ticketBundles.mjs'
+import { DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
+import {
+  buildPrizeRevealEmailHtmlBlock,
+  buildPrizeRevealEmailTextLines,
+} from './prizeRevealEmailBlock.mjs'
 
 /**
  * Sent after payment when skill answers are still required.
@@ -25,8 +30,10 @@ export function buildPendingQuizHtml(props) {
     quantity,
     amountPence,
     ticketNumbers = [],
+    prizeRevealUrl = '',
   } = props
-  const logoSrc = emailLogoUrl(siteUrl)
+  const logoSrc = emailLogoUrl(siteUrl, { forBrowserPreview: Boolean(props.forBrowserPreview) })
+  const prizeRevealBlock = buildPrizeRevealEmailHtmlBlock({ prizeRevealUrl })
   const price = amountPence != null ? formatBundlePriceGBP(amountPence) : ''
   const ctaUrl = escapeHtml(completeQuizUrl)
   const ticketsHtml =
@@ -44,7 +51,7 @@ export function buildPendingQuizHtml(props) {
         <tr><td style="padding:0 0 20px;text-align:center">
           <img src="${escapeHtml(logoSrc)}" alt="ShowSkills Rewards" width="156" style="display:block;margin:0 auto 12px;max-width:156px;height:auto;border:0" />
           <div style="font-size:22px;font-weight:700;color:#fef3c7;line-height:1.25">Answer your skill questions</div>
-          <div style="margin-top:6px;font-size:14px;color:#a8a29e">Ronaldo Legacy Bundle</div>
+          <div style="margin-top:6px;font-size:14px;color:#a8a29e">${DRAW_COMPETITION_LABEL}</div>
         </td></tr>
         <tr><td style="background:linear-gradient(180deg,#0f2922 0%,#0a1f19 100%);border:1px solid rgba(251,191,36,0.45);border-radius:16px;padding:28px 24px">
           <p style="margin:0 0 14px;font-size:16px;color:#e7e5e4">Hi ${escapeHtml(customerFullName || 'there')},</p>
@@ -60,6 +67,7 @@ export function buildPendingQuizHtml(props) {
               : ''
           }
           ${ticketsHtml}
+          ${prizeRevealBlock}
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">
             <tr><td style="border-radius:12px;background:linear-gradient(90deg,#0d9488,#059669)">
               <a href="${ctaUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Answer the questions now</a>
@@ -83,6 +91,7 @@ export function buildPendingQuizText(props) {
     quantity,
     amountPence,
     ticketNumbers = [],
+    prizeRevealUrl = '',
   } = props
   const price = amountPence != null ? formatBundlePriceGBP(amountPence) : ''
   const lines = [
@@ -102,6 +111,7 @@ export function buildPendingQuizText(props) {
     '',
     'Use this link on any device until you submit your answers (pass or fail):',
     completeQuizUrl,
+    ...buildPrizeRevealEmailTextLines({ prizeRevealUrl }),
     '',
   )
   return lines.join('\n')

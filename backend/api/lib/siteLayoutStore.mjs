@@ -6,8 +6,44 @@ import {
 import { mergeHomepageLayout, defaultHomepageLayout } from '../../../shared/homepageLayout.mjs'
 import { EMAIL_LAYOUT_PAGE_ID, mergeEmailLayout, defaultEmailLayout } from '../../../shared/emailLayout.mjs'
 import { ensureHomepageLayoutSchema } from './homepageLayout.mjs'
+import { migrateCompetitionDisplayNameInJson } from '../../../shared/competitionDisplayNameMigration.mjs'
 
 export { ensureHomepageLayoutSchema as ensureSiteLayoutSchema }
+
+let layoutDisplayNameBackfillDone = false
+
+export async function backfillSiteLayoutDisplayNames() {
+  if (layoutDisplayNameBackfillDone) return
+  layoutDisplayNameBackfillDone = true
+  await ensureHomepageLayoutSchema()
+  const rows = await query(`SELECT id, config_json FROM site_layout_config`)
+  const now = new Date().toISOString()
+  for (const row of rows.rows || []) {
+    let raw
+    try {
+      raw = typeof row.config_json === 'string' ? JSON.parse(row.config_json) : row.config_json
+    } catch {
+      continue
+    }
+    const migrated = migrateCompetitionDisplayNameInJson(raw)
+    const before = JSON.stringify(raw)
+    const after = JSON.stringify(migrated)
+    if (before === after) continue
+    const json = after
+    if (dbIsPostgres()) {
+      await query(
+        `UPDATE site_layout_config SET config_json = $2::jsonb, updated_at = $3 WHERE id = $1`,
+        [row.id, json, now],
+      )
+    } else {
+      await query(`UPDATE site_layout_config SET config_json = $2, updated_at = $3 WHERE id = $1`, [
+        row.id,
+        json,
+        now,
+      ])
+    }
+  }
+}
 
 function parseRow(pageId, row) {
   if (!row?.config_json) {
@@ -29,6 +65,7 @@ function parseRow(pageId, row) {
 
 export async function getSitePageLayout(pageId) {
   await ensureHomepageLayoutSchema()
+  await backfillSiteLayoutDisplayNames()
   const r = await query(`SELECT config_json FROM site_layout_config WHERE id = $1 LIMIT 1`, [pageId])
   if (!r.rows?.length) {
     if (pageId === 'homepage') return defaultHomepageLayout()

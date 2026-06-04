@@ -1,5 +1,10 @@
 import { formatBundlePriceGBP } from './ticketBundles.mjs'
+import { DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
 import { buildTrustpilotEmailHtmlBlock, buildTrustpilotEmailTextLines } from './trustpilotEmailInvite.mjs'
+import {
+  buildPrizeRevealEmailHtmlBlock,
+  buildPrizeRevealEmailTextLines,
+} from './prizeRevealEmailBlock.mjs'
 
 export function escapeHtml(s) {
   return String(s)
@@ -44,7 +49,10 @@ export function resolvePublicSiteUrlForEmail(siteUrl) {
   return EMAIL_PUBLIC_SITE_URL
 }
 
-export function emailLogoUrl(siteUrl) {
+export function emailLogoUrl(siteUrl, { forBrowserPreview = false } = {}) {
+  if (forBrowserPreview && isLocalOrPrivateSiteUrl(siteUrl)) {
+    return `${String(siteUrl || 'http://localhost').replace(/\/$/, '')}/email/showskills-logo.png`
+  }
   const base = resolvePublicSiteUrlForEmail(siteUrl)
   return `${base}/email/showskills-logo.png`
 }
@@ -115,13 +123,15 @@ export function buildPurchaseConfirmationHtml(props) {
     siteUrl,
     quizPending = false,
     completeQuizUrl = '',
+    prizeRevealUrl = '',
   } = props
   const price = formatBundlePriceGBP(amountPence)
-  const logoSrc = emailLogoUrl(siteUrl)
+  const logoSrc = emailLogoUrl(siteUrl, { forBrowserPreview: Boolean(props.forBrowserPreview) })
   const showTickets = ticketNumbers.length > 0
   const ticketLabel = ticketNumbers.length === 1 ? 'Ticket number' : 'Ticket numbers'
   const ticketsHtml = showTickets ? buildTicketGridHtml(ticketNumbers) : ''
   const ctaUrl = completeQuizUrl ? escapeHtml(completeQuizUrl) : ''
+  const prizeRevealBlock = quizPending ? '' : buildPrizeRevealEmailHtmlBlock({ prizeRevealUrl })
 
   if (quizPending) {
     return `<!DOCTYPE html>
@@ -140,7 +150,7 @@ export function buildPurchaseConfirmationHtml(props) {
             <td style="padding:0 0 20px;text-align:center">
               <img src="${escapeHtml(logoSrc)}" alt="ShowSkills Rewards" width="156" height="auto" style="display:block;margin:0 auto 12px;max-width:156px;height:auto;border:0" />
               <div style="font-size:22px;font-weight:700;color:#fef3c7;line-height:1.25">Your questions are not answered</div>
-              <div style="margin-top:6px;font-size:14px;color:#a8a29e">Ronaldo Legacy Bundle</div>
+              <div style="margin-top:6px;font-size:14px;color:#a8a29e">${DRAW_COMPETITION_LABEL}</div>
             </td>
           </tr>
           <tr>
@@ -162,12 +172,13 @@ export function buildPurchaseConfirmationHtml(props) {
               ${
                 showTickets
                   ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table>`
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table>
+              <p style="margin:14px 0 20px;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — your ticket numbers are confirmed below.</p>`
                   : ''
               }
               ${
                 ctaUrl
-                  ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 16px">
+                  ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0">
                 <tr><td style="border-radius:12px;background:linear-gradient(90deg,#0d9488,#059669)">
                   <a href="${ctaUrl}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">Answer your questions now</a>
                 </td></tr>
@@ -207,7 +218,7 @@ export function buildPurchaseConfirmationHtml(props) {
             <td style="padding:0 0 20px;text-align:center">
               <img src="${escapeHtml(logoSrc)}" alt="ShowSkills Rewards" width="156" height="auto" style="display:block;margin:0 auto 12px;max-width:156px;height:auto;border:0" />
               <div style="font-size:22px;font-weight:700;color:#f5f5f4;line-height:1.25">Purchase confirmed</div>
-              <div style="margin-top:6px;font-size:14px;color:#a8a29e">Ronaldo Legacy Bundle draw</div>
+              <div style="margin-top:6px;font-size:14px;color:#a8a29e">${DRAW_COMPETITION_LABEL} draw</div>
             </td>
           </tr>
           <tr>
@@ -216,7 +227,7 @@ export function buildPurchaseConfirmationHtml(props) {
               <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#d6d3d1">Thank you for your purchase. Your payment was successful.</p>
               ${
                 showTickets
-                  ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#d6d3d1">You qualify for the Ronaldo Legacy Bundle draw. Your ticket numbers are below.</p>`
+                  ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#d6d3d1">You qualify for the ${DRAW_COMPETITION_LABEL} draw. Your ticket numbers are below.</p>`
                   : `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#d6d3d1"><strong style="color:#ecfdf5">Important:</strong> paying for tickets does not enter you into the draw by itself. On the website, submit your three skill answers straight after payment. <strong style="color:#ecfdf5">You only qualify if all three answers are correct</strong> — we will email you the result. If you qualify, your ticket numbers will be in that email.</p>`
               }
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:rgba(0,0,0,0.25);border-radius:12px;border:1px solid rgba(255,255,255,0.08)">
@@ -237,6 +248,7 @@ export function buildPurchaseConfirmationHtml(props) {
               <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#a8a29e">Keep this email — each number is unique and linked to your qualified draw entry.</p>`
                   : ''
               }
+              ${prizeRevealBlock}
               ${buildTrustpilotEmailHtmlBlock()}
             </td>
           </tr>
@@ -264,8 +276,10 @@ export function buildPurchaseConfirmationText(props) {
     siteUrl,
     quizPending = false,
     completeQuizUrl = '',
+    prizeRevealUrl = '',
   } = props
   const price = formatBundlePriceGBP(amountPence)
+  const prizeRevealLines = quizPending ? [] : buildPrizeRevealEmailTextLines({ prizeRevealUrl })
 
   if (quizPending) {
     return [
@@ -292,7 +306,7 @@ export function buildPurchaseConfirmationText(props) {
   return [
     `Hi ${customerFullName || 'there'},`,
     '',
-    'Thank you for your purchase for the Ronaldo Legacy Bundle draw on ShowSkills Rewards.',
+    `Thank you for your purchase for the ${DRAW_COMPETITION_LABEL} draw on ShowSkills Rewards.`,
     '',
     `Order reference: ${purchaseRef}`,
     `Bundle: ${bundleTitle} (${quantity} ticket${quantity === 1 ? '' : 's'})`,
@@ -311,6 +325,7 @@ export function buildPurchaseConfirmationText(props) {
           'We will email you whether your answers are correct or not.',
           'If you qualify, your ticket numbers will be in that email.',
         ]),
+    ...prizeRevealLines,
     ...buildTrustpilotEmailTextLines(),
     '',
     siteUrl,

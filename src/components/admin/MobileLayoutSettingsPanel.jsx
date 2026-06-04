@@ -29,7 +29,7 @@ export function MobileLayoutSettingsPanel({ editorViewport, onResetPageMobile, o
             onClick={onResetLegacyMobile}
             className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs text-amber-100/90 hover:bg-amber-950/40"
           >
-            Reset Legacy Bundle mobile panels
+            Reset Signed Football Legend Bundle mobile panels
           </button>
         ) : null}
         {onResetShirtMobile ? (

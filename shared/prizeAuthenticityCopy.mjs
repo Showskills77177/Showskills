@@ -25,7 +25,7 @@ export const PRIZE_AUTHENTICITY_TRANSPARENCY = `Transparency is important to us.
 export const PRIZE_AUTHENTICITY_FAQ_ANSWER = [
   PRIZE_AUTHENTICITY_INTRO,
   PRIZE_AUTHENTICITY_MARKET,
-  'For the Ronaldo Legacy Bundle:',
+  'For the Signed Football Legend Bundle:',
   ...PRIZE_AUTHENTICITY_LEGACY_ITEMS.map((item) => `• ${item}`),
   PRIZE_AUTHENTICITY_AFFILIATION,
   PRIZE_AUTHENTICITY_VERIFICATION,

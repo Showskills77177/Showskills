@@ -24,6 +24,11 @@ import {
   legacyEntryMethods,
 } from '../../shared/competitionEntryMethods.mjs'
 import { COMPETITION_NAME_POSTAL } from '../competitionData'
+import { useHomepageLayout } from '../hooks/useHomepageLayout'
+import { useSiteShell } from '../hooks/useSitePages'
+import { resolvePublicSocialLinks } from '../../shared/socialLinks.mjs'
+import { SHIRT_GIVEAWAY_SOCIAL_PLATFORMS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
+import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -39,6 +44,17 @@ function getInitialPaidBundleId(searchParams) {
 }
 
 export function EntryFlowProvider({ children }) {
+  const { layout: homepageLayout } = useHomepageLayout()
+  const { shell } = useSiteShell()
+  const shirtGiveawaySocialLinks = useMemo(
+    () =>
+      resolvePublicSocialLinks({
+        footerSocialLinks: shell.footer?.socialLinks,
+        homepageSocialLinks: homepageLayout.socialLinks,
+      }),
+    [shell.footer?.socialLinks, homepageLayout.socialLinks],
+  )
+
   const initialQuizSession = readInitialQuizSession()
   const initialContact =
     typeof window !== 'undefined' ? loadPaidEntryContact() : null
@@ -1086,7 +1102,15 @@ export function EntryFlowProvider({ children }) {
         return
       }
       if (!['tiktok', 'instagram', 'facebook'].includes(kickSocialPlatform)) {
-        setKickError('Choose TikTok, Instagram, or Facebook and confirm you follow us.')
+        setKickError('Choose TikTok, Instagram, or Facebook, then open our profile in a new tab to follow us.')
+        return
+      }
+      if (!shirtGiveawaySocialLinks[kickSocialPlatform]) {
+        const label =
+          SHIRT_GIVEAWAY_SOCIAL_PLATFORMS.find((p) => p.id === kickSocialPlatform)?.label || 'that network'
+        setKickError(
+          `Our ${label} profile link is not available. Choose another network or email ${SHOWSKILLS_CONTACT_EMAIL || 'us'}.`,
+        )
         return
       }
       if (!kickSocialHandle.trim()) {
@@ -1132,7 +1156,19 @@ export function EntryFlowProvider({ children }) {
         setKickError(err instanceof Error ? err.message : 'Submission failed')
       }
     },
-    [kickAnswer, kickConsent, kickEmail, kickFullName, kickPhone, kickVpnBlocked, kickNewsletterOptIn, kickSocialPlatform, kickSocialHandle, kickSocialFollowConfirmed],
+    [
+      kickAnswer,
+      kickConsent,
+      kickEmail,
+      kickFullName,
+      kickPhone,
+      kickVpnBlocked,
+      kickNewsletterOptIn,
+      kickSocialPlatform,
+      kickSocialHandle,
+      kickSocialFollowConfirmed,
+      shirtGiveawaySocialLinks,
+    ],
   )
 
   const entriesClosedMessage =

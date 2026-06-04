@@ -72,7 +72,7 @@ for (const email of testEmails) {
 
 await upsertPeriod(
   legacyId,
-  'Ronaldo Legacy Bundle — Main (test)',
+  'Signed Football Legend Bundle — Main (test)',
   legacyOpens,
   legacyCloses,
   PERIOD_STATUS.closed,

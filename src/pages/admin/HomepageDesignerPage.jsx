@@ -406,25 +406,11 @@ export default function HomepageDesignerPage() {
           </section>
 
           <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Social links (shirt giveaway)</h2>
-            <p className="mt-1 text-xs text-stone-500">Used in the free shirt entry form — entrants pick one network to follow.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {['tiktok', 'instagram', 'facebook'].map((key) => (
-                <Field key={key} label={key.charAt(0).toUpperCase() + key.slice(1)}>
-                  <input
-                    value={layout.socialLinks?.[key] || ''}
-                    onChange={(e) =>
-                      setLayout((l) => ({
-                        ...l,
-                        socialLinks: { ...l.socialLinks, [key]: e.target.value },
-                      }))
-                    }
-                    placeholder="https://..."
-                    className={inputClass()}
-                  />
-                </Field>
-              ))}
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Shirt giveaway — Open profile links</h2>
+            <p className="mt-2 text-sm text-stone-400">
+              Managed in <strong className="text-stone-300">Site shell → Footer social links</strong> so the shirt form and
+              footer use one Facebook (and TikTok / Instagram) URL.
+            </p>
           </section>
         </>
       ) : null}

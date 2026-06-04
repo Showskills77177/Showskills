@@ -722,7 +722,7 @@ export default function PageEditorPage() {
               />
             </div>
             <p className="mt-1 text-xs text-stone-500">
-              Paid Legacy Bundle and free giveaways — shown below the hero. Drag &quot;Competitions hub&quot; in section order to move it.
+              Paid Signed Football Legend Bundle and free giveaways — shown below the hero. Drag &quot;Competitions hub&quot; in section order to move it.
             </p>
             <div className="mt-3 grid gap-3">
               <EditorField label="Section title">
@@ -822,23 +822,12 @@ export default function PageEditorPage() {
           </section>
 
           <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Social links (shirt form)</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {['tiktok', 'instagram', 'facebook'].map((key) => (
-                <EditorField key={key} label={key}>
-                  <input
-                    value={homepage.socialLinks?.[key] || ''}
-                    onChange={(e) =>
-                      patchPage('homepage', {
-                        socialLinks: { ...homepage.socialLinks, [key]: e.target.value },
-                      })
-                    }
-                    placeholder={`@${DEFAULT_SOCIAL_HANDLE} or full URL`}
-                    className={editorInputClass()}
-                  />
-                </EditorField>
-              ))}
-            </div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Shirt giveaway — Open profile links</h2>
+            <p className="mt-2 text-sm text-stone-400">
+              The free shirt entry form uses the same TikTok, Instagram, and Facebook URLs as the site footer. Edit them
+              under <strong className="text-stone-300">Site shell → Footer social links</strong> (not here) so entrants
+              and the footer always match.
+            </p>
           </section>
         </div>
       ) : null}
@@ -1066,6 +1055,10 @@ function SiteShellEditor({ shell, onChange, setPages }) {
             Show social links in footer
           </label>
         </div>
+        <p className="mt-2 text-xs text-stone-500">
+          Also used for <strong className="text-stone-400">Open profile</strong> in the free Ronaldo shirt giveaway entry
+          form.
+        </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {['tiktok', 'instagram', 'facebook'].map((key) => (
             <EditorField key={key} label={`Footer ${key}`}>
@@ -1186,7 +1179,7 @@ function CompetitionsPageEditor({ layout, selectedBlockId, editorViewport, onCha
             legacyBlockSelected ? 'border-teal-500/40 ring-1 ring-teal-500/20' : 'border-white/10'
           }`}
         >
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Legacy Bundle card</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Signed Football Legend Bundle card</h2>
           {legacyBlockSelected && COMPETITIONS_BLOCK_LABELS[selectedBlockId] ? (
             <p className="mt-1 text-xs font-medium text-teal-400/90">
               Selected in preview: {COMPETITIONS_BLOCK_LABELS[selectedBlockId]} — drag to move, Ctrl/Cmd+drag to resize,
@@ -1211,7 +1204,7 @@ function CompetitionsPageEditor({ layout, selectedBlockId, editorViewport, onCha
               <input
                 value={legacyCard.title || ''}
                 onChange={(e) => patchLegacyCard({ title: e.target.value })}
-                placeholder="Ronaldo Legacy Bundle"
+                placeholder="Signed Football Legend Bundle"
                 className={editorInputClass()}
               />
             </EditorField>

@@ -21,7 +21,7 @@ export function PrizeAuthenticityNotice({ headingLevel = 'h3', id = 'ss-prize-au
         <strong>specialist memorabilia dealers</strong>).
       </p>
 
-      <p className="mb-2 font-medium text-stone-300">For the Ronaldo Legacy Bundle:</p>
+      <p className="mb-2 font-medium text-stone-300">For the Signed Football Legend Bundle:</p>
       <ul className="mb-3 list-inside list-disc space-y-1.5 text-zinc-300">
         <li>
           The signed Cristiano Ronaldo shirt comes with a <strong>Certificate of Authenticity</strong>.

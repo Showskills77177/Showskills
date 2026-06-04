@@ -40,7 +40,7 @@ test.describe('Edge cases & errors', () => {
     await qInputs.nth(1).fill('wrong')
     await qInputs.nth(2).fill('wrong')
     await page.getByRole('button', { name: 'Submit answers' }).click()
-    await expect(page.getByText(/do not qualify for the main Legacy Bundle draw/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/do not qualify for the main Signed Football Legend Bundle draw/i)).toBeVisible({ timeout: 15_000 })
   })
 
   test('unknown path falls back to home route', async ({ page }) => {

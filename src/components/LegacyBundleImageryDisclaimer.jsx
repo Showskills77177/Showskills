@@ -1,4 +1,4 @@
-/** Small print under Ronaldo Legacy Bundle prize imagery (homepage, cards, featured promo). */
+/** Small print under Signed Football Legend Bundle prize imagery (homepage, cards, featured promo). */
 export function LegacyBundleImageryDisclaimer({ className = '' }) {
   return (
     <p

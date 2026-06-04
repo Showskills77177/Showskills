@@ -24,7 +24,7 @@ export async function hasConsolationBeenAwarded(competitionEntryId) {
 }
 
 /**
- * Award consolation shirt giveaway rows when Legacy Bundle skill answers are wrong.
+ * Award consolation shirt giveaway rows when Signed Football Legend Bundle skill answers are wrong.
  * @param {{ req?: import('http').IncomingMessage, fullName: string, email: string, competitionEntryId: string, source: 'paid' | 'free', amountPence?: number, orderRef?: string }} params
  */
 export async function awardConsolationShirtEntries({
@@ -57,7 +57,7 @@ export async function awardConsolationShirtEntries({
     const id = randomUUID()
     const entryNumber = await allocateShirtEntryNumber()
     const adminNotes = [
-      'Consolation prize — Ronaldo Legacy Bundle (incorrect skill answers)',
+      'Consolation prize — Signed Football Legend Bundle (incorrect skill answers)',
       `Competition entry: ${competitionEntryId}`,
       `Source: ${source}`,
       `Entry ${i} of ${count}`,

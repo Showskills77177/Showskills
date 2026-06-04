@@ -27,7 +27,7 @@ export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
     id: 'social_follow',
     title: 'Follow us on social media',
     detail:
-      'Follow ShowSkills on TikTok, Instagram, or Facebook (pick one), enter your username on that network, and confirm you have followed us.',
+      'Pick TikTok, Instagram, or Facebook, open our profile in a new tab to follow us, enter your handle here, then tick to confirm.',
   },
 ]
 
@@ -52,12 +52,12 @@ export const SHIRT_GIVEAWAY_PUBLIC_STEPS = [
     num: '4',
     title: 'Follow us on social media',
     detail:
-      'Follow ShowSkills on TikTok, Instagram, or Facebook (at least one). Enter your username on that network and confirm you have followed us.',
+      'Pick one network, open our profile in a new tab to follow ShowSkills, return here, enter your username, and tick to confirm.',
   },
   {
     num: '5',
     title: 'Agree to the terms and submit',
-    detail: `One entry per device; VPNs and proxies are not allowed. Prize: signed Ronaldo United shirt (${SHIRT_GIVEAWAY_SEASON_LABEL}) — not the Legacy Bundle.`,
+    detail: `One entry per device; VPNs and proxies are not allowed. Prize: signed Ronaldo United shirt (${SHIRT_GIVEAWAY_SEASON_LABEL}) — not the Signed Football Legend Bundle.`,
   },
   {
     num: '6',

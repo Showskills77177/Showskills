@@ -15,8 +15,7 @@ import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
 import { LegacyShirtGiveawayCard } from '../components/LegacyShirtGiveawayCard'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
-import { LiveLayoutOffset } from '../components/LiveLayoutOffset'
-import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
+import { resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 
 function SectionHeading({ id, children }) {
@@ -116,25 +115,8 @@ export default function CompetitionsPage({
   }
 
   function dragWrap(id, label, offsetKey, node, opts = {}) {
+    if (!editorMode) return node
     const pos = offsets?.[offsetKey] || { x: 0, y: 0, scale: 1 }
-    if (!editorMode) {
-      const style = liveOffsetStyle(pos, {
-        cssScaleOnly: opts.cssScaleOnly,
-        transformOrigin: 'center top',
-        widthOnly: true,
-        scale: pos.scale ?? 1,
-      })
-      if (!style) return node
-      return (
-        <LiveLayoutOffset
-          style={style}
-          variant={opts.cssScaleOnly ? 'panel' : 'layout'}
-          className={opts.className}
-        >
-          {node}
-        </LiveLayoutOffset>
-      )
-    }
     return (
       <EditableDragFrame
         id={id}
@@ -217,7 +199,7 @@ export default function CompetitionsPage({
 
     const wrapped =
       isLegacy && index === 0
-        ? dragWrap('comp_paid_card', 'Legacy Bundle card', 'paidPrimaryCard', card, { cssScaleOnly: true })
+        ? dragWrap('comp_paid_card', 'Signed Football Legend Bundle card', 'paidPrimaryCard', card, { cssScaleOnly: true })
         : card
 
     return (

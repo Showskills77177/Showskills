@@ -17,6 +17,7 @@ import {
   normalizeEntryMethods,
 } from '../../../shared/competitionEntryMethods.mjs'
 import { COMPETITION_NAME_POSTAL } from '../../../shared/competitionCopy.mjs'
+import { OLD_POSTAL_COMPETITION_NAME } from '../../../shared/competitionDisplayNameMigration.mjs'
 import { defaultPostalName } from '../../../shared/competitionEntryMethods.mjs'
 
 export const COMPETITION_STATUS = {
@@ -42,6 +43,40 @@ async function retireLiveTestBundle() {
   } else {
     await query(
       `UPDATE competition_bundles SET active = 0, updated_at = $1 WHERE bundle_key = 'liveTest5'`,
+      [now],
+    )
+  }
+}
+
+/** Restore catalog bundles polluted by local admin/catalog tests (e.g. "Medium bundle (admin test)"). */
+async function reconcilePollutedLegacyBundles() {
+  const now = new Date().toISOString()
+  for (let i = 0; i < TICKET_BUNDLES.length; i++) {
+    const bundle = TICKET_BUNDLES[i]
+    const polluted = await query(
+      `SELECT title, total_pence, line1 FROM competition_bundles
+       WHERE competition = $1 AND bundle_key = $2
+         AND (
+           title LIKE '%(admin test)%'
+           OR title LIKE '%(catalog test)%'
+           OR (bundle_key = 'medium10' AND total_pence = 599)
+         )
+       LIMIT 1`,
+      [DRAW_COMPETITION_SLUG, bundle.id],
+    )
+    if (!polluted.rows[0]) continue
+    await upsertCompetitionBundleRow(DRAW_COMPETITION_SLUG, bundle, i)
+  }
+  if (dbIsPostgres()) {
+    await query(
+      `UPDATE competition_bundles SET active = false, updated_at = $1
+       WHERE title LIKE '%(admin test)%' OR title LIKE '%(catalog test)%'`,
+      [now],
+    )
+  } else {
+    await query(
+      `UPDATE competition_bundles SET active = 0, updated_at = $1
+       WHERE title LIKE '%(admin test)%' OR title LIKE '%(catalog test)%'`,
       [now],
     )
   }
@@ -131,7 +166,10 @@ export async function ensureCompetitionCatalogSchema() {
 
   schemaEnsured = true
   await ensureBuiltinCompetitions()
+  await reconcilePollutedLegacyBundles()
   await backfillLegacyEntryMethods()
+  const { backfillSiteLayoutDisplayNames } = await import('./siteLayoutStore.mjs')
+  await backfillSiteLayoutDisplayNames()
 }
 
 const BUILTIN_MAIN_DRAWS = [
@@ -285,7 +323,7 @@ export function competitionImagePublicUrl(ref, siteOrigin = '') {
   return ref
 }
 
-/** Ensures Ronaldo Legacy + Michael Jackson rows exist even when other competitions were created first. */
+/** Ensures main draw competitions (football legend bundle + MJ album) exist even when others were created first. */
 async function ensureBuiltinCompetitions() {
   const now = new Date().toISOString()
 
@@ -317,6 +355,23 @@ async function ensureBuiltinCompetitions() {
         `UPDATE competitions SET summary = $1, updated_at = $2
          WHERE slug = $3 AND summary IN ($4, $5)`,
         [c.summary, now, DRAW_COMPETITION_SLUG, 'Updated from catalog test', 'Created from catalog test'],
+      )
+      await query(
+        `UPDATE competitions SET title = $1, updated_at = $2
+         WHERE slug = $3 AND title IN ($4, $5)`,
+        [c.title, now, DRAW_COMPETITION_SLUG, 'Ronaldo Legacy Bundle', ''],
+      )
+      await query(
+        `UPDATE competitions SET postal_competition_name = $1, updated_at = $2
+         WHERE slug = $3 AND postal_competition_name IN ($4, $5, $6)`,
+        [
+          COMPETITION_NAME_POSTAL,
+          now,
+          DRAW_COMPETITION_SLUG,
+          OLD_POSTAL_COMPETITION_NAME,
+          'Ronaldo Legacy Bundle',
+          '',
+        ],
       )
     }
 
