@@ -122,6 +122,9 @@ export function EntryFlowProvider({ children }) {
   const [kickSocialFollowConfirmed, setKickSocialFollowConfirmed] = useState(false)
   const [kickError, setKickError] = useState('')
   const [kickSuccess, setKickSuccess] = useState(false)
+  const [kickEntryNumber, setKickEntryNumber] = useState('')
+  const [kickShirtPrizeRevealUrl, setKickShirtPrizeRevealUrl] = useState('')
+  const [kickEmailSent, setKickEmailSent] = useState(false)
   const [kickVpnBlocked, setKickVpnBlocked] = useState(false)
   const [kickCheckingVpn, setKickCheckingVpn] = useState(false)
 
@@ -554,6 +557,9 @@ export function EntryFlowProvider({ children }) {
     if (type === 'kickups') {
       setKickError('')
       setKickSuccess(false)
+      setKickEntryNumber('')
+      setKickShirtPrizeRevealUrl('')
+      setKickEmailSent(false)
       setKickVpnBlocked(false)
       setKickFullName('')
       setKickAnswer('')
@@ -1151,6 +1157,10 @@ export function EntryFlowProvider({ children }) {
           const j = await res.json().catch(() => ({}))
           throw new Error(j.error || 'Could not submit')
         }
+        const j = await res.json().catch(() => ({}))
+        setKickEntryNumber(typeof j.entryNumber === 'string' ? j.entryNumber : '')
+        setKickShirtPrizeRevealUrl(typeof j.shirtPrizeRevealUrl === 'string' ? j.shirtPrizeRevealUrl : '')
+        setKickEmailSent(Boolean(j.emailSent))
         setKickSuccess(true)
       } catch (err) {
         setKickError(err instanceof Error ? err.message : 'Submission failed')
@@ -1277,6 +1287,9 @@ export function EntryFlowProvider({ children }) {
       kickError,
       setKickError,
       kickSuccess,
+      kickEntryNumber,
+      kickShirtPrizeRevealUrl,
+      kickEmailSent,
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,
@@ -1368,6 +1381,9 @@ export function EntryFlowProvider({ children }) {
       kickError,
       setKickError,
       kickSuccess,
+      kickEntryNumber,
+      kickShirtPrizeRevealUrl,
+      kickEmailSent,
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,

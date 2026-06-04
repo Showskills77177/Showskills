@@ -14,6 +14,10 @@ import { upsertUserContact } from '../lib/userContact.mjs'
 import { allocateShirtEntryNumber } from '../lib/shirtEntryNumbers.mjs'
 import { subscribeNewsletter } from '../lib/newsletter.mjs'
 import { isValidShirtSocialPlatform } from '../../../shared/shirtGiveawayEntryRequirements.mjs'
+import { sendShirtGiveawayConfirmationEmail } from '../lib/sendShirtGiveawayConfirmationEmail.mjs'
+import { ensureShirtPreviewToken } from '../lib/shirtPreviewToken.mjs'
+import { buildShirtPrizeRevealUrl } from '../../../shared/shirtPrizeReveal.mjs'
+import { resolveSiteUrl } from '../lib/resendConfig.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -124,6 +128,29 @@ export default async function handler(req, res) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, entry_number`,
       [id, fullName, email, storedRef || null, storedFilename, adminNotes, entryNumber, COMPETITION_SHIRT_GIVEAWAY],
     )
+    const submissionId = r.rows[0].id
+    const entryNumber = r.rows[0].entry_number
+
+    const previewToken = await ensureShirtPreviewToken(submissionId)
+    const shirtPrizeRevealUrl = previewToken
+      ? buildShirtPrizeRevealUrl(resolveSiteUrl(), previewToken)
+      : ''
+
+    let emailSent = false
+    const emailResult = await sendShirtGiveawayConfirmationEmail({
+      to: email,
+      customerFullName: fullName,
+      submissionId,
+      entryNumber,
+    })
+    emailSent = Boolean(emailResult?.ok)
+    if (emailSent) {
+      await query(`UPDATE kickup_submissions SET confirmation_email_sent_at = $2 WHERE id = $1`, [
+        submissionId,
+        new Date().toISOString(),
+      ])
+    }
+
     await logEntryAttempt(req, {
       competition: COMPETITION_SHIRT_GIVEAWAY,
       flow: 'shirt_giveaway',
@@ -131,9 +158,15 @@ export default async function handler(req, res) {
       email,
       addressKey: shirtLimits.identityKey,
       outcome: 'success',
-      metadata: { submission_id: r.rows[0].id, entry_number: r.rows[0].entry_number },
+      metadata: { submission_id: submissionId, entry_number: entryNumber, email_sent: emailSent },
     })
-    return json(res, 201, { ok: true, id: r.rows[0].id, entryNumber: r.rows[0].entry_number })
+    return json(res, 201, {
+      ok: true,
+      id: submissionId,
+      entryNumber,
+      emailSent,
+      shirtPrizeRevealUrl,
+    })
   } catch (e) {
     console.error(e)
     await logEntryAttempt(req, {

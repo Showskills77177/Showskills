@@ -1,4 +1,5 @@
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
+import { DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
 
 /** Plain-text prize authenticity notice — Terms, Privacy, FAQs. */
 export const PRIZE_AUTHENTICITY_INTRO =
@@ -8,8 +9,8 @@ export const PRIZE_AUTHENTICITY_MARKET =
   'All prizes featured in our competitions are genuine items purchased by us on the open secondary market (primarily through reputable platforms such as eBay and specialist memorabilia dealers).'
 
 export const PRIZE_AUTHENTICITY_LEGACY_ITEMS = [
-  'The signed Cristiano Ronaldo shirt comes with a Certificate of Authenticity.',
-  'The signed museum golden ball is an officially licensed collectible with supporting documentation.',
+  'The signed Ronaldo shirt comes with a Certificate of Authenticity.',
+  'The signed museum golden ball comes with a Certificate of Authenticity.',
   'The iPhone 17 Pro Max and luxury gold case are brand new, sealed, and sourced through authorised channels.',
 ]
 
@@ -25,7 +26,7 @@ export const PRIZE_AUTHENTICITY_TRANSPARENCY = `Transparency is important to us.
 export const PRIZE_AUTHENTICITY_FAQ_ANSWER = [
   PRIZE_AUTHENTICITY_INTRO,
   PRIZE_AUTHENTICITY_MARKET,
-  'For the Signed Football Legend Bundle:',
+  `For the ${DRAW_COMPETITION_LABEL}:`,
   ...PRIZE_AUTHENTICITY_LEGACY_ITEMS.map((item) => `• ${item}`),
   PRIZE_AUTHENTICITY_AFFILIATION,
   PRIZE_AUTHENTICITY_VERIFICATION,

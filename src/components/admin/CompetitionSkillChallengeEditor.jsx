@@ -76,7 +76,7 @@ export function CompetitionSkillChallengeEditor({ questions, onChange, compact =
             onClick={() => onChange(legacySkillQuestionRows())}
             className="rounded border border-white/15 px-2 py-1 text-xs text-stone-400 hover:bg-white/5"
           >
-            Reset to Signed Football Legend template
+            Reset to Signed Legacy template
           </button>
           <button
             type="button"

@@ -1,5 +1,5 @@
 /**
- * Legal disclaimer & IP notice — shown in Terms & privacy (Signed Football Legend Bundle and site-wide).
+ * Legal disclaimer & IP notice — shown in Terms & privacy (Signed Legacy Bundle and site-wide).
  */
 export function LegalDisclaimerNotice({ headingLevel = 'h3', id = 'ss-legal-disclaimer' }) {
   const Heading = headingLevel

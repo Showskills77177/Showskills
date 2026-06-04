@@ -74,7 +74,7 @@ function buildConsolationBlock({
     <tr><td style="padding:16px">
       <p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24">Consolation prize — Free Ronaldo Shirt Giveaway</p>
       <img src="${escapeHtml(shirtImg)}" alt="Signed Ronaldo Manchester United shirt, ${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)}" width="160" style="display:block;width:100%;max-width:160px;height:auto;margin:0 auto 14px;border-radius:12px;border:1px solid rgba(250,204,21,0.25)" />
-      <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#d6d3d1">You received <strong style="color:#fcd34d">${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'}</strong> into the separate Free Ronaldo Shirt Giveaway. Prize: <strong style="color:#fde68a">signed Ronaldo United shirt (${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)})</strong> — not the full Signed Football Legend Bundle.</p>
+      <p style="margin:0 0 10px;font-size:15px;line-height:1.55;color:#d6d3d1">You received <strong style="color:#fcd34d">${consolationShirtEntries} automatic ${consolationShirtEntries === 1 ? 'entry' : 'entries'}</strong> into the separate Free Ronaldo Shirt Giveaway. Prize: <strong style="color:#fde68a">signed Ronaldo United shirt (${escapeHtml(SHIRT_GIVEAWAY_SEASON_LABEL)})</strong> — not the full Signed Legacy Bundle.</p>
       ${numbersBlock}
     </td></tr>
   </table>`
@@ -156,7 +156,7 @@ export function buildQuizResultHtml(props) {
           ${resultHtml}
           ${noConsolationHtml}
           ${consolationHtml}
-          ${ticketsHtml ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table><p style="margin:14px 0 ${allCorrect && prizeRevealUrl ? '20px' : '0'};font-size:13px;line-height:1.5;color:#a8a29e">Keep this email for your records.${allCorrect ? '' : ' Ticket numbers are shown for your purchase; they do not enter the Signed Football Legend Bundle draw unless all answers are correct.'}</p>` : ''}
+          ${ticketsHtml ? `<p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#34d399">${escapeHtml(ticketLabel)}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${ticketsHtml}</table><p style="margin:14px 0 ${allCorrect && prizeRevealUrl ? '20px' : '0'};font-size:13px;line-height:1.5;color:#a8a29e">Keep this email for your records.${allCorrect ? '' : ' Ticket numbers are shown for your purchase; they do not enter the Signed Legacy Bundle draw unless all answers are correct.'}</p>` : ''}
           ${allCorrect ? buildPrizeRevealEmailHtmlBlock({ prizeRevealUrl }) : ''}
           ${buildTrustpilotEmailHtmlBlock()}
         </td></tr>
@@ -213,7 +213,7 @@ export function buildQuizResultText(props) {
     }
   }
   if (ticketNumbers.length) {
-    lines.push('', '--- Signed Football Legend Bundle ticket numbers ---', ...ticketNumbers.map((n) => `  • ${n}`))
+    lines.push('', `--- ${DRAW_COMPETITION_LABEL} ticket numbers ---`, ...ticketNumbers.map((n) => `  • ${n}`))
   }
   if (allCorrect) {
     lines.push(...buildPrizeRevealEmailTextLines({ prizeRevealUrl }))

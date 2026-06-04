@@ -8,7 +8,7 @@ test.describe('Homepage — layout & stress', () => {
     await page.goto('/')
 
     await expect(page.getByRole('heading', { name: 'ShowSkills Rewards' })).toBeVisible()
-    await expect(page.getByText('Signed Football Legend Bundle details')).toBeVisible()
+    await expect(page.getByText('Signed Legacy Bundle details')).toBeVisible()
     await expect(page.locator('.ss-ticket-bundles-heading')).toBeVisible()
 
     const prizes = page.locator('#prizes')
@@ -26,10 +26,10 @@ test.describe('Homepage — layout & stress', () => {
   test('Enter Bundle Draw opens and closes entry modal', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
     await openLegacyBundleEntryFromHome(page)
-    await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeVisible()
 
     await closeEntryModal(page)
-    await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeHidden({
+    await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeHidden({
       timeout: 10_000,
     })
 
@@ -49,11 +49,11 @@ test.describe('Homepage — layout & stress', () => {
       await page.goto('/')
       await expect(page.getByRole('button', { name: 'Enter Bundle Draw' })).toBeVisible()
       await page.getByRole('button', { name: 'Enter Bundle Draw' }).click()
-      await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeVisible({
+      await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeVisible({
         timeout: 15_000,
       })
       await closeEntryModal(page)
-      await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeHidden({
+      await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeHidden({
         timeout: 10_000,
       })
     }
@@ -66,10 +66,10 @@ test.describe('Homepage — layout & stress', () => {
     await page.goto('/')
     const draw = page.getByRole('button', { name: 'Enter Bundle Draw' })
     await draw.dblclick()
-    await expect(page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeVisible({
       timeout: 15_000,
     })
-    const modals = page.getByRole('heading', { name: /Enter — Signed Football Legend Bundle/i })
+    const modals = page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })
     await expect(modals).toHaveCount(1)
 
     await assertClean()

@@ -110,7 +110,7 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
       text: buildQuizResultText(sample),
       subject: quizResultSubject(sample.orderRef, sample.allCorrect),
       description: allCorrect
-        ? 'Sent after correct skill answers. Signed Football Legend Bundle ticket numbers enter the main draw pool.'
+        ? 'Sent after correct skill answers. Signed Legacy Bundle ticket numbers enter the main draw pool.'
         : withConsolation
           ? 'Sent after wrong answers on a £10+ purchase. Includes Legacy ticket numbers (not in draw), shirt photo, and 2 SG- entry numbers for the Free Ronaldo Shirt Giveaway.'
           : 'Sent after wrong answers when spend is under £10 in one purchase. No consolation shirt entries — explains the £10 threshold.',
@@ -222,7 +222,7 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
         {competition !== defaultMainDrawCompetitionSlug() ? (
           <span className="text-stone-600">
             {' '}
-            — copy still reflects Signed Football Legend Bundle until MJ templates are added.
+            — copy still reflects Signed Legacy Bundle until MJ templates are added.
           </span>
         ) : null}
       </p>

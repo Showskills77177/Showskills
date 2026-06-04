@@ -2,6 +2,7 @@ import { CompetitionCountdown } from './CompetitionCountdown'
 import { LegacyBundlePhonePrizes } from './LegacyBundlePhonePrizes'
 import { LegacyBundleImageryDisclaimer } from './LegacyBundleImageryDisclaimer'
 import { LegacyBundleImageryCaption } from './LegacyBundleImageryCaption'
+import { LegacyBundlePosterTitle } from './LegacyBundlePosterTitle'
 import { EditableDragFrame } from './admin/EditableDragFrame'
 import { formatBundlePriceGBP } from '../competitionData'
 import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
@@ -74,9 +75,7 @@ export function CompetitionPublicCard({
   const headlineGapPx = cardLayout?.headlineGapPx ?? 14
   const countdownPeriod = pickCountdownPeriod(competition)
   const periodMonth = formatPeriodMonthLabel(countdownPeriod?.entryClosesAt)
-  const hero =
-    competition.heroImageUrl ||
-    (isLegacyBundle ? legacyBundlePoster : null)
+  const hero = isLegacyBundle ? legacyBundlePoster : competition.heroImageUrl || null
   const gallery = (competition.galleryUrls || []).filter(Boolean)
   const subImages = isLegacyBundle ? [] : gallery.slice(0, 2)
   const summaryOverride = cardLayout?.summary?.trim()
@@ -141,12 +140,23 @@ export function CompetitionPublicCard({
                 <>
                   <img
                     src={hero}
-                    alt=""
-                    className={`h-auto w-full object-cover ${isPageLayout ? '' : 'max-h-72'}`}
+                    alt={
+                      isLegacyBundle
+                        ? 'Signed Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout.'
+                        : ''
+                    }
+                    width={isLegacyBundle ? 1024 : undefined}
+                    height={isLegacyBundle ? 576 : undefined}
+                    className="h-full w-full object-cover"
                     loading="lazy"
                     decoding="async"
                   />
-                  {isLegacyBundle ? <LegacyBundleImageryCaption /> : null}
+                  {isLegacyBundle ? (
+                    <>
+                      <LegacyBundlePosterTitle />
+                      <LegacyBundleImageryCaption />
+                    </>
+                  ) : null}
                 </>
               ) : (
                 <div className="flex aspect-video items-center justify-center bg-stone-900/80 text-sm text-stone-500">

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blur the Apple logo on the Signed Football Legend Bundle gold case prize photo."""
+"""Blur the Apple logo on the Signed Legacy Bundle gold case prize photo."""
 from __future__ import annotations
 
 from pathlib import Path

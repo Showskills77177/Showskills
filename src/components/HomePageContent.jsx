@@ -17,6 +17,7 @@ import { HomeWinnersPanel } from '../components/HomeWinnersPanel'
 import { HomeCompetitionsHub } from '../components/HomeCompetitionsHub'
 import { LegacyBundleImageryDisclaimer } from '../components/LegacyBundleImageryDisclaimer'
 import { LegacyBundleImageryCaption } from '../components/LegacyBundleImageryCaption'
+import { LegacyBundlePosterTitle } from '../components/LegacyBundlePosterTitle'
 import { EditableSectionOverlay } from '../components/admin/EditableSectionOverlay'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { mergePrizeImages } from '../../shared/homepageLayout.mjs'
@@ -85,7 +86,7 @@ const LEGACY_BUNDLE_SPECS = [
   },
   {
     label: 'Museum signed football',
-    body: 'Cristiano Ronaldo museum-style signed football, presented as a collector item with the bundle.',
+    body: 'Certified Ronaldo museum-style signed football, presented as a collector item with the bundle.',
   },
 ]
 
@@ -490,13 +491,14 @@ export function HomePageContent({
                   <>
                     <img
                       src={legacyBundlePoster}
-                      alt="Signed Football Legend Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+                      alt="Signed Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
                       width={1024}
                       height={576}
                       loading="eager"
                       decoding="async"
                       className="h-auto w-full"
                     />
+                    <LegacyBundlePosterTitle />
                     <LegacyBundleImageryCaption />
                   </>,
                 )}
@@ -619,7 +621,7 @@ export function HomePageContent({
     <div ref={detailsMeasureRef} className={`ss-hero-copy-footer flex w-full ${detailsCol}`}>
       {dragWrap(
         'details_panel',
-        'Signed Football Legend Bundle details',
+        'Signed Legacy Bundle details',
         'hero_details',
         'panel',
         details,
@@ -628,7 +630,7 @@ export function HomePageContent({
           style={{ '--ss-panel-scale': detailsPanelScale }}
         >
           <div className="ss-legacy-details-inner flex min-h-0 flex-1 flex-col">
-          <h2 className="ss-legacy-details-title">{details.title || 'Signed Football Legend Bundle details'}</h2>
+          <h2 className="ss-legacy-details-title">{details.title || 'Signed Legacy Bundle details'}</h2>
           <section className="ss-legacy-details-block" aria-labelledby="ss-legacy-prize-stack-heading">
             <h3 id="ss-legacy-prize-stack-heading" className="ss-legacy-details-kicker">
               Prize stack
@@ -639,8 +641,8 @@ export function HomePageContent({
               ))}
             </ul>
             <p className="ss-legacy-value-blurb">
-              Estimated total stack value is <strong>over £3,000</strong>, with collector legacy value from the signed
-              Ronaldo shirt and museum signed football.
+              Estimated total stack value is <strong>over £3,000</strong>, with collector legacy value from the certified
+              Ronaldo shirt and certified museum signed football.
             </p>
           </section>
           <section

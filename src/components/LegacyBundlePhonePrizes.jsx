@@ -1,7 +1,7 @@
 import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
 import { GoldCasePrizePhoto } from './GoldCasePrizePhoto'
 
-/** Built-in iPhone + gold case tiles for the Signed Football Legend Bundle (bundled assets, not admin uploads). */
+/** Built-in iPhone + gold case tiles for the Signed Legacy Bundle (bundled assets, not admin uploads). */
 export function LegacyBundlePhonePrizes({ compact = false, eager = false }) {
   const photoMax = compact ? 'max-w-[7rem]' : 'max-w-[7.5rem]'
   const imgLoading = eager ? 'eager' : 'lazy'

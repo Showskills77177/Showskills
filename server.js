@@ -134,6 +134,7 @@ for (const required of [
   '/api/admin/competition-periods',
   '/api/prize-reveal',
   '/api/prize-reveal/image',
+  '/api/shirt-prize-reveal',
 ]) {
   if (!mountedPaths.includes(required)) {
     console.error(`[api] FATAL: ${required} missing from dispatch routes`)

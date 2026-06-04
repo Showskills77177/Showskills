@@ -1,5 +1,6 @@
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import { LegacyBundleImageryCaption } from './LegacyBundleImageryCaption'
+import { LegacyBundlePosterTitle } from './LegacyBundlePosterTitle'
 import { LegacyBundlePhonePrizes } from './LegacyBundlePhonePrizes'
 
 /**
@@ -17,7 +18,7 @@ export function LegacyBundlePrizeStudio({ hero = true, eager = false, className 
           <div className="ss-prize-studio-photo overflow-hidden">
             <img
               src={legacyBundlePoster}
-              alt="Signed Football Legend Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
+              alt="Signed Legacy Bundle: signed shirt, signed ball and gold phone case in a luxury poster layout."
               width={1024}
               height={576}
               loading={imgLoading}
@@ -25,6 +26,7 @@ export function LegacyBundlePrizeStudio({ hero = true, eager = false, className 
               className="h-auto w-full"
               draggable={false}
             />
+            <LegacyBundlePosterTitle />
             <LegacyBundleImageryCaption />
           </div>
         </div>

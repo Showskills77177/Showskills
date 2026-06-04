@@ -116,7 +116,7 @@ export function defaultCompetitionsPageLayout() {
         visible: true,
         title: 'Prize draw competitions',
         subtitle:
-          'Paid ticket bundles plus free postal and free online entry — including the Signed Football Legend Bundle.',
+          'Paid ticket bundles plus free postal and free online entry — including the Signed Legacy Bundle.',
       },
       free: {
         visible: true,
@@ -129,8 +129,7 @@ export function defaultCompetitionsPageLayout() {
     showFaqLink: true,
     jumpLinkLabel: 'Jump to free giveaways',
     showJumpLink: true,
-    emptyPaidMessage:
-      'No extra paid prize draws published yet — the Signed Football Legend Bundle is on the homepage.',
+    emptyPaidMessage: '',
     emptyFreeMessage: '',
   }
 }
@@ -305,7 +304,7 @@ export function defaultContactPageLayout() {
     eyebrow: 'Get in touch',
     title: 'Contact us',
     intro:
-      'Questions about the Signed Football Legend Bundle, paid tickets, or postal entry? Check our FAQ first, or send a message below — we will reply to the email you provide.',
+      'Questions about the Signed Legacy Bundle, paid tickets, or postal entry? Check our FAQ first, or send a message below — we will reply to the email you provide.',
     showEmailCard: true,
     showPostalCard: true,
   }
@@ -317,7 +316,7 @@ export function defaultShirtGiveawayPageLayout() {
     badge: 'Free giveaway · Not the paid bundle',
     title: 'Ronaldo shirt giveaway',
     intro:
-      `Separate from the paid Signed Football Legend Bundle: enter free online to win the signed ${SHIRT_GIVEAWAY_SEASON} Manchester United home shirt shown below. Answer the skill question, enter your details, subscribe to our newsletter, follow us on social media, and submit the form — no payment or video upload.`,
+      `Separate from the paid Signed Legacy Bundle: enter free online to win the signed ${SHIRT_GIVEAWAY_SEASON} Manchester United home shirt shown below. Answer the skill question, enter your details, subscribe to our newsletter, follow us on social media, and submit the form — no payment or video upload.`,
     ctaButtonLabel: 'Open free giveaway form',
     howToTitle: 'How to qualify',
     prizeImageRef: null,
@@ -499,7 +498,7 @@ export const COMPETITIONS_BLOCK_LABELS = {
   comp_paid: 'Prize draws column',
   comp_free: 'Free giveaways column',
   comp_shirt: 'Shirt giveaway card',
-  comp_paid_card: 'Signed Football Legend Bundle card',
+  comp_paid_card: 'Signed Legacy Bundle card',
   comp_paid_card_image: 'Bundle prize images',
   comp_paid_card_meta: 'Meta labels',
   comp_paid_card_timer: 'Countdown timer',

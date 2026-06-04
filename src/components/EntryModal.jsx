@@ -36,6 +36,7 @@ import { useHomepageLayout } from '../hooks/useHomepageLayout'
 import { useSiteShell } from '../hooks/useSitePages'
 import { resolvePublicSocialLinks } from '../../shared/socialLinks.mjs'
 import { ShirtGiveawaySocialFollow } from './ShirtGiveawaySocialFollow'
+import { ShirtGiveawayJerseyImagery } from './ShirtGiveawayJerseyImagery'
 
 export function EntryModal() {
   const {
@@ -121,6 +122,9 @@ export function EntryModal() {
     kickError,
     setKickError,
     kickSuccess,
+    kickEntryNumber,
+    kickShirtPrizeRevealUrl,
+    kickEmailSent,
     kickVpnBlocked,
     kickCheckingVpn,
     handleKickupsGiveawaySubmit,
@@ -836,12 +840,39 @@ export function EntryModal() {
               </ul>
               <p className="mt-3 text-sm text-stone-500">
                 <strong className="text-lime-200/90">Free giveaway:</strong> complete every requirement above, then fill in your details below.
-                Prize is the <strong className="text-stone-300">signed Ronaldo United shirt ({SHIRT_GIVEAWAY_SEASON_LABEL})</strong> — not the Signed Football Legend Bundle.
+                Prize is the <strong className="text-stone-300">signed Ronaldo United shirt ({SHIRT_GIVEAWAY_SEASON_LABEL})</strong> — not the Signed Legacy Bundle.
                 One entry per device; VPNs are not permitted.
               </p>
               {kickCheckingVpn ? (
                 <p className="mt-3 text-sm text-stone-500">Checking your connection…</p>
               ) : null}
+              <ShirtGiveawayJerseyImagery className="mt-4" />
+              {kickSuccess ? (
+                <div className="mt-4 rounded-xl border border-lime-500/35 bg-lime-950/25 px-4 py-4 text-sm text-lime-100/95">
+                  <p className="font-semibold text-lime-50">You&apos;re in the draw</p>
+                  {kickEntryNumber ? (
+                    <p className="mt-2">
+                      Entry number:{' '}
+                      <span className="font-mono text-base font-bold text-lime-200">{kickEntryNumber}</span>
+                    </p>
+                  ) : null}
+                  <p className="mt-2 text-stone-300">
+                    {kickEmailSent
+                      ? 'A confirmation email is on its way with your entry number and a one-time link to view the shirt imagery for 10 seconds.'
+                      : 'If email is configured, you will receive a confirmation with your entry number and a timed shirt preview link.'}
+                  </p>
+                  {kickShirtPrizeRevealUrl ? (
+                    <a
+                      href={kickShirtPrizeRevealUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-lime-600 to-emerald-600 px-4 text-sm font-bold text-stone-950 hover:from-lime-500 hover:to-emerald-500"
+                    >
+                      View shirt imagery (10s, one time)
+                    </a>
+                  ) : null}
+                </div>
+              ) : (
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleKickupsGiveawaySubmit}>
                 <ShirtGiveawaySocialFollow
                   socialLinks={socialLinks}
@@ -921,11 +952,6 @@ export function EntryModal() {
                   variant="emerald"
                 />
                 {kickError ? <ErrorBanner message={kickError} /> : null}
-                {kickSuccess ? (
-                  <p className="rounded-lg border border-emerald-800/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200/90">
-                    Thanks — your submission was received.
-                  </p>
-                ) : null}
                 <button
                   type="submit"
                   disabled={kickVpnBlocked || kickCheckingVpn}
@@ -934,6 +960,7 @@ export function EntryModal() {
                   Submit giveaway entry
                 </button>
               </form>
+              )}
             </>
           ) : null}
 

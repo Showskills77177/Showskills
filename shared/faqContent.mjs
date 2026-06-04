@@ -44,7 +44,7 @@ export const FAQ_SECTIONS = [
         id: 'what-is-showskills',
         question: 'What is ShowSkills Rewards?',
         answer:
-          'ShowSkills Rewards is a UK skill-based rewards site. Our headline promotion is the Signed Football Legend Bundle draw: signed memorabilia, a museum football, and iPhone prizes for one winner. You enter with paid tickets or a free postal route, answer three Ronaldo skill questions, and — if every answer is correct — your ticket numbers join a random draw. We also run a separate free Ronaldo signed shirt giveaway.',
+          'ShowSkills Rewards is a UK skill-based rewards site. Our headline promotion is the Signed Legacy Bundle draw: signed memorabilia, a museum football, and iPhone prizes for one winner. You enter with paid tickets or a free postal route, answer three Ronaldo skill questions, and — if every answer is correct — your ticket numbers join a random draw. We also run a separate free Ronaldo signed shirt giveaway.',
         popular: true,
       },
       {
@@ -57,7 +57,7 @@ export const FAQ_SECTIONS = [
         id: 'lottery-or-skill',
         question: 'Is this a lottery?',
         answer:
-          'No. The Signed Football Legend Bundle draw is a skill competition, not a lottery. You must answer three free-text skill questions correctly to qualify for the main draw. Among everyone who qualified in that competition period, one winner is chosen at random. ' +
+          'No. The Signed Legacy Bundle draw is a skill competition, not a lottery. You must answer three free-text skill questions correctly to qualify for the main draw. Among everyone who qualified in that competition period, one winner is chosen at random. ' +
           NO_PURCHASE_ENTRY_NOTICE +
           ' ' +
           LEGACY_SKILL_ONE_ATTEMPT_NOTICE +
@@ -84,12 +84,12 @@ export const FAQ_SECTIONS = [
   },
   {
     id: 'legacy-bundle',
-    title: 'Signed Football Legend Bundle rewards',
+    title: 'Signed Legacy Bundle rewards',
     summary: 'Paid tickets, free postal entry, and how your answers qualify you for the draw.',
     items: [
       {
         id: 'no-purchase-necessary',
-        question: 'Do I have to pay to enter the Signed Football Legend Bundle draw?',
+        question: 'Do I have to pay to enter the Signed Legacy Bundle draw?',
         answer:
           NO_PURCHASE_ENTRY_NOTICE +
           ' Postal address: ' +
@@ -101,7 +101,7 @@ export const FAQ_SECTIONS = [
         id: 'how-to-enter-paid',
         question: 'How do I enter with paid tickets?',
         answer:
-          'Open the Signed Football Legend Bundle entry from Competitions or the home page. Choose a ticket bundle, enter your name, email, and mobile number, agree to the terms, and pay by debit or credit card (Apple Pay or Google Pay when shown on your device). After payment succeeds, complete all three skill questions in the same session. Every answer must be correct for your tickets to count in the draw.',
+          'Open the Signed Legacy Bundle entry from Competitions or the home page. Choose a ticket bundle, enter your name, email, and mobile number, agree to the terms, and pay by debit or credit card (Apple Pay or Google Pay when shown on your device). After payment succeeds, complete all three skill questions in the same session. Every answer must be correct for your tickets to count in the draw.',
         popular: true,
       },
       {
@@ -121,14 +121,14 @@ export const FAQ_SECTIONS = [
         id: 'free-postal',
         question: 'How does free postal entry work?',
         answer:
-          `${NO_PURCHASE_ENTRY_NOTICE} You may enter the same Signed Football Legend Bundle draw without payment by post. Send your full name, full postal address, email, and the competition name (${COMPETITION_NAME_POSTAL}), plus written answers to all three skill questions, to: ${POSTAL_ENTRY_ADDRESS}. Limit: one free postal entry per person. Postal entries have the same chance to qualify as paid entries if answers are correct.`,
+          `${NO_PURCHASE_ENTRY_NOTICE} You may enter the same Signed Legacy Bundle draw without payment by post. Send your full name, full postal address, email, and the competition name (${COMPETITION_NAME_POSTAL}), plus written answers to all three skill questions, to: ${POSTAL_ENTRY_ADDRESS}. Limit: one free postal entry per person. Postal entries have the same chance to qualify as paid entries if answers are correct.`,
         popular: true,
       },
       {
         id: 'free-online-entry',
         question: 'How does free online entry work (no payment)?',
         answer:
-          `${NO_PURCHASE_ENTRY_NOTICE} Where offered on the Signed Football Legend Bundle entry form, choose the free online route: complete £0 debit card verification (you are not charged), then answer the three skill questions in the same session. Card details are entered only in our payment provider’s secure fields — ShowSkills Rewards does not collect or store your debit card details from free entry. Entry limits (e.g. per name and address) are shown on the form.`,
+          `${NO_PURCHASE_ENTRY_NOTICE} Where offered on the Signed Legacy Bundle entry form, choose the free online route: complete £0 debit card verification (you are not charged), then answer the three skill questions in the same session. Card details are entered only in our payment provider’s secure fields — ShowSkills Rewards does not collect or store your debit card details from free entry. Entry limits (e.g. per name and address) are shown on the form.`,
         popular: true,
       },
       {
@@ -194,13 +194,13 @@ export const FAQ_SECTIONS = [
         id: 'quiz-wrong',
         question: 'I got a question wrong — can I try again?',
         answer:
-          'For a given paid purchase or free online Signed Football Legend Bundle entry, you have one attempt at the three skill questions. If your answers are wrong, that entry does not qualify for the main draw and tickets are not refunded. ' +
+          'For a given paid purchase or free online Signed Legacy Bundle entry, you have one attempt at the three skill questions. If your answers are wrong, that entry does not qualify for the main draw and tickets are not refunded. ' +
           CONSOLATION_PRIZE_SUMMARY +
           ' ' +
           CONSOLATION_PRIZE_PAID_THRESHOLD +
           ' ' +
           CONSOLATION_PRIZE_FREE_APPLIES +
-          ' Buying another ticket bundle starts a new paid entry (subject to our rules and limits). Free postal and free online Signed Football Legend Bundle routes have their own limits — see the Signed Football Legend Bundle section above.',
+          ' Buying another ticket bundle starts a new paid entry (subject to our rules and limits). Free postal and free online Signed Legacy Bundle routes have their own limits — see the Signed Legacy Bundle section above.',
       },
       {
         id: 'consolation-prize',
@@ -228,13 +228,13 @@ export const FAQ_SECTIONS = [
   {
     id: 'shirt-giveaway',
     title: 'Free Ronaldo shirt giveaway',
-    summary: 'A separate free promotion — not the same draw as the Signed Football Legend Bundle.',
+    summary: 'A separate free promotion — not the same draw as the Signed Legacy Bundle.',
     items: [
       {
         id: 'shirt-separate',
-        question: 'Is the shirt giveaway the same as the Signed Football Legend Bundle draw?',
+        question: 'Is the shirt giveaway the same as the Signed Legacy Bundle draw?',
         answer:
-          `No. The shirt giveaway is a separate free promotion. The prize is a signed Cristiano Ronaldo Manchester United home shirt from the ${SHIRT_GIVEAWAY_SEASON_LABEL} only — not the full Signed Football Legend Bundle. Entering the shirt giveaway does not automatically enter you into the paid bundle draw unless we state otherwise on the site.`,
+          `No. The shirt giveaway is a separate free promotion. The prize is a signed Cristiano Ronaldo Manchester United home shirt from the ${SHIRT_GIVEAWAY_SEASON_LABEL} only — not the full Signed Legacy Bundle. Entering the shirt giveaway does not automatically enter you into the paid bundle draw unless we state otherwise on the site.`,
       },
       {
         id: 'shirt-how',
@@ -264,9 +264,9 @@ export const FAQ_SECTIONS = [
       },
       {
         id: 'what-prizes',
-        question: 'What rewards can I win in the Signed Football Legend Bundle draw?',
+        question: 'What rewards can I win in the Signed Legacy Bundle draw?',
         answer:
-          'The Signed Football Legend Bundle prize stack includes a 2008 Cristiano Ronaldo signed shirt, a Cristiano Ronaldo Museum signed football, an iPhone 17 Pro Max (512GB, unlocked), and a 24K gold-style case for the phone. Exact specifications and substitution rules (for example phone colour) are listed on the home page and in the full terms. For how we source and verify items, see the Prize authenticity section in our FAQs.',
+          'The Signed Legacy Bundle prize stack includes a certified 2008 Ronaldo signed shirt, a certified Ronaldo museum signed football, an iPhone 17 Pro Max (512GB, unlocked), and a 24K gold-style case for the phone. Exact specifications and substitution rules (for example phone colour) are listed on the home page and in the full terms. For how we source and verify items, see the Prize authenticity section in our FAQs.',
       },
       {
         id: 'winner-contact',

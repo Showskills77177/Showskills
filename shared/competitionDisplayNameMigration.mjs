@@ -6,6 +6,10 @@ const NEW_POSTAL = `${DRAW_COMPETITION_LABEL} — ShowSkills Rewards`
 /** Longest-first string replacements for published copy saved before the rename. */
 export const COMPETITION_DISPLAY_NAME_REPLACEMENTS = [
   [OLD_POSTAL_COMPETITION_NAME, NEW_POSTAL],
+  ['Signed Football Legacy Bundle details', `${DRAW_COMPETITION_LABEL} details`],
+  ['Signed Football Legacy Bundle', DRAW_COMPETITION_LABEL],
+  ['Signed Football Legend Bundle details', `${DRAW_COMPETITION_LABEL} details`],
+  ['Signed Football Legend Bundle', DRAW_COMPETITION_LABEL],
   ['Ronaldo Legacy Bundle details', `${DRAW_COMPETITION_LABEL} details`],
   ['Ronaldo Legacy Bundle', DRAW_COMPETITION_LABEL],
   ['Legacy Bundle draw', `${DRAW_COMPETITION_LABEL} draw`],

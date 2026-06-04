@@ -58,7 +58,7 @@ export function HomeCompetitionsHub({ block = {}, onEnterPaid, onEnterGiveaway }
   const paidTitle = block.paidTitle || 'Main paid competitions'
   const paidSubtitle =
     block.paidSubtitle ||
-    'Ticket bundles and skill questions — qualify for the full Signed Football Legend Bundle draw and other main prize competitions.'
+    'Ticket bundles and skill questions — qualify for the full Signed Legacy Bundle draw and other main prize competitions.'
   const freeTitle = block.freeTitle || 'Free giveaways'
   const freeSubtitle =
     block.freeSubtitle ||

@@ -11,7 +11,7 @@ import { awardConsolationShirtEntries } from '../lib/awardConsolationShirtEntrie
 import { prizeRevealUrlForTicket } from '../lib/prizeRevealEmailContext.mjs'
 
 /**
- * Public endpoint: persist Signed Football Legend Bundle quiz answers (paid or free entry_type).
+ * Public endpoint: persist Signed Legacy Bundle quiz answers (paid or free entry_type).
  * Postal entries are not recorded here.
  */
 export default async function handler(req, res) {

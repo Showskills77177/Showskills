@@ -3,6 +3,7 @@ import { CompetitionCountdown } from './CompetitionCountdown'
 import { LegacyBundlePhonePrizes } from './LegacyBundlePhonePrizes'
 import { LegacyBundleImageryDisclaimer } from './LegacyBundleImageryDisclaimer'
 import { LegacyBundleImageryCaption } from './LegacyBundleImageryCaption'
+import { LegacyBundlePosterTitle } from './LegacyBundlePosterTitle'
 import { GlowingFootballIcon } from './siteChrome'
 import { formatBundlePriceGBP } from '../competitionData'
 import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
@@ -95,7 +96,12 @@ export function HomeFeaturedPromotion({ competition, onEnter, preview = false })
                   {hero ? (
                     <>
                       <img src={hero} alt="" className="h-auto w-full object-cover" loading="lazy" />
-                      {isLegacy ? <LegacyBundleImageryCaption /> : null}
+                      {isLegacy ? (
+                        <>
+                          <LegacyBundlePosterTitle />
+                          <LegacyBundleImageryCaption />
+                        </>
+                      ) : null}
                     </>
                   ) : (
                     <div className="flex aspect-video items-center justify-center text-sm text-stone-500">

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useMemo } from 'react'
 import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
 import { useEntryFlow } from '../entry/entryContext'
-import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
+import { usePublishedCompetitions, usePublicCompetition } from '../hooks/usePublicCompetition'
 import { usePublishedGiveaways } from '../hooks/usePublicGiveaway'
 import { usePageLayout } from '../hooks/useSitePages'
 import { useMatchedCompetitionCardHeight } from '../hooks/useMatchedCompetitionCardHeight'
@@ -16,6 +17,7 @@ import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
 import { LegacyShirtGiveawayCard } from '../components/LegacyShirtGiveawayCard'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
+import { resolveLegacyBundlePublicCompetition } from '../../shared/legacyBundlePublic.mjs'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 
 function SectionHeading({ id, children }) {
@@ -72,8 +74,21 @@ export default function CompetitionsPage({
   const layout = mergeCompetitionsPageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
+  const { competition: legacyDetail, loading: loadingLegacyDetail } = usePublicCompetition(DRAW_COMPETITION_SLUG)
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
-  const loading = layoutLoading || loadingCompetitions || loadingGiveaways
+  const paidCompetitions = useMemo(() => {
+    const legacy = resolveLegacyBundlePublicCompetition({
+      detail: legacyDetail,
+      listItems: competitions,
+    })
+    const extras = competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG)
+    return [legacy, ...extras]
+  }, [competitions, legacyDetail])
+  const extraPaidCompetitions = useMemo(
+    () => competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG),
+    [competitions],
+  )
+  const loading = layoutLoading || loadingCompetitions || loadingLegacyDetail || loadingGiveaways
 
   const desktopOffsets = layout.offsets || {}
   const pageMobileOffsets = layout.mobileOffsets || {}
@@ -90,7 +105,7 @@ export default function CompetitionsPage({
   const shirtCountdownPeriod = pickCountdownPeriod(shirtCompetition)
 
   const matchKey = [
-    competitions.length,
+    paidCompetitions.length,
     giveaways.length,
     loading,
     shirtPeriodLoading,
@@ -199,7 +214,7 @@ export default function CompetitionsPage({
 
     const wrapped =
       isLegacy && index === 0
-        ? dragWrap('comp_paid_card', 'Signed Football Legend Bundle card', 'paidPrimaryCard', card, { cssScaleOnly: true })
+        ? dragWrap('comp_paid_card', 'Signed Legacy Bundle card', 'paidPrimaryCard', card, { cssScaleOnly: true })
         : card
 
     return (
@@ -219,13 +234,13 @@ export default function CompetitionsPage({
       </SectionHeading>
       <p className="mt-2 text-sm text-stone-500">{layout.sections.paid?.subtitle}</p>
       <ul className="mt-4 grid list-none gap-6">
-        {competitions.map((c, index) => (
+        {paidCompetitions.map((c, index) => (
           <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
             {renderPaidCard(c, index)}
           </li>
         ))}
       </ul>
-      {!loading && competitions.length === 0 && layout.emptyPaidMessage ? (
+      {!loading && extraPaidCompetitions.length === 0 && layout.emptyPaidMessage?.trim() ? (
         <p className="mt-6 text-sm text-stone-500">{layout.emptyPaidMessage}</p>
       ) : null}
     </div>

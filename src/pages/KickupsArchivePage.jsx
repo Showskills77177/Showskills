@@ -67,7 +67,7 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
                   </p>
                   <p className="mt-1 text-xs font-medium text-emerald-100/60">{SHIRT_GIVEAWAY_SEASON_LABEL}</p>
                   <p className="mt-2 text-sm leading-relaxed text-emerald-100/75">
-                    Shirt only — the full Signed Football Legend Bundle (phone, ball, 2008 signed shirt) is a separate paid competition on
+                    Shirt only — the full Signed Legacy Bundle (phone, ball, 2008 signed shirt) is a separate paid competition on
                     this site.
                   </p>
                 </div>

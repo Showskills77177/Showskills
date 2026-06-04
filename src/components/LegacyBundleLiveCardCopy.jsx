@@ -16,7 +16,7 @@ function bundlePriceLine(competition) {
   return 'Paid ticket bundles available'
 }
 
-/** Fixed public layout for the Signed Football Legend Bundle card — no saved editor offsets. */
+/** Fixed public layout for the Signed Legacy Bundle card — no saved editor offsets. */
 export function LegacyBundleLiveCardCopy({
   metaFeaturedLabel,
   periodMonth,

@@ -67,7 +67,7 @@ function PrivacyPolicySection() {
           on our servers)
         </li>
         <li>
-          For <strong>free online entry</strong> to the Signed Football Legend Bundle, we may ask you to complete a{' '}
+          For <strong>free online entry</strong> to the Signed Legacy Bundle, we may ask you to complete a{' '}
           <strong>£0.00 card authorisation</strong> (verification only — you are not charged). Your card details are
           entered only into <strong>Cashflows&apos; secure payment fields</strong>.{' '}
           <strong>ShowSkills Rewards does not receive, store, or retain your card details</strong> from that £0
@@ -279,7 +279,7 @@ export function TermsModal({ open, onClose }) {
         <div className="overflow-y-auto px-6 py-5 text-left text-sm leading-relaxed text-zinc-400">
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
-            promotions in the United Kingdom, including the paid <strong>Signed Football Legend Bundle</strong> skill competition
+            promotions in the United Kingdom, including the paid <strong>Signed Legacy Bundle</strong> skill competition
             and the separate <strong>free Ronaldo shirt giveaway</strong>. By entering, you agree to these terms.
           </p>
 
@@ -303,7 +303,7 @@ export function TermsModal({ open, onClose }) {
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">2. Paid competition — skill-based (not a lottery)</h3>
           <p className="mb-3">
-            The <strong>Signed Football Legend Bundle</strong> draw is a <strong>skill-based competition</strong>, not a lottery.
+            The <strong>Signed Legacy Bundle</strong> draw is a <strong>skill-based competition</strong>, not a lottery.
             Each competition runs for a defined <strong>entry period</strong>; only qualifying entries received within that
             period are included in the draw for that period. When a period closes, the winner is drawn only from that
             period&apos;s pool — entries from earlier or later periods are not mixed in. After purchasing ticket(s), you must submit <strong>three free-text answers</strong> about
@@ -315,10 +315,10 @@ export function TermsModal({ open, onClose }) {
 
           <div className="mb-3 rounded-lg border border-stone-700/50 bg-stone-900/50 px-3 py-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
-              Signed Football Legend Bundle — legal notice
+              Signed Legacy Bundle — legal notice
             </p>
             <p className="mb-2 text-zinc-200">
-              The <strong>Signed Football Legend Bundle</strong> prizes (signed memorabilia, museum football, iPhone, and case)
+              The <strong>Signed Legacy Bundle</strong> prizes (signed memorabilia, museum football, iPhone, and case)
               are <strong>genuine, legally purchased rare collectibles</strong> — not official licensed merchandise from
               Cristiano Ronaldo, CR7, Manchester United, or Apple.
             </p>
@@ -335,15 +335,15 @@ export function TermsModal({ open, onClose }) {
             2a. Consolation prize (Free Ronaldo Shirt Giveaway)
           </h3>
           <p className="mb-3">
-            The main Signed Football Legend Bundle draw remains strictly skill-based: incorrect answers do <strong>not</strong> qualify for
+            The main Signed Legacy Bundle draw remains strictly skill-based: incorrect answers do <strong>not</strong> qualify for
             the bundle prize, and <strong>tickets are not refunded</strong> if your skill answers are wrong.
           </p>
           <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
             <strong>Consolation prize:</strong> If you get the three skill questions wrong, you automatically receive{' '}
             <strong>2 entries</strong> into the separate <strong>Free Ronaldo Shirt Giveaway</strong> (consolation prize).
-            This applies equally to <strong>free online Signed Football Legend Bundle entrants</strong> and to{' '}
+            This applies equally to <strong>free online Signed Legacy Bundle entrants</strong> and to{' '}
             <strong>paid ticket buyers who spend £10 or more on tickets in a single purchase</strong>. Consolation entries
-            do <strong>not</strong> enter you into the main Signed Football Legend Bundle draw and do <strong>not</strong> replace a
+            do <strong>not</strong> enter you into the main Signed Legacy Bundle draw and do <strong>not</strong> replace a
             qualifying entry. They are recorded automatically — you do not need to complete the separate shirt giveaway form
             again for these consolation entries.
           </p>
@@ -359,7 +359,7 @@ export function TermsModal({ open, onClose }) {
 
           <WinnerPhotographyConsentTerms id="ss-terms-winner-photography-consent" headingLevel="h3" />
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Signed Football Legend Bundle)</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">4. Free postal entry (Signed Legacy Bundle)</h3>
           <p className="mb-3">
             <strong>No purchase necessary.</strong> You may enter the same draw <strong>without payment</strong> by post.
             Send your <strong>full name</strong>, <strong>full postal address</strong>, <strong>email address</strong>, and
@@ -372,10 +372,10 @@ export function TermsModal({ open, onClose }) {
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">
-            5. Free online entry — £0 card verification (Signed Football Legend Bundle)
+            5. Free online entry — £0 card verification (Signed Legacy Bundle)
           </h3>
           <p className="mb-3">
-            Where offered on the site, you may enter the Signed Football Legend Bundle draw <strong>online without paying</strong>{' '}
+            Where offered on the site, you may enter the Signed Legacy Bundle draw <strong>online without paying</strong>{' '}
             subject to entry limits shown at checkout. This is part of our <strong>no purchase necessary</strong> free entry
             route alongside postal entry. Before you submit your skill answers, we may require{' '}
             <strong>£0 debit card verification</strong> — a <strong>zero-pound authorisation only</strong> (you are{' '}
@@ -403,7 +403,7 @@ export function TermsModal({ open, onClose }) {
             need one); and provide your social handle so we can verify engagement. The prize is a{' '}
             <strong>signed Cristiano Ronaldo Manchester United home shirt from the {SHIRT_GIVEAWAY_SEASON_LABEL}</strong>{' '}
             (not the full bundle). It does <strong>not</strong> form part of
-            the paid Signed Football Legend Bundle competition unless expressly stated. Signed Football Legend Bundle entrants who get the three skill
+            the paid Signed Legacy Bundle competition unless expressly stated. Signed Legacy Bundle entrants who get the three skill
             questions wrong may receive <strong>automatic consolation entries</strong> into this shirt draw — see section 2a above.
           </p>
           <p className="mb-3">
@@ -444,7 +444,7 @@ export function TermsModal({ open, onClose }) {
             we agree otherwise; no cash alternative is guaranteed; we may substitute items of similar value if needed.
           </p>
           <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
-            <strong>Authenticity:</strong> Signed Football Legend Bundle prizes are{' '}
+            <strong>Authenticity:</strong> Signed Legacy Bundle prizes are{' '}
             <strong>genuine, legally purchased rare collectibles</strong> acquired on the open market.{' '}
             <strong>Illustrative images</strong> on the site may be{' '}
             <strong>AI-generated or heavily edited</strong> — see section 13 for the full disclaimer. Actual physical

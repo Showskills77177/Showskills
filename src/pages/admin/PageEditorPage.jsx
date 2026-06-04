@@ -722,7 +722,7 @@ export default function PageEditorPage() {
               />
             </div>
             <p className="mt-1 text-xs text-stone-500">
-              Paid Signed Football Legend Bundle and free giveaways — shown below the hero. Drag &quot;Competitions hub&quot; in section order to move it.
+              Paid Signed Legacy Bundle and free giveaways — shown below the hero. Drag &quot;Competitions hub&quot; in section order to move it.
             </p>
             <div className="mt-3 grid gap-3">
               <EditorField label="Section title">
@@ -1179,7 +1179,7 @@ function CompetitionsPageEditor({ layout, selectedBlockId, editorViewport, onCha
             legacyBlockSelected ? 'border-teal-500/40 ring-1 ring-teal-500/20' : 'border-white/10'
           }`}
         >
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Signed Football Legend Bundle card</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Signed Legacy Bundle card</h2>
           {legacyBlockSelected && COMPETITIONS_BLOCK_LABELS[selectedBlockId] ? (
             <p className="mt-1 text-xs font-medium text-teal-400/90">
               Selected in preview: {COMPETITIONS_BLOCK_LABELS[selectedBlockId]} — drag to move, Ctrl/Cmd+drag to resize,
@@ -1204,7 +1204,7 @@ function CompetitionsPageEditor({ layout, selectedBlockId, editorViewport, onCha
               <input
                 value={legacyCard.title || ''}
                 onChange={(e) => patchLegacyCard({ title: e.target.value })}
-                placeholder="Signed Football Legend Bundle"
+                placeholder="Signed Legacy Bundle"
                 className={editorInputClass()}
               />
             </EditorField>

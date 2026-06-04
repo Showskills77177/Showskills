@@ -1,6 +1,6 @@
 import { COMPETITION_NAME_POSTAL } from './competitionCopy.mjs'
 
-/** Entry routes available on a main prize draw (same UX as Signed Football Legend Bundle). */
+/** Entry routes available on a main prize draw (same UX as Signed Legacy Bundle). */
 export const ENTRY_METHOD = {
   paid: 'paid',
   freeOnline: 'free_online',

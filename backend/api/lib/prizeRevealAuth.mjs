@@ -144,7 +144,7 @@ export async function markPrizeRevealViewed(ticketId) {
   )
 }
 
-/** Paid Signed Football Legend Bundle ticket for this resume token. */
+/** Paid Signed Legacy Bundle ticket for this resume token. */
 export async function resolvePrizeRevealTicket(resumeToken) {
   const token = typeof resumeToken === 'string' ? resumeToken.trim() : ''
   if (token.length < 20) return null

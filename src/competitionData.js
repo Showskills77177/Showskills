@@ -16,14 +16,14 @@ export {
 export { PAID_SKILL_QUESTIONS, validatePaidSkillAnswers } from '../shared/paidSkillQuestions.mjs'
 
 export const BUNDLE_OFFER_ITEMS = [
-  'Cristiano Ronaldo signed shirt (2008 season)',
-  'Cristiano Ronaldo Museum signed football',
+  'Certified Ronaldo signed shirt (2008 season)',
+  'Certified Ronaldo museum signed football',
   'iPhone 17 Pro Max',
   'iPhone 17 Pro Max 24K gold case',
 ]
 
 export const GRAND_PRIZE_BUNDLE = {
-  title: 'Signed Football Legend Bundle',
+  title: 'Signed Legacy Bundle',
 }
 
 export {

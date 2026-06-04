@@ -17,7 +17,6 @@ import {
   normalizeEntryMethods,
 } from '../../../shared/competitionEntryMethods.mjs'
 import { COMPETITION_NAME_POSTAL } from '../../../shared/competitionCopy.mjs'
-import { OLD_POSTAL_COMPETITION_NAME } from '../../../shared/competitionDisplayNameMigration.mjs'
 import { defaultPostalName } from '../../../shared/competitionEntryMethods.mjs'
 
 export const COMPETITION_STATUS = {
@@ -356,23 +355,16 @@ async function ensureBuiltinCompetitions() {
          WHERE slug = $3 AND summary IN ($4, $5)`,
         [c.summary, now, DRAW_COMPETITION_SLUG, 'Updated from catalog test', 'Created from catalog test'],
       )
-      await query(
-        `UPDATE competitions SET title = $1, updated_at = $2
-         WHERE slug = $3 AND title IN ($4, $5)`,
-        [c.title, now, DRAW_COMPETITION_SLUG, 'Ronaldo Legacy Bundle', ''],
-      )
-      await query(
-        `UPDATE competitions SET postal_competition_name = $1, updated_at = $2
-         WHERE slug = $3 AND postal_competition_name IN ($4, $5, $6)`,
-        [
-          COMPETITION_NAME_POSTAL,
-          now,
-          DRAW_COMPETITION_SLUG,
-          OLD_POSTAL_COMPETITION_NAME,
-          'Ronaldo Legacy Bundle',
-          '',
-        ],
-      )
+      await query(`UPDATE competitions SET title = $1, updated_at = $2 WHERE slug = $3`, [
+        c.title,
+        now,
+        DRAW_COMPETITION_SLUG,
+      ])
+      await query(`UPDATE competitions SET postal_competition_name = $1, updated_at = $2 WHERE slug = $3`, [
+        COMPETITION_NAME_POSTAL,
+        now,
+        DRAW_COMPETITION_SLUG,
+      ])
     }
 
     if (c.seedBundles) {

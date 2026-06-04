@@ -1,4 +1,4 @@
-/** Rubber-stamp badge — clarifies Signed Football Legend Bundle prizes are collectibles, not official merch. */
+/** Rubber-stamp badge — clarifies Signed Legacy Bundle prizes are collectibles, not official merch. */
 export function LegacyBundleCollectiblesStamp({ className = '', size = 'md' }) {
   const sizes = {
     sm: 'px-1 py-px text-[8px] tracking-[0.1em]',

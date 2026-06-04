@@ -176,7 +176,7 @@ export default async function handler(req, res) {
       message: recorded.allCorrect
         ? 'Free entry complete — you qualify for the draw. Your ticket number is in your email.'
         : consolationShirtEntries
-          ? `Free entry saved — you did not qualify for the Signed Football Legend Bundle draw, but you received ${consolationShirtEntries} automatic entries into the separate Free Ronaldo Shirt Giveaway.`
+          ? `Free entry saved — you did not qualify for the Signed Legacy Bundle draw, but you received ${consolationShirtEntries} automatic entries into the separate Free Ronaldo Shirt Giveaway.`
           : 'Free entry saved — your skill answers did not all qualify for the draw.',
     })
   } catch (e) {

@@ -1,3 +1,4 @@
+import { DRAW_COMPETITION_LABEL } from '../../shared/competitionPeriods.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 
 /** Prize authenticity — Terms, Privacy, and cross-linked from FAQs. */
@@ -21,14 +22,13 @@ export function PrizeAuthenticityNotice({ headingLevel = 'h3', id = 'ss-prize-au
         <strong>specialist memorabilia dealers</strong>).
       </p>
 
-      <p className="mb-2 font-medium text-stone-300">For the Signed Football Legend Bundle:</p>
+      <p className="mb-2 font-medium text-stone-300">For the {DRAW_COMPETITION_LABEL}:</p>
       <ul className="mb-3 list-inside list-disc space-y-1.5 text-zinc-300">
         <li>
-          The signed Cristiano Ronaldo shirt comes with a <strong>Certificate of Authenticity</strong>.
+          The signed Ronaldo shirt comes with a <strong>Certificate of Authenticity</strong>.
         </li>
         <li>
-          The signed museum golden ball is an <strong>officially licensed collectible</strong> with supporting
-          documentation.
+          The signed museum golden ball comes with a <strong>Certificate of Authenticity</strong>.
         </li>
         <li>
           The iPhone 17 Pro Max and luxury gold case are <strong>brand new, sealed</strong>, and sourced through{' '}

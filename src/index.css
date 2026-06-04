@@ -165,6 +165,7 @@ body {
   /* Biggest Safari perf wins: remove continuous decorative animation/filter work. */
   .ss-page-bg::before,
   .ss-btn-enter,
+  .ss-legacy-bundle-poster-title,
   .ss-bundle-arrow--down,
   .ss-bundle-arrow--right,
   .ss-bundle-arrow__halo,
@@ -634,7 +635,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .ss-btn-enter,
   .ss-bundle-arrow,
-  .ss-page-bg::before {
+  .ss-page-bg::before,
+  .ss-legacy-bundle-poster-title {
     animation: none !important;
   }
 }
@@ -1301,6 +1303,59 @@ body {
   pointer-events: none;
 }
 
+@keyframes ss-legacy-signed-glow {
+  0%,
+  100% {
+    color: #b98636;
+    text-shadow:
+      0 0 3px rgba(206, 152, 62, 0.38),
+      0 0 8px rgba(185, 134, 54, 0.24),
+      0 1px 3px rgba(0, 0, 0, 0.75);
+  }
+
+  50% {
+    color: #d4a044;
+    text-shadow:
+      0 0 7px rgba(206, 152, 62, 0.72),
+      0 0 14px rgba(185, 134, 54, 0.48),
+      0 0 22px rgba(177, 120, 53, 0.28),
+      0 1px 3px rgba(0, 0, 0, 0.75);
+  }
+}
+
+.ss-legacy-bundle-poster-title {
+  position: absolute;
+  top: 6%;
+  left: 21%;
+  right: auto;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 5.4vw, 2.05rem);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  color: #c8943a;
+  text-shadow:
+    0 0 4px rgba(206, 152, 62, 0.5),
+    0 0 10px rgba(185, 134, 54, 0.32),
+    0 1px 3px rgba(0, 0, 0, 0.75);
+  animation: ss-legacy-signed-glow 2.6s ease-in-out infinite;
+}
+
+@media (min-width: 640px) {
+  .ss-legacy-bundle-poster-title {
+    top: 7%;
+    left: 23%;
+    font-size: clamp(1.45rem, 3.1vw, 2.15rem);
+  }
+}
+
 @media (min-width: 640px) {
   .ss-legacy-bundle-stamp-overlay {
     top: 24.5%;
@@ -1351,12 +1406,17 @@ body {
   animation: none !important;
 }
 
-/* Homepage Signed Football Legend Bundle studio — fixed aspect slots so images never reflow on route change */
+/* Homepage Signed Legacy Bundle studio — fixed aspect slots so images never reflow on route change */
 .ss-hero-prize-column .ss-prize-studio--hero {
   contain: layout style;
 }
 
 .ss-hero-prize-column .ss-prize-studio-tile--main .ss-prize-studio-photo {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+[data-competition-card] .ss-prize-studio-tile--main .ss-prize-studio-photo {
   aspect-ratio: 16 / 9;
   width: 100%;
 }
@@ -1369,6 +1429,12 @@ body {
 }
 
 .ss-hero-prize-column .ss-prize-studio-photo img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+[data-competition-card] .ss-prize-studio-tile--main .ss-prize-studio-photo img {
   height: 100%;
   width: 100%;
   object-fit: cover;
@@ -1975,7 +2041,7 @@ body {
   transform: scale(0.98);
 }
 
-/* Hero cue → Signed Football Legend Bundle: motion + glow (honours reduced motion) */
+/* Hero cue → Signed Legacy Bundle: motion + glow (honours reduced motion) */
 .ss-bundle-arrow {
   display: flex;
   align-items: center;
@@ -2900,8 +2966,20 @@ input.ss-cf-pay-button.ss-pay-cta {
 }
 
 /* Paid purchaser prize reveal — timed full bundle preview (email link only) */
-.ss-prize-reveal-page {
+.ss-prize-reveal-page,
+.ss-shirt-prize-reveal-page {
   -webkit-touch-callout: none;
+}
+
+.ss-shirt-prize-reveal-stage {
+  position: relative;
+  margin: 0 auto;
+  max-width: min(100%, 36rem);
+}
+
+.ss-shirt-prize-reveal-wrap {
+  position: relative;
+  overflow: hidden;
 }
 
 .ss-prize-reveal-panel {

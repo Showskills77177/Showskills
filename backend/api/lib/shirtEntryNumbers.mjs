@@ -26,6 +26,21 @@ export async function ensureShirtEntrySchema() {
   } catch {
     /* column exists */
   }
+  try {
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN preview_token TEXT UNIQUE`)
+  } catch {
+    /* column exists */
+  }
+  try {
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN shirt_preview_viewed_at TEXT`)
+  } catch {
+    /* column exists */
+  }
+  try {
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN confirmation_email_sent_at TEXT`)
+  } catch {
+    /* column exists */
+  }
   await query(
     `UPDATE kickup_submissions SET competition = $1 WHERE competition IS NULL OR competition = ''`,
     [COMPETITION_SHIRT_GIVEAWAY],

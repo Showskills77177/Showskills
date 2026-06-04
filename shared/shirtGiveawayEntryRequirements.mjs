@@ -57,7 +57,7 @@ export const SHIRT_GIVEAWAY_PUBLIC_STEPS = [
   {
     num: '5',
     title: 'Agree to the terms and submit',
-    detail: `One entry per device; VPNs and proxies are not allowed. Prize: signed Ronaldo United shirt (${SHIRT_GIVEAWAY_SEASON_LABEL}) — not the Signed Football Legend Bundle.`,
+    detail: `One entry per device; VPNs and proxies are not allowed. Prize: signed Ronaldo United shirt (${SHIRT_GIVEAWAY_SEASON_LABEL}) — not the Signed Legacy Bundle.`,
   },
   {
     num: '6',

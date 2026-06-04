@@ -27,7 +27,7 @@ export function CompetitionEntryMethodsEditor({
       <p className="text-xs text-stone-500">
         {giveawayMode
           ? 'Free entry routes only — £0 card-verified online entry and/or free postal entry into the same draw pool.'
-          : 'Same entry routes as the Signed Football Legend Bundle — paid ticket bundles, £0 card-verified free online entry, and free postal entry into the same draw pool.'}
+          : 'Same entry routes as the Signed Legacy Bundle — paid ticket bundles, £0 card-verified free online entry, and free postal entry into the same draw pool.'}
       </p>
       <div className={`grid gap-2 ${giveawayMode ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         {!giveawayMode ? (
