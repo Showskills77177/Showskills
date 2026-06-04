@@ -5,7 +5,7 @@ import kickupsHeroBg from '../assets/kickups-hero-bg.png'
 import competitionsPageBg from '../assets/competitions-page-bg.png'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
 import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
-import iphone17ProMaxGoldCase from '../assets/iphone-17-pro-max-gold-case.png'
+import { GoldCasePrizePhoto } from '../components/GoldCasePrizePhoto'
 import { BUNDLE_OFFER_ITEMS } from '../competitionData'
 import { GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
 import { CompetitionCountdown } from '../components/CompetitionCountdown'
@@ -526,19 +526,7 @@ export function HomePageContent({
               </div>
               <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
                 <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-hidden rounded-md">
-                  {prizeFrame(
-                    'case',
-                    'Gold case',
-                    <img
-                      src={iphone17ProMaxGoldCase}
-                      alt="24K gold case for iPhone 17 Pro Max prize photo."
-                      width={960}
-                      height={1024}
-                      loading="eager"
-                      decoding="async"
-                      className="aspect-[3/4] h-auto w-full object-cover object-center"
-                    />,
-                  )}
+                  {prizeFrame('case', 'Gold case', <GoldCasePrizePhoto loading="eager" />)}
                 </div>
                 <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">
                   Case prize

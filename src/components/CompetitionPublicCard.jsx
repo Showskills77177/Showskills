@@ -92,7 +92,7 @@ export function CompetitionPublicCard({
     const widthOnly = opts.uniformScale ? false : opts.widthOnly !== false
     const raw = cardOffsets[offsetKey] || { x: 0, y: 0, scale: 1 }
     let pos = moveOnly ? { ...raw, scale: 1 } : raw
-    if (!editorMode && offsetKey === 'enter') {
+    if (!editorMode && (offsetKey === 'enter' || offsetKey === 'price')) {
       pos = { ...pos, y: Math.max(0, Number(pos.y) || 0) }
     }
     if (!editorMode || !isLegacyBundle) {
@@ -194,9 +194,19 @@ export function CompetitionPublicCard({
     </div>
   )
 
+  const priceBadge = cardDragWrap(
+    'comp_paid_card_price',
+    'Price badge',
+    'price',
+    <p className="ss-competition-card-footer__price inline-flex w-fit rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-3 py-1.5 text-sm font-display text-emerald-50 sm:text-base">
+      {bundlePriceLine(competition)}
+    </p>,
+    { widthOnly: false },
+  )
+
   const headlinePanel = (
     <div
-      className={`flex min-h-0 flex-1 flex-col px-6 pt-2 pb-0 sm:px-8 sm:pt-2.5 ${editorMode && isLegacyBundle ? 'overflow-visible' : ''}`}
+      className={`ss-competition-card-headline flex min-h-0 flex-1 flex-col px-6 pt-2 pb-2 sm:px-8 sm:pt-2.5 sm:pb-3 ${editorMode && isLegacyBundle ? 'overflow-visible' : ''}`}
     >
       {cardDragWrap(
         'comp_paid_card_meta',
@@ -252,21 +262,17 @@ export function CompetitionPublicCard({
         <p className="text-sm leading-relaxed text-stone-500 sm:text-base">{summary}</p>,
         { widthOnly: false },
       )}
-      <div className="ss-competition-card-focus__spacer" aria-hidden />
-      {cardDragWrap(
-        'comp_paid_card_price',
-        'Price badge',
-        'price',
-        <p className="inline-flex w-fit rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-3 py-1.5 text-sm font-display text-emerald-50 sm:text-base">
-          {bundlePriceLine(competition)}
-        </p>,
-        { widthOnly: false },
-      )}
+      {!isLegacyBundle ? (
+        <>
+          <div className="ss-competition-card-focus__spacer" aria-hidden />
+          {priceBadge}
+        </>
+      ) : null}
     </div>
   )
 
   const postalLine = competition.allowPostalEntry ? (
-    <p className="mb-3 text-xs leading-relaxed text-stone-600 sm:mb-4 sm:text-sm">
+    <p className="text-xs leading-relaxed text-stone-600 sm:text-sm">
       Postal entries: write <span className="text-stone-400">{competition.postalCompetitionName}</span> on your
       envelope → {POSTAL_ENTRY_ADDRESS}
     </p>
@@ -276,6 +282,7 @@ export function CompetitionPublicCard({
     isLegacyBundle && (editorMode || (!preview && onEnter))
       ? (
           <div className="ss-competition-card-actions ss-competition-card-footer">
+            {priceBadge}
             {postalLine}
             {cardDragWrap(
               'comp_paid_card_enter',
