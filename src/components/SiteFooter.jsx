@@ -31,7 +31,7 @@ function LogoMark({ className = 'h-7 sm:h-8' }) {
 function FooterNavLink({ link, openTerms }) {
   if (link.visible === false) return null
   const className =
-    'text-sm font-medium text-stone-400 transition hover:text-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400/50'
+    'text-base font-medium text-stone-400 transition hover:text-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400/50 md:text-sm'
 
   if (link.action === 'terms') {
     return (
@@ -119,9 +119,9 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
           {withOffset(
             footerOffsets,
             'legal',
-            <p className="text-xs leading-relaxed text-stone-400 sm:text-[13px]">{legalMain}</p>,
+            <p className="text-sm leading-relaxed text-stone-400 sm:text-[13px]">{legalMain}</p>,
           )}
-          <p className="text-xs leading-relaxed text-stone-500 sm:text-[13px]">
+          <p className="text-sm leading-relaxed text-stone-500 sm:text-[13px]">
             Skill-based paid draw — winner picked at random from correct entries only. Free postal entry — post to{' '}
             {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
           </p>
@@ -137,7 +137,7 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
           ? withOffset(
               footerOffsets,
               'disclaimer',
-              <p className="mt-3 max-w-2xl border-t border-white/[0.06] pt-3 text-xs leading-relaxed text-stone-500">
+              <p className="mt-3 max-w-2xl border-t border-white/[0.06] pt-3 text-sm leading-relaxed text-stone-500 md:text-xs">
                 {shell.footer.disclaimer}
               </p>,
             )

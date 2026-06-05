@@ -1744,6 +1744,136 @@ body {
   outline-offset: 1px;
 }
 
+/* Mobile readability — competitions, home, terms, newsletter (≤767px). */
+@media (max-width: 767px) {
+  .ss-mobile-logo-row {
+    padding-top: 0.825rem;
+    padding-bottom: 0.4125rem;
+  }
+
+  .ss-mobile-header-logo {
+    height: 3.025rem !important;
+  }
+
+  .ss-mobile-nav-dock__grid {
+    gap: 0.55rem;
+    padding: 0.6875rem 0.6875rem 0.55rem;
+  }
+
+  .ss-mobile-nav-btn {
+    min-height: 3rem;
+    font-size: 0.9375rem;
+  }
+
+  .ss-competition-countdown {
+    min-height: 3.125rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .ss-competitions-columns h2 {
+    font-size: 1.625rem;
+    line-height: 1.05;
+  }
+
+  [data-competition-card] {
+    font-size: 1rem;
+  }
+
+  [data-competition-card] .text-xs {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  [data-competition-card] .ss-competition-enter-btn {
+    font-size: 1rem;
+  }
+
+  .ss-legacy-details-card {
+    font-size: 1.0625rem;
+  }
+
+  .ss-legacy-details-title,
+  .ss-legacy-details-kicker {
+    font-size: 0.75rem;
+  }
+
+  .ss-legacy-details-block--notes .ss-legacy-details-kicker {
+    font-size: 0.75rem;
+  }
+
+  .ss-legacy-spec-row dt {
+    font-size: 0.6875rem;
+  }
+
+  .ss-legacy-spec-row dd {
+    font-size: 0.875rem;
+  }
+
+  .ss-legacy-details-footnote {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+
+  .ss-ticket-bundles-panel {
+    font-size: 1rem;
+  }
+
+  .ss-ticket-bundles-heading {
+    font-size: 0.75rem !important;
+  }
+
+  .ss-ticket-bundles-footnote {
+    font-size: 0.8125rem !important;
+  }
+
+  .ss-hero-countdown-slot .ss-competition-countdown {
+    font-size: 0.9375rem;
+  }
+
+  .ss-terms-modal-body {
+    font-size: 0.9375rem;
+    line-height: 1.65;
+  }
+
+  .ss-terms-modal-body h2 {
+    font-size: 1.125rem;
+  }
+
+  .ss-terms-modal-body h3 {
+    font-size: 1.0625rem;
+  }
+
+  .ss-terms-modal-body ul,
+  .ss-terms-modal-body ol {
+    font-size: inherit;
+  }
+
+  .ss-newsletter-signup p {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+
+  .ss-footer-bg .text-sm {
+    font-size: 0.875rem;
+    line-height: 1.55;
+  }
+
+  .ss-footer-bg nav .text-sm {
+    font-size: 0.9375rem;
+  }
+
+  .ss-photo-page h1 {
+    font-size: clamp(2rem, 9vw, 2.5rem);
+  }
+
+  .ss-shirt-giveaway-card .text-sm,
+  .ss-shirt-giveaway-card .text-base {
+    line-height: 1.5;
+  }
+}
+
 /* Small-phone homepage pass: iPhone 13 mini and similarly narrow devices. */
 @media (max-width: 430px) {
   .ss-mobile-nav-dock__grid {
@@ -1752,8 +1882,8 @@ body {
   }
 
   .ss-mobile-nav-btn {
-    min-height: 2.875rem;
-    font-size: 0.875rem;
+    min-height: 3rem;
+    font-size: 0.9375rem;
   }
 
   .ss-hero-inner {
@@ -1790,7 +1920,7 @@ body {
   .ss-prize-panel > p:first-child {
     margin-bottom: 0.6rem;
     padding: 0.32rem 0.6rem;
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     letter-spacing: 0.08em;
   }
 
@@ -1806,8 +1936,8 @@ body {
 
   .ss-hero-copy-panel > p:nth-of-type(2) {
     margin-top: 1rem;
-    font-size: clamp(1.08rem, 5.5vw, 1.32rem);
-    line-height: 1.18;
+    font-size: clamp(1.125rem, 5.8vw, 1.375rem);
+    line-height: 1.22;
   }
 
   .ss-pen-highlight {
@@ -1819,21 +1949,21 @@ body {
   }
 
   .ss-legacy-prize-stack li {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
   }
 
   .ss-legacy-value-blurb {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
   }
 
   .ss-legacy-details-block--notes .ss-legacy-spec-row dd {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
   }
 
   .ss-hero-helper-copy {
     margin-top: 0.9rem;
-    font-size: 0.9375rem;
-    line-height: 1.45;
+    font-size: 1rem;
+    line-height: 1.48;
   }
 
   .ss-hero-cta-row {
@@ -1846,7 +1976,7 @@ body {
     width: 100%;
     min-height: 2.75rem;
     padding: 0.65rem 1rem;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
   }
 
   .ss-hero-cta-row .ss-hero-cta-shirt-link {
@@ -1868,8 +1998,8 @@ body {
 
   .ss-hero-prize-column > div > p,
   .ss-prize-panel > p {
-    font-size: 0.875rem;
-    line-height: 1.45;
+    font-size: 0.9375rem;
+    line-height: 1.48;
   }
 
   .ss-hero-prize-column > div > p + p,
@@ -1895,16 +2025,16 @@ body {
   }
 
   .ss-ticket-bundles-panel.ss-hero-matched-panel .ss-ticket-bundles-heading {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
   }
 
   .ss-ticket-bundles-panel.ss-hero-matched-panel .ss-ticket-bundles-footnote {
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
   }
 
   .ss-legacy-details-title,
   .ss-legacy-details-kicker {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
   }
 }
 
@@ -1917,9 +2047,9 @@ body {
   }
 
   .ss-mobile-nav-btn {
-    min-height: 2.875rem;
+    min-height: 2.9375rem;
     padding: 0.5rem 0.4rem;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     letter-spacing: 0.01em;
   }
 
@@ -1931,12 +2061,12 @@ body {
 
 @media (max-width: 390px) {
   .ss-mobile-logo-row {
-    padding-top: 0.65rem;
-    padding-bottom: 0.35rem;
+    padding-top: 0.7rem;
+    padding-bottom: 0.4rem;
   }
 
   .ss-mobile-header-logo {
-    height: 2.45rem;
+    height: 2.7rem;
   }
 }
 
@@ -1957,24 +2087,24 @@ body {
   }
 
   .ss-legacy-prize-stack li {
-    font-size: 0.75rem;
+    font-size: 0.875rem;
   }
 }
 
 @media (max-width: 350px) {
   .ss-mobile-header-logo {
-    height: 2.25rem;
+    height: 2.5rem;
   }
 }
 
 @media (max-width: 320px) {
   .ss-mobile-header-logo {
-    height: 2.05rem;
+    height: 2.35rem;
   }
 
   .ss-mobile-nav-btn {
-    min-height: 2.75rem;
-    font-size: 0.75rem;
+    min-height: 2.875rem;
+    font-size: 0.875rem;
   }
 }
 

@@ -22,10 +22,10 @@ export function TicketBundlePrice({ className = '', compact = false, style }) {
       className={`ss-ticket-bundles-panel flex w-full flex-col rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-4 py-3 shadow-[0_0_24px_rgba(16,185,129,0.12)] sm:px-5 sm:py-4 ${className}`}
       style={style}
     >
-      <p className="ss-ticket-bundles-heading text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200/85">
+      <p className="ss-ticket-bundles-heading text-xs font-bold uppercase tracking-[0.2em] text-emerald-200/85 md:text-[10px]">
         Ticket bundles
       </p>
-      <ul className="ss-ticket-bundles-list mt-3 space-y-2 text-[0.9375rem] leading-snug text-emerald-50/95 sm:mt-3.5 sm:space-y-2.5 sm:text-base">
+      <ul className="ss-ticket-bundles-list mt-3 space-y-2 text-base leading-snug text-emerald-50/95 sm:mt-3.5 sm:space-y-2.5 md:text-[0.9375rem] lg:text-base">
         {PUBLIC_TICKET_BUNDLES.map((b) => (
           <li
             key={b.id}

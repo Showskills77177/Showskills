@@ -83,13 +83,13 @@ export function Layout() {
 
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
         <div className="overflow-visible sm:hidden">
-          <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-1 pt-3">
+          <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-1.5 pt-3.5">
             <Link
               to="/"
               className="outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512]"
               aria-label="ShowSkills Rewards home"
             >
-              <LogoMark className="ss-mobile-header-logo h-11" />
+              <LogoMark className="ss-mobile-header-logo h-12" />
             </Link>
           </div>
           {showQuizPrompt ? (

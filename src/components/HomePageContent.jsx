@@ -420,7 +420,7 @@ export function HomePageContent({
         </p>,
       )}
       {intro.consolationCopy ? (
-        <p className="max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">{intro.consolationCopy}</p>
+        <p className="max-w-xl text-base leading-relaxed text-stone-400 md:text-sm lg:text-base">{intro.consolationCopy}</p>
       ) : null}
       {intro.helperCopy
         ? dragWrap(
@@ -429,7 +429,7 @@ export function HomePageContent({
             'hero_intro',
             'helper',
             intro,
-            <p className="ss-hero-helper-copy max-w-xl text-sm leading-relaxed text-stone-400 sm:text-base">
+            <p className="ss-hero-helper-copy max-w-xl text-base leading-relaxed text-stone-400 md:text-sm lg:text-base">
               {intro.helperCopy}
             </p>,
           )
@@ -443,14 +443,14 @@ export function HomePageContent({
         <div className="ss-hero-cta-row mt-1 flex max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5 md:mt-auto md:border-t md:border-white/10 md:pt-4">
         <a
           href={editorMode ? undefined : '#prizes'}
-          className="ss-hero-cta-prize-lineup inline-flex min-h-[3rem] w-full shrink-0 items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40 sm:w-auto sm:min-h-[3.25rem]"
+          className="ss-hero-cta-prize-lineup inline-flex min-h-[3rem] w-full shrink-0 items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-2.5 text-base font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40 sm:w-auto sm:min-h-[3.25rem] md:text-sm"
           onClick={editorMode ? (e) => e.preventDefault() : undefined}
         >
           {intro.prizeLineupLabel || 'Prize lineup'}
         </a>
         <Link
           to={editorMode ? '.' : '/archive/ronaldo-shirt-giveaway'}
-          className="ss-hero-cta-shirt-link inline-flex w-full items-center justify-center self-center rounded-lg px-3 py-2 text-xs font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:w-auto sm:py-2.5"
+          className="ss-hero-cta-shirt-link inline-flex w-full items-center justify-center self-center rounded-lg px-3 py-2 text-sm font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:w-auto sm:py-2.5 md:text-xs"
           onClick={editorMode ? (e) => e.preventDefault() : undefined}
         >
           {intro.shirtLinkLabel || 'Free shirt giveaway'}

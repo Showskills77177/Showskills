@@ -11,7 +11,7 @@ export default function NewsletterPage() {
         <h1 className="font-display text-3xl uppercase tracking-[0.08em] text-white sm:text-4xl">
           ShowSkills Rewards
         </h1>
-        <p className="mt-3 text-base text-stone-400">
+        <p className="mt-3 text-base leading-relaxed text-stone-400 md:text-base">
           Free email updates about giveaways, competitions, and prize draws. You do not need a ShowSkills account — just
           your email.
         </p>

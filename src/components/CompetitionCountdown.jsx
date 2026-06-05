@@ -39,7 +39,7 @@ const THEME_TONES = {
 }
 
 const PILL_CLASS =
-  'inline-flex min-h-[2.85rem] w-full max-w-full items-center justify-center gap-2 rounded-full border px-3 py-1.5 text-center text-[11px] font-semibold leading-snug tabular-nums sm:min-h-[3rem] sm:w-fit sm:text-xs md:text-sm'
+  'ss-competition-countdown inline-flex min-h-[3rem] w-full max-w-full items-center justify-center gap-2 rounded-full border px-3 py-2 text-center text-sm font-semibold leading-snug tabular-nums sm:min-h-[3rem] sm:w-fit md:text-base'
 
 const BODY_CLASS = 'flex min-w-0 flex-col items-center gap-0.5 text-center sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-1.5 sm:gap-y-0'
 

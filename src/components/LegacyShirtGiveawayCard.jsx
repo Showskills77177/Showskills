@@ -114,10 +114,10 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
 
   const stepsPanel = (
     <div className="mx-auto w-full max-w-[28rem] rounded-xl border border-lime-400/25 bg-lime-950/20 px-3 py-2.5 text-left">
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-lime-300/80">{stepsHeading}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-lime-300/80 md:text-[10px]">{stepsHeading}</p>
       <ol className="mt-2 list-none space-y-1.5">
         {stepTitles.map((title, index) => (
-          <li key={`${index}-${title}`} className="flex gap-2 text-sm leading-snug">
+          <li key={`${index}-${title}`} className="flex gap-2 text-base leading-snug md:text-sm">
             <span
               className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-lime-400/15 text-[10px] font-bold text-lime-200"
               aria-hidden
@@ -180,7 +180,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
             'comp_shirt_card_badge',
             'Free giveaway badge',
             'badge',
-            <p className="text-[10px] font-bold uppercase tracking-[0.26em] text-lime-300/90">{badgeLabel}</p>,
+            <p className="text-xs font-bold uppercase tracking-[0.26em] text-lime-300/90 md:text-[10px]">{badgeLabel}</p>,
             { widthOnly: false },
           )}
           {spacer}
@@ -188,7 +188,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
             'comp_shirt_card_title',
             'Giveaway title',
             'title',
-            <h2 className="font-display text-xl font-bold leading-tight text-white sm:text-2xl">{titleText}</h2>,
+            <h2 className="font-display text-[1.375rem] font-bold leading-tight text-white sm:text-2xl">{titleText}</h2>,
             { widthOnly: false },
           )}
           {spacer}
@@ -196,7 +196,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
             'comp_shirt_card_prize',
             'Prize line',
             'prizeLine',
-            <p className="text-sm leading-snug text-stone-500">{prizeLine}</p>,
+            <p className="text-base leading-snug text-stone-500 md:text-sm">{prizeLine}</p>,
             { widthOnly: false },
           )}
           {spacer}
@@ -204,7 +204,7 @@ export const LegacyShirtGiveawayCard = forwardRef(function LegacyShirtGiveawayCa
             'comp_shirt_card_helper',
             'Helper line',
             'helper',
-            <p className="text-sm text-stone-500">{helperLine}</p>,
+            <p className="text-base text-stone-500 md:text-sm">{helperLine}</p>,
             { widthOnly: false },
           )}
         </div>

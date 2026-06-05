@@ -29,7 +29,7 @@ function PrivacyPolicySection() {
         <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
           Privacy Policy
         </h2>
-        <p className="mt-2 text-xs text-zinc-500">Last updated: 2 June 2026</p>
+        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 2 June 2026</p>
         <p className="mt-4 text-zinc-300">
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
@@ -276,7 +276,7 @@ export function TermsModal({ open, onClose }) {
             </svg>
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-5 text-left text-sm leading-relaxed text-zinc-400">
+        <div className="overflow-y-auto px-5 py-5 text-left text-base leading-relaxed text-zinc-400 ss-terms-modal-body sm:px-6">
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
             promotions in the United Kingdom, including the paid <strong>Signed Legacy Bundle</strong> skill competition

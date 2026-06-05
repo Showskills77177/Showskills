@@ -22,7 +22,7 @@ import { useLayoutViewport } from '../hooks/useLayoutViewport'
 
 function SectionHeading({ id, children }) {
   return (
-    <h2 id={id} className="font-display text-2xl uppercase tracking-[0.08em] text-white sm:text-3xl">
+    <h2 id={id} className="font-display text-[1.625rem] uppercase tracking-[0.08em] text-white sm:text-3xl">
       {children}
     </h2>
   )
@@ -224,7 +224,7 @@ export default function CompetitionsPage({
       <SectionHeading id="paid-competitions-heading">
         {layout.sections.paid?.title || 'Prize draw competitions'}
       </SectionHeading>
-      <p className="mt-2 text-sm text-stone-500">{layout.sections.paid?.subtitle}</p>
+      <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">{layout.sections.paid?.subtitle}</p>
       <ul className="mt-4 grid list-none gap-6">
         {paidCompetitions.map((c, index) => (
           <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
@@ -240,7 +240,7 @@ export default function CompetitionsPage({
       <SectionHeading id="free-giveaways-heading">
         {layout.sections.free?.title || 'Free giveaways'}
       </SectionHeading>
-      <p className="mt-2 text-sm text-stone-500">{layout.sections.free?.subtitle}</p>
+      <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">{layout.sections.free?.subtitle}</p>
       <ul className="mt-4 grid list-none gap-6">
         <li className="ss-competition-free-primary w-full">
           <div
@@ -284,19 +284,19 @@ export default function CompetitionsPage({
             'comp_title',
             'Page title',
             'title',
-            <h1 className="font-display text-4xl uppercase tracking-[0.08em] text-white sm:text-5xl">{layout.title}</h1>,
+            <h1 className="font-display text-[2.125rem] uppercase tracking-[0.08em] text-white sm:text-5xl">{layout.title}</h1>,
           )}
           {dragWrap(
             'comp_intro',
             'Intro',
             'intro',
-            <p className="mt-4 max-w-2xl text-base text-stone-400 sm:text-lg">{layout.intro}</p>,
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">{layout.intro}</p>,
           )}
           {dragWrap(
             'comp_links',
             'Links row',
             'links',
-            <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-stone-500">
+            <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-stone-500 md:text-sm">
               {layout.showFaqLink !== false ? (
                 <Link
                   to="/faq"

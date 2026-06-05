@@ -212,13 +212,13 @@ export function CompetitionPublicCard({
         'Meta labels',
         'meta',
         <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{metaFeaturedLabel}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-400/90 md:text-[10px]">{metaFeaturedLabel}</p>
           {periodMonth ? (
             <>
               <span className="hidden text-teal-600/40 sm:inline" aria-hidden>
                 ·
               </span>
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-teal-400/90">{periodMonth} draw</p>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-400/90 md:text-[10px]">{periodMonth} draw</p>
             </>
           ) : null}
         </div>,
@@ -250,7 +250,7 @@ export function CompetitionPublicCard({
         'comp_paid_card_title',
         'Competition title',
         'title',
-        <h2 className="font-display text-2xl uppercase leading-[0.88] tracking-wide text-white sm:text-3xl">{titleText}</h2>,
+        <h2 className="font-display text-[1.75rem] uppercase leading-[0.88] tracking-wide text-white sm:text-2xl md:text-3xl">{titleText}</h2>,
         { widthOnly: false },
       )}
       <div className="ss-competition-card-focus__spacer" aria-hidden />
@@ -258,7 +258,7 @@ export function CompetitionPublicCard({
         'comp_paid_card_summary',
         'Summary text',
         'summary',
-        <p className="text-sm leading-relaxed text-stone-500 sm:text-base">{summary}</p>,
+        <p className="text-base leading-relaxed text-stone-400 md:text-sm lg:text-base">{summary}</p>,
         { widthOnly: false },
       )}
       {!isLegacyBundle ? (
@@ -271,7 +271,7 @@ export function CompetitionPublicCard({
   )
 
   const postalLine = competition.allowPostalEntry ? (
-    <p className="text-xs leading-relaxed text-stone-500 sm:text-sm">
+    <p className="text-sm leading-relaxed text-stone-500 md:text-xs lg:text-sm">
       Postal entries: write <span className="text-stone-400">{competition.postalCompetitionName}</span> on your
       envelope → {POSTAL_ENTRY_ADDRESS}
     </p>

@@ -59,10 +59,10 @@ export function NewsletterSignupForm({
       <p
         className={
           isFooter
-            ? 'text-center text-sm leading-snug text-stone-400'
+            ? 'text-center text-base leading-snug text-stone-400 md:text-sm'
             : compact
-              ? 'text-xs text-stone-500'
-              : 'text-sm text-stone-400'
+              ? 'text-sm text-stone-500 md:text-xs'
+              : 'text-base text-stone-400 md:text-sm'
         }
       >
         {isFooter ? (
@@ -94,13 +94,13 @@ export function NewsletterSignupForm({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="min-h-[2.5rem] flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40 sm:min-h-[2.75rem] sm:text-base"
+          className="min-h-[2.75rem] flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40 sm:min-h-[2.75rem]"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading}
-          className="min-h-[2.5rem] shrink-0 rounded-lg bg-gradient-to-r from-lime-700 to-emerald-700 px-5 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50 sm:min-h-[2.75rem]"
+          className="min-h-[2.75rem] shrink-0 rounded-lg bg-gradient-to-r from-lime-700 to-emerald-700 px-5 py-2 text-base font-bold text-white transition hover:brightness-110 disabled:opacity-50 sm:min-h-[2.75rem] md:text-sm"
         >
           {loading ? 'Joining…' : 'Subscribe'}
         </button>
