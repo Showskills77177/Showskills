@@ -6,6 +6,7 @@ import { GiveawayPublicCard } from './GiveawayPublicCard'
 import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
 import { usePublishedGiveaways } from '../hooks/usePublicGiveaway'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
+import { resolveLegacyBundlePublicCompetition } from '../../shared/legacyBundlePublic.mjs'
 
 function SectionLabel({ icon, tone, children }) {
   const IconMark = icon
@@ -49,11 +50,8 @@ export function HomeCompetitionsHub({ block = {}, onEnterPaid, onEnterGiveaway }
   const { giveaways, loading: loadingFree } = usePublishedGiveaways()
   const loading = loadingPaid || loadingFree
 
-  const legacy =
-    competitions.find((c) => c.slug === DRAW_COMPETITION_SLUG) ||
-    competitions[0] ||
-    null
-  const otherPaid = competitions.filter((c) => c.slug !== legacy?.slug)
+  const legacy = resolveLegacyBundlePublicCompetition({ listItems: competitions })
+  const otherPaid = competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG)
 
   const paidTitle = block.paidTitle || 'Main paid competitions'
   const paidSubtitle =
@@ -111,19 +109,13 @@ export function HomeCompetitionsHub({ block = {}, onEnterPaid, onEnterGiveaway }
             <p className="mt-8 text-sm text-stone-600">Loading competitions…</p>
           ) : (
             <ul className="mt-8 grid list-none gap-8 md:grid-cols-2 md:items-stretch">
-              {legacy ? (
-                <li className={otherPaid.length ? '' : 'md:col-span-2 md:max-w-3xl md:justify-self-center md:w-full'}>
-                  <CompetitionPublicCard
-                    competition={legacy}
-                    onEnter={() => onEnterPaid(legacy.slug)}
-                    layout={otherPaid.length ? 'card' : 'page'}
-                  />
-                </li>
-              ) : (
-                <li className="rounded-2xl border border-dashed border-white/10 bg-stone-950/40 px-6 py-10 text-center text-sm text-stone-500 md:col-span-2">
-                  No paid competitions published yet.
-                </li>
-              )}
+              <li className={otherPaid.length ? '' : 'md:col-span-2 md:max-w-3xl md:justify-self-center md:w-full'}>
+                <CompetitionPublicCard
+                  competition={legacy}
+                  onEnter={() => onEnterPaid(legacy.slug)}
+                  layout={otherPaid.length ? 'card' : 'page'}
+                />
+              </li>
               {otherPaid.map((c) => (
                 <li key={c.slug}>
                   <CompetitionPublicCard competition={c} onEnter={() => onEnterPaid(c.slug)} />

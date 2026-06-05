@@ -80,10 +80,6 @@ export default function CompetitionsPage({
     const extras = competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG)
     return [legacy, ...extras]
   }, [competitions])
-  const extraPaidCompetitions = useMemo(
-    () => competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG),
-    [competitions],
-  )
   const loading = layoutLoading || loadingCompetitions || loadingGiveaways
 
   const desktopOffsets = layout.offsets || {}
@@ -236,9 +232,6 @@ export default function CompetitionsPage({
           </li>
         ))}
       </ul>
-      {!loading && extraPaidCompetitions.length === 0 && layout.emptyPaidMessage?.trim() ? (
-        <p className="mt-6 text-sm text-stone-500">{layout.emptyPaidMessage}</p>
-      ) : null}
     </div>
   )
 

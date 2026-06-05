@@ -1498,16 +1498,8 @@ function CompetitionsPageEditor({ layout, selectedBlockId, editorViewport, onCha
 
       <section className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Empty states</h2>
-        <p className="mt-1 text-xs text-stone-500">Shown when no published competitions or giveaways exist in that column.</p>
+        <p className="mt-1 text-xs text-stone-500">Shown when no published giveaways exist in the free column.</p>
         <div className="mt-3 grid gap-3">
-          <EditorField label="No paid competitions message">
-            <textarea
-              rows={2}
-              value={layout.emptyPaidMessage || ''}
-              onChange={(e) => onChange({ emptyPaidMessage: e.target.value })}
-              className={editorInputClass()}
-            />
-          </EditorField>
           <EditorField label="No extra giveaways message (optional)">
             <textarea
               rows={2}

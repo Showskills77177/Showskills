@@ -129,7 +129,6 @@ export function defaultCompetitionsPageLayout() {
     showFaqLink: true,
     jumpLinkLabel: 'Jump to free giveaways',
     showJumpLink: true,
-    emptyPaidMessage: '',
     emptyFreeMessage: '',
   }
 }
@@ -405,8 +404,6 @@ export function mergeCompetitionsPageLayout(input) {
     jumpLinkLabel: typeof input.jumpLinkLabel === 'string' ? input.jumpLinkLabel : base.jumpLinkLabel,
     showFaqLink: input.showFaqLink !== false,
     showJumpLink: input.showJumpLink !== false,
-    emptyPaidMessage:
-      typeof input.emptyPaidMessage === 'string' ? input.emptyPaidMessage : base.emptyPaidMessage,
     emptyFreeMessage:
       typeof input.emptyFreeMessage === 'string' ? input.emptyFreeMessage : base.emptyFreeMessage,
     offsets: mergeOffsets(base.offsets, input.offsets),
