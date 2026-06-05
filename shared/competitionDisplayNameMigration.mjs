@@ -20,12 +20,34 @@ export const COMPETITION_DISPLAY_NAME_REPLACEMENTS = [
   ['Legacy Bundle', DRAW_COMPETITION_LABEL],
 ]
 
+/** Collapse corruption from earlier runs that prefixed "Signed " inside the canonical label. */
+export function repairSignedLegacyBundlePrefix(text) {
+  if (typeof text !== 'string' || !text) return text
+  return text.replace(/(?:Signed )+(?=Legacy Bundle\b)/g, 'Signed ')
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Replace legacy bundle names without touching text that is already canonical.
+ * Rules whose `from` ends with "Legacy Bundle" must not match inside "Signed Legacy Bundle".
+ */
 export function applyCompetitionDisplayNameReplacements(text) {
   if (typeof text !== 'string' || !text) return text
-  let out = text
+  let out = repairSignedLegacyBundlePrefix(text)
+
   for (const [from, to] of COMPETITION_DISPLAY_NAME_REPLACEMENTS) {
-    if (out.includes(from)) out = out.split(from).join(to)
+    if (!out.includes(from)) continue
+    if (from.includes('Legacy Bundle')) {
+      const pattern = new RegExp(`(?<!Signed )${escapeRegExp(from)}`, 'g')
+      out = out.replace(pattern, to)
+      continue
+    }
+    out = out.split(from).join(to)
   }
+
   return out
 }
 
