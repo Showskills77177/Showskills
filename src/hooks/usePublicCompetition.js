@@ -4,7 +4,7 @@ import {
   fetchPublishedCompetitions,
   hydrateCompetitionCache,
 } from '../lib/publicCatalogFetch.js'
-import { getCachedCompetition } from '../lib/publicDataCache.js'
+import { getCachedCompetition, getCachedPublishedCompetitions } from '../lib/publicDataCache.js'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
 
 export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {

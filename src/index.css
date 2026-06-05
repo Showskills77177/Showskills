@@ -1478,7 +1478,7 @@ body {
 }
 
 .ss-mobile-nav-dock__grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .ss-mobile-nav-btn {
@@ -1895,10 +1895,9 @@ body {
   }
 }
 
-/* Narrow phones: 2×2 grid so “Competitions” and labels are not clipped in four columns */
+/* Narrow phones: tighter padding on the 2×2 mobile menu grid */
 @media (max-width: 420px) {
   .ss-mobile-nav-dock__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     padding: 0.6rem;
     padding-top: 0.5rem;
