@@ -4,7 +4,7 @@ import { useMatchedPanelHeight } from '../hooks/useMatchedPanelHeight'
 import kickupsHeroBg from '../assets/kickups-hero-bg.png'
 import competitionsPageBg from '../assets/competitions-page-bg.png'
 import legacyBundlePoster from '../assets/legacy-bundle-poster.png'
-import iphone17ProMax from '../assets/iphone-17-pro-max-silver.png'
+import { IphonePrizePhoto } from './IphonePrizePhoto'
 import { GoldCasePrizePhoto } from '../components/GoldCasePrizePhoto'
 import { BUNDLE_OFFER_ITEMS } from '../competitionData'
 import { GlowingFootballIcon, TicketBundlePrice } from '../components/siteChrome'
@@ -521,34 +521,30 @@ export function HomePageContent({
             </div>
             <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
               <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                <div className="ss-prize-studio-photo mx-auto max-w-[8.25rem] overflow-hidden rounded-md">
+                <div className="ss-prize-tile-photo overflow-hidden rounded-md">
                   {prizeFrame(
                     'phone',
                     'Phone',
-                    <img
-                      src={iphone17ProMax}
-                      alt="iPhone 17 Pro Max prize photo."
-                      width={768}
-                      height={1024}
-                      loading="eager"
-                      decoding="async"
-                      className="aspect-[3/4] h-auto w-full object-cover object-center"
-                    />,
+                    <IphonePrizePhoto loading="eager" decoding="async" />,
                   )}
                 </div>
-                <p className="ss-phone-prize-glow mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em]">
-                  Phone prize
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
+                <div className="ss-prize-tile-caption">
+                  <p className="ss-phone-prize-glow mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em]">
+                    Phone prize
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
+                </div>
               </div>
               <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-hidden rounded-md">
+                <div className="ss-prize-tile-photo overflow-hidden rounded-md">
                   {prizeFrame('case', 'Gold case', <GoldCasePrizePhoto loading="eager" />)}
                 </div>
-                <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">
-                  Case prize
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-stone-100">24K gold case</p>
+                <div className="ss-prize-tile-caption">
+                  <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">
+                    Case prize
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-stone-100">24K gold case</p>
+                </div>
               </div>
             </div>
             <LegacyBundleImageryDisclaimer />

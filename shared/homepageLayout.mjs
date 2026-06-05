@@ -67,7 +67,7 @@ export function defaultHomepageLayout() {
         ctaButtonLabel: 'Enter Bundle Draw',
         prizeImages: {
           poster: { x: 0, y: 0, scale: 1 },
-          phone: { x: 0, y: 0, scale: 1.375 },
+          phone: { x: 0, y: 0, scale: 1 },
           case: { x: 0, y: 0, scale: 1 },
         },
         offsets: { ...DEFAULT_PRIZES_OFFSETS },
@@ -119,8 +119,8 @@ export function mergePrizeImages(input) {
       }
     }
   }
-  if (out.phone && Math.abs(out.phone.scale - 1.25) < 0.01) {
-    out.phone.scale = base.phone.scale
+  if (out.phone && (Math.abs(out.phone.scale - 1.25) < 0.01 || Math.abs(out.phone.scale - 1.375) < 0.01)) {
+    out.phone.scale = 1
   }
   return out
 }

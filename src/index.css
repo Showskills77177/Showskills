@@ -1421,20 +1421,58 @@ body {
   width: 100%;
 }
 
-.ss-hero-prize-column .ss-prize-studio-subgrid .ss-prize-studio-tile:first-child .ss-prize-studio-photo {
-  aspect-ratio: 3 / 4;
-  width: 100%;
-  max-width: 8.25rem;
-  margin-inline: auto;
-}
-
-.ss-hero-prize-column .ss-prize-studio-subgrid .ss-prize-studio-tile:last-child .ss-prize-studio-photo {
+.ss-hero-prize-column .ss-prize-studio-subgrid .ss-prize-tile-photo,
+.ss-hero-prize-column .ss-prize-studio-subgrid .ss-prize-studio-photo {
   aspect-ratio: 3 / 4;
   width: 100%;
   max-width: 7.5rem;
   margin-inline: auto;
 }
 
+.ss-prize-tile-photo {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  max-width: 7.5rem;
+  margin-inline: auto;
+  overflow: hidden;
+}
+
+.ss-prize-tile-photo--compact {
+  max-width: 7rem;
+}
+
+.ss-prize-tile-caption {
+  width: 100%;
+  max-width: 7.5rem;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.ss-prize-tile-caption--compact {
+  max-width: 7rem;
+}
+
+.ss-phone-prize-photo__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 38%;
+}
+
+.ss-prize-tile-photo .ss-gold-case-photo,
+.ss-prize-tile-photo .ss-gold-case-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ss-prize-tile-photo .ss-gold-case-photo img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.ss-hero-prize-column .ss-prize-tile-photo img,
 .ss-hero-prize-column .ss-prize-studio-photo img {
   height: 100%;
   width: 100%;

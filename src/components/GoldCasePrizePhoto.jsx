@@ -16,7 +16,7 @@ export function GoldCasePrizePhoto({
         height={1024}
         loading={loading}
         decoding={decoding}
-        className={`aspect-[3/4] h-auto w-full object-cover object-center ${imgClassName}`.trim()}
+        className={`aspect-[3/4] h-full w-full object-cover object-center ${imgClassName}`.trim()}
       />
     </div>
   )
