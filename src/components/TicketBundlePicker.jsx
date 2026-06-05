@@ -36,9 +36,9 @@ export function TicketBundlePicker({
       <p className="text-sm font-medium text-stone-300">{routeHeading}</p>
 
       <div className="mt-2 max-md:block md:hidden">
-        <label htmlFor="ticket-bundle-select" className="mb-1.5 flex items-center justify-between text-xs text-stone-500">
+        <label htmlFor="ticket-bundle-select" className="mb-1.5 flex items-center justify-between text-sm text-stone-500">
           <span>Entry route</span>
-          <span className="text-[10px] uppercase tracking-wide text-teal-400/90">Tap to choose</span>
+          <span className="text-xs uppercase tracking-wide text-teal-400/90">Tap to choose</span>
         </label>
         <div className="relative">
           <select
@@ -85,20 +85,20 @@ export function TicketBundlePicker({
                 {formatBundlePriceGBP(selectedTicketBundle.totalPence)}
               </span>
             </div>
-            <p className="mt-1 text-xs text-stone-400">{selectedTicketBundle.line1}</p>
+            <p className="mt-1 text-sm text-stone-400">{selectedTicketBundle.line1}</p>
             {selectedTicketBundle.bullets?.length ? (
-              <p className="mt-1 text-xs text-stone-500">{selectedTicketBundle.bullets[0]}</p>
+              <p className="mt-1 text-sm text-stone-500">{selectedTicketBundle.bullets[0]}</p>
             ) : null}
           </div>
         ) : null}
         {paidEntryRoute === 'free_online' ? (
-          <p className="mt-2 text-xs leading-relaxed text-stone-500">
+          <p className="mt-2 text-sm leading-relaxed text-stone-500">
             Verify your card online (£0, no charge), then answer three skill questions for the same {competitionTitle}{' '}
             prize pool.
           </p>
         ) : null}
         {paidEntryRoute === 'postal' ? (
-          <p className="mt-2 text-xs leading-relaxed text-stone-500">
+          <p className="mt-2 text-sm leading-relaxed text-stone-500">
             No payment online. Post your details and three skill answers for{' '}
             <span className="text-stone-400">{postalName}</span> to{' '}
             <span className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</span>.

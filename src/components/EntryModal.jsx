@@ -13,7 +13,10 @@ import {
   COMPETITION_NAME_POSTAL,
   formatBundlePriceGBP,
 } from '../competitionData'
-import { LEGACY_ENTRY_CHECKOUT_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import {
+  LEGACY_ENTRY_CHECKOUT_NOTICE,
+  TICKET_PURCHASE_NON_REFUND_NOTICE,
+} from '../../shared/ticketCheckoutNotice.mjs'
 import { LEGACY_SKILL_ONE_ATTEMPT_NOTICE } from '../../shared/consolationShirtGiveaway.mjs'
 import { PromoterAddress } from './PromoterAddress'
 import { ErrorBanner } from './ErrorBanner'
@@ -291,7 +294,7 @@ export function EntryModal() {
           <div className="ss-entry-modal-scroll min-h-0 flex-1 px-4 py-3 sm:px-5 sm:py-4">
           {entryModalType === 'paid' ? (
             <>
-              <p className="text-sm leading-relaxed text-stone-500 md:hidden">
+              <p className="text-base leading-relaxed text-stone-400 md:hidden">
                 Choose how to enter, then answer three skill questions. All must be correct to qualify —{' '}
                 <strong className="text-stone-400">one attempt</strong> per entry.
               </p>
@@ -718,6 +721,16 @@ export function EntryModal() {
                   {paymentNotConfiguredMessage && paidEntryRoute === 'tickets' ? (
                     <ErrorBanner message={paymentNotConfiguredMessage} />
                   ) : null}
+                  {showPaidCheckoutFooter ? (
+                    <div className="ss-entry-mobile-refund-notice mt-4 flex flex-col gap-3 md:hidden">
+                      <p className="rounded-lg border border-amber-800/35 bg-amber-950/25 px-3 py-2.5 text-center text-sm font-medium leading-snug text-amber-100/90">
+                        {TICKET_PURCHASE_NON_REFUND_NOTICE}
+                      </p>
+                      <p className="rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-center text-sm leading-snug text-stone-400">
+                        <strong className="text-stone-300">Skill quiz:</strong> {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </>
@@ -884,7 +897,9 @@ export function EntryModal() {
           {showPaidCheckoutFooter ? (
             <div className="ss-entry-modal-checkout-footer shrink-0 border-t border-white/10 px-4 py-3 sm:px-5">
               <div className="ss-entry-checkout-actions flex flex-col gap-2.5">
-                <p className="text-center text-[11px] leading-snug text-stone-500">{LEGACY_ENTRY_CHECKOUT_NOTICE}</p>
+                <p className="ss-entry-checkout-notice text-center text-sm font-medium leading-snug text-amber-100/90">
+                  {LEGACY_ENTRY_CHECKOUT_NOTICE}
+                </p>
                 {E2E_SIMULATE_CHECKOUT ? (
                   <button
                     type="button"

@@ -49,7 +49,7 @@ export function TicketBundlePrice({ className = '', compact = false, style }) {
           </li>
         ))}
       </ul>
-      <p className="ss-ticket-bundles-footnote mt-auto border-t border-emerald-500/10 pt-2.5 text-[10px] leading-snug text-stone-500 sm:pt-3 sm:text-[11px]">
+      <p className="ss-ticket-bundles-footnote mt-auto border-t border-emerald-500/10 pt-2.5 text-xs leading-snug text-stone-400 sm:pt-3 sm:text-sm">
         <span aria-hidden>* </span>
         All ticket bundles are non-refundable.
       </p>
