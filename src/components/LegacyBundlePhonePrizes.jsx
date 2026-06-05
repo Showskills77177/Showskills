@@ -3,7 +3,8 @@ import { GoldCasePrizePhoto } from './GoldCasePrizePhoto'
 
 /** Built-in iPhone + gold case tiles for the Signed Legacy Bundle (bundled assets, not admin uploads). */
 export function LegacyBundlePhonePrizes({ compact = false, eager = false }) {
-  const photoMax = compact ? 'max-w-[7rem]' : 'max-w-[7.5rem]'
+  const photoMax = compact ? 'max-w-[7.7rem]' : 'max-w-[8.25rem]'
+  const casePhotoMax = compact ? 'max-w-[7rem]' : 'max-w-[7.5rem]'
   const imgLoading = eager ? 'eager' : 'lazy'
   return (
     <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
@@ -23,7 +24,7 @@ export function LegacyBundlePhonePrizes({ compact = false, eager = false }) {
         <p className="mt-0.5 text-sm font-semibold text-stone-100">iPhone 17 Pro Max</p>
       </div>
       <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-        <div className={`ss-prize-studio-photo mx-auto ${photoMax} rounded-md`}>
+        <div className={`ss-prize-studio-photo mx-auto ${casePhotoMax} rounded-md`}>
           <GoldCasePrizePhoto loading={imgLoading} />
         </div>
         <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.21em] text-amber-300/90">Case prize</p>

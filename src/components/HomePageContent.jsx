@@ -521,7 +521,7 @@ export function HomePageContent({
             </div>
             <div className="ss-prize-studio-subgrid mx-auto grid w-full max-w-[20rem] grid-cols-2 gap-2 sm:gap-0">
               <div className="ss-prize-studio-tile px-1 pb-0.5 text-center sm:px-1.5">
-                <div className="ss-prize-studio-photo mx-auto max-w-[7.5rem] overflow-hidden rounded-md">
+                <div className="ss-prize-studio-photo mx-auto max-w-[8.25rem] overflow-hidden rounded-md">
                   {prizeFrame(
                     'phone',
                     'Phone',
