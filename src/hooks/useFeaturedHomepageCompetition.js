@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
 import {
   getCachedFeaturedHomepageCompetition,
   setCachedFeaturedHomepageCompetition,
 } from '../lib/publicDataCache.js'
+
+function fetchFeaturedHomepageCompetition() {
+  return apiFetch('/api/competitions?featured=homepage').then(async (res) => {
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || 'Failed to load featured competition')
+    return j.competition || null
+  })
+}
 
 export function useFeaturedHomepageCompetition() {
   const cached = getCachedFeaturedHomepageCompetition()
@@ -11,19 +19,31 @@ export function useFeaturedHomepageCompetition() {
   const [loading, setLoading] = useState(() => cached === undefined)
   const [error, setError] = useState('')
 
+  const reload = useCallback(() => {
+    setLoading(true)
+    setError('')
+    return fetchFeaturedHomepageCompetition()
+      .then((next) => {
+        setCachedFeaturedHomepageCompetition(next)
+        setCompetition(next)
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Error')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
+
   useEffect(() => {
     let cancelled = false
-    if (cached === undefined) setLoading(true)
+    setLoading(true)
     setError('')
-    apiFetch('/api/competitions?featured=homepage')
-      .then(async (res) => {
-        const j = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(j.error || 'Failed to load featured competition')
-        if (!cancelled) {
-          const next = j.competition || null
-          setCachedFeaturedHomepageCompetition(next)
-          setCompetition(next)
-        }
+    fetchFeaturedHomepageCompetition()
+      .then((next) => {
+        if (cancelled) return
+        setCachedFeaturedHomepageCompetition(next)
+        setCompetition(next)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Error')
@@ -31,10 +51,18 @@ export function useFeaturedHomepageCompetition() {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
+    function onCompetitionUpdated() {
+      if (cancelled) return
+      reload()
+    }
+
+    window.addEventListener('ss-competition-updated', onCompetitionUpdated)
     return () => {
       cancelled = true
+      window.removeEventListener('ss-competition-updated', onCompetitionUpdated)
     }
-  }, [])
+  }, [reload])
 
-  return { competition, loading, error }
+  return { competition, loading, error, reload }
 }

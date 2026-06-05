@@ -129,7 +129,6 @@ export default async function handler(req, res) {
       [id, fullName, email, storedRef || null, storedFilename, adminNotes, entryNumber, COMPETITION_SHIRT_GIVEAWAY],
     )
     const submissionId = r.rows[0].id
-    const entryNumber = r.rows[0].entry_number
 
     const previewToken = await ensureShirtPreviewToken(submissionId)
     const shirtPrizeRevealUrl = previewToken

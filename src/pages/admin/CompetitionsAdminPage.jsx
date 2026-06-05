@@ -12,6 +12,7 @@ import {
 } from '../../components/admin/CompetitionSkillChallengeEditor'
 import { defaultEntryMethodsForNewCompetition, defaultEntryMethodsForNewGiveaway } from '../../../shared/competitionEntryMethods.mjs'
 import { CompetitionSitePreviewModal } from '../../components/admin/CompetitionSitePreviewModal'
+import { notifyCompetitionUpdated } from '../../lib/publicDataCache.js'
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft (hidden on site)' },
@@ -549,6 +550,7 @@ export default function AdminCompetitionCatalogPage({ catalogKind = 'main_draw' 
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Period update failed')
       await selectCompetition(draft.slug)
+      notifyCompetitionUpdated(draft.slug)
       setMsg('Period status updated.')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Period update failed')
@@ -586,6 +588,7 @@ export default function AdminCompetitionCatalogPage({ catalogKind = 'main_draw' 
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not save period dates')
       if (j.competition) setDraft(structuredClone(j.competition))
+      notifyCompetitionUpdated(draft.slug)
       setEditingPeriodId('')
       setMsg('Entry period dates saved. Open the period if entries should be live now.')
     } catch (e) {

@@ -176,12 +176,27 @@ export function HomePageContent({
   onPatchHomeBlock,
 }) {
   const { openEntry } = useEntryFlow()
-  const { competition: featuredCompetition, loading: featuredCompetitionLoading } = useFeaturedHomepageCompetition()
-  const { competition: legacyCompetition, loading: legacyCompetitionLoading } = usePublicCompetition(DRAW_COMPETITION_SLUG)
+  const { competition: featuredCompetition, loading: featuredCompetitionLoading, error: featuredCompetitionError } =
+    useFeaturedHomepageCompetition()
+  const {
+    competition: legacyCompetition,
+    loading: legacyCompetitionLoading,
+    error: legacyCompetitionError,
+  } = usePublicCompetition(DRAW_COMPETITION_SLUG)
   const legacyCountdownPeriod = pickCountdownPeriod(legacyCompetition)
-  const countdownPeriod = legacyCountdownPeriod || pickCountdownPeriod(featuredCompetition)
+  const featuredCountdownPeriod = pickCountdownPeriod(featuredCompetition)
+  const countdownPeriod = legacyCountdownPeriod || featuredCountdownPeriod
   const countdownPending =
     legacyCompetitionLoading || (!legacyCountdownPeriod && featuredCompetitionLoading)
+  const countdownFetchFailed =
+    !countdownPending &&
+    !countdownPeriod &&
+    Boolean(legacyCompetitionError || featuredCompetitionError)
+  const countdownKnownEmpty =
+    !countdownPending &&
+    !countdownPeriod &&
+    !countdownFetchFailed &&
+    Boolean(legacyCompetition || featuredCompetition)
   const { layout: fetchedLayout } = useHomepageLayout()
   const layout = mergeHomepageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
@@ -562,23 +577,31 @@ export function HomePageContent({
         data-editor-center-root
       >
         <div className="ss-hero-countdown-slot flex min-h-[2.85rem] w-full items-center justify-center px-1 sm:min-h-[3rem]">
-          {dragWrap(
-            'prizes_countdown',
-            'Countdown timer',
-            'hero_prizes',
-            'countdown',
-            prizes,
-            <CompetitionCountdown
-              opensAt={countdownPeriod?.entryOpensAt}
-              closesAt={countdownPeriod?.entryClosesAt}
-              label="Competition ends"
-              live={!editorMode}
-              showDot={false}
-              pending={countdownPending}
-              className="max-w-[min(100%,22rem)] text-center sm:max-w-xl"
-            />,
-            1,
-            { className: 'block w-fit max-w-full', transformOrigin: 'top center', uniformScale: true },
+          {countdownFetchFailed ? (
+            <p className="text-center text-xs text-stone-500" role="status">
+              Could not load entry dates — refresh the page or run <code className="text-stone-400">npm run dev:all</code>{' '}
+              locally.
+            </p>
+          ) : (
+            dragWrap(
+              'prizes_countdown',
+              'Countdown timer',
+              'hero_prizes',
+              'countdown',
+              prizes,
+              <CompetitionCountdown
+                opensAt={countdownPeriod?.entryOpensAt}
+                closesAt={countdownPeriod?.entryClosesAt}
+                label="Competition ends"
+                live={!editorMode}
+                showDot={false}
+                pending={countdownPending}
+                showUnknown={countdownKnownEmpty}
+                className="max-w-[min(100%,22rem)] text-center sm:max-w-xl"
+              />,
+              1,
+              { className: 'block w-fit max-w-full', transformOrigin: 'top center', uniformScale: true },
+            )
           )}
         </div>
         {prizes.ctaBlurb

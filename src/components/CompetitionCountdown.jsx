@@ -61,7 +61,7 @@ function CountdownBody({ primary, secondary }) {
 }
 
 /**
- * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean, pending?: boolean, theme?: 'teal' | 'lime' }} props
+ * @param {{ closesAt?: string | null, opensAt?: string | null, label?: string, className?: string, live?: boolean, showDot?: boolean, pending?: boolean, showUnknown?: boolean, theme?: 'teal' | 'lime' }} props
  */
 export function CompetitionCountdown({
   closesAt,
@@ -71,6 +71,7 @@ export function CompetitionCountdown({
   live = true,
   showDot = true,
   pending = false,
+  showUnknown = true,
   theme = 'teal',
 }) {
   const palette = THEME_TONES[theme] || THEME_TONES.teal
@@ -106,7 +107,11 @@ export function CompetitionCountdown({
       }
     }
     return { kind: 'unknown', primary: 'Entry dates not set yet' }
-  }, [closesAt, opensAt, label, now, pending])
+  }, [closesAt, opensAt, label, now, pending, showUnknown])
+
+  if (!showUnknown && state.kind === 'unknown') {
+    return null
+  }
 
   if (pending) {
     return (

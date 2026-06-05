@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
 import { getCachedCompetition, setCachedCompetition } from '../lib/publicDataCache.js'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
+
+function fetchPublicCompetition(slug) {
+  return apiFetch(`/api/competitions?slug=${encodeURIComponent(slug)}`).then(async (res) => {
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || 'Failed to load competition')
+    return j.competition || null
+  })
+}
 
 export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
   const cacheKey = String(slug || '').trim() || DRAW_COMPETITION_SLUG
@@ -10,19 +18,31 @@ export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
   const [loading, setLoading] = useState(() => cached === undefined)
   const [error, setError] = useState('')
 
+  const reload = useCallback(() => {
+    setLoading(true)
+    setError('')
+    return fetchPublicCompetition(cacheKey)
+      .then((next) => {
+        setCachedCompetition(cacheKey, next)
+        setCompetition(next)
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : 'Error')
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [cacheKey])
+
   useEffect(() => {
     let cancelled = false
-    if (cached === undefined) setLoading(true)
+    setLoading(true)
     setError('')
-    apiFetch(`/api/competitions?slug=${encodeURIComponent(cacheKey)}`)
-      .then(async (res) => {
-        const j = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(j.error || 'Failed to load competition')
-        if (!cancelled) {
-          const next = j.competition || null
-          setCachedCompetition(cacheKey, next)
-          setCompetition(next)
-        }
+    fetchPublicCompetition(cacheKey)
+      .then((next) => {
+        if (cancelled) return
+        setCachedCompetition(cacheKey, next)
+        setCompetition(next)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Error')
@@ -30,12 +50,22 @@ export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
+    function onCompetitionUpdated(event) {
+      const updatedSlug = event?.detail?.slug
+      if (updatedSlug && updatedSlug !== cacheKey) return
+      if (cancelled) return
+      reload()
+    }
+
+    window.addEventListener('ss-competition-updated', onCompetitionUpdated)
     return () => {
       cancelled = true
+      window.removeEventListener('ss-competition-updated', onCompetitionUpdated)
     }
-  }, [cacheKey])
+  }, [cacheKey, reload])
 
-  return { competition, loading, error }
+  return { competition, loading, error, reload }
 }
 
 export function usePublishedCompetitions() {

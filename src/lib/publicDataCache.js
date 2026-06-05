@@ -12,6 +12,11 @@ export function setCachedCompetition(slug, competition) {
   competitionBySlug.set(slug, competition ?? null)
 }
 
+export function clearPublicCompetitionCaches() {
+  competitionBySlug.clear()
+  featuredHomepageCompetition = undefined
+}
+
 export function getCachedFeaturedHomepageCompetition() {
   return featuredHomepageCompetition
 }
@@ -45,9 +50,18 @@ export function clearPublicLayoutCaches() {
   featuredHomepageCompetition = undefined
 }
 
+/** Notify open tabs to reload competition dates and layout from the API. */
+export function notifyCompetitionUpdated(slug) {
+  clearPublicCompetitionCaches()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ss-competition-updated', { detail: { slug } }))
+  }
+}
+
 /** Notify open tabs to reload layout from the API (homepage, site shell, etc.). */
 export function notifyLayoutUpdated(pageId) {
   clearPublicLayoutCaches()
+  clearPublicCompetitionCaches()
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('ss-layout-updated', { detail: { pageId } }))
   }

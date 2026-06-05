@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '../../lib/api'
 import { COMPETITION_SHIRT_GIVEAWAY } from '../../../shared/freeEntryLimits.mjs'
 import { PERIOD_STATUS, PERIOD_STATUS_LABELS, formatPeriodMonthLabel } from '../../../shared/competitionPeriods.mjs'
+import { notifyCompetitionUpdated } from '../../lib/publicDataCache.js'
 
 function isoToDatetimeLocal(iso) {
   if (!iso) return ''
@@ -85,6 +86,7 @@ export default function ShirtGiveawayPeriodsAdmin() {
       setPeriodForm({ title: '', entryOpensAt: '', entryClosesAt: '' })
       if (j.competition) setDraft(j.competition)
       else await load()
+      notifyCompetitionUpdated(COMPETITION_SHIRT_GIVEAWAY)
       setMsg('Shirt giveaway period created.')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Create failed')
@@ -112,6 +114,7 @@ export default function ShirtGiveawayPeriodsAdmin() {
       if (!res.ok) throw new Error(j.error || 'Period update failed')
       if (j.competition) setDraft(j.competition)
       else await load()
+      notifyCompetitionUpdated(COMPETITION_SHIRT_GIVEAWAY)
       setMsg('Period status updated.')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Update failed')
@@ -149,6 +152,7 @@ export default function ShirtGiveawayPeriodsAdmin() {
       if (!res.ok) throw new Error(j.error || 'Could not save period dates')
       if (j.competition) setDraft(j.competition)
       else await load()
+      notifyCompetitionUpdated(COMPETITION_SHIRT_GIVEAWAY)
       setEditingPeriodId('')
       setMsg('Entry period dates saved. Open the period when entries should go live.')
     } catch (e) {
