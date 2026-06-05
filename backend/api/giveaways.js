@@ -32,6 +32,7 @@ export default async function handler(req, res) {
     const url = new URL(req.url || '/', 'http://local')
     const slug = (url.searchParams.get('slug') || '').trim()
     const siteOrigin = siteOriginFromReq(req)
+    res.setHeader('Cache-Control', 'public, s-maxage=20, stale-while-revalidate=120')
 
     if (slug) {
       const detail = await getPublicGiveawayDetail(slug, { siteOrigin })

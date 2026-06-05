@@ -2522,8 +2522,26 @@ body {
     min-height: 44px;
   }
 
+  .ss-entry-modal-panel--paid {
+    max-height: min(96dvh, 980px);
+    min-height: min(72dvh, 640px);
+  }
+
   .ss-entry-modal-scroll {
-    padding-bottom: 0.75rem;
+    padding-bottom: 1rem;
+  }
+
+  .ss-entry-modal-checkout-footer {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    background: rgb(12 10 9);
+  }
+
+  .ss-entry-modal-checkout-footer .ss-entry-checkout-actions {
+    position: static;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    background: none;
   }
 
   .ss-entry-consent-box {
@@ -2922,17 +2940,16 @@ input.ss-cf-pay-button.ss-pay-cta {
 
 @media (max-width: 767px) {
   .ss-entry-checkout-actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 3;
+    position: static;
+    z-index: auto;
     margin-top: 1rem;
     padding-top: 1rem;
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-    background: linear-gradient(to top, rgb(12 10 9) 72%, rgb(12 10 9 / 0.92) 88%, transparent);
+    padding-bottom: 0;
+    background: none;
   }
 
   .ss-entry-modal-panel {
-    max-height: min(92dvh, 920px);
+    max-height: min(96dvh, 980px);
   }
 
   .ss-legacy-bundle-stamp-overlay {

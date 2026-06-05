@@ -13,16 +13,8 @@ import {
   COMPETITION_NAME_POSTAL,
   formatBundlePriceGBP,
 } from '../competitionData'
-import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
-import {
-  CONSOLATION_NOT_AWARDED_GENERIC,
-  CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD,
-  CONSOLATION_PRIZE_SUMMARY,
-  formatConsolationAwardMessage,
-  LEGACY_SKILL_ONE_ATTEMPT_NOTICE,
-  paidSpendQualifiesForConsolation,
-} from '../../shared/consolationShirtGiveaway.mjs'
-import { ConsolationTermsLink } from './ConsolationTermsLink'
+import { LEGACY_ENTRY_CHECKOUT_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import { LEGACY_SKILL_ONE_ATTEMPT_NOTICE } from '../../shared/consolationShirtGiveaway.mjs'
 import { PromoterAddress } from './PromoterAddress'
 import { ErrorBanner } from './ErrorBanner'
 import { ModalPortal } from './ModalPortal'
@@ -66,7 +58,6 @@ export function EntryModal() {
     paidQuizValidation,
     paidQuizError,
     paidQuizResult,
-    paidConsolationShirtEntries,
     paidQuizSubmitted,
     paidQuizSubmitting,
     paidEmailConfirmationSent,
@@ -202,21 +193,16 @@ export function EntryModal() {
   }
 
   function renderLegacyNotQualifiedMessage() {
-    if (paidConsolationShirtEntries > 0) {
-      return formatConsolationAwardMessage({ entryCount: paidConsolationShirtEntries })
-    }
-    if (
-      paidEntryRoute === 'tickets' &&
-      selectedTicketBundle &&
-      !paidSpendQualifiesForConsolation(selectedTicketBundle.totalPence)
-    ) {
-      return CONSOLATION_NOT_AWARDED_PAID_BELOW_THRESHOLD
-    }
-    if (paidEntryRoute === 'free_online') {
-      return `${CONSOLATION_PRIZE_SUMMARY} You did not qualify for the main draw on this attempt.`
-    }
-    return CONSOLATION_NOT_AWARDED_GENERIC
+    return 'You did not qualify for the main draw on this attempt. Full details are in your confirmation email.'
   }
+
+  const showPaidCheckoutFooter =
+    entryModalType === 'paid' &&
+    !paidPostCheckout &&
+    paidEntryRoute === 'tickets' &&
+    !paymentNotConfiguredMessage &&
+    (hasCardCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&
+    !showPaymentSheet
 
   useEffect(() => {
     if (!entryModalType) return
@@ -259,7 +245,7 @@ export function EntryModal() {
   return (
     <ModalPortal>
       <div
-        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:items-center sm:p-6"
+        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="entry-modal-title"
@@ -273,7 +259,7 @@ export function EntryModal() {
         <div
           ref={panelRef}
           inert={showPaymentSheet}
-          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(90dvh,920px)] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(92vh,920px)] ${panelWidthClass} ${
+          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(96dvh,980px)] w-full max-w-none flex-col rounded-t-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(92vh,920px)] sm:max-w-lg sm:rounded-2xl ${panelWidthClass} ${
             entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
           } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''}`}
         >
@@ -285,7 +271,7 @@ export function EntryModal() {
           }`}
           aria-hidden
         />
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5 sm:py-4">
           <h2 id="entry-modal-title" className="text-lg font-semibold leading-snug text-stone-100">
             {titles[entryModalType]}
           </h2>
@@ -302,17 +288,20 @@ export function EntryModal() {
         </div>
 
         <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col">
-          <div className="ss-entry-modal-scroll min-h-0 flex-1 px-4 py-4 sm:px-5">
+          <div className="ss-entry-modal-scroll min-h-0 flex-1 px-4 py-3 sm:px-5 sm:py-4">
           {entryModalType === 'paid' ? (
             <>
-              <p className="text-sm text-stone-500">
+              <p className="text-sm leading-relaxed text-stone-500 md:hidden">
+                Choose how to enter, then answer three skill questions. All must be correct to qualify —{' '}
+                <strong className="text-stone-400">one attempt</strong> per entry.
+              </p>
+              <p className="hidden text-sm text-stone-500 md:block">
                 <strong className="text-stone-300">{paidCompetitionTitle}.</strong> Pick a ticket bundle to pay online,
                 free online entry (£0 card verify), or free postal entry for the same prize pool. Then answer the skill
                 questions (no multiple choice). <strong className="text-stone-400">All must be correct to qualify</strong>{' '}
                 for the main draw — you have <strong className="text-stone-400">one attempt</strong> per entry. The winner
                 is picked at random from correct entries only.
               </p>
-              <ConsolationTermsLink onOpenTerms={openTerms} className="mt-2" />
               {paidPostCheckout && paidQuizSubmitted ? (
                 <div className="mt-4 flex flex-col gap-4 text-center">
                   <div className="rounded-2xl border border-emerald-600/35 bg-gradient-to-b from-emerald-950/50 to-stone-950/80 px-5 py-8">
@@ -479,7 +468,7 @@ export function EntryModal() {
                   </button>
                 </form>
               ) : (
-                <div className="mt-4 flex flex-col gap-5">
+                <div className="mt-3 flex flex-col gap-4 sm:mt-4 sm:gap-5">
                   <TicketBundlePicker
                     paidBundleId={paidBundleId}
                     setPaidBundleId={setPaidBundleId}
@@ -490,7 +479,6 @@ export function EntryModal() {
                     entryMethods={paidEntryMethods}
                     postalCompetitionName={postalCompetitionName}
                     competitionTitle={paidCompetitionTitle}
-                    onOpenTerms={openTerms}
                   />
                   {paidEntryRoute === 'free_online' ? (
                     <>
@@ -581,21 +569,16 @@ export function EntryModal() {
                       </div>
                       <p className="text-xs leading-relaxed text-stone-500">
                         Max 3 free online entries per name and address. Verify your card first (£0.00 authorisation, no
-                        charge), then answer the {skillQuestionLabel}. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
+                        charge), then answer the {skillQuestionLabel}.
                       </p>
-                      <ConsolationTermsLink onOpenTerms={openTerms} />
                       {freeCardVerified ? (
                         <form className="flex flex-col gap-4" onSubmit={handleFreeQuizSubmit}>
                           <div className="rounded-lg border border-teal-600/30 bg-teal-950/40 px-3 py-3 text-sm text-teal-100/90">
                             <p className="font-medium text-teal-50">Card verified</p>
                             <p className="mt-1 text-teal-100/90">
-                            Answer all {skillQuestionLabel} below. You only qualify for the main draw if every answer is
+                              Answer all {skillQuestionLabel} below. You only qualify for the main draw if every answer is
                               correct. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
                             </p>
-                            <ConsolationTermsLink
-                              onOpenTerms={openTerms}
-                              className="mt-2 text-xs leading-relaxed text-teal-200/80"
-                            />
                           </div>
                           {paidSkillQuestions.map((q, i) => {
                             const questionKey = q.questionKey || q.id
@@ -734,74 +717,6 @@ export function EntryModal() {
                   ) : null}
                   {paymentNotConfiguredMessage && paidEntryRoute === 'tickets' ? (
                     <ErrorBanner message={paymentNotConfiguredMessage} />
-                  ) : null}
-                  {paidEntryRoute === 'tickets' &&
-                  !paymentNotConfiguredMessage &&
-                  (hasCardCheckout || hasPayPal || E2E_SIMULATE_CHECKOUT) &&
-                  !showPaymentSheet ? (
-                    <div className="ss-entry-checkout-actions flex flex-col gap-3 border-t border-white/10 pt-4">
-                      <p className="rounded-lg border border-amber-800/35 bg-amber-950/25 px-3 py-2.5 text-center text-[11px] font-medium leading-snug text-amber-100/90">
-                        {TICKET_PURCHASE_NON_REFUND_NOTICE}
-                      </p>
-                      <p className="rounded-lg border border-stone-600/30 bg-stone-900/40 px-3 py-2.5 text-center text-[11px] leading-snug text-stone-400">
-                        <strong className="text-stone-300">Skill quiz:</strong> {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
-                      </p>
-                      {E2E_SIMULATE_CHECKOUT ? (
-                        <button
-                          type="button"
-                          onClick={handlePaidEntry}
-                          disabled={paidLoading}
-                          className="min-h-[48px] w-full rounded-xl border border-amber-500/40 bg-amber-950/50 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={handlePayNow}
-                        disabled={paidLoading || paidCardPreparing || !paidFormReadyForPayment}
-                        className="ss-pay-cta min-h-[48px] w-full shrink-0 rounded-xl py-3.5 text-base transition hover:brightness-110 disabled:cursor-not-allowed sm:text-lg"
-                      >
-                        {paidLoading || paidCardPreparing ? 'Preparing secure checkout…' : 'Pay now'}
-                      </button>
-                      {hasCashflowsEmbedded ? (
-                        <p className="text-center text-xs leading-relaxed text-stone-500">
-                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — pay by card on the
-                          next screen (secure fields on this site), then complete the quiz.
-                        </p>
-                      ) : null}
-                      {hasCashflowsEmbedded && hasPayPal ? (
-                        <p className="text-center text-xs leading-relaxed text-stone-500">
-                          Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card or PayPal on the
-                          next screen.
-                        </p>
-                      ) : null}
-                      {hasPayPal ? (
-                        <div className="pt-1">
-                          {hasCashflowsEmbedded ? (
-                            <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
-                              or pay with PayPal
-                            </p>
-                          ) : null}
-                          <PayPalPayButton
-                            clientId={payPalClientId}
-                            currency={payPalCurrency}
-                            createOrderUrl={paypalCreateOrderApi}
-                            captureOrderUrl={paypalCaptureOrderApi}
-                            bundleId={paidBundleId}
-                            competition={paidCompetitionSlug}
-                            ticketQuantity={selectedTicketBundle?.qty ?? 1}
-                            customerEmail={paidEmail}
-                            customerFullName={paidFullName}
-                            customerPhone={paidPhone}
-                            newsletterOptIn={paidNewsletterOptIn}
-                            disabled={!paidFormReadyForPayment}
-                            onPaid={markPaidCheckoutComplete}
-                            onError={(msg) => setPaidError(msg)}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
                   ) : null}
                 </div>
               )}
@@ -965,9 +880,74 @@ export function EntryModal() {
           ) : null}
 
           </div>
+
+          {showPaidCheckoutFooter ? (
+            <div className="ss-entry-modal-checkout-footer shrink-0 border-t border-white/10 px-4 py-3 sm:px-5">
+              <div className="ss-entry-checkout-actions flex flex-col gap-2.5">
+                <p className="text-center text-[11px] leading-snug text-stone-500">{LEGACY_ENTRY_CHECKOUT_NOTICE}</p>
+                {E2E_SIMULATE_CHECKOUT ? (
+                  <button
+                    type="button"
+                    onClick={handlePaidEntry}
+                    disabled={paidLoading}
+                    className="min-h-[48px] w-full rounded-xl border border-amber-500/40 bg-amber-950/50 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {paidLoading ? 'Working…' : 'Continue (E2E simulated checkout)'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handlePayNow}
+                  disabled={paidLoading || paidCardPreparing || !paidFormReadyForPayment}
+                  className="ss-pay-cta min-h-[48px] w-full shrink-0 rounded-xl py-3.5 text-base transition hover:brightness-110 disabled:cursor-not-allowed sm:text-lg"
+                >
+                  {paidLoading || paidCardPreparing ? 'Preparing secure checkout…' : 'Pay now'}
+                </button>
+                {hasCashflowsEmbedded ? (
+                  <p className="text-center text-xs leading-relaxed text-stone-500">
+                    Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — pay by card on the next
+                    screen, then complete the quiz.
+                  </p>
+                ) : null}
+                {hasCashflowsEmbedded && hasPayPal ? (
+                  <p className="text-center text-xs leading-relaxed text-stone-500">
+                    Total {formatBundlePriceGBP(selectedTicketBundle?.totalPence ?? 0)} — card or PayPal on the next
+                    screen.
+                  </p>
+                ) : null}
+                {hasPayPal ? (
+                  <div className="pt-0.5">
+                    {hasCashflowsEmbedded ? (
+                      <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+                        or pay with PayPal
+                      </p>
+                    ) : null}
+                    <PayPalPayButton
+                      clientId={payPalClientId}
+                      currency={payPalCurrency}
+                      createOrderUrl={paypalCreateOrderApi}
+                      captureOrderUrl={paypalCaptureOrderApi}
+                      bundleId={paidBundleId}
+                      competition={paidCompetitionSlug}
+                      ticketQuantity={selectedTicketBundle?.qty ?? 1}
+                      customerEmail={paidEmail}
+                      customerFullName={paidFullName}
+                      customerPhone={paidPhone}
+                      newsletterOptIn={paidNewsletterOptIn}
+                      disabled={!paidFormReadyForPayment}
+                      onPaid={markPaidCheckoutComplete}
+                      onError={(msg) => setPaidError(msg)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        <div className="shrink-0 border-t border-white/10 px-4 py-3 sm:px-5">
+        <div
+          className={`shrink-0 border-t border-white/10 px-4 py-3 sm:px-5 ${entryModalType === 'paid' ? 'max-md:hidden' : ''}`}
+        >
           <button
             type="button"
             onClick={closeEntry}

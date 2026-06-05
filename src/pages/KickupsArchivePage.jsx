@@ -32,14 +32,14 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
               {layout.title}
             </h1>
             <p className="mt-4 text-base font-medium leading-relaxed text-sky-100/85 sm:text-lg">{layout.intro}</p>
-            {countdownPeriod || shirtPeriodLoading ? (
+            {countdownPeriod || (!countdownPeriod && shirtPeriodLoading) ? (
               <div className="mt-5">
                 <CompetitionCountdown
                   opensAt={countdownPeriod?.entryOpensAt}
                   closesAt={countdownPeriod?.entryClosesAt}
                   label="Giveaway ends"
                   showDot={false}
-                  pending={shirtPeriodLoading}
+                  pending={!countdownPeriod && shirtPeriodLoading}
                   theme="lime"
                 />
               </div>

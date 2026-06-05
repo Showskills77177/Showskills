@@ -1,30 +1,31 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
+import { fetchPublishedGiveaways } from '../lib/publicCatalogFetch.js'
+import { getCachedPublishedGiveaways } from '../lib/publicDataCache.js'
 
 export function usePublishedGiveaways() {
-  const [giveaways, setGiveaways] = useState([])
-  const [loading, setLoading] = useState(true)
+  const cached = getCachedPublishedGiveaways()
+  const [giveaways, setGiveaways] = useState(cached ?? [])
+  const [loading, setLoading] = useState(() => cached === undefined)
 
   useEffect(() => {
     let cancelled = false
-    const ac = new AbortController()
-    const timeout = window.setTimeout(() => ac.abort(), 20_000)
-    apiFetch('/api/giveaways', { signal: ac.signal })
-      .then(async (res) => {
-        const j = await res.json().catch(() => ({}))
-        if (!cancelled) setGiveaways(j.giveaways || [])
+    const hasCache = getCachedPublishedGiveaways() !== undefined
+    if (!hasCache) setLoading(true)
+
+    fetchPublishedGiveaways()
+      .then((next) => {
+        if (!cancelled) setGiveaways(next)
       })
       .catch(() => {
         if (!cancelled) setGiveaways([])
       })
       .finally(() => {
-        window.clearTimeout(timeout)
         if (!cancelled) setLoading(false)
       })
+
     return () => {
       cancelled = true
-      ac.abort()
-      window.clearTimeout(timeout)
     }
   }, [])
 

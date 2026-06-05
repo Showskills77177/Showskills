@@ -1,8 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, formatBundlePriceGBP } from '../competitionData'
-import { LEGACY_SKILL_ONE_ATTEMPT_NOTICE } from '../../shared/consolationShirtGiveaway.mjs'
 import { legacyEntryMethods } from '../../shared/competitionEntryMethods.mjs'
-import { ConsolationTermsLink } from './ConsolationTermsLink'
 import { TicketBundleIcon } from './TicketBundleIcon'
 
 /**
@@ -18,7 +16,6 @@ export function TicketBundlePicker({
   entryMethods = legacyEntryMethods(),
   postalCompetitionName = COMPETITION_NAME_POSTAL,
   competitionTitle = 'this prize draw',
-  onOpenTerms,
 }) {
   const methods = entryMethods || legacyEntryMethods()
   const postalName = postalCompetitionName || COMPETITION_NAME_POSTAL
@@ -95,19 +92,10 @@ export function TicketBundlePicker({
           </div>
         ) : null}
         {paidEntryRoute === 'free_online' ? (
-          <>
-            <p className="mt-2 text-xs leading-relaxed text-stone-500">
-              Verify your card online (£0, no charge), then answer three skill questions — same {competitionTitle} prize
-              pool as paid tickets. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
-            </p>
-            {onOpenTerms ? <ConsolationTermsLink onOpenTerms={onOpenTerms} className="mt-1.5" /> : null}
-          </>
-        ) : null}
-        {paidEntryRoute === 'tickets' ? (
-          <>
-            <p className="mt-2 text-xs leading-relaxed text-stone-500">{LEGACY_SKILL_ONE_ATTEMPT_NOTICE}</p>
-            {onOpenTerms ? <ConsolationTermsLink onOpenTerms={onOpenTerms} className="mt-1.5" /> : null}
-          </>
+          <p className="mt-2 text-xs leading-relaxed text-stone-500">
+            Verify your card online (£0, no charge), then answer three skill questions for the same {competitionTitle}{' '}
+            prize pool.
+          </p>
         ) : null}
         {paidEntryRoute === 'postal' ? (
           <p className="mt-2 text-xs leading-relaxed text-stone-500">
@@ -194,11 +182,8 @@ export function TicketBundlePicker({
               </div>
               <p className="mt-0.5 text-sm text-stone-400">
                 Same draw as paid tickets. Verify your card (£0 authorisation, no charge), then answer three skill
-                questions online. {LEGACY_SKILL_ONE_ATTEMPT_NOTICE}
+                questions online.
               </p>
-              {onOpenTerms ? (
-                <ConsolationTermsLink onOpenTerms={onOpenTerms} className="mt-2 text-xs text-stone-500" />
-              ) : null}
             </div>
           </label>
         ) : null}

@@ -187,7 +187,7 @@ export function HomePageContent({
   const featuredCountdownPeriod = pickCountdownPeriod(featuredCompetition)
   const countdownPeriod = legacyCountdownPeriod || featuredCountdownPeriod
   const countdownPending =
-    legacyCompetitionLoading || (!legacyCountdownPeriod && featuredCompetitionLoading)
+    !countdownPeriod && (legacyCompetitionLoading || featuredCompetitionLoading)
   const countdownFetchFailed =
     !countdownPending &&
     !countdownPeriod &&

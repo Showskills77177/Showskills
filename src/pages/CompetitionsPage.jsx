@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useMemo } from 'react'
 import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
 import { useEntryFlow } from '../entry/entryContext'
-import { usePublishedCompetitions, usePublicCompetition } from '../hooks/usePublicCompetition'
+import { usePublishedCompetitions } from '../hooks/usePublicCompetition'
 import { usePublishedGiveaways } from '../hooks/usePublicGiveaway'
 import { usePageLayout } from '../hooks/useSitePages'
 import { useMatchedCompetitionCardHeight } from '../hooks/useMatchedCompetitionCardHeight'
@@ -74,21 +74,17 @@ export default function CompetitionsPage({
   const layout = mergeCompetitionsPageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
-  const { competition: legacyDetail, loading: loadingLegacyDetail } = usePublicCompetition(DRAW_COMPETITION_SLUG)
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
   const paidCompetitions = useMemo(() => {
-    const legacy = resolveLegacyBundlePublicCompetition({
-      detail: legacyDetail,
-      listItems: competitions,
-    })
+    const legacy = resolveLegacyBundlePublicCompetition({ listItems: competitions })
     const extras = competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG)
     return [legacy, ...extras]
-  }, [competitions, legacyDetail])
+  }, [competitions])
   const extraPaidCompetitions = useMemo(
     () => competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG),
     [competitions],
   )
-  const loading = layoutLoading || loadingCompetitions || loadingLegacyDetail || loadingGiveaways
+  const loading = layoutLoading || loadingCompetitions || loadingGiveaways
 
   const desktopOffsets = layout.offsets || {}
   const pageMobileOffsets = layout.mobileOffsets || {}
@@ -179,7 +175,7 @@ export default function CompetitionsPage({
       cardScale={shirtCardOffset.scale ?? 1}
       cardLayout={shirtGiveawayCard}
       countdownPeriod={shirtCountdownPeriod}
-      countdownPending={shirtPeriodLoading}
+      countdownPending={!shirtCountdownPeriod && shirtPeriodLoading}
       editorMode={editorMode}
       layoutViewport={layoutViewport}
       selectedBlockId={selectedBlockId}

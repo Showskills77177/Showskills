@@ -2,6 +2,8 @@
 
 const competitionBySlug = new Map()
 let featuredHomepageCompetition = undefined
+let publishedCompetitionsCache = undefined
+let publishedGiveawaysCache = undefined
 let homepageLayoutCache = null
 
 export function getCachedCompetition(slug) {
@@ -15,6 +17,24 @@ export function setCachedCompetition(slug, competition) {
 export function clearPublicCompetitionCaches() {
   competitionBySlug.clear()
   featuredHomepageCompetition = undefined
+  publishedCompetitionsCache = undefined
+  publishedGiveawaysCache = undefined
+}
+
+export function getCachedPublishedCompetitions() {
+  return publishedCompetitionsCache
+}
+
+export function setCachedPublishedCompetitions(competitions) {
+  publishedCompetitionsCache = competitions ?? []
+}
+
+export function getCachedPublishedGiveaways() {
+  return publishedGiveawaysCache
+}
+
+export function setCachedPublishedGiveaways(giveaways) {
+  publishedGiveawaysCache = giveaways ?? []
 }
 
 export function getCachedFeaturedHomepageCompetition() {

@@ -953,7 +953,10 @@ export async function listPublishedGiveawayCompetitions({ siteOrigin = '' } = {}
   const rows = await listCompetitions({ status: COMPETITION_STATUS.published, kind: COMPETITION_KIND.giveaway })
   const enriched = await Promise.all(
     rows.map(async (c) => {
-      const openPeriod = await getOpenCompetitionPeriod(c.slug)
+      const [openPeriod, countdownPeriod] = await Promise.all([
+        getOpenCompetitionPeriod(c.slug),
+        getCountdownPeriodForDisplay(c.slug),
+      ])
       return {
         slug: c.slug,
         title: c.title,
@@ -970,6 +973,13 @@ export async function listPublishedGiveawayCompetitions({ siteOrigin = '' } = {}
               entryOpensAt: openPeriod.entryOpensAt,
               entryClosesAt: openPeriod.entryClosesAt,
               status: openPeriod.status,
+            }
+          : null,
+        countdownPeriod: countdownPeriod
+          ? {
+              entryOpensAt: countdownPeriod.entryOpensAt,
+              entryClosesAt: countdownPeriod.entryClosesAt,
+              status: countdownPeriod.status,
             }
           : null,
       }

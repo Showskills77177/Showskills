@@ -19,6 +19,10 @@ function siteOriginFromReq(req) {
   return `${proto}://${host}`.replace(/\/$/, '')
 }
 
+function setPublicCacheHeaders(res) {
+  res.setHeader('Cache-Control', 'public, s-maxage=20, stale-while-revalidate=120')
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -40,6 +44,7 @@ export default async function handler(req, res) {
     const slug = (url.searchParams.get('slug') || '').trim()
     const featured = (url.searchParams.get('featured') || '').trim()
     const siteOrigin = siteOriginFromReq(req)
+    setPublicCacheHeaders(res)
 
     if (featured === 'homepage') {
       const competition = await getFeaturedHomepageCompetition({ siteOrigin })

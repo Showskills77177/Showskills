@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiFetch } from '../lib/api'
-import { getCachedCompetition, setCachedCompetition } from '../lib/publicDataCache.js'
+import {
+  fetchPublicCompetitionBySlug,
+  fetchPublishedCompetitions,
+  hydrateCompetitionCache,
+} from '../lib/publicCatalogFetch.js'
+import { getCachedCompetition } from '../lib/publicDataCache.js'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
-
-function fetchPublicCompetition(slug) {
-  return apiFetch(`/api/competitions?slug=${encodeURIComponent(slug)}`).then(async (res) => {
-    const j = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(j.error || 'Failed to load competition')
-    return j.competition || null
-  })
-}
 
 export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
   const cacheKey = String(slug || '').trim() || DRAW_COMPETITION_SLUG
+  hydrateCompetitionCache(cacheKey)
   const cached = getCachedCompetition(cacheKey)
   const [competition, setCompetition] = useState(cached ?? null)
   const [loading, setLoading] = useState(() => cached === undefined)
@@ -21,9 +18,8 @@ export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
   const reload = useCallback(() => {
     setLoading(true)
     setError('')
-    return fetchPublicCompetition(cacheKey)
+    return fetchPublicCompetitionBySlug(cacheKey)
       .then((next) => {
-        setCachedCompetition(cacheKey, next)
         setCompetition(next)
       })
       .catch((e) => {
@@ -36,12 +32,13 @@ export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    const hasCache = getCachedCompetition(cacheKey) !== undefined
+    if (!hasCache) setLoading(true)
     setError('')
-    fetchPublicCompetition(cacheKey)
+
+    fetchPublicCompetitionBySlug(cacheKey)
       .then((next) => {
         if (cancelled) return
-        setCachedCompetition(cacheKey, next)
         setCompetition(next)
       })
       .catch((e) => {
@@ -69,29 +66,28 @@ export function usePublicCompetition(slug = DRAW_COMPETITION_SLUG) {
 }
 
 export function usePublishedCompetitions() {
-  const [competitions, setCompetitions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const cached = getCachedPublishedCompetitions()
+  const [competitions, setCompetitions] = useState(cached ?? [])
+  const [loading, setLoading] = useState(() => cached === undefined)
 
   useEffect(() => {
     let cancelled = false
-    const ac = new AbortController()
-    const timeout = window.setTimeout(() => ac.abort(), 20_000)
-    apiFetch('/api/competitions', { signal: ac.signal })
-      .then(async (res) => {
-        const j = await res.json().catch(() => ({}))
-        if (!cancelled) setCompetitions(j.competitions || [])
+    const hasCache = getCachedPublishedCompetitions() !== undefined
+    if (!hasCache) setLoading(true)
+
+    fetchPublishedCompetitions()
+      .then((next) => {
+        if (!cancelled) setCompetitions(next)
       })
       .catch(() => {
         if (!cancelled) setCompetitions([])
       })
       .finally(() => {
-        window.clearTimeout(timeout)
         if (!cancelled) setLoading(false)
       })
+
     return () => {
       cancelled = true
-      ac.abort()
-      window.clearTimeout(timeout)
     }
   }, [])
 
