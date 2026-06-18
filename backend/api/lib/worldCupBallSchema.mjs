@@ -132,7 +132,7 @@ export async function createWorldCupBallSession(ipAddress, { questionKeys, combi
   await ensureWorldCupBallSchema()
   const id = randomUUID()
   const now = new Date().toISOString()
-  const keysJson = dbIsPostgres() ? questionKeys : JSON.stringify(questionKeys)
+  const keysJson = JSON.stringify(questionKeys ?? [])
   await query(
     `INSERT INTO world_cup_ball_sessions (id, ip_address, status, started_at, question_keys_json, combination_index)
      VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -202,7 +202,7 @@ export async function finalizeWorldCupBallSession({
 }) {
   await ensureWorldCupBallSchema()
   const now = new Date().toISOString()
-  const answersJson = dbIsPostgres() ? answers : JSON.stringify(answers)
+  const answersJson = JSON.stringify(answers ?? {})
   await query(
     `UPDATE world_cup_ball_sessions SET
       status = $2,

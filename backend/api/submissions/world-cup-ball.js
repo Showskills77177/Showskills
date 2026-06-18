@@ -138,18 +138,28 @@ export async function startWorldCupBallSession(req, res) {
             sessionMaxMinutes: WORLD_CUP_BALL_SESSION_MAX_MINUTES,
           })
         }
+        await finalizeWorldCupBallSession({
+          sessionId: existing.id,
+          status: 'abandoned',
+          timeoutsUsed: existing.timeouts_used ?? 0,
+          answers: existing.answers_json || {},
+        })
       }
     }
 
     const { combinationIndex, questionKeys } = pickRandomWorldCupBallCombination()
     const session = await createWorldCupBallSession(ip, { questionKeys, combinationIndex })
-    await logEntryAttempt(req, {
-      competition: COMPETITION_WORLD_CUP_BALL,
-      flow: 'world_cup_ball_start',
-      ip,
-      outcome: 'success',
-      metadata: { session_id: session.id, combination_index: combinationIndex },
-    })
+    try {
+      await logEntryAttempt(req, {
+        competition: COMPETITION_WORLD_CUP_BALL,
+        flow: 'world_cup_ball_start',
+        ip,
+        outcome: 'success',
+        metadata: { session_id: session.id, combination_index: combinationIndex },
+      })
+    } catch (logErr) {
+      console.error('[world-cup-ball] entry attempt log failed:', logErr)
+    }
     return json(res, 201, {
       ok: true,
       sessionId: session.id,
