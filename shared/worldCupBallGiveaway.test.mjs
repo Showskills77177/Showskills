@@ -4,6 +4,7 @@ import {
   validateWorldCupBallAnswers,
   isWorldCupBallDisqualifiedByTimeouts,
   buildWorldCupBallWrongReview,
+  worldCupBallReviewCorrectAnswerDisplay,
   pickWorldCupBallSalvageQuestion,
   countWorldCupBallWrongAnswers,
   WORLD_CUP_BALL_QUESTION_BANK,
@@ -38,6 +39,16 @@ describe('worldCupBallGiveaway', () => {
     const review = buildWorldCupBallWrongReview(answers, questionKeys)
     assert.equal(review.length, 9)
     assert.match(review[0].prompt, /./)
+    assert.ok(review[0].correctAnswer)
+    assert.notEqual(review[0].correctAnswer, review[0].yourAnswer)
+  })
+
+  it('picks a readable correct answer for review display', () => {
+    const mc = WORLD_CUP_BALL_QUESTION_BANK.find((q) => q.questionKey === 'q4')
+    assert.equal(worldCupBallReviewCorrectAnswerDisplay(mc), 'Lev Yashin')
+
+    const goals = WORLD_CUP_BALL_QUESTION_BANK.find((q) => q.questionKey === 'q15')
+    assert.equal(worldCupBallReviewCorrectAnswerDisplay(goals), '32 goals')
   })
 
   it('picks salvage question outside quiz set', () => {

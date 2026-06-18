@@ -218,6 +218,22 @@ export function countWorldCupBallWrongAnswers(validation, questionKeys) {
   return (questionKeys || []).filter((key) => !validation.perQuestion[key]).length
 }
 
+/** Pick the clearest accepted answer to show in the post-quiz review. */
+export function worldCupBallReviewCorrectAnswerDisplay(question) {
+  const list = Array.isArray(question?.acceptedAnswers)
+    ? question.acceptedAnswers.filter((entry) => typeof entry === 'string' && entry.trim())
+    : []
+  if (!list.length) return ''
+
+  if (Array.isArray(question?.choices) && question.choices.length > 0) {
+    const inChoices = list.find((entry) => question.choices.includes(entry))
+    if (inChoices) return inChoices
+  }
+
+  const named = list.find((entry) => !/^\d+$/.test(entry.trim()))
+  return named || list[0]
+}
+
 /** @param {Record<string, string>} answers @param {string[]} questionKeys */
 export function buildWorldCupBallWrongReview(answers, questionKeys) {
   const validation = validateWorldCupBallAnswers(answers, questionKeys)
@@ -229,6 +245,7 @@ export function buildWorldCupBallWrongReview(answers, questionKeys) {
       questionKey: key,
       prompt: q?.prompt || key,
       yourAnswer: String(answers?.[key] ?? '').trim() || '(no answer)',
+      correctAnswer: worldCupBallReviewCorrectAnswerDisplay(q) || '(see accepted answers)',
     })
   }
   return wrong
