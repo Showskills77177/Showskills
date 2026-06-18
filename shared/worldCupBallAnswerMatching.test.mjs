@@ -44,6 +44,35 @@ describe('worldCupBallAnswerMatching', () => {
     assert.equal(answerMatchesWorldCupBallAnswer('nineteen ninety nine', ['1999', 'nineteen ninety nine']), true)
   })
 
+  it('accepts two misspelled names when both people are correct', () => {
+    const salahHaaland = [
+      '32 goals',
+      '32',
+      'Mohamed Salah',
+      'Erling Haaland',
+      'Salah',
+      'Haaland',
+      'Salah and Haaland',
+      'Haaland and Salah',
+    ]
+    assert.equal(answerMatchesWorldCupBallAnswer('Salsh and Haland', salahHaaland), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('mohamed salsh erling haland', salahHaaland), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('salsh haland', salahHaaland), true)
+
+    const kluivertMilo = [
+      'Patrick Kluivert and Savo Milošević',
+      'Kluivert and Milošević',
+      'Patrick Kluivert and Savo Milosevic',
+      'Kluivert and Milosevic',
+      'Patrick Kluivert',
+      'Kluivert',
+    ]
+    assert.equal(answerMatchesWorldCupBallAnswer('Patrik Kluivert and Savo Milosevic', kluivertMilo), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('kluivert milosevic', kluivertMilo), true)
+
+    assert.equal(answerMatchesWorldCupBallAnswer('Salsh and Terry', salahHaaland), false)
+  })
+
   it('rejects clearly wrong answers', () => {
     assert.equal(answerMatchesWorldCupBallAnswer('John Terry', ['Richard Dunne', 'Dunne']), false)
     assert.equal(answerMatchesWorldCupBallAnswer('Brazil', ['Liverpool', '6 titles']), false)

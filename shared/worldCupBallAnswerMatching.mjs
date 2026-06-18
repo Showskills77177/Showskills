@@ -115,7 +115,7 @@ function significantTokens(value) {
 function isLikelyPersonNamePhrase(raw) {
   const norm = normalizeSkillAnswer(raw)
   const tokens = significantTokens(raw).filter((token) => !NAME_PARTICLES.has(token))
-  if (tokens.length < 2 || tokens.length > 4) return false
+  if (tokens.length < 2 || tokens.length > 6) return false
   if (tokens.some((token) => NON_NAME_WORDS.has(token) || /^\d+$/.test(token))) return false
   if (norm.endsWith(' states')) return false
 
@@ -127,7 +127,82 @@ function isLikelyPersonNamePhrase(raw) {
   return true
 }
 
+function isMultiPersonPhrase(raw) {
+  return /\sand\s/i.test(String(raw || ''))
+}
+
+function isStatOrNumberPhrase(raw) {
+  const norm = normalizeSkillAnswer(raw)
+  const tokens = significantTokens(raw)
+  if (!tokens.length) return true
+  if (tokens.length === 1 && /^\d+$/.test(tokens[0])) return true
+  if (tokens.some((token) => NON_NAME_WORDS.has(token))) return true
+  if (/^\d+\s/.test(norm) || /\d+\s*(goals|titles|caps|secs|seconds|minutes)/.test(norm)) return true
+  return false
+}
+
+function nameTokensFromPhrase(phrase) {
+  return significantTokens(phrase).filter(
+    (token) => !NAME_PARTICLES.has(token) && !NON_NAME_WORDS.has(token) && !/^\d+$/.test(token),
+  )
+}
+
+function profileKey(tokens) {
+  return tokens[tokens.length - 1] || tokens.join(' ')
+}
+
+/** Distinct people referenced across accepted answers (surnames / short names). */
+function extractPersonProfiles(acceptedList) {
+  const profiles = new Map()
+
+  for (const raw of acceptedList || []) {
+    if (typeof raw !== 'string' || !raw.trim() || isStatOrNumberPhrase(raw)) continue
+
+    const chunks = isMultiPersonPhrase(raw) ? raw.split(/\s+and\s+/i) : [raw]
+
+    for (const chunk of chunks) {
+      const trimmed = chunk.trim()
+      if (!trimmed || isStatOrNumberPhrase(trimmed)) continue
+
+      const tokens = nameTokensFromPhrase(trimmed)
+      if (!tokens.length || tokens.length > 5) continue
+
+      const key = profileKey(tokens)
+      const existing = profiles.get(key)
+      if (existing) {
+        for (const token of tokens) existing.tokens.add(token)
+      } else {
+        profiles.set(key, { key, tokens: new Set(tokens) })
+      }
+    }
+  }
+
+  return [...profiles.values()].map((profile) => ({
+    key: profile.key,
+    tokens: [...profile.tokens],
+  }))
+}
+
+/** User gave two or more names (with typos) that map to different expected people. */
+function matchAtLeastTwoPeople(userAnswer, profiles) {
+  if (profiles.length < 2) return false
+
+  const userTokens = nameTokensFromPhrase(userAnswer)
+  if (userTokens.length < 2) return false
+
+  const matched = new Set()
+  for (const profile of profiles) {
+    const hit = profile.tokens.some((profileToken) =>
+      userTokens.some((userToken) => fuzzyTokenMatch(userToken, profileToken)),
+    )
+    if (hit) matched.add(profile.key)
+  }
+
+  return matched.size >= 2
+}
+
 function allowsTokenSplitMatch(raw) {
+  if (isMultiPersonPhrase(raw)) return true
   if (isLikelyPersonNamePhrase(raw)) return true
   return significantTokens(raw).length === 1
 }
@@ -235,6 +310,12 @@ function anyDistinctTokenMatches(userTokens, acceptedTokens) {
   )
 }
 
+function shouldRequireTwoPeople(userAnswer, acceptedList) {
+  const nameUserTokens = nameTokensFromPhrase(userAnswer)
+  const profiles = extractPersonProfiles(acceptedList)
+  return nameUserTokens.length >= 2 && profiles.length >= 2
+}
+
 function answerMatchesExpandedExact(userAnswer, expandedAccepted) {
   const normalized = normalizeSkillAnswer(userAnswer)
   const normalizedCompact = compact(userAnswer)
@@ -290,23 +371,26 @@ export function answerMatchesWorldCupBallAnswer(userAnswer, acceptedList) {
 
     const acceptedTokens = significantTokens(raw).filter((token) => !NAME_PARTICLES.has(token))
     if (allowsTokenSplitMatch(raw) && acceptedTokens.length > 0 && tokensMatch(userTokens, acceptedTokens)) {
+      if (
+        shouldRequireTwoPeople(userAnswer, acceptedList) &&
+        !isMultiPersonPhrase(raw) &&
+        acceptedTokens.length < 2
+      ) {
+        continue
+      }
       return true
-    }
-
-    if (allowsTokenSplitMatch(raw) && acceptedTokens.length >= 1 && userTokens.length >= 1) {
-      if (anyDistinctTokenMatches(userTokens, acceptedTokens)) return true
     }
 
     if (accepted.length >= 4 && userNorm.includes(accepted)) return true
   }
 
-  if (userTokens.length === 1) {
-    const solo = userTokens[0]
+  const nameUserTokens = nameTokensFromPhrase(userAnswer)
+
+  if (nameUserTokens.length === 1) {
+    const solo = nameUserTokens[0]
     const exactPool = new Set(expandedAccepted.map((entry) => normalizeSkillAnswer(entry)))
     if (exactPool.has(solo)) return true
-  }
 
-  if (userTokens.length >= 1) {
     const pool = [...expandAcceptedWithNameParts(acceptedList)]
     for (const raw of expandedAccepted) {
       if (!isLikelyPersonNamePhrase(raw)) continue
@@ -315,7 +399,12 @@ export function answerMatchesWorldCupBallAnswer(userAnswer, acceptedList) {
       }
     }
     const uniquePool = [...new Set(pool)]
-    if (anyDistinctTokenMatches(userTokens, uniquePool)) return true
+    if (anyDistinctTokenMatches(nameUserTokens, uniquePool)) return true
+  }
+
+  const personProfiles = extractPersonProfiles(acceptedList)
+  if (nameUserTokens.length >= 2 && personProfiles.length >= 2) {
+    if (matchAtLeastTwoPeople(userAnswer, personProfiles)) return true
   }
 
   return false
