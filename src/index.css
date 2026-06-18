@@ -3269,6 +3269,10 @@ body {
 }
 
 
+.ss-quiz-answer-field {
+  text-transform: none;
+}
+
 .ss-entry-field,
 .ss-entry-modal-panel input:not([type='checkbox']):not([type='radio']),
 .ss-entry-modal-panel textarea,

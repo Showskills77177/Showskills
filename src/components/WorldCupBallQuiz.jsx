@@ -6,6 +6,7 @@ import {
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
@@ -602,11 +603,14 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
             <input
               type="text"
               autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
               autoFocus
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
-              className="ss-entry-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
-              placeholder="Type your answer"
+              className="ss-entry-field ss-quiz-answer-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
+              placeholder="Type your answer (capitals optional)"
               disabled={submitting}
             />
             <button
@@ -678,11 +682,14 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           <input
             type="text"
             autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             autoFocus
             value={currentAnswer}
             onChange={(e) => setCurrentAnswer(e.target.value)}
-            className="ss-entry-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
-            placeholder="Type your answer"
+            className="ss-entry-field ss-quiz-answer-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
+            placeholder="Type your answer (capitals optional)"
             disabled={submitting}
           />
           <button
@@ -696,8 +703,8 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       )}
       <p className="text-xs leading-relaxed text-stone-500">
         {questionSeconds} seconds per question. One {timeoutBonusSeconds}-second bonus if you run out of time once; a
-        second timeout disqualifies your attempt. {WORLD_CUP_BALL_SALVAGE_NOTICE} You have{' '}
-        {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
+        second timeout disqualifies your attempt. {WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE} {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
+        You have {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
       </p>
     </div>
   )

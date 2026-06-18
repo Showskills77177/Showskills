@@ -282,6 +282,9 @@ function maxEditDistance(len) {
 
 function fuzzyTokenMatch(userToken, acceptedToken) {
   if (!userToken || !acceptedToken) return false
+  userToken = compact(userToken)
+  acceptedToken = compact(acceptedToken)
+  if (!userToken || !acceptedToken) return false
   if (userToken === acceptedToken) return true
 
   const shorterLen = Math.min(userToken.length, acceptedToken.length)

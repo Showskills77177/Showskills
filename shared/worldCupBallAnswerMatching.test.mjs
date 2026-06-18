@@ -73,6 +73,13 @@ describe('worldCupBallAnswerMatching', () => {
     assert.equal(answerMatchesWorldCupBallAnswer('Salsh and Terry', salahHaaland), false)
   })
 
+  it('accepts answers regardless of capital letters', () => {
+    assert.equal(answerMatchesWorldCupBallAnswer('HARRY KANE', ['Harry Kane', 'Kane']), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('mAn ChItY', ['Manchester City', 'Man City']), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('lfc', ['Liverpool', 'LFC']), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('GEORGE WEAH', ['George Weah', 'Weah']), true)
+  })
+
   it('rejects clearly wrong answers', () => {
     assert.equal(answerMatchesWorldCupBallAnswer('John Terry', ['Richard Dunne', 'Dunne']), false)
     assert.equal(answerMatchesWorldCupBallAnswer('Brazil', ['Liverpool', '6 titles']), false)

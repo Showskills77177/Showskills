@@ -5,6 +5,7 @@ import {
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_MAX_TIMEOUTS,
+  WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
@@ -36,7 +37,7 @@ export const WORLD_CUP_BALL_RULES_INTRO =
   `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — under strict time limits — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. At least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} questions are multiple-choice bonus questions with four options; the rest are free-text. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
 
 export const WORLD_CUP_BALL_SKILL_NOTICE =
-  'This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second timeout, or use of a VPN means you do not win the ball.'
+  `This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. ${WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE} One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second timeout, or use of a VPN means you do not win the ball.`
 
 export const WORLD_CUP_BALL_TERMS_TIMING_NOTICE =
   `Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. The first time you exceed the limit on a question, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. A second timeout on any question disqualifies your attempt. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. VPNs and proxies are not allowed.`
@@ -67,7 +68,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   {
     num: 2,
     title: `Answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult questions under time pressure`,
-    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. Type your answer and move on before time runs out — or tap one of four options on the bonus multiple-choice questions. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. If you run out of time a second time, you are disqualified immediately.`,
+    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE} Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. Type your answer and move on before time runs out — or tap one of four options on the bonus multiple-choice questions. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. If you run out of time a second time, you are disqualified immediately.`,
   },
   {
     num: 3,
