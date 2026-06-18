@@ -15,13 +15,20 @@ import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE
 import { SHIRT_GIVEAWAY_SEASON, SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
 import { PRIZE_AUTHENTICITY_FAQ_ANSWER } from './prizeAuthenticityCopy.mjs'
 import { winnerPhotographyConsentFaqAnswer } from './winnerPhotographyConsent.mjs'
-import { WORLD_CUP_BALL_QUESTION_COUNT, WORLD_CUP_BALL_CHOICE_BONUS_NOTICE } from './worldCupBallGiveaway.mjs'
+import {
+  WORLD_CUP_BALL_QUESTION_COUNT,
+  WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_SALVAGE_NOTICE,
+  WORLD_CUP_BALL_QUESTION_SECONDS,
+  WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
+} from './worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
-  WORLD_CUP_BALL_WINNER_DETAILS_NOTICE,
   WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
-  WORLD_CUP_BALL_MIN_AGE,
+  WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
+  WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
+  WORLD_CUP_BALL_TERMS_WIN_NOTICE,
 } from './worldCupBallGiveawayRules.mjs'
 import { worldCupBallPhotographyFaqAnswer } from './worldCupBallPhotography.mjs'
 
@@ -316,25 +323,25 @@ export const FAQ_SECTIONS = [
   {
     id: 'world-cup-ball',
     title: 'World Cup Ball Giveaway',
-    summary: `Free skill challenge — win the World Cup ball outright by answering ${WORLD_CUP_BALL_QUESTION_COUNT} timed questions correctly.`,
+    summary: `Free skill challenge — win the World Cup ball by answering ${WORLD_CUP_BALL_QUESTION_COUNT} timed questions correctly, or one wrong with a successful salvage question.`,
     items: [
       {
         id: 'wc-ball-what',
         question: 'What is the World Cup Ball Giveaway?',
         answer:
-          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed). Answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win immediately. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} There is no random draw and no payment.`,
+          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed). Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win outright, or get exactly one wrong and answer a bonus salvage question correctly. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} There is no random draw and no payment.`,
       },
       {
         id: 'wc-ball-how-win',
         question: 'How do I win the ball?',
         answer:
-          `You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} questions correctly in your single attempt. Each question has a 15-second timer. If you run out of time once, you receive a one-off 5-second bonus on that question. A second timeout disqualifies you. One incorrect answer means you do not win.`,
+          `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or answer exactly one incorrectly and then answer the bonus salvage question correctly. Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question. A second timeout disqualifies you. ${WORLD_CUP_BALL_SALVAGE_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
       },
       {
         id: 'wc-ball-details',
         question: 'When do I enter my name, phone, and address?',
         answer:
-          `Only if you win. After a perfect score, complete the winner delivery form with your full name, email, UK mobile number, and UK postal address. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Entrants aged ${WORLD_CUP_BALL_MIN_AGE}–17 must also provide a parent or guardian’s delivery details. ${WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}`,
+          `${WORLD_CUP_BALL_TERMS_WIN_NOTICE} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} ${WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}`,
       },
       {
         id: 'wc-ball-eligibility',
@@ -350,7 +357,7 @@ export const FAQ_SECTIONS = [
         id: 'wc-ball-attempts',
         question: 'Can I try again if I fail?',
         answer:
-          'No. You get one quiz attempt per device. Wrong answers, a second timeout, or VPN use ends your attempt under the published rules.',
+          `You get one main quiz attempt per device. ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE} Two or more wrong answers, a failed salvage answer, a second timeout, or VPN use ends your attempt under the published rules.`,
       },
     ],
   },

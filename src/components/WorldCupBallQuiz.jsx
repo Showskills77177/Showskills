@@ -6,6 +6,7 @@ import {
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_SALVAGE_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import { apiUrl } from '../lib/api'
 import {
@@ -33,6 +34,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   const [sessionSecondsLeft, setSessionSecondsLeft] = useState(null)
   const [secondsLeft, setSecondsLeft] = useState(WORLD_CUP_BALL_QUESTION_SECONDS)
   const [submitting, setSubmitting] = useState(false)
+  const [salvageQuestion, setSalvageQuestion] = useState(null)
   const disqualifiedRef = useRef(false)
   const answersRef = useRef({})
 
@@ -92,7 +94,6 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       if (!sessionId || submitting) return
       setSubmitting(true)
       setPhase('submitting')
-      clearWorldCupBallQuizProgress()
       try {
         const res = await fetch(apiUrl('/api/submissions/world-cup-ball/submit'), {
           method: 'POST',
@@ -112,11 +113,21 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           setSubmitting(false)
           return
         }
+        if (data.result === 'salvage_bonus' && data.salvageQuestion) {
+          setSalvageQuestion(data.salvageQuestion)
+          setCurrentAnswer('')
+          setPhase('salvage')
+          resetTimer(false)
+          setSubmitting(false)
+          return
+        }
+        clearWorldCupBallQuizProgress()
         onResult({
           result: data.result,
           allCorrect: data.allCorrect,
           disqualified: data.disqualified,
           claimToken: data.claimToken || null,
+          wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
         })
       } catch {
         onError('Could not submit your answers. Check your connection and try again.')
@@ -125,7 +136,48 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
         setSubmitting(false)
       }
     },
-    [sessionId, submitting, onResult, onError],
+    [sessionId, submitting, onResult, onError, resetTimer],
+  )
+
+  const submitSalvageAnswer = useCallback(
+    async (answerText) => {
+      if (!sessionId || submitting || !salvageQuestion) return
+      setSubmitting(true)
+      setPhase('submitting')
+      try {
+        const res = await fetch(apiUrl('/api/submissions/world-cup-ball/submit'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            sessionId,
+            salvageAnswer: answerText.trim(),
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          onError(typeof data.error === 'string' ? data.error : 'Could not submit your bonus answer.')
+          setPhase('salvage')
+          setSubmitting(false)
+          return
+        }
+        clearWorldCupBallQuizProgress()
+        onResult({
+          result: data.result,
+          allCorrect: data.allCorrect,
+          disqualified: data.disqualified,
+          claimToken: data.claimToken || null,
+          wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
+          salvageCorrect: data.salvageCorrect,
+        })
+      } catch {
+        onError('Could not submit your bonus answer. Check your connection and try again.')
+        setPhase('salvage')
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [sessionId, submitting, salvageQuestion, onResult, onError],
   )
 
   const advanceQuestion = useCallback(
@@ -243,20 +295,24 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   }, [phase, disabled, sessionDeadlineMs, finishQuiz, timeoutsUsed, submitting])
 
   useEffect(() => {
-    if (phase !== 'active' || disabled) return undefined
+    if ((phase !== 'active' && phase !== 'salvage') || disabled) return undefined
     if (secondsLeft <= 0) {
+      if (phase === 'salvage') {
+        void submitSalvageAnswer('')
+        return undefined
+      }
       handleTimeout()
       return undefined
     }
     const t = window.setTimeout(() => {
       setSecondsLeft((s) => {
         const next = s - 1
-        persistProgress({ secondsLeft: next })
+        if (phase === 'active') persistProgress({ secondsLeft: next })
         return next
       })
     }, 1000)
     return () => window.clearTimeout(t)
-  }, [phase, secondsLeft, handleTimeout, disabled, persistProgress])
+  }, [phase, secondsLeft, handleTimeout, disabled, persistProgress, submitSalvageAnswer])
 
   const startQuiz = async () => {
     if (disabled || submitting) return
@@ -330,6 +386,82 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       <p className="text-sm text-stone-400">
         {phase === 'loading' ? 'Preparing your quiz…' : 'Checking your answers…'}
       </p>
+    )
+  }
+
+  if (phase === 'salvage' && salvageQuestion) {
+    const salvageChoices = Array.isArray(salvageQuestion.choices) ? [...salvageQuestion.choices] : []
+    for (let i = salvageChoices.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[salvageChoices[i], salvageChoices[j]] = [salvageChoices[j], salvageChoices[i]]
+    }
+    const hasSalvageChoices = salvageChoices.length > 0
+
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-4 text-sm text-amber-50/95">
+          <p className="font-semibold text-amber-100">Bonus salvage question</p>
+          <p className="mt-2 text-stone-300">{WORLD_CUP_BALL_SALVAGE_NOTICE}</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
+          <span className="font-semibold text-amber-100">One chance to stay in the running</span>
+          <span
+            className={`font-mono tabular-nums ${secondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
+            aria-live="polite"
+          >
+            {secondsLeft}s
+          </span>
+        </div>
+        {hasSalvageChoices ? (
+          <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-100/85">Pick the correct option below.</p>
+          </div>
+        ) : null}
+        <p className="text-base font-medium leading-snug text-stone-100">{salvageQuestion.prompt}</p>
+        {hasSalvageChoices ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {salvageChoices.map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                disabled={submitting}
+                onClick={() => void submitSalvageAnswer(choice)}
+                className="rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40 disabled:opacity-50"
+              >
+                {choice}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!currentAnswer.trim()) return
+              void submitSalvageAnswer(currentAnswer)
+            }}
+          >
+            <input
+              type="text"
+              autoComplete="off"
+              autoFocus
+              value={currentAnswer}
+              onChange={(e) => setCurrentAnswer(e.target.value)}
+              className="ss-entry-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
+              placeholder="Type your answer"
+              disabled={submitting}
+            />
+            <button
+              type="submit"
+              disabled={!currentAnswer.trim() || submitting}
+              className="w-full rounded-xl border border-amber-500/40 bg-amber-950/40 py-3 text-sm font-bold text-amber-100 hover:bg-amber-900/40 disabled:opacity-50"
+            >
+              Submit salvage answer
+            </button>
+          </form>
+        )}
+      </div>
     )
   }
 
@@ -407,8 +539,8 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       )}
       <p className="text-xs leading-relaxed text-stone-500">
         {questionSeconds} seconds per question. One {timeoutBonusSeconds}-second bonus if you run out of time once; a
-        second timeout disqualifies your attempt. You have {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the
-        full quiz.
+        second timeout disqualifies your attempt. {WORLD_CUP_BALL_SALVAGE_NOTICE} You have{' '}
+        {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
       </p>
     </div>
   )

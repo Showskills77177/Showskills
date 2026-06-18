@@ -16,12 +16,12 @@ import {
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
   WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
   WORLD_CUP_BALL_MIN_AGE,
+  WORLD_CUP_BALL_TERMS_TIMING_NOTICE,
+  WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
+  WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
+  WORLD_CUP_BALL_TERMS_WIN_NOTICE,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from '../../shared/worldCupBallPhotography.mjs'
-import {
-  WORLD_CUP_BALL_QUESTION_SECONDS,
-  WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
-} from '../../shared/worldCupBallGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { LegalDisclaimerNotice } from './LegalDisclaimerNotice'
@@ -49,7 +49,7 @@ function PrivacyPolicySection() {
         <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
           Privacy Policy
         </h2>
-        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 2 June 2026</p>
+        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 18 June 2026</p>
         <p className="mt-4 text-zinc-300">
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
@@ -95,6 +95,11 @@ function PrivacyPolicySection() {
           reference or verification identifier to prevent duplicate or fraudulent entries.
         </li>
         <li>Answers to skill-based questions (paid entries after purchase and free postal or giveaway routes)</li>
+        <li>
+          <strong>World Cup Ball Giveaway:</strong> quiz answers, device and IP checks for one attempt per device, and —
+          if you do not win — which questions you answered incorrectly (shown to you in your browser during the attempt
+          only)
+        </li>
         <li>Postal address (only if you submit a free postal entry)</li>
         <li>
           <strong>Contact telephone number</strong> — collected at online entry so we can reach you if you win or need
@@ -448,16 +453,17 @@ export function TermsModal({ open, onClose }) {
             <strong>Free UK delivery:</strong> {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}
           </p>
           <p className="mb-3">
-            Each question has a <strong>{WORLD_CUP_BALL_QUESTION_SECONDS}-second</strong> timer. The first time you exceed
-            the limit, you receive a one-off <strong>{WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second</strong> bonus on that
-            question only. A <strong>second timeout</strong> on any question disqualifies your attempt. You have{' '}
-            <strong>one attempt</strong> per device. <strong>VPNs and proxies are not allowed.</strong>
+            <strong>Timing:</strong> {WORLD_CUP_BALL_TERMS_TIMING_NOTICE}
           </p>
           <p className="mb-3">
-            <strong>If you win:</strong> you must complete the prize delivery form with your full name, email, UK mobile
-            number, and UK postal address so we can ship the football. Entrants aged <strong>{WORLD_CUP_BALL_MIN_AGE}–17</strong>{' '}
-            must also provide a parent or legal guardian&apos;s name, mobile number, and UK delivery address.{' '}
-            {WORLD_CUP_BALL_WINNER_DETAILS_NOTICE} {WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}
+            <strong>Salvage question:</strong> {WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE}
+          </p>
+          <p className="mb-3">
+            <strong>If you do not win:</strong> {WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}
+          </p>
+          <p className="mb-3">
+            <strong>If you win:</strong> {WORLD_CUP_BALL_TERMS_WIN_NOTICE} {WORLD_CUP_BALL_WINNER_DETAILS_NOTICE}{' '}
+            {WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}
           </p>
           <p className="mb-3">
             <strong>Winner photography:</strong> {WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY} See also{' '}

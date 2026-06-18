@@ -17,7 +17,7 @@ export const WORLD_CUP_BALL_GIVEAWAY_PATH = '/world-cup-ball-giveaway'
 export const WORLD_CUP_BALL_PRIZE_TITLE = 'Official-style FIFA World Cup ball'
 
 export const WORLD_CUP_BALL_PRIZE_DETAIL =
-  'One official-style FIFA World Cup football (2026 tournament design, not signed). Awarded outright to the first entrant who answers all skill questions correctly within the time limits.'
+  'One official-style FIFA World Cup football (2026 tournament design, not signed). Awarded outright when you win the skill quiz — including via a successful salvage question after one wrong answer.'
 
 export const WORLD_CUP_BALL_PRIZE_IMAGE_ALT =
   'Official-style FIFA World Cup ball on grass — white panel with blue 26 and Trionda branding.'
@@ -37,6 +37,12 @@ export const WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS = 5
 
 /** Second timeout ends the attempt immediately. */
 export const WORLD_CUP_BALL_MAX_TIMEOUTS = 1
+
+/** One incorrect answer triggers a salvage bonus question instead of instant loss. */
+export const WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE = 1
+
+export const WORLD_CUP_BALL_SALVAGE_NOTICE =
+  'One incorrect answer? You receive one bonus salvage question — answer it correctly to still win the ball. Two or more incorrect answers end your attempt.'
 
 /** Minimum multiple-choice (four-option) bonus questions per quiz. */
 export const WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS = 2
@@ -199,6 +205,50 @@ export function validateWorldCupBallAnswers(answers, questionKeys) {
     if (!ok) results.allCorrect = false
   }
   return results
+}
+
+export function countWorldCupBallWrongAnswers(validation, questionKeys) {
+  return (questionKeys || []).filter((key) => !validation.perQuestion[key]).length
+}
+
+/** @param {Record<string, string>} answers @param {string[]} questionKeys */
+export function buildWorldCupBallWrongReview(answers, questionKeys) {
+  const validation = validateWorldCupBallAnswers(answers, questionKeys)
+  const wrong = []
+  for (const key of questionKeys || []) {
+    if (validation.perQuestion[key]) continue
+    const q = bankByKey.get(key)
+    wrong.push({
+      questionKey: key,
+      prompt: q?.prompt || key,
+      yourAnswer: String(answers?.[key] ?? '').trim() || '(no answer)',
+    })
+  }
+  return wrong
+}
+
+/** Pick a bonus salvage question outside the quiz set (prefers multiple-choice). */
+export function pickWorldCupBallSalvageQuestion(excludedKeys) {
+  const excluded = new Set(excludedKeys || [])
+  const pool = WORLD_CUP_BALL_QUESTION_BANK.filter((q) => !excluded.has(q.questionKey))
+  const mc = pool.filter((q) => Array.isArray(q.choices) && q.choices.length >= 4)
+  const candidates = mc.length ? mc : pool
+  if (!candidates.length) return null
+  return candidates[Math.floor(Math.random() * candidates.length)]
+}
+
+export function publicWorldCupBallQuestion(questionKey) {
+  const q = bankByKey.get(questionKey)
+  if (!q) return null
+  const row = {
+    questionKey: q.questionKey,
+    prompt: q.prompt,
+    sortOrder: 0,
+  }
+  if (Array.isArray(q.choices) && q.choices.length > 0) {
+    row.choices = [...q.choices]
+  }
+  return row
 }
 
 export function isWorldCupBallDisqualifiedByTimeouts(timeoutsUsed) {

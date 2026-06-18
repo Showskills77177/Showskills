@@ -24,7 +24,14 @@ import {
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_MAX_TIMEOUTS,
+  WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE,
+  countWorldCupBallWrongAnswers,
+  buildWorldCupBallWrongReview,
+  pickWorldCupBallSalvageQuestion,
+  publicWorldCupBallQuestion,
+  getWorldCupBallQuestionsByKeys,
 } from '../../../shared/worldCupBallGiveaway.mjs'
+import { answerMatchesWorldCupBallAnswer } from '../../../shared/worldCupBallAnswerMatching.mjs'
 import {
   createWorldCupBallSession,
   getWorldCupBallSession,
@@ -36,11 +43,13 @@ import {
   hasWorldCupBallWinnerClaim,
   recordWorldCupBallWinner,
   markWorldCupBallWinnerEmailSent,
+  saveWorldCupBallSalvageOffer,
 } from '../lib/worldCupBallSchema.mjs'
 import { sendWorldCupBallWinnerEmail } from '../lib/sendWorldCupBallWinnerEmail.mjs'
 import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs'
 import { resolveSiteUrl } from '../lib/resendConfig.mjs'
 import { WORLD_CUP_BALL_MIN_AGE } from '../../../shared/worldCupBallGiveawayRules.mjs'
+import { isWorldCupBallLocalDevBypass } from '../lib/worldCupBallDev.mjs'
 
 function sessionExpired(startedAt) {
   const start = new Date(startedAt).getTime()
@@ -51,6 +60,28 @@ function sessionExpired(startedAt) {
 
 function newClaimToken() {
   return randomBytes(24).toString('hex')
+}
+
+function parseSessionAnswers(session) {
+  const raw = session?.answers_json
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
+async function resolveWorldCupBallWinStatus() {
+  const winners = await countWorldCupBallWinners()
+  if (!isWorldCupBallLocalDevBypass() && winners >= 1) {
+    return { status: 'lost', claimToken: null }
+  }
+  return { status: 'won', claimToken: newClaimToken() }
 }
 
 async function enforceVpnAndDevice(req, res, flow) {
@@ -67,23 +98,25 @@ async function enforceVpnAndDevice(req, res, flow) {
   }
 
   const ip = clientIp(req)
-  const attempts = await countWorldCupBallFinalizedAttemptsByIp(ip)
-  if (attempts >= MAX_WORLD_CUP_BALL_PER_DEVICE) {
-    await logEntryAttempt(req, {
-      competition: COMPETITION_WORLD_CUP_BALL,
-      flow,
-      ip,
-      outcome: 'blocked',
-      blockReason: 'device_used',
-    })
-    json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallDeviceUsed, code: 'device_used' })
-    return false
-  }
+  if (!isWorldCupBallLocalDevBypass()) {
+    const attempts = await countWorldCupBallFinalizedAttemptsByIp(ip)
+    if (attempts >= MAX_WORLD_CUP_BALL_PER_DEVICE) {
+      await logEntryAttempt(req, {
+        competition: COMPETITION_WORLD_CUP_BALL,
+        flow,
+        ip,
+        outcome: 'blocked',
+        blockReason: 'device_used',
+      })
+      json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallDeviceUsed, code: 'device_used' })
+      return false
+    }
 
-  const winners = await countWorldCupBallWinners()
-  if (winners >= 1) {
-    json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAlreadyWon, code: 'prize_claimed' })
-    return false
+    const winners = await countWorldCupBallWinners()
+    if (winners >= 1) {
+      json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAlreadyWon, code: 'prize_claimed' })
+      return false
+    }
   }
 
   return true
@@ -199,6 +232,7 @@ export async function submitWorldCupBallQuiz(req, res) {
   const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
   const timeoutsUsed = Number(body.timeoutsUsed)
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
+  const salvageAnswer = typeof body.salvageAnswer === 'string' ? body.salvageAnswer.trim() : ''
 
   if (!sessionId) return json(res, 400, { error: 'sessionId required' })
 
@@ -216,38 +250,127 @@ export async function submitWorldCupBallQuiz(req, res) {
     await finalizeWorldCupBallSession({
       sessionId,
       status: 'expired',
-      timeoutsUsed: Number.isFinite(timeoutsUsed) ? timeoutsUsed : 0,
-      answers,
+      timeoutsUsed: Number.isFinite(timeoutsUsed) ? timeoutsUsed : session.timeouts_used ?? 0,
+      answers: parseSessionAnswers(session),
     })
     return json(res, 400, { error: FREE_ENTRY_ERRORS.worldCupBallInvalidSession, code: 'session_expired' })
   }
 
-  const disqualified = isWorldCupBallDisqualifiedByTimeouts(timeoutsUsed)
   const questionKeys = parseWorldCupBallSessionQuestionKeys(session)
   if (!questionKeys || questionKeys.length !== WORLD_CUP_BALL_QUESTION_COUNT) {
     return json(res, 400, { error: FREE_ENTRY_ERRORS.worldCupBallInvalidSession, code: 'invalid_session' })
   }
+
+  const effectiveTimeouts = Number.isFinite(timeoutsUsed)
+    ? timeoutsUsed
+    : Number(session.timeouts_used) || 0
+  const disqualified = isWorldCupBallDisqualifiedByTimeouts(effectiveTimeouts)
+
+  if (salvageAnswer && session.salvage_question_key) {
+    const mainAnswers = parseSessionAnswers(session)
+    const validation = validateWorldCupBallAnswers(mainAnswers, questionKeys)
+    const wrongCount = countWorldCupBallWrongAnswers(validation, questionKeys)
+    const salvageQ = getWorldCupBallQuestionsByKeys([session.salvage_question_key])[0]
+    const salvageCorrect =
+      salvageQ && answerMatchesWorldCupBallAnswer(salvageAnswer, salvageQ.acceptedAnswers)
+    const wrongReview = buildWorldCupBallWrongReview(mainAnswers, questionKeys)
+
+    let status = 'lost'
+    let claimToken = null
+    if (!disqualified && wrongCount === WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE && salvageCorrect) {
+      ;({ status, claimToken } = await resolveWorldCupBallWinStatus())
+    } else if (disqualified) {
+      status = 'disqualified'
+    }
+
+    try {
+      await finalizeWorldCupBallSession({
+        sessionId,
+        status,
+        timeoutsUsed: effectiveTimeouts,
+        answers: mainAnswers,
+        claimToken,
+      })
+
+      await logEntryAttempt(req, {
+        competition: COMPETITION_WORLD_CUP_BALL,
+        flow: 'world_cup_ball_submit',
+        ip,
+        outcome: status,
+        metadata: {
+          session_id: sessionId,
+          salvage: true,
+          salvage_correct: salvageCorrect,
+          wrong_count: wrongCount,
+        },
+      })
+
+      return json(res, 200, {
+        ok: true,
+        result: status,
+        allCorrect: status === 'won',
+        disqualified,
+        claimToken: status === 'won' ? claimToken : null,
+        wrongReview: status === 'won' ? [] : wrongReview,
+        salvageCorrect,
+      })
+    } catch (e) {
+      console.error(e)
+      return json(res, 500, { error: 'Could not save quiz result' })
+    }
+  }
+
   const validation = validateWorldCupBallAnswers(answers, questionKeys)
+  const wrongCount = countWorldCupBallWrongAnswers(validation, questionKeys)
   const won = !disqualified && validation.allCorrect
 
   let status = 'lost'
   let claimToken = null
-  if (disqualified) status = 'disqualified'
-  else if (won) {
-    const winners = await countWorldCupBallWinners()
-    if (winners >= 1) {
+  if (disqualified) {
+    status = 'disqualified'
+  } else if (won) {
+    ;({ status, claimToken } = await resolveWorldCupBallWinStatus())
+  } else if (
+    wrongCount === WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE &&
+    !session.salvage_question_key
+  ) {
+    const salvage = pickWorldCupBallSalvageQuestion(questionKeys)
+    if (!salvage) {
       status = 'lost'
     } else {
-      status = 'won'
-      claimToken = newClaimToken()
+      try {
+        await saveWorldCupBallSalvageOffer({
+          sessionId,
+          answers,
+          timeoutsUsed: effectiveTimeouts,
+          salvageQuestionKey: salvage.questionKey,
+        })
+        return json(res, 200, {
+          ok: true,
+          result: 'salvage_bonus',
+          allCorrect: false,
+          disqualified: false,
+          wrongCount,
+          salvageQuestion: publicWorldCupBallQuestion(salvage.questionKey),
+          claimToken: null,
+        })
+      } catch (e) {
+        console.error(e)
+        return json(res, 500, { error: 'Could not save quiz result' })
+      }
     }
   }
+
+  const wrongReview =
+    status === 'lost' || status === 'disqualified'
+      ? buildWorldCupBallWrongReview(answers, questionKeys)
+      : []
 
   try {
     await finalizeWorldCupBallSession({
       sessionId,
       status,
-      timeoutsUsed: Number.isFinite(timeoutsUsed) ? timeoutsUsed : 0,
+      timeoutsUsed: effectiveTimeouts,
       answers,
       claimToken,
     })
@@ -261,6 +384,7 @@ export async function submitWorldCupBallQuiz(req, res) {
         session_id: sessionId,
         all_correct: validation.allCorrect,
         disqualified,
+        wrong_count: wrongCount,
       },
     })
 
@@ -270,6 +394,8 @@ export async function submitWorldCupBallQuiz(req, res) {
       allCorrect: validation.allCorrect,
       disqualified,
       claimToken: status === 'won' ? claimToken : null,
+      wrongReview,
+      wrongCount,
     })
   } catch (e) {
     console.error(e)
@@ -429,21 +555,23 @@ export async function claimWorldCupBallPrize(req, res) {
   const phoneKey = phoneCheck.phone.replace(/\D/g, '')
   const addressKey = buildNameAddressKey({ fullName, ...address })
 
-  if (await hasWorldCupBallWinnerClaim(nameKey, phoneKey, addressKey)) {
-    const nameRow = await query(`SELECT 1 FROM world_cup_ball_winners WHERE name_key = $1`, [nameKey])
-    if (nameRow.rows[0]) {
-      return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallNameUsed, code: 'name_used' })
+  if (!isWorldCupBallLocalDevBypass()) {
+    if (await hasWorldCupBallWinnerClaim(nameKey, phoneKey, addressKey)) {
+      const nameRow = await query(`SELECT 1 FROM world_cup_ball_winners WHERE name_key = $1`, [nameKey])
+      if (nameRow.rows[0]) {
+        return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallNameUsed, code: 'name_used' })
+      }
+      const phoneRow = await query(`SELECT 1 FROM world_cup_ball_winners WHERE phone_key = $1`, [phoneKey])
+      if (phoneRow.rows[0]) {
+        return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallPhoneUsed, code: 'phone_used' })
+      }
+      return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAddressUsed, code: 'address_used' })
     }
-    const phoneRow = await query(`SELECT 1 FROM world_cup_ball_winners WHERE phone_key = $1`, [phoneKey])
-    if (phoneRow.rows[0]) {
-      return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallPhoneUsed, code: 'phone_used' })
-    }
-    return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAddressUsed, code: 'address_used' })
-  }
 
-  const winners = await countWorldCupBallWinners()
-  if (winners >= 1) {
-    return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAlreadyWon, code: 'prize_claimed' })
+    const winners = await countWorldCupBallWinners()
+    if (winners >= 1) {
+      return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAlreadyWon, code: 'prize_claimed' })
+    }
   }
 
   try {

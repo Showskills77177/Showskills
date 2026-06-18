@@ -241,6 +241,11 @@ if (devPeriod) {
   console.log(`[competition] Local dev entry period open: ${devPeriod.id}`)
 }
 
+const { isWorldCupBallLocalDevBypass } = await import('./backend/api/lib/worldCupBallDev.mjs')
+if (isWorldCupBallLocalDevBypass()) {
+  console.log('[world-cup-ball] Local dev bypass on — repeat quiz attempts and test wins allowed')
+}
+
 const server = app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })

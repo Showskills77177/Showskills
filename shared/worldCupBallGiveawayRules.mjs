@@ -7,6 +7,7 @@ import {
   WORLD_CUP_BALL_MAX_TIMEOUTS,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS,
+  WORLD_CUP_BALL_SALVAGE_NOTICE,
 } from './worldCupBallGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from './worldCupBallPhotography.mjs'
@@ -22,10 +23,22 @@ export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
   `Open to UK residents aged ${WORLD_CUP_BALL_MIN_AGE} or over. This is a free skill challenge, not gambling or a lottery. One quiz attempt per person/device. VPNs, proxies, and similar anonymising tools are not allowed. Entrants aged 16 or 17 may take part, but prize delivery must go to a parent or legal guardian’s UK postal address with their contact details (see Winner details below).`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
-  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — under strict time limits — to win outright. There is no random draw: every answer must be correct, and you only get one attempt. At least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} questions are a bonus with four multiple-choice options; the rest are free-text. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
+  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — under strict time limits — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. You get one quiz attempt per device. At least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} questions are multiple-choice bonus questions with four options; the rest are free-text. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
 
 export const WORLD_CUP_BALL_SKILL_NOTICE =
-  'This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. One wrong answer, a second timeout, or use of a VPN means you do not win the ball.'
+  'This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second timeout, or use of a VPN means you do not win the ball.'
+
+export const WORLD_CUP_BALL_TERMS_TIMING_NOTICE =
+  `Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. The first time you exceed the limit on a question, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. A second timeout on any question disqualifies your attempt. You have one quiz attempt per device. VPNs and proxies are not allowed.`
+
+export const WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE =
+  `If you answer exactly one of the ${WORLD_CUP_BALL_QUESTION_COUNT} main questions incorrectly, you receive one bonus salvage question that was not part of your original quiz. ${WORLD_CUP_BALL_SALVAGE_NOTICE} The salvage question is subject to the same time limits. Two or more incorrect answers in the main quiz end your attempt without a salvage question.`
+
+export const WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE =
+  'If you do not win, we show you which main quiz questions you answered incorrectly and the answers you submitted. This feedback is displayed to you in your browser during the attempt only — it is not emailed automatically.'
+
+export const WORLD_CUP_BALL_TERMS_WIN_NOTICE =
+  `If you win (including after a successful salvage question), you must complete the prize delivery form with your full name, email, UK mobile number, and UK postal address so we can ship the football. Entrants aged ${WORLD_CUP_BALL_MIN_AGE}–17 must also provide a parent or legal guardian's name, mobile number, and UK delivery address.`
 
 export const WORLD_CUP_BALL_WINNER_DETAILS_NOTICE =
   `If you win, you must complete the prize delivery form straight away with your full name, email, UK mobile number, and UK postal address so we can ship the ball (${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE.toLowerCase()}). Entrants aged 16 or 17 must also provide a parent or legal guardian’s full name, mobile number, and UK delivery address. We send a formal winner email to the address you provide. That email includes a personal link so you can return to the form if you need to finish later — once your details are saved, the link confirms delivery information is on file. Each name, email, mobile number, and postal address may only be used once for this giveaway. If you do not provide your details, we cannot send the prize.`
@@ -39,7 +52,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
     num: 1,
     title: 'Read the rules and start the challenge',
     detail:
-      `Open the timed quiz from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy. You get exactly one attempt at all ${WORLD_CUP_BALL_QUESTION_COUNT} questions — there are no second chances.`,
+      `Open the timed quiz from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy. You get exactly one quiz attempt per device on the main ${WORLD_CUP_BALL_QUESTION_COUNT} questions.`,
   },
   {
     num: 2,
@@ -48,15 +61,15 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   },
   {
     num: 3,
-    title: 'Win only if every answer is correct',
+    title: 'Win only if every answer is correct (one salvage chance)',
     detail:
-      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct. One incorrect answer means you do not win. There is no consolation prize and no random draw — this is a pure skill test.`,
+      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct to win outright. If you get exactly one answer wrong, you receive one bonus salvage question — answer it correctly and you still win. Two or more wrong answers mean you do not win. There is no consolation prize and no random draw.`,
   },
   {
     num: 4,
     title: 'Complete the winner delivery form',
     detail:
-      `If — and only if — you answer all ${WORLD_CUP_BALL_QUESTION_COUNT} questions correctly, you win the ball immediately. You must then enter your name, email, mobile number, and UK delivery address on the winner form. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} If you are 16 or 17, also enter your parent or guardian’s delivery details. We email you a confirmation with a link to return to the form if needed.`,
+      `If you win (including after one wrong answer and a successful salvage question), complete the winner delivery form with your name, email, mobile number, and UK delivery address. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} If you are 16 or 17, also enter your parent or guardian's delivery details. We email you a confirmation with a link to return to the form if needed. If you do not win, we show which questions you missed.`,
   },
   {
     num: 5,
@@ -80,7 +93,15 @@ export const WORLD_CUP_BALL_RULES_SECTIONS = [
   },
   {
     title: 'Timing',
-    body: `You have ${WORLD_CUP_BALL_QUESTION_SECONDS} seconds per question. The first time you exceed the limit, you receive ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} extra seconds on that question only. A second timeout on any question disqualifies your attempt.`,
+    body: WORLD_CUP_BALL_TERMS_TIMING_NOTICE,
+  },
+  {
+    title: 'Salvage question (one wrong answer)',
+    body: WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
+  },
+  {
+    title: 'If you do not win',
+    body: WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
   },
   {
     title: 'Winner details & delivery',

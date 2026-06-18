@@ -35,6 +35,7 @@ import { ShirtGiveawaySocialFollow } from './ShirtGiveawaySocialFollow'
 import { ShirtGiveawayJerseyImagery } from './ShirtGiveawayJerseyImagery'
 import { WorldCupBallQuiz } from './WorldCupBallQuiz'
 import { WorldCupBallClaimForm } from './WorldCupBallClaimForm'
+import { WorldCupBallWrongReview } from './WorldCupBallWrongReview'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
 import {
   WORLD_CUP_BALL_GIVEAWAY_LABEL,
@@ -933,8 +934,10 @@ export function EntryModal() {
               />
               <p className="text-sm leading-relaxed text-stone-400">
                 <strong className="text-amber-100/90">Free skill giveaway:</strong> {WORLD_CUP_BALL_PRIZE_TITLE}. Answer
-                all {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within the time limits to win outright — one attempt only.
-                {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Open to UK residents aged {WORLD_CUP_BALL_MIN_AGE}+. VPNs are not permitted.
+                Answer all {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within the time limits to win
+                outright — or get exactly one wrong and answer the bonus salvage question correctly. One main quiz attempt per
+                device. {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Open to UK residents aged {WORLD_CUP_BALL_MIN_AGE}+. VPNs are not
+                permitted.
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}
@@ -994,8 +997,11 @@ export function EntryModal() {
                   <p className="mt-2">
                     {wcBallOutcome.result === 'disqualified'
                       ? 'You ran out of time twice. Under the rules, your single attempt has ended.'
-                      : 'At least one answer was incorrect. This is a strict skill test — every answer must be correct to win the ball.'}
+                      : wcBallOutcome.salvageCorrect === false
+                        ? 'Your bonus salvage answer was incorrect, so you do not win the ball on this attempt.'
+                        : 'You did not answer every question correctly. See the questions you missed below.'}
                   </p>
+                  <WorldCupBallWrongReview wrongReview={wcBallOutcome.wrongReview} />
                 </div>
               ) : (
                 <div className="mt-4">

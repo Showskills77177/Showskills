@@ -20,7 +20,8 @@ export async function ensureWorldCupBallSchema() {
         combination_index INTEGER,
         started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         submitted_at TIMESTAMPTZ,
-        claimed_at TIMESTAMPTZ
+        claimed_at TIMESTAMPTZ,
+        salvage_question_key TEXT
       )
     `)
     await query(
@@ -63,7 +64,8 @@ export async function ensureWorldCupBallSchema() {
         combination_index INTEGER,
         started_at TEXT NOT NULL DEFAULT (datetime('now')),
         submitted_at TEXT,
-        claimed_at TEXT
+        claimed_at TEXT,
+        salvage_question_key TEXT
       )
     `)
     await query(
@@ -97,6 +99,7 @@ export async function ensureWorldCupBallSchema() {
     await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS winner_email_resend_id TEXT`)
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS question_keys_json JSONB`)
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS combination_index INTEGER`)
+    await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS salvage_question_key TEXT`)
   } else {
     try {
       await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN email TEXT`)
@@ -120,6 +123,11 @@ export async function ensureWorldCupBallSchema() {
     }
     try {
       await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN combination_index INTEGER`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN salvage_question_key TEXT`)
     } catch {
       /* column exists */
     }
@@ -190,6 +198,15 @@ export async function hasWorldCupBallWinnerClaim(nameKey, phoneKey, addressKey) 
     [nameKey, phoneKey, addressKey],
   )
   return Boolean(r.rows[0])
+}
+
+export async function saveWorldCupBallSalvageOffer({ sessionId, answers, timeoutsUsed, salvageQuestionKey }) {
+  await ensureWorldCupBallSchema()
+  const answersJson = JSON.stringify(answers ?? {})
+  await query(
+    `UPDATE world_cup_ball_sessions SET answers_json = $2, timeouts_used = $3, salvage_question_key = $4 WHERE id = $1 AND status = 'in_progress'`,
+    [sessionId, answersJson, timeoutsUsed, salvageQuestionKey],
+  )
 }
 
 export async function finalizeWorldCupBallSession({

@@ -3,6 +3,9 @@ import { describe, it } from 'node:test'
 import {
   validateWorldCupBallAnswers,
   isWorldCupBallDisqualifiedByTimeouts,
+  buildWorldCupBallWrongReview,
+  pickWorldCupBallSalvageQuestion,
+  countWorldCupBallWrongAnswers,
   WORLD_CUP_BALL_QUESTION_BANK,
 } from './worldCupBallGiveaway.mjs'
 
@@ -24,5 +27,23 @@ describe('worldCupBallGiveaway', () => {
     assert.equal(isWorldCupBallDisqualifiedByTimeouts(0), false)
     assert.equal(isWorldCupBallDisqualifiedByTimeouts(1), false)
     assert.equal(isWorldCupBallDisqualifiedByTimeouts(2), true)
+  })
+
+  it('builds wrong-answer review rows', () => {
+    const questionKeys = WORLD_CUP_BALL_QUESTION_BANK.slice(0, 10).map((q) => q.questionKey)
+    const answers = Object.fromEntries(questionKeys.map((key) => [key, 'wrong']))
+    answers[questionKeys[0]] = WORLD_CUP_BALL_QUESTION_BANK[0].acceptedAnswers[0]
+    const validation = validateWorldCupBallAnswers(answers, questionKeys)
+    assert.equal(countWorldCupBallWrongAnswers(validation, questionKeys), 9)
+    const review = buildWorldCupBallWrongReview(answers, questionKeys)
+    assert.equal(review.length, 9)
+    assert.match(review[0].prompt, /./)
+  })
+
+  it('picks salvage question outside quiz set', () => {
+    const questionKeys = WORLD_CUP_BALL_QUESTION_BANK.slice(0, 10).map((q) => q.questionKey)
+    const salvage = pickWorldCupBallSalvageQuestion(questionKeys)
+    assert.ok(salvage)
+    assert.equal(questionKeys.includes(salvage.questionKey), false)
   })
 })
