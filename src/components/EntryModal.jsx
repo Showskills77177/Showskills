@@ -1020,7 +1020,11 @@ export function EntryModal() {
                   />
                 </div>
               )}
-              {wcBallError ? <ErrorBanner message={wcBallError} /> : null}
+              {wcBallError ? (
+                <div className="mt-2.5">
+                  <ErrorBanner message={wcBallError} />
+                </div>
+              ) : null}
             </>
           ) : null}
 
