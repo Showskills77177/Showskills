@@ -47,8 +47,9 @@ import {
 import {
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
   WORLD_CUP_BALL_MIN_AGE,
+  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
+  WORLD_CUP_BALL_SKILL_NOTICE,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
-import { WORLD_CUP_BALL_SKILL_NOTICE } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { saveWorldCupBallSession } from '../lib/worldCupBallSession.mjs'
 
 export function EntryModal() {
@@ -933,11 +934,11 @@ export function EntryModal() {
                 className="mx-auto mb-6 w-full max-w-[14rem]"
               />
               <p className="text-sm leading-relaxed text-stone-400">
-                <strong className="text-amber-100/90">Free skill giveaway:</strong> {WORLD_CUP_BALL_PRIZE_TITLE}. Answer
-                Answer all {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within the time limits to win
-                outright — or get exactly one wrong and answer the bonus salvage question correctly. One main quiz attempt per
-                device. {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Open to UK residents aged {WORLD_CUP_BALL_MIN_AGE}+. VPNs are not
-                permitted.
+                <strong className="text-amber-100/90">Free skill giveaway:</strong> {WORLD_CUP_BALL_PRIZE_TITLE}. Answer all{' '}
+                {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within the time limits to win outright
+                — or get exactly one wrong and answer the bonus salvage question correctly.{' '}
+                {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Open to UK residents
+                aged {WORLD_CUP_BALL_MIN_AGE}+. VPNs are not permitted.
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}

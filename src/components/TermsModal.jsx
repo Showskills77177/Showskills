@@ -20,6 +20,7 @@ import {
   WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
   WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
   WORLD_CUP_BALL_TERMS_WIN_NOTICE,
+  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from '../../shared/worldCupBallPhotography.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
@@ -96,9 +97,9 @@ function PrivacyPolicySection() {
         </li>
         <li>Answers to skill-based questions (paid entries after purchase and free postal or giveaway routes)</li>
         <li>
-          <strong>World Cup Ball Giveaway:</strong> quiz answers, device and IP checks for one attempt per device, and —
-          if you do not win — which questions you answered incorrectly (shown to you in your browser during the attempt
-          only)
+          <strong>World Cup Ball Giveaway:</strong> quiz answers, connection (IP address) checks for one attempt per
+          connection, and — if you do not win — which questions you answered incorrectly (shown to you in your browser
+          during the attempt only)
         </li>
         <li>Postal address (only if you submit a free postal entry)</li>
         <li>
@@ -451,6 +452,9 @@ export function TermsModal({ open, onClose }) {
           </p>
           <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/20 px-3 py-2.5 text-zinc-200">
             <strong>Free UK delivery:</strong> {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}
+          </p>
+          <p className="mb-3 rounded-lg border border-stone-700/45 bg-stone-900/35 px-3 py-2.5 text-zinc-200">
+            <strong>One attempt per connection:</strong> {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE}
           </p>
           <p className="mb-3">
             <strong>Timing:</strong> {WORLD_CUP_BALL_TERMS_TIMING_NOTICE}

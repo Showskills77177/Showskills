@@ -29,6 +29,7 @@ import {
   WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
   WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
   WORLD_CUP_BALL_TERMS_WIN_NOTICE,
+  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
 } from './worldCupBallGiveawayRules.mjs'
 import { worldCupBallPhotographyFaqAnswer } from './worldCupBallPhotography.mjs'
 
@@ -354,10 +355,15 @@ export const FAQ_SECTIONS = [
         answer: worldCupBallPhotographyFaqAnswer(),
       },
       {
+        id: 'wc-ball-connection',
+        question: 'Can I try on my phone and my computer?',
+        answer: WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
+      },
+      {
         id: 'wc-ball-attempts',
         question: 'Can I try again if I fail?',
         answer:
-          `You get one main quiz attempt per device. ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE} Two or more wrong answers, a failed salvage answer, a second timeout, or VPN use ends your attempt under the published rules.`,
+          `${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE} Two or more wrong answers, a failed salvage answer, a second timeout, or VPN use ends your attempt under the published rules.`,
       },
     ],
   },

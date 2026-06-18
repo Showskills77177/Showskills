@@ -34,7 +34,7 @@ export function WorldCupBallGiveawayCard({ onEnter, className = '' }) {
           {WORLD_CUP_BALL_PRIZE_TITLE} — beat the clock, nail all {WORLD_CUP_BALL_QUESTION_COUNT} answers, take the ball home.
         </p>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <span className="ss-world-cup-ball-card__pill">1 attempt</span>
+          <span className="ss-world-cup-ball-card__pill">1 per connection</span>
           <span className="ss-world-cup-ball-card__pill">{WORLD_CUP_BALL_QUESTION_SECONDS}s each</span>
           <span className="ss-world-cup-ball-card__pill ss-world-cup-ball-card__pill--gold">No draw</span>
         </div>

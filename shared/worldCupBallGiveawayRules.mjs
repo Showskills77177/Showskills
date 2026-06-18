@@ -16,20 +16,30 @@ export const WORLD_CUP_BALL_GIVEAWAY_PAGE_ID = 'world_cup_ball_giveaway'
 
 export const WORLD_CUP_BALL_MIN_AGE = 16
 
+/** Enforcement is by public IP — Wi‑Fi, hotspot, and mobile data each count as one connection. */
+export const WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT =
+  'One quiz attempt per internet connection (IP address)'
+
+export const WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE =
+  `${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. Devices on the same Wi‑Fi or mobile hotspot share that limit — you cannot take separate attempts on a phone and a PC using the same connection.`
+
+export const WORLD_CUP_BALL_CONNECTION_USED_ERROR =
+  'This internet connection has already been used for the World Cup Ball Giveaway. Only one quiz attempt is allowed per IP address (shared Wi‑Fi or hotspot counts as one connection).'
+
 export const WORLD_CUP_BALL_FREE_SHIPPING_NOTICE =
   'Prize delivery is free within the United Kingdom. We ship the official-style World Cup football to the UK postal address you provide after you win — there is no delivery charge for the winner.'
 
 export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
-  `Open to UK residents aged ${WORLD_CUP_BALL_MIN_AGE} or over. This is a free skill challenge, not gambling or a lottery. One quiz attempt per person/device. VPNs, proxies, and similar anonymising tools are not allowed. Entrants aged 16 or 17 may take part, but prize delivery must go to a parent or legal guardian’s UK postal address with their contact details (see Winner details below).`
+  `Open to UK residents aged ${WORLD_CUP_BALL_MIN_AGE} or over. This is a free skill challenge, not gambling or a lottery. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} VPNs, proxies, and similar anonymising tools are not allowed. Entrants aged 16 or 17 may take part, but prize delivery must go to a parent or legal guardian’s UK postal address with their contact details (see Winner details below).`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
-  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — under strict time limits — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. You get one quiz attempt per device. At least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} questions are multiple-choice bonus questions with four options; the rest are free-text. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
+  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — under strict time limits — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. At least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} questions are multiple-choice bonus questions with four options; the rest are free-text. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
 
 export const WORLD_CUP_BALL_SKILL_NOTICE =
   'This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second timeout, or use of a VPN means you do not win the ball.'
 
 export const WORLD_CUP_BALL_TERMS_TIMING_NOTICE =
-  `Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. The first time you exceed the limit on a question, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. A second timeout on any question disqualifies your attempt. You have one quiz attempt per device. VPNs and proxies are not allowed.`
+  `Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. The first time you exceed the limit on a question, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. A second timeout on any question disqualifies your attempt. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. VPNs and proxies are not allowed.`
 
 export const WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE =
   `If you answer exactly one of the ${WORLD_CUP_BALL_QUESTION_COUNT} main questions incorrectly, you receive one bonus salvage question that was not part of your original quiz. ${WORLD_CUP_BALL_SALVAGE_NOTICE} The salvage question is subject to the same time limits. Two or more incorrect answers in the main quiz end your attempt without a salvage question.`
@@ -52,7 +62,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
     num: 1,
     title: 'Read the rules and start the challenge',
     detail:
-      `Open the timed quiz from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy. You get exactly one quiz attempt per device on the main ${WORLD_CUP_BALL_QUESTION_COUNT} questions.`,
+      `Open the timed quiz from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT} on the main ${WORLD_CUP_BALL_QUESTION_COUNT} questions.`,
   },
   {
     num: 2,
@@ -102,6 +112,10 @@ export const WORLD_CUP_BALL_RULES_SECTIONS = [
   {
     title: 'If you do not win',
     body: WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
+  },
+  {
+    title: 'One attempt per connection',
+    body: WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
   },
   {
     title: 'Winner details & delivery',

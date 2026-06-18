@@ -1,3 +1,5 @@
+import { WORLD_CUP_BALL_CONNECTION_USED_ERROR } from './worldCupBallGiveawayRules.mjs'
+
 /** Anti-abuse limits for free competition entry routes. */
 
 export const COMPETITION_LEGACY_BUNDLE = 'ronaldo_legacy_bundle'
@@ -16,7 +18,7 @@ export const MAX_SHIRT_PER_NAME_EMAIL_IP = 1
 /** Shirt giveaway: one attempt block per device/IP (any email or name). */
 export const MAX_SHIRT_PER_DEVICE = 1
 
-/** World Cup ball giveaway: one quiz attempt per device/IP. */
+/** World Cup ball giveaway: one quiz attempt per connection/IP. */
 export const MAX_WORLD_CUP_BALL_PER_DEVICE = 1
 
 export function normalizePersonName(name) {
@@ -68,8 +70,7 @@ export const FREE_ENTRY_ERRORS = {
     'You have already entered with these details. Only one shirt giveaway entry per name, email, and device.',
   shirtDeviceUsed:
     'This device has already been used to enter the shirt giveaway. Only one entry per device is allowed, even with a different email.',
-  worldCupBallDeviceUsed:
-    'This device has already been used for the World Cup Ball Giveaway. Only one quiz attempt is allowed per device.',
+  worldCupBallDeviceUsed: WORLD_CUP_BALL_CONNECTION_USED_ERROR,
   worldCupBallAlreadyWon:
     'The World Cup ball has already been won. Thank you for taking part.',
   worldCupBallNameUsed:

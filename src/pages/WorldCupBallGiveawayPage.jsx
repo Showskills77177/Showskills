@@ -14,6 +14,7 @@ import {
   WORLD_CUP_BALL_RULES_INTRO,
   WORLD_CUP_BALL_RULES_SECTIONS,
   WORLD_CUP_BALL_SKILL_NOTICE,
+  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
   WORLD_CUP_BALL_GIVEAWAY_PAGE_ID,
   mergeWorldCupBallGiveawayPageLayout,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
@@ -114,8 +115,9 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
                 {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions
               </p>
               <p className="mt-3 text-sm leading-relaxed text-amber-200/70">
-                Answer every question correctly within the time limits to win the ball immediately. One attempt per device.
-                No VPNs. You only share your name, phone, and address if you win.
+                Answer every question correctly within the time limits to win the ball immediately.{' '}
+                {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. No VPNs. You only share your name, phone, and address if
+                you win.
               </p>
               <button
                 type="button"
