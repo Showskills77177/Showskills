@@ -5,14 +5,16 @@ import {
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
-  WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
+  WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_PRACTICE_QUESTION,
   WORLD_CUP_BALL_PRACTICE_INTRO,
   WORLD_CUP_BALL_PRACTICE_TIMER_TIP,
+  WORLD_CUP_BALL_PRACTICE_TYPING_TIP,
   worldCupBallPracticeCompleteTips,
 } from '../../shared/worldCupBallPractice.mjs'
 import { apiUrl } from '../lib/api'
@@ -452,6 +454,9 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-relaxed text-stone-400">{WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}</p>
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
+          {WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}
+        </p>
+        <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
         <button
@@ -473,6 +478,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           <p className="font-semibold text-teal-100">Practice — not counted</p>
           <p className="mt-1.5 text-xs leading-relaxed text-stone-300">{WORLD_CUP_BALL_PRACTICE_INTRO}</p>
           <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TIMER_TIP}</p>
+          <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TYPING_TIP}</p>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
           <span className="font-semibold text-amber-100">Practice question</span>
@@ -600,6 +606,10 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
               void submitSalvageAnswer(currentAnswer)
             }}
           >
+            <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Type your answer</p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}</p>
+            </div>
             <input
               type="text"
               autoComplete="off"
@@ -661,7 +671,12 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
             Pick one of the four options below — you do not need to type an answer on this question.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Type your answer</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}</p>
+        </div>
+      )}
       <p className="text-base font-medium leading-snug text-stone-100">{q?.prompt}</p>
       {hasChoices ? (
         <div className="grid gap-2 sm:grid-cols-2">

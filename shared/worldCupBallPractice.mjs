@@ -2,8 +2,8 @@ import {
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_QUESTION_COUNT,
+  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
-  WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
 } from './worldCupBallGiveaway.mjs'
@@ -25,6 +25,9 @@ export const WORLD_CUP_BALL_PRACTICE_BONUS_TIP = `Run out of time once and you g
 export const WORLD_CUP_BALL_PRACTICE_CHOICE_TIP =
   'Some real questions are multiple-choice with four options — tap one to answer instantly, as you did here.'
 
+export const WORLD_CUP_BALL_PRACTICE_TYPING_TIP =
+  'On typed questions in the real test, write your answer however you wish — lowercase, normal capitals, or ALL CAPS all count the same.'
+
 export function worldCupBallPracticeCompleteTips({ timedOutOnce = false, answered = false } = {}) {
   const tips = [WORLD_CUP_BALL_PRACTICE_TIMER_TIP]
   if (timedOutOnce) {
@@ -35,7 +38,8 @@ export function worldCupBallPracticeCompleteTips({ timedOutOnce = false, answere
   }
   tips.push(
     `The real test has ${WORLD_CUP_BALL_QUESTION_COUNT} questions and a ${WORLD_CUP_BALL_SESSION_MAX_MINUTES}-minute session limit.`,
-    WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
+    WORLD_CUP_BALL_PRACTICE_TYPING_TIP,
+    WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
     WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
     WORLD_CUP_BALL_SALVAGE_NOTICE,
   )

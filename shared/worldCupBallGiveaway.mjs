@@ -51,7 +51,11 @@ export const WORLD_CUP_BALL_CHOICE_BONUS_NOTICE =
   'Each quiz includes at least two bonus questions — tap the correct answer from four options instead of typing. All other questions are free-text and must still be answered correctly.'
 
 export const WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE =
-  'Capital letters are optional — type names however you like (lowercase, mixed case, or ALL CAPS).'
+  'Capital letters are optional — write names however you prefer (lowercase, mixed case, or ALL CAPS).'
+
+/** Shown in quiz and entry instructions before free-text questions. */
+export const WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION =
+  'For free-text questions, type your answer however you wish — all lowercase (kane), normal capitals (Kane), or ALL CAPS (KANE). Capital letters are never mandatory, but they are fine if you prefer them. We mark the answer the same either way.'
 
 /** Maximum minutes to finish once a session starts (server-side). */
 export const WORLD_CUP_BALL_SESSION_MAX_MINUTES = 5

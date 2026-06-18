@@ -5,6 +5,7 @@ import {
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_MAX_TIMEOUTS,
+  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS,
@@ -68,7 +69,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   {
     num: 2,
     title: `Answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult questions under time pressure`,
-    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE} Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. Type your answer and move on before time runs out — or tap one of four options on the bonus multiple-choice questions. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. If you run out of time a second time, you are disqualified immediately.`,
+    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. Type your answer and move on before time runs out — or tap one of four options on the bonus multiple-choice questions. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question only. If you run out of time a second time, you are disqualified immediately.`,
   },
   {
     num: 3,

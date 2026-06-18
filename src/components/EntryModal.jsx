@@ -43,6 +43,7 @@ import {
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
@@ -942,6 +943,9 @@ export function EntryModal() {
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}
+              </p>
+              <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
+                {WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_SKILL_NOTICE}

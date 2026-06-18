@@ -18,6 +18,7 @@ import { winnerPhotographyConsentFaqAnswer } from './winnerPhotographyConsent.mj
 import {
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
@@ -337,6 +338,11 @@ export const FAQ_SECTIONS = [
         question: 'How do I win the ball?',
         answer:
           `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or answer exactly one incorrectly and then answer the bonus salvage question correctly. Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question. A second timeout disqualifies you. ${WORLD_CUP_BALL_SALVAGE_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
+      },
+      {
+        id: 'wc-ball-capitals',
+        question: 'Do capital letters matter in my answers?',
+        answer: WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
       },
       {
         id: 'wc-ball-details',
