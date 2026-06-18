@@ -135,6 +135,8 @@ for (const required of [
   '/api/prize-reveal',
   '/api/prize-reveal/image',
   '/api/shirt-prize-reveal',
+  '/api/submissions/world-cup-ball/start',
+  '/api/submissions/world-cup-ball/claim-status',
 ]) {
   if (!mountedPaths.includes(required)) {
     console.error(`[api] FATAL: ${required} missing from dispatch routes`)
