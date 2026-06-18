@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import {
@@ -37,6 +38,7 @@ import { WorldCupBallClaimForm } from './WorldCupBallClaimForm'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
 import {
   WORLD_CUP_BALL_GIVEAWAY_LABEL,
+  WORLD_CUP_BALL_GIVEAWAY_PATH,
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
@@ -939,6 +941,15 @@ export function EntryModal() {
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_SKILL_NOTICE}
+              </p>
+              <p className="mt-3 text-center">
+                <Link
+                  to={WORLD_CUP_BALL_GIVEAWAY_PATH}
+                  onClick={() => closeEntry()}
+                  className="text-sm font-semibold text-amber-400/95 underline underline-offset-2 hover:text-amber-300"
+                >
+                  Full rules &amp; how to win
+                </Link>
               </p>
               {wcBallCheckingVpn ? (
                 <p className="mt-3 text-sm text-stone-500">Checking your connection…</p>

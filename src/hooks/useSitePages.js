@@ -17,6 +17,11 @@ import {
   CONTACT_PAGE_ID,
   SHIRT_GIVEAWAY_PAGE_ID,
 } from '../../shared/sitePageLayout.mjs'
+import {
+  WORLD_CUP_BALL_GIVEAWAY_PAGE_ID,
+  defaultWorldCupBallGiveawayPageLayout,
+  mergeWorldCupBallGiveawayPageLayout,
+} from '../../shared/worldCupBallGiveawayRules.mjs'
 import { usePageEditorDraftPages } from '../pageEditor/PageEditorPreviewContext.jsx'
 import {
   getCachedSitePages,
@@ -30,6 +35,7 @@ const PAGE_LOADERS = {
   [FAQ_PAGE_ID]: () => mergeFaqPageLayout(null),
   [CONTACT_PAGE_ID]: () => mergeContactPageLayout(null),
   [SHIRT_GIVEAWAY_PAGE_ID]: () => mergeShirtGiveawayPageLayout(null),
+  [WORLD_CUP_BALL_GIVEAWAY_PAGE_ID]: () => mergeWorldCupBallGiveawayPageLayout(null),
 }
 
 const PAGE_MERGERS = {
@@ -38,6 +44,7 @@ const PAGE_MERGERS = {
   [FAQ_PAGE_ID]: mergeFaqPageLayout,
   [CONTACT_PAGE_ID]: mergeContactPageLayout,
   [SHIRT_GIVEAWAY_PAGE_ID]: mergeShirtGiveawayPageLayout,
+  [WORLD_CUP_BALL_GIVEAWAY_PAGE_ID]: mergeWorldCupBallGiveawayPageLayout,
 }
 
 function applyPagesPayload(j) {
@@ -155,7 +162,7 @@ export function usePageLayout(pageId) {
     return { layout: merger(draftLayout), loading: false }
   }
 
-  return { layout: layout ?? loader(), loading }
+  return { layout: layout ?? (loader ? loader() : null), loading }
 }
 
 export function useSiteShell() {
