@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { BUNDLE_OFFER_ITEMS, formatBundlePriceGBP, getVisibleTicketBundles } from '../competitionData'
+import { MINIMUM_SALES_POLICY_FOOTNOTE } from '../../shared/competitionMinimumSalesPolicy.mjs'
 
 const PUBLIC_TICKET_BUNDLES = getVisibleTicketBundles()
 import { TicketBundleIcon } from './TicketBundleIcon'
@@ -51,7 +52,7 @@ export function TicketBundlePrice({ className = '', compact = false, style }) {
       </ul>
       <p className="ss-ticket-bundles-footnote mt-auto border-t border-emerald-500/10 pt-2.5 text-xs leading-snug text-stone-400 sm:pt-3 sm:text-sm">
         <span aria-hidden>* </span>
-        All ticket bundles are non-refundable.
+        {MINIMUM_SALES_POLICY_FOOTNOTE}
       </p>
     </div>
   )

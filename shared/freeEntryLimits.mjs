@@ -2,6 +2,7 @@
 
 export const COMPETITION_LEGACY_BUNDLE = 'ronaldo_legacy_bundle'
 export const COMPETITION_SHIRT_GIVEAWAY = 'ronaldo_shirt_giveaway'
+export const COMPETITION_WORLD_CUP_BALL = 'world_cup_ball_giveaway'
 
 /** Max successful free online Legacy entries per normalised name + address. */
 export const MAX_FREE_LEGACY_PER_NAME_ADDRESS = 3
@@ -14,6 +15,9 @@ export const MAX_SHIRT_PER_NAME_EMAIL_IP = 1
 
 /** Shirt giveaway: one attempt block per device/IP (any email or name). */
 export const MAX_SHIRT_PER_DEVICE = 1
+
+/** World Cup ball giveaway: one quiz attempt per device/IP. */
+export const MAX_WORLD_CUP_BALL_PER_DEVICE = 1
 
 export function normalizePersonName(name) {
   return String(name || '')
@@ -64,6 +68,18 @@ export const FREE_ENTRY_ERRORS = {
     'You have already entered with these details. Only one shirt giveaway entry per name, email, and device.',
   shirtDeviceUsed:
     'This device has already been used to enter the shirt giveaway. Only one entry per device is allowed, even with a different email.',
+  worldCupBallDeviceUsed:
+    'This device has already been used for the World Cup Ball Giveaway. Only one quiz attempt is allowed per device.',
+  worldCupBallAlreadyWon:
+    'The World Cup ball has already been won. Thank you for taking part.',
+  worldCupBallNameUsed:
+    'That name has already been used to claim this prize.',
+  worldCupBallPhoneUsed:
+    'That mobile number has already been used to claim this prize.',
+  worldCupBallAddressUsed:
+    'That postal address has already been used to claim this prize.',
+  worldCupBallInvalidSession:
+    'Your quiz session expired or is invalid. Please start again from the rules page.',
   vpnNotAllowed: "We don't allow VPNs. Please turn off your VPN and try again.",
   invalidAddress: 'Please enter your full postal address (line 1, town/city, and postcode).',
   setupRequired: 'Card verification is required to complete your free entry (no charge).',

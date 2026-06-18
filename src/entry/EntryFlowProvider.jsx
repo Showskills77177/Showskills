@@ -13,6 +13,10 @@ import {
   savePaidEntryContact,
 } from '../lib/paidEntryContact'
 import { loadPaidQuizSession, savePaidQuizSession } from '../lib/paidQuizSession'
+import {
+  loadWorldCupBallSession,
+  saveWorldCupBallSession,
+} from '../lib/worldCupBallSession.mjs'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
@@ -29,6 +33,7 @@ import { useSiteShell } from '../hooks/useSitePages'
 import { resolvePublicSocialLinks } from '../../shared/socialLinks.mjs'
 import { SHIRT_GIVEAWAY_SOCIAL_PLATFORMS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
+import { WORLD_CUP_BALL_CLAIM_QUERY_PARAM } from '../../shared/worldCupBallClaim.mjs'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -127,6 +132,14 @@ export function EntryFlowProvider({ children }) {
   const [kickEmailSent, setKickEmailSent] = useState(false)
   const [kickVpnBlocked, setKickVpnBlocked] = useState(false)
   const [kickCheckingVpn, setKickCheckingVpn] = useState(false)
+
+  const [wcBallError, setWcBallError] = useState('')
+  const [wcBallClaimToken, setWcBallClaimToken] = useState('')
+  const [wcBallOutcome, setWcBallOutcome] = useState(null)
+  const [wcBallClaimed, setWcBallClaimed] = useState(false)
+  const [wcBallWinnerEmail, setWcBallWinnerEmail] = useState(null)
+  const [wcBallVpnBlocked, setWcBallVpnBlocked] = useState(false)
+  const [wcBallCheckingVpn, setWcBallCheckingVpn] = useState(false)
 
   /** Avoid sending the unanswered ticket email more than once per checkout. */
   const unansweredTicketEmailRequestedRef = useRef(false)
@@ -274,6 +287,15 @@ export function EntryFlowProvider({ children }) {
       cancelled = true
     }
   }, [paidCompetitionSlug])
+
+  useEffect(() => {
+    const bundles = paidCompetitionMeta?.bundles
+    if (!bundles?.length) return
+    const ids = bundles.map((b) => b.id || b.bundleKey).filter(Boolean)
+    if (ids.includes(paidBundleId)) return
+    const featured = bundles.find((b) => b.featured)
+    setPaidBundleId(featured?.id || featured?.bundleKey || ids[0])
+  }, [paidCompetitionMeta, paidBundleId])
 
   useEffect(() => {
     const routeOk =
@@ -507,6 +529,55 @@ export function EntryFlowProvider({ children }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- email link landing once
 
   useEffect(() => {
+    const claimToken = (searchParams.get(WORLD_CUP_BALL_CLAIM_QUERY_PARAM) || '').trim()
+    if (claimToken.length < 20) return
+
+    const next = new URLSearchParams(searchParams)
+    next.delete(WORLD_CUP_BALL_CLAIM_QUERY_PARAM)
+    setSearchParams(next, { replace: true })
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          apiUrl(`/api/submissions/world-cup-ball/claim-status?token=${encodeURIComponent(claimToken)}`),
+          { credentials: 'include' },
+        )
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setWcBallError(typeof data.error === 'string' ? data.error : 'This winner link is invalid or has expired.')
+          setEntryModalType('worldCupBall')
+          return
+        }
+        setWcBallError('')
+        setWcBallClaimToken(claimToken)
+        setWcBallOutcome({ result: 'won' })
+        if (data.detailsComplete) {
+          setWcBallClaimed(true)
+          setWcBallWinnerEmail({ sent: true, detailsComplete: true, claimUrl: data.claimUrl || null })
+          saveWorldCupBallSession({
+            outcome: { result: 'won' },
+            claimToken,
+            claimed: true,
+            winnerEmail: { sent: true, detailsComplete: true },
+          })
+        } else {
+          setWcBallClaimed(false)
+          setWcBallWinnerEmail(null)
+          saveWorldCupBallSession({
+            outcome: { result: 'won' },
+            claimToken,
+            claimed: false,
+          })
+        }
+        setEntryModalType('worldCupBall')
+      } catch {
+        setWcBallError('Could not open your winner link. Check your connection and try again.')
+        setEntryModalType('worldCupBall')
+      }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- winner email link landing once
+
+  useEffect(() => {
     if (!import.meta.env.DEV) return
     const preview = searchParams.get('preview-quiz')
     if (preview !== 'pending' && preview !== 'answered') return
@@ -586,6 +657,45 @@ export function EntryFlowProvider({ children }) {
         })
         .finally(() => setKickCheckingVpn(false))
     }
+    if (type === 'worldCupBall') {
+      const saved = loadWorldCupBallSession()
+      setWcBallError('')
+      setWcBallVpnBlocked(false)
+      if (saved?.claimed) {
+        setWcBallClaimed(true)
+        setWcBallOutcome(saved.outcome)
+        setWcBallClaimToken(saved.claimToken || '')
+        setWcBallWinnerEmail(saved.winnerEmail || (saved.winnerEmailSent ? { sent: true } : null))
+      } else if (saved?.outcome?.result === 'won' && saved.claimToken) {
+        setWcBallOutcome(saved.outcome)
+        setWcBallClaimToken(saved.claimToken)
+        setWcBallClaimed(false)
+        setWcBallWinnerEmail(null)
+      } else if (saved?.outcome) {
+        setWcBallOutcome(saved.outcome)
+        setWcBallClaimToken('')
+        setWcBallClaimed(false)
+        setWcBallWinnerEmail(null)
+      } else {
+        setWcBallClaimToken('')
+        setWcBallOutcome(null)
+        setWcBallClaimed(false)
+        setWcBallWinnerEmail(null)
+      }
+      setWcBallCheckingVpn(true)
+      void fetch(apiUrl('/api/vpn-check'), { credentials: 'include' })
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok && data.code === 'vpn_not_allowed') {
+            setWcBallVpnBlocked(true)
+            setWcBallError(
+              typeof data.error === 'string' ? data.error : FREE_ENTRY_ERRORS.vpnNotAllowed,
+            )
+          }
+        })
+        .catch(() => {})
+        .finally(() => setWcBallCheckingVpn(false))
+    }
     if (type === 'paid') {
       setPaidError('')
       const session = loadPaidQuizSession()
@@ -664,8 +774,8 @@ export function EntryFlowProvider({ children }) {
 
   const fetchCashflowsIntent = useCallback(
     async ({ signal } = {}) => {
-      const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
-      if (!bundle) throw new Error('Choose a ticket bundle.')
+      const bundle = selectedTicketBundle
+      if (!bundle?.id) throw new Error('Choose a ticket bundle.')
       const res = await fetch(apiUrl(cashflowsCreateApi), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -701,7 +811,15 @@ export function EntryFlowProvider({ children }) {
       }
       return token
     },
-    [paidBundleId, paidCompetitionSlug, paidEmail, paidFullName, paidPhone, paidNewsletterOptIn, cashflowsCreateApi],
+    [
+      selectedTicketBundle,
+      paidCompetitionSlug,
+      paidEmail,
+      paidFullName,
+      paidPhone,
+      paidNewsletterOptIn,
+      cashflowsCreateApi,
+    ],
   )
 
   /** Background warm-up once name, email, and consent are filled (Pay now opens faster). */
@@ -937,8 +1055,8 @@ export function EntryFlowProvider({ children }) {
       setPaidError('Please confirm you agree to the Terms & Conditions and Privacy Policy.')
       return
     }
-    const bundle = getTicketBundleById(paidBundleId) ?? getTicketBundleById(DEFAULT_TICKET_BUNDLE_ID)
-    if (!bundle) {
+    const bundle = selectedTicketBundle
+    if (!bundle?.id) {
       setPaidError('Choose a ticket bundle.')
       return
     }
@@ -998,7 +1116,7 @@ export function EntryFlowProvider({ children }) {
     }
   }, [
     paidConsent,
-    paidBundleId,
+    selectedTicketBundle,
     paidEmail,
     paidFullName,
     paidCompetitionSlug,
@@ -1293,6 +1411,18 @@ export function EntryFlowProvider({ children }) {
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,
+      wcBallError,
+      setWcBallError,
+      wcBallClaimToken,
+      setWcBallClaimToken,
+      wcBallOutcome,
+      setWcBallOutcome,
+      wcBallClaimed,
+      setWcBallClaimed,
+      wcBallWinnerEmail,
+      setWcBallWinnerEmail,
+      wcBallVpnBlocked,
+      wcBallCheckingVpn,
       paidQuizNavStatus,
       openResumePaidQuiz,
       freeAddressLine1,
@@ -1387,6 +1517,13 @@ export function EntryFlowProvider({ children }) {
       kickVpnBlocked,
       kickCheckingVpn,
       handleKickupsGiveawaySubmit,
+      wcBallError,
+      wcBallClaimToken,
+      wcBallOutcome,
+      wcBallClaimed,
+      wcBallWinnerEmail,
+      wcBallVpnBlocked,
+      wcBallCheckingVpn,
       paidQuizNavStatus,
       openResumePaidQuiz,
       freeAddressLine1,

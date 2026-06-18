@@ -15,6 +15,8 @@ import { useHomepageLayout } from '../hooks/useHomepageLayout'
 import { usePublicWinners } from '../hooks/usePublicWinners'
 import { HomeWinnersPanel } from '../components/HomeWinnersPanel'
 import { HomeCompetitionsHub } from '../components/HomeCompetitionsHub'
+import { HomeIphone17ProPanel } from '../components/HomeIphone17ProPanel'
+import { HomeWorldCupBallPanel } from '../components/HomeWorldCupBallPanel'
 import { LegacyBundleImageryDisclaimer } from '../components/LegacyBundleImageryDisclaimer'
 import { LegacyBundleImageryCaption } from '../components/LegacyBundleImageryCaption'
 import { LegacyBundlePosterTitle } from '../components/LegacyBundlePosterTitle'
@@ -25,6 +27,7 @@ import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '.
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
+import { IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
   HOMEPAGE_BLOCK_IDS,
@@ -39,6 +42,7 @@ const HERO_INNER_BLOCK_IDS = new Set([
   'hero_prizes',
   'hero_details',
   'ticket_bundles',
+  'world_cup_ball_panel',
 ])
 
 function buildHomeSectionSequence(blockOrder) {
@@ -50,6 +54,8 @@ function buildHomeSectionSequence(blockOrder) {
         seq.push('hero')
         heroAdded = true
       }
+    } else if (id === 'iphone_17_pro_panel') {
+      seq.push('iphone_17_pro_panel')
     } else if (id === 'competitions_hub') {
       seq.push('competitions_hub')
     } else if (id === 'winners_panel') {
@@ -203,6 +209,7 @@ export function HomePageContent({
   const winners = usePublicWinners()
   const enterPaid = editorMode ? () => {} : (slug) => openEntry('paid', slug ? { competitionSlug: slug } : undefined)
   const enterGiveaway = editorMode ? () => {} : () => openEntry('kickups')
+  const enterWorldCupBall = editorMode ? () => {} : () => openEntry('worldCupBall')
 
   const intro = layout.blocks.hero_intro
   const prizes = layout.blocks.hero_prizes
@@ -211,6 +218,8 @@ export function HomePageContent({
   const bundles = layout.blocks.ticket_bundles
   const winnersBlock = layout.blocks.winners_panel
   const hubBlock = layout.blocks.competitions_hub
+  const iphonePanelBlock = layout.blocks.iphone_17_pro_panel
+  const wcBallPanelBlock = layout.blocks.world_cup_ball_panel
   const blockOrder = (layout.blockOrder || HOMEPAGE_BLOCK_IDS).filter((id) => HOMEPAGE_BLOCK_IDS.includes(id))
   const sectionSequence = buildHomeSectionSequence(blockOrder)
   const detailsIdx = blockOrder.indexOf('hero_details')
@@ -312,15 +321,37 @@ export function HomePageContent({
     })
   }
 
+  const hubVisible = isHomeBlockVisible(hubBlock)
+  const winnersVisible = isHomeBlockVisible(winnersBlock)
+  const iphonePanelVisible = iphonePanelBlock?.visible !== false
+  const wcBallPanelVisible = wcBallPanelBlock?.visible !== false
+
+  const iphonePanel =
+    iphonePanelVisible || editorMode ? (
+      <HomeIphone17ProPanel
+        block={iphonePanelBlock}
+        onEnter={() => enterPaid(IPHONE_17_PRO_COMPETITION_SLUG)}
+        editorMode={editorMode}
+      />
+    ) : null
+
+  const wcBallHeroPanel =
+    wcBallPanelVisible || editorMode ? (
+      <HomeWorldCupBallPanel
+        block={wcBallPanelBlock}
+        onEnter={enterWorldCupBall}
+        editorMode={editorMode}
+        embedded
+      />
+    ) : null
+
   const heroHidden =
     promo.visible === false &&
     intro.visible === false &&
     prizes.visible === false &&
     details.visible === false &&
-    bundles.visible === false
-
-  const hubVisible = isHomeBlockVisible(hubBlock)
-  const winnersVisible = isHomeBlockVisible(winnersBlock)
+    bundles.visible === false &&
+    wcBallPanelBlock?.visible === false
 
   const winnersPanel = editorMode ? (
     winnersVisible ? (
@@ -745,6 +776,13 @@ export function HomePageContent({
           {bundles.visible !== false
             ? wrapBlock('ticket_bundles', HOMEPAGE_BLOCK_LABELS.ticket_bundles, bundlesBlock)
             : null}
+          {wcBallPanelVisible || editorMode
+            ? wrapBlock(
+                'world_cup_ball_panel',
+                HOMEPAGE_BLOCK_LABELS.world_cup_ball_panel,
+                wcBallHeroPanel,
+              )
+            : null}
         </article>
       </div>
     </section>
@@ -765,6 +803,7 @@ export function HomePageContent({
       {sectionSequence.map((section) => {
         if (section === 'competitions_hub' && !competitionsHub) return null
         if (section === 'winners_panel' && !winnersPanel) return null
+        if (section === 'iphone_17_pro_panel' && !iphonePanel) return null
         if (section === 'hero') {
           return (
             <div key="hero">
@@ -795,6 +834,23 @@ export function HomePageContent({
                 ...dragHandlers,
                 hidden: editorMode ? false : !hubVisible,
                 children: competitionsHub,
+              })}
+            </div>
+          )
+        }
+        if (section === 'iphone_17_pro_panel') {
+          return (
+            <div key="iphone_17_pro_panel">
+              {wrapEditorSection({
+                editorMode,
+                id: 'iphone_17_pro_panel',
+                label: HOMEPAGE_BLOCK_LABELS.iphone_17_pro_panel,
+                selectedBlockId,
+                onSelectBlock,
+                draggable: true,
+                ...dragHandlers,
+                hidden: editorMode ? false : !iphonePanelVisible,
+                children: iphonePanel,
               })}
             </div>
           )

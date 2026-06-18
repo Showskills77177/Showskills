@@ -34,4 +34,12 @@ describe('homepageLayout', () => {
     assert.equal(homeBlockEditorVisible({}, 'hero_intro'), true)
     assert.equal(homeBlockEditorVisible({ visible: false }, 'hero_intro'), false)
   })
+
+  it('mergeHomepageLayout appends missing block ids in default order', () => {
+    const merged = mergeHomepageLayout({
+      blockOrder: ['hero_intro', 'promo_strip'],
+    })
+    assert.ok(merged.blockOrder.includes('world_cup_ball_panel'))
+    assert.ok(merged.blockOrder.indexOf('hero_intro') < merged.blockOrder.indexOf('world_cup_ball_panel'))
+  })
 })

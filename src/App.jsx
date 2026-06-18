@@ -32,6 +32,7 @@ import AdminNewsletterPage from './pages/admin/NewsletterPage'
 import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
 import PrizeRevealPage from './pages/PrizeRevealPage'
 import ShirtPrizeRevealPage from './pages/ShirtPrizeRevealPage'
+import WorldCupBallGiveawayPage from './pages/WorldCupBallGiveawayPage'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="newsletter/preferences" element={<NewsletterPreferencesPage />} />
             <Route path="newsletter/unsubscribe" element={<NewsletterUnsubscribePage />} />
             <Route path="archive/ronaldo-shirt-giveaway" element={<KickupsArchivePage />} />
+            <Route path="world-cup-ball-giveaway" element={<WorldCupBallGiveawayPage />} />
             <Route path="archive/35-kickups" element={<Navigate to="/archive/ronaldo-shirt-giveaway" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

@@ -14,6 +14,13 @@ describe('competitionSkillQuestions', () => {
     assert.equal(answerMatchesAccepted('wrong', ['Bolton']), false)
   })
 
+  it('requires exact digits for numeric-only answers', () => {
+    assert.equal(answerMatchesAccepted('1099', ['1099', '£1,099']), true)
+    assert.equal(answerMatchesAccepted('£1,099', ['1099']), true)
+    assert.equal(answerMatchesAccepted('999', ['1099']), false)
+    assert.equal(answerMatchesAccepted('1100', ['1099']), false)
+  })
+
   it('validates dynamic question keys', () => {
     const questions = [
       { questionKey: 'q1', prompt: 'Q1', acceptedAnswers: ['Bolton'] },

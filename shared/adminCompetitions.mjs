@@ -1,6 +1,7 @@
 /** Admin competition registry — main prize draws and separate giveaways. */
 
 import { DRAW_COMPETITION_SLUG, DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
+import { IPHONE_17_PRO_COMPETITION_LABEL, IPHONE_17_PRO_COMPETITION_SLUG } from './iphone17ProCompetition.mjs'
 import { COMPETITION_SHIRT_GIVEAWAY } from './freeEntryLimits.mjs'
 
 export const MJ_COMPETITION_SLUG = 'michael_jackson_album'
@@ -10,6 +11,10 @@ export const MJ_COMPETITION_LABEL = 'Michael Jackson Signed Album'
 export const MAIN_DRAW_COMPETITIONS = [
   { slug: DRAW_COMPETITION_SLUG, label: DRAW_COMPETITION_LABEL },
   { slug: MJ_COMPETITION_SLUG, label: MJ_COMPETITION_LABEL },
+  {
+    slug: IPHONE_17_PRO_COMPETITION_SLUG,
+    label: IPHONE_17_PRO_COMPETITION_LABEL,
+  },
 ]
 
 /** Side promotions (shirt sign-ups, consolation rows) — not Legacy draw pool. */

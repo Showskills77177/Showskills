@@ -9,9 +9,21 @@ export const HOMEPAGE_BLOCK_IDS = [
   'hero_prizes',
   'hero_details',
   'ticket_bundles',
+  'world_cup_ball_panel',
+  'iphone_17_pro_panel',
   'competitions_hub',
   'winners_panel',
 ]
+
+/** Blocks rendered inside the ShowSkills Rewards hero panel (not standalone page sections). */
+export const HOMEPAGE_HERO_INNER_BLOCK_IDS = new Set([
+  'promo_strip',
+  'hero_intro',
+  'hero_prizes',
+  'hero_details',
+  'ticket_bundles',
+  'world_cup_ball_panel',
+])
 
 export const HOMEPAGE_HERO_BACKGROUNDS = {
   kickups: 'kickups-hero-bg',
@@ -80,6 +92,22 @@ export function defaultHomepageLayout() {
       ticket_bundles: {
         visible: true,
         offsets: { ...DEFAULT_BUNDLES_OFFSETS },
+      },
+      iphone_17_pro_panel: {
+        visible: true,
+        badgeLabel: 'Also live now',
+        title: '',
+        summary: '',
+        ctaButtonLabel: 'Enter iPhone draw',
+        offsets: { panel: defaultOffset() },
+      },
+      world_cup_ball_panel: {
+        visible: true,
+        badgeLabel: 'Free skill giveaway',
+        title: '',
+        summary: '',
+        ctaButtonLabel: 'Start timed quiz',
+        offsets: { panel: defaultOffset() },
       },
       competitions_hub: {
         visible: false,

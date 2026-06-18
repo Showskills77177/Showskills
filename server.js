@@ -159,7 +159,10 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
   const { recordCashflowsPaymentCompleted } = await import('./backend/api/lib/recordSale.mjs')
   const { reserveTicketNumbers } = await import('./backend/api/lib/ticketNumbers.mjs')
   const { createPendingTicketCheckout } = await import('./backend/api/lib/pendingCheckout.mjs')
-  const { getTicketBundleById } = await import('./shared/ticketBundles.mjs')
+  const { parseCheckoutCompetition, resolveCheckoutBundle } = await import(
+    './backend/api/lib/checkoutBundle.mjs',
+  )
+  const { getOpenCompetitionPeriodForEntry } = await import('./backend/api/lib/competitionPeriods.mjs')
   const e2eSecret = (process.env.E2E_SECRET || 'e2e-dev-only-secret').trim()
   app.post('/api/e2e/mock-paid-completion', express.json(), async (req, res) => {
     if ((req.headers['x-e2e-secret'] || '').trim() !== e2eSecret) {
@@ -170,9 +173,17 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
     const customerFullName =
       typeof body.customerFullName === 'string' ? body.customerFullName.trim() : 'E2E User'
     const bundleId = typeof body.bundleId === 'string' ? body.bundleId.trim() : 'single'
-    const bundle = getTicketBundleById(bundleId)
-    const quantity = bundle?.qty ?? (Number(body.quantity) > 0 ? Number(body.quantity) : 1)
-    const amountPence = bundle?.totalPence ?? (Number(body.amountPence) >= 0 ? Number(body.amountPence) : 75)
+    const competition = await parseCheckoutCompetition(body)
+    const bundleResult = await resolveCheckoutBundle(competition, bundleId)
+    if (!bundleResult.ok) {
+      return res.status(400).json({ error: bundleResult.error })
+    }
+    const { bundle } = bundleResult
+    const quantity = bundle.qty
+    const amountPence =
+      Number.isFinite(Number(body.amountPence)) && Number(body.amountPence) >= 0
+        ? Number(body.amountPence)
+        : bundle.totalPence
     const paymentJobReference =
       typeof body.paymentJobReference === 'string' && body.paymentJobReference.trim()
         ? body.paymentJobReference.trim()
@@ -181,26 +192,31 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
       return res.status(400).json({ error: 'customerEmail required' })
     }
     try {
+      const periodResult = await getOpenCompetitionPeriodForEntry(competition)
+      const periodId = periodResult.ok ? periodResult.period.id : null
       const ticketNumbers = await reserveTicketNumbers(quantity)
       await createPendingTicketCheckout({
         provider: 'cashflows',
         externalId: paymentJobReference,
-        bundleId: bundle?.id ?? bundleId,
+        bundleId: bundle.id,
         quantity,
         ticketNumbers,
         customerEmail,
         customerFullName,
+        competition,
+        periodId,
         cashflowsIntentToken: `e2e_token_${paymentJobReference}`,
       })
       const r = await recordCashflowsPaymentCompleted({
         paymentJobReference,
         customerEmail,
         customerFullName,
-        bundleId: bundle?.id ?? bundleId,
+        bundleId: bundle.id,
         quantity,
         amountPence,
         currency: 'gbp',
         reservedTicketNumbers: ticketNumbers,
+        periodId,
       })
       if (!r?.ticketId) {
         return res.status(400).json({ error: 'Could not record sale (check email and DB)' })

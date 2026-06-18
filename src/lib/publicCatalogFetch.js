@@ -2,8 +2,6 @@ import { apiFetch } from './api'
 import {
   getCachedCompetition,
   getCachedFeaturedHomepageCompetition,
-  getCachedPublishedCompetitions,
-  getCachedPublishedGiveaways,
   setCachedCompetition,
   setCachedFeaturedHomepageCompetition,
   setCachedPublishedCompetitions,

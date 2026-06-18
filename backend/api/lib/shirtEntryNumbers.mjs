@@ -27,9 +27,16 @@ export async function ensureShirtEntrySchema() {
     /* column exists */
   }
   try {
-    await query(`ALTER TABLE kickup_submissions ADD COLUMN preview_token TEXT UNIQUE`)
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN preview_token TEXT`)
   } catch {
     /* column exists */
+  }
+  try {
+    await query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_kickups_preview_token ON kickup_submissions (preview_token)`,
+    )
+  } catch {
+    /* ignore */
   }
   try {
     await query(`ALTER TABLE kickup_submissions ADD COLUMN shirt_preview_viewed_at TEXT`)

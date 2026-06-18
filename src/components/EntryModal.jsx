@@ -32,6 +32,21 @@ import { useSiteShell } from '../hooks/useSitePages'
 import { resolvePublicSocialLinks } from '../../shared/socialLinks.mjs'
 import { ShirtGiveawaySocialFollow } from './ShirtGiveawaySocialFollow'
 import { ShirtGiveawayJerseyImagery } from './ShirtGiveawayJerseyImagery'
+import { WorldCupBallQuiz } from './WorldCupBallQuiz'
+import { WorldCupBallClaimForm } from './WorldCupBallClaimForm'
+import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
+import {
+  WORLD_CUP_BALL_GIVEAWAY_LABEL,
+  WORLD_CUP_BALL_PRIZE_TITLE,
+  WORLD_CUP_BALL_QUESTION_COUNT,
+  WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+} from '../../shared/worldCupBallGiveaway.mjs'
+import {
+  WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
+  WORLD_CUP_BALL_MIN_AGE,
+} from '../../shared/worldCupBallGiveawayRules.mjs'
+import { WORLD_CUP_BALL_SKILL_NOTICE } from '../../shared/worldCupBallGiveawayRules.mjs'
+import { saveWorldCupBallSession } from '../lib/worldCupBallSession.mjs'
 
 export function EntryModal() {
   const {
@@ -122,6 +137,18 @@ export function EntryModal() {
     kickVpnBlocked,
     kickCheckingVpn,
     handleKickupsGiveawaySubmit,
+    wcBallError,
+    setWcBallError,
+    wcBallClaimToken,
+    setWcBallClaimToken,
+    wcBallOutcome,
+    setWcBallOutcome,
+    wcBallClaimed,
+    setWcBallClaimed,
+    wcBallWinnerEmail,
+    setWcBallWinnerEmail,
+    wcBallVpnBlocked,
+    wcBallCheckingVpn,
     freeAddressLine1,
     setFreeAddressLine1,
     freeAddressLine2,
@@ -236,6 +263,7 @@ export function EntryModal() {
   const titles = {
     paid: `Enter — ${paidCompetitionTitle}`,
     kickups: 'Enter — Ronaldo shirt giveaway',
+    worldCupBall: `Enter — ${WORLD_CUP_BALL_GIVEAWAY_LABEL}`,
   }
 
   const panelWidthClass =
@@ -270,7 +298,9 @@ export function EntryModal() {
           className={`h-1 w-full ${
             entryModalType === 'kickups'
               ? 'bg-gradient-to-r from-lime-500/80 via-emerald-500/60 to-transparent'
-              : 'bg-gradient-to-r from-teal-500/70 via-emerald-500/50 to-transparent'
+              : entryModalType === 'worldCupBall'
+                ? 'bg-gradient-to-r from-amber-500/80 via-yellow-500/60 to-transparent'
+                : 'bg-gradient-to-r from-teal-500/70 via-emerald-500/50 to-transparent'
           }`}
           aria-hidden
         />
@@ -889,6 +919,91 @@ export function EntryModal() {
                 </button>
               </form>
               )}
+            </>
+          ) : null}
+
+          {entryModalType === 'worldCupBall' ? (
+            <>
+              <WorldCupBallPrizeFrame
+                variant="compact"
+                showChips={false}
+                className="mx-auto mb-6 w-full max-w-[14rem]"
+              />
+              <p className="text-sm leading-relaxed text-stone-400">
+                <strong className="text-amber-100/90">Free skill giveaway:</strong> {WORLD_CUP_BALL_PRIZE_TITLE}. Answer
+                all {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within the time limits to win outright — one attempt only.
+                {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Open to UK residents aged {WORLD_CUP_BALL_MIN_AGE}+. VPNs are not permitted.
+              </p>
+              <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
+                {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}
+              </p>
+              <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
+                {WORLD_CUP_BALL_SKILL_NOTICE}
+              </p>
+              {wcBallCheckingVpn ? (
+                <p className="mt-3 text-sm text-stone-500">Checking your connection…</p>
+              ) : null}
+              {wcBallClaimed ? (
+                <div className="mt-4 rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-4 text-sm text-amber-50/95">
+                  <p className="font-semibold text-amber-100">Details received — congratulations again!</p>
+                  <p className="mt-2 text-stone-300">
+                    {wcBallWinnerEmail?.sent
+                      ? 'We have sent a winner confirmation email with a personal link back to this form. Your delivery details are saved and we will arrange free UK shipping of your World Cup ball.'
+                      : wcBallWinnerEmail?.skipped
+                        ? 'Your prize details are saved. We will contact you by phone to arrange free UK delivery. (Email confirmation was not sent in this environment.)'
+                        : 'Your prize details are saved. We will contact you by phone to arrange free UK delivery of your World Cup ball.'}
+                  </p>
+                </div>
+              ) : wcBallOutcome?.result === 'won' && wcBallClaimToken ? (
+                <div className="mt-4">
+                  <WorldCupBallClaimForm
+                    claimToken={wcBallClaimToken}
+                    onOpenTerms={openTerms}
+                    onClaimed={(winnerEmail) => {
+                      setWcBallClaimed(true)
+                      setWcBallWinnerEmail(winnerEmail || null)
+                      saveWorldCupBallSession({
+                        outcome: wcBallOutcome,
+                        claimToken: wcBallClaimToken,
+                        claimed: true,
+                        winnerEmailSent: Boolean(winnerEmail?.sent),
+                        winnerEmail: winnerEmail || null,
+                      })
+                    }}
+                    onError={setWcBallError}
+                  />
+                </div>
+              ) : wcBallOutcome ? (
+                <div className="mt-4 rounded-xl border border-stone-600/40 bg-stone-900/40 px-4 py-4 text-sm text-stone-300">
+                  <p className="font-semibold text-stone-100">
+                    {wcBallOutcome.result === 'disqualified'
+                      ? 'Attempt disqualified'
+                      : 'You did not win on this attempt'}
+                  </p>
+                  <p className="mt-2">
+                    {wcBallOutcome.result === 'disqualified'
+                      ? 'You ran out of time twice. Under the rules, your single attempt has ended.'
+                      : 'At least one answer was incorrect. This is a strict skill test — every answer must be correct to win the ball.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <WorldCupBallQuiz
+                    disabled={wcBallVpnBlocked || wcBallCheckingVpn}
+                    onError={setWcBallError}
+                    onResult={(result) => {
+                      setWcBallOutcome(result)
+                      if (result.claimToken) setWcBallClaimToken(result.claimToken)
+                      saveWorldCupBallSession({
+                        outcome: result,
+                        claimToken: result.claimToken || '',
+                        claimed: false,
+                      })
+                    }}
+                  />
+                </div>
+              )}
+              {wcBallError ? <ErrorBanner message={wcBallError} /> : null}
             </>
           ) : null}
 

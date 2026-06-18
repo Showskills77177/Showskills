@@ -1,6 +1,15 @@
 import { query, dbIsPostgres } from './db.mjs'
 import { DRAW_COMPETITION_SLUG, DRAW_COMPETITION_LABEL } from '../../../shared/competitionPeriods.mjs'
 import {
+  IPHONE_17_PRO_BUNDLES,
+  IPHONE_17_PRO_COMPETITION_LABEL,
+  IPHONE_17_PRO_COMPETITION_SLUG,
+  IPHONE_17_PRO_COMPETITION_SUMMARY,
+  IPHONE_17_PRO_RULES_MARKDOWN,
+  defaultPostalNameForIphone17ProCompetition,
+  getIphone17ProBundleById,
+} from '../../../shared/iphone17ProCompetition.mjs'
+import {
   MJ_COMPETITION_SLUG,
   MJ_COMPETITION_LABEL,
 } from '../../../shared/adminCompetitions.mjs'
@@ -167,6 +176,7 @@ export async function ensureCompetitionCatalogSchema() {
   await ensureBuiltinCompetitions()
   await reconcilePollutedLegacyBundles()
   await backfillLegacyEntryMethods()
+  await backfillIphone17ProCompetition()
   const { backfillSiteLayoutDisplayNames } = await import('./siteLayoutStore.mjs')
   await backfillSiteLayoutDisplayNames()
 }
@@ -193,6 +203,17 @@ const BUILTIN_MAIN_DRAWS = [
     kind: COMPETITION_KIND.mainDraw,
     sortOrder: 1,
     seedBundles: true,
+  },
+  {
+    slug: IPHONE_17_PRO_COMPETITION_SLUG,
+    title: IPHONE_17_PRO_COMPETITION_LABEL,
+    summary: IPHONE_17_PRO_COMPETITION_SUMMARY,
+    rulesMarkdown: IPHONE_17_PRO_RULES_MARKDOWN,
+    status: COMPETITION_STATUS.published,
+    kind: COMPETITION_KIND.mainDraw,
+    sortOrder: 2,
+    seedBundles: true,
+    seedBundleList: IPHONE_17_PRO_BUNDLES,
   },
 ]
 
@@ -253,6 +274,59 @@ async function backfillLegacyEntryMethods() {
       paidVal,
     ],
   ).catch(() => {})
+}
+
+async function backfillIphone17ProCompetition() {
+  const paidVal = dbIsPostgres() ? true : 1
+  const freeVal = dbIsPostgres() ? true : 1
+  const postalVal = dbIsPostgres() ? true : 1
+  const now = new Date().toISOString()
+  await query(
+    `UPDATE competitions SET
+      title = $2,
+      summary = $3,
+      rules_markdown = $4,
+      allow_paid_entry = $5,
+      allow_free_online = $6,
+      allow_postal_entry = $7,
+      postal_competition_name = COALESCE(NULLIF(postal_competition_name, ''), $8),
+      updated_at = $9
+     WHERE slug = $1`,
+    [
+      IPHONE_17_PRO_COMPETITION_SLUG,
+      IPHONE_17_PRO_COMPETITION_LABEL,
+      IPHONE_17_PRO_COMPETITION_SUMMARY,
+      IPHONE_17_PRO_RULES_MARKDOWN,
+      paidVal,
+      freeVal,
+      postalVal,
+      defaultPostalNameForIphone17ProCompetition(),
+      now,
+    ],
+  ).catch(() => {})
+
+  const bundleCount = await query(
+    `SELECT COUNT(*)::int AS c FROM competition_bundles WHERE competition = $1`,
+    [IPHONE_17_PRO_COMPETITION_SLUG],
+  )
+  if ((bundleCount.rows[0]?.c ?? 0) === 0) {
+    for (let i = 0; i < IPHONE_17_PRO_BUNDLES.length; i++) {
+      await upsertCompetitionBundleRow(IPHONE_17_PRO_COMPETITION_SLUG, IPHONE_17_PRO_BUNDLES[i], i)
+    }
+  }
+
+  const { replaceCompetitionSkillQuestions } = await import('./competitionSkillQuestions.mjs')
+  const { IPHONE_17_PRO_SKILL_QUESTION_SEED } = await import('../../../shared/iphone17ProCompetition.mjs')
+  const skillCount = await query(
+    `SELECT COUNT(*)::int AS c FROM competition_skill_questions WHERE competition = $1`,
+    [IPHONE_17_PRO_COMPETITION_SLUG],
+  )
+  if ((skillCount.rows[0]?.c ?? 0) === 0) {
+    await replaceCompetitionSkillQuestions(
+      IPHONE_17_PRO_COMPETITION_SLUG,
+      IPHONE_17_PRO_SKILL_QUESTION_SEED,
+    ).catch(() => {})
+  }
 }
 
 function parseJsonArray(val) {
@@ -368,13 +442,14 @@ async function ensureBuiltinCompetitions() {
     }
 
     if (c.seedBundles) {
+      const bundlesToSeed = c.seedBundleList || TICKET_BUNDLES
       const bundleCount = await query(
         `SELECT COUNT(*)::int AS c FROM competition_bundles WHERE competition = $1`,
         [c.slug],
       )
       if ((bundleCount.rows[0]?.c ?? 0) === 0) {
-        for (let i = 0; i < TICKET_BUNDLES.length; i++) {
-          await upsertCompetitionBundleRow(c.slug, TICKET_BUNDLES[i], i)
+        for (let i = 0; i < bundlesToSeed.length; i++) {
+          await upsertCompetitionBundleRow(c.slug, bundlesToSeed[i], i)
         }
       }
     }
@@ -489,6 +564,10 @@ export async function resolveTicketBundle(competition, bundleKey, { includeTest 
   if (staticBundle && competition === DRAW_COMPETITION_SLUG) {
     if (staticBundle.testOnly && !includeTest) return null
     return staticBundle
+  }
+  const iphoneBundle = getIphone17ProBundleById(bundleKey)
+  if (iphoneBundle && competition === IPHONE_17_PRO_COMPETITION_SLUG) {
+    return iphoneBundle
   }
   return null
 }

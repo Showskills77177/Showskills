@@ -1,7 +1,27 @@
 import { useEffect } from 'react'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE } from '../competitionData'
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from '../../shared/ticketCheckoutNotice.mjs'
+import {
+  MINIMUM_SALES_DEFAULT_RULE,
+  MINIMUM_SALES_EXCEPTION_RULE,
+  MINIMUM_SALES_TERMS_INTRO,
+  TICKET_NON_REFUND_SKILL_AND_VOLUNTARY,
+} from '../../shared/competitionMinimumSalesPolicy.mjs'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
+import {
+  WORLD_CUP_BALL_RULES_INTRO,
+  WORLD_CUP_BALL_SKILL_NOTICE,
+  WORLD_CUP_BALL_WINNER_DETAILS_NOTICE,
+  WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
+  WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
+  WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
+  WORLD_CUP_BALL_MIN_AGE,
+} from '../../shared/worldCupBallGiveawayRules.mjs'
+import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from '../../shared/worldCupBallPhotography.mjs'
+import {
+  WORLD_CUP_BALL_QUESTION_SECONDS,
+  WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
+} from '../../shared/worldCupBallGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { LegalDisclaimerNotice } from './LegalDisclaimerNotice'
@@ -12,7 +32,7 @@ import { WINNER_PHOTOGRAPHY_BUNDLE_TERMS_SUMMARY } from '../../shared/winnerPhot
 function PaidTicketNonRefundCallout() {
   return (
     <p className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/30 px-3 py-2.5 text-zinc-200">
-      <strong>{TICKET_PURCHASE_NON_REFUND_NOTICE}</strong>
+      <strong>{TICKET_NON_REFUND_SKILL_AND_VOLUNTARY}</strong>
     </p>
   )
 }
@@ -416,6 +436,40 @@ export function TermsModal({ open, onClose }) {
             off your VPN before entering.
           </p>
 
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">6a. World Cup Ball Giveaway (free skill challenge)</h3>
+          <p className="mb-3">{WORLD_CUP_BALL_RULES_INTRO}</p>
+          <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
+            <strong>Eligibility:</strong> {WORLD_CUP_BALL_ELIGIBILITY_NOTICE}
+          </p>
+          <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
+            <strong>Skill requirement:</strong> {WORLD_CUP_BALL_SKILL_NOTICE}
+          </p>
+          <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/20 px-3 py-2.5 text-zinc-200">
+            <strong>Free UK delivery:</strong> {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}
+          </p>
+          <p className="mb-3">
+            Each question has a <strong>{WORLD_CUP_BALL_QUESTION_SECONDS}-second</strong> timer. The first time you exceed
+            the limit, you receive a one-off <strong>{WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second</strong> bonus on that
+            question only. A <strong>second timeout</strong> on any question disqualifies your attempt. You have{' '}
+            <strong>one attempt</strong> per device. <strong>VPNs and proxies are not allowed.</strong>
+          </p>
+          <p className="mb-3">
+            <strong>If you win:</strong> you must complete the prize delivery form with your full name, email, UK mobile
+            number, and UK postal address so we can ship the football. Entrants aged <strong>{WORLD_CUP_BALL_MIN_AGE}–17</strong>{' '}
+            must also provide a parent or legal guardian&apos;s name, mobile number, and UK delivery address.{' '}
+            {WORLD_CUP_BALL_WINNER_DETAILS_NOTICE} {WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}
+          </p>
+          <p className="mb-3">
+            <strong>Winner photography:</strong> {WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY} See also{' '}
+            <a
+              href="#ss-terms-winner-photography-consent"
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              Winner Photography &amp; Promotional Consent
+            </a>{' '}
+            above. Contact: <a href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`} className="text-amber-300 underline">{SHOWSKILLS_CONTACT_EMAIL}</a>.
+          </p>
+
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">7. Promotional rights and publicity</h3>
           <p className="mb-3">
             By entering, you grant the promoter a <strong>non-exclusive, royalty-free, worldwide licence</strong> to use
@@ -469,6 +523,19 @@ export function TermsModal({ open, onClose }) {
             verification, or free giveaways). For paid tickets, card details are entered into our providers&apos;
             secure fields — <strong>we do not store your full card details</strong> on our servers.
           </p>
+
+          <h4 className="mb-2 mt-4 font-semibold text-stone-200" id="ss-terms-minimum-ticket-sales">
+            Minimum ticket sales &amp; automatic refunds
+          </h4>
+          <p className="mb-3">{MINIMUM_SALES_TERMS_INTRO}</p>
+          <p className="mb-3 rounded-lg border border-teal-800/40 bg-teal-950/30 px-3 py-2.5 text-zinc-200">
+            <strong>Default rule (most paid prize draws):</strong> {MINIMUM_SALES_DEFAULT_RULE}
+          </p>
+          <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
+            <strong>Exception (typically smaller prizes):</strong> {MINIMUM_SALES_EXCEPTION_RULE}
+          </p>
+
+          <h4 className="mb-2 mt-4 font-semibold text-stone-200">Non-refundable purchases</h4>
           <PaidTicketNonRefundCallout />
           <p className="mb-3">
             Unjustified chargebacks may result in disqualification from the promotion. Nothing in these terms limits

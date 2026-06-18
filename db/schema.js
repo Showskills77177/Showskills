@@ -136,5 +136,20 @@ try {
   /* already exists */
 }
 
+for (const stmt of [
+  'ALTER TABLE kickup_submissions ADD COLUMN competition TEXT;',
+  'ALTER TABLE kickup_submissions ADD COLUMN preview_token TEXT;',
+  'ALTER TABLE kickup_submissions ADD COLUMN shirt_preview_viewed_at TEXT;',
+  'ALTER TABLE kickup_submissions ADD COLUMN confirmation_email_sent_at TEXT;',
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_kickups_preview_token ON kickup_submissions (preview_token);',
+  'CREATE INDEX IF NOT EXISTS idx_kickups_competition ON kickup_submissions (competition, created_at);',
+]) {
+  try {
+    db.exec(stmt)
+  } catch {
+    /* already exists */
+  }
+}
+
 db.close()
 console.log('Schema applied:', filePath)

@@ -12,8 +12,27 @@ export async function openLegacyBundleEntryFromHome(page) {
 /** Open Signed Legacy Bundle paid entry modal (stable vs home layout changes). */
 export async function openLegacyBundleEntry(page) {
   await page.goto('/competitions')
-  await page.getByRole('button', { name: /Enter this competition/i }).click()
+  await page.getByRole('button', { name: /Enter this competition/i }).first().click()
   await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeVisible({
+    timeout: 15_000,
+  })
+}
+
+/** Open iPhone 17 Pro or Cash paid entry from the homepage panel. */
+export async function openIphone17ProEntryFromHome(page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: /Enter iPhone draw/i }).click()
+  await expect(page.getByRole('heading', { name: /Enter — iPhone 17 Pro or Cash/i })).toBeVisible({
+    timeout: 15_000,
+  })
+}
+
+/** Open iPhone 17 Pro or Cash paid entry from the competitions page card. */
+export async function openIphone17ProEntryFromCompetitions(page) {
+  await page.goto('/competitions')
+  const card = page.locator('[data-competition-card]').filter({ hasText: 'iPhone 17 Pro or Cash' })
+  await card.getByRole('button', { name: /Enter this competition/i }).click()
+  await expect(page.getByRole('heading', { name: /Enter — iPhone 17 Pro or Cash/i })).toBeVisible({
     timeout: 15_000,
   })
 }

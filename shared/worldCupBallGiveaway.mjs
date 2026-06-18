@@ -1,0 +1,208 @@
+import { answerMatchesWorldCupBallAnswer } from './worldCupBallAnswerMatching.mjs'
+import { WORLD_CUP_BALL_QUESTION_BANK } from './worldCupBallQuestionBank.mjs'
+import {
+  WORLD_CUP_BALL_COMBINATION_TARGET,
+  buildWorldCupBallCombinations,
+  combinationCount,
+  combinationHasDuplicateKeys,
+  combinationHasExclusionConflict,
+} from './worldCupBallQuestionCombinations.mjs'
+
+export const WORLD_CUP_BALL_GIVEAWAY_SLUG = 'world_cup_ball_giveaway'
+
+export const WORLD_CUP_BALL_GIVEAWAY_LABEL = 'World Cup Ball Giveaway'
+
+export const WORLD_CUP_BALL_GIVEAWAY_PATH = '/world-cup-ball-giveaway'
+
+export const WORLD_CUP_BALL_PRIZE_TITLE = 'Official-style FIFA World Cup ball'
+
+export const WORLD_CUP_BALL_PRIZE_DETAIL =
+  'One official-style FIFA World Cup football (2026 tournament design, not signed). Awarded outright to the first entrant who answers all skill questions correctly within the time limits.'
+
+export const WORLD_CUP_BALL_PRIZE_IMAGE_ALT =
+  'Official-style FIFA World Cup ball on grass — white panel with blue 26 and Trionda branding.'
+
+export const WORLD_CUP_BALL_QUESTION_COUNT = 10
+
+/** @deprecated Use WORLD_CUP_BALL_QUESTION_BANK */
+export const WORLD_CUP_BALL_QUESTIONS = WORLD_CUP_BALL_QUESTION_BANK
+
+export { WORLD_CUP_BALL_QUESTION_BANK, WORLD_CUP_BALL_COMBINATION_TARGET }
+
+/** Seconds allowed per question before a timeout. */
+export const WORLD_CUP_BALL_QUESTION_SECONDS = 15
+
+/** Extra seconds granted after the first timed-out question only. */
+export const WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS = 5
+
+/** Second timeout ends the attempt immediately. */
+export const WORLD_CUP_BALL_MAX_TIMEOUTS = 1
+
+/** Minimum multiple-choice (four-option) bonus questions per quiz. */
+export const WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS = 2
+
+export const WORLD_CUP_BALL_CHOICE_BONUS_NOTICE =
+  'Each quiz includes at least two bonus questions — tap the correct answer from four options instead of typing. All other questions are free-text and must still be answered correctly.'
+
+/** Maximum minutes to finish once a session starts (server-side). */
+export const WORLD_CUP_BALL_SESSION_MAX_MINUTES = 5
+
+const bankByKey = new Map(WORLD_CUP_BALL_QUESTION_BANK.map((q) => [q.questionKey, q]))
+const choiceQuestionKeys = new Set(
+  WORLD_CUP_BALL_QUESTION_BANK.filter((q) => Array.isArray(q.choices) && q.choices.length > 0).map(
+    (q) => q.questionKey,
+  ),
+)
+const exclusionGroupByKey = new Map(
+  WORLD_CUP_BALL_QUESTION_BANK.flatMap((q) =>
+    q.exclusionGroup ? [[q.questionKey, q.exclusionGroup]] : [],
+  ),
+)
+let cachedCombinations = null
+
+export function getWorldCupBallChoiceQuestionKeys() {
+  return choiceQuestionKeys
+}
+
+export function countWorldCupBallChoiceQuestions(questionKeys) {
+  return (questionKeys || []).filter((key) => choiceQuestionKeys.has(key)).length
+}
+
+export function getWorldCupBallExclusionGroupByKey() {
+  return exclusionGroupByKey
+}
+
+/** @param {string[]} questionKeys */
+export function assertWorldCupBallQuestionKeysValid(questionKeys) {
+  if (!Array.isArray(questionKeys) || questionKeys.length !== WORLD_CUP_BALL_QUESTION_COUNT) {
+    throw new Error(`World Cup Ball quiz requires exactly ${WORLD_CUP_BALL_QUESTION_COUNT} questions`)
+  }
+  if (combinationHasDuplicateKeys(questionKeys)) {
+    throw new Error('World Cup Ball quiz cannot include the same question twice')
+  }
+  if (combinationHasExclusionConflict(questionKeys, exclusionGroupByKey)) {
+    throw new Error('World Cup Ball quiz cannot include multiple questions about the same subject')
+  }
+  for (const key of questionKeys) {
+    if (!bankByKey.has(key)) {
+      throw new Error(`Unknown World Cup Ball question key: ${key}`)
+    }
+  }
+  if (countWorldCupBallChoiceQuestions(questionKeys) < WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS) {
+    throw new Error(
+      `World Cup Ball quiz requires at least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} multiple-choice bonus questions`,
+    )
+  }
+}
+
+export function getWorldCupBallQuestionCombinations() {
+  if (!cachedCombinations) {
+    const poolKeys = WORLD_CUP_BALL_QUESTION_BANK.map((q) => q.questionKey)
+    cachedCombinations = buildWorldCupBallCombinations(
+      poolKeys,
+      WORLD_CUP_BALL_QUESTION_COUNT,
+      WORLD_CUP_BALL_COMBINATION_TARGET,
+      {
+        exclusionGroupByKey,
+        choiceKeys: choiceQuestionKeys,
+        minChoiceCount: WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS,
+      },
+    )
+    for (const combo of cachedCombinations) {
+      assertWorldCupBallQuestionKeysValid(combo)
+    }
+  }
+  return cachedCombinations
+}
+
+export function getWorldCupBallCombinationStats() {
+  const poolSize = WORLD_CUP_BALL_QUESTION_BANK.length
+  const maxPossible = combinationCount(poolSize, WORLD_CUP_BALL_QUESTION_COUNT)
+  const combinations = getWorldCupBallQuestionCombinations()
+  return {
+    poolSize,
+    questionsPerQuiz: WORLD_CUP_BALL_QUESTION_COUNT,
+    targetCombinations: WORLD_CUP_BALL_COMBINATION_TARGET,
+    maxPossibleCombinations: maxPossible,
+    activeCombinations: combinations.length,
+  }
+}
+
+/** Pick a random pre-generated combination for a new quiz session. */
+export function pickRandomWorldCupBallCombination() {
+  const combinations = getWorldCupBallQuestionCombinations()
+  const combinationIndex = Math.floor(Math.random() * combinations.length)
+  return {
+    combinationIndex,
+    questionKeys: combinations[combinationIndex],
+  }
+}
+
+export function getWorldCupBallQuestionsByKeys(questionKeys) {
+  return (questionKeys || [])
+    .map((key) => bankByKey.get(key))
+    .filter(Boolean)
+}
+
+export function parseWorldCupBallSessionQuestionKeys(session) {
+  const raw = session?.question_keys_json
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+export function publicWorldCupBallQuestions(questionKeys) {
+  const keys =
+    questionKeys ||
+    getWorldCupBallQuestionCombinations()[0] ||
+    WORLD_CUP_BALL_QUESTION_BANK.slice(0, WORLD_CUP_BALL_QUESTION_COUNT).map((q) => q.questionKey)
+
+  assertWorldCupBallQuestionKeysValid(keys)
+
+  return getWorldCupBallQuestionsByKeys(keys).map((q, index) => {
+    const row = {
+      questionKey: q.questionKey,
+      prompt: q.prompt,
+      sortOrder: index,
+    }
+    if (Array.isArray(q.choices) && q.choices.length > 0) {
+      row.choices = [...q.choices]
+    }
+    return row
+  })
+}
+
+export function validateWorldCupBallAnswers(answers, questionKeys) {
+  const keys =
+    questionKeys ||
+    getWorldCupBallQuestionCombinations()[0] ||
+    WORLD_CUP_BALL_QUESTION_BANK.slice(0, WORLD_CUP_BALL_QUESTION_COUNT).map((q) => q.questionKey)
+
+  const results = { allCorrect: true, perQuestion: {} }
+  for (const key of keys) {
+    const q = bankByKey.get(key)
+    if (!q) {
+      results.perQuestion[key] = false
+      results.allCorrect = false
+      continue
+    }
+    const userVal = answers?.[key] ?? ''
+    const ok = answerMatchesWorldCupBallAnswer(userVal, q.acceptedAnswers)
+    results.perQuestion[key] = ok
+    if (!ok) results.allCorrect = false
+  }
+  return results
+}
+
+export function isWorldCupBallDisqualifiedByTimeouts(timeoutsUsed) {
+  const n = Number(timeoutsUsed)
+  if (!Number.isFinite(n) || n < 0) return true
+  return n > WORLD_CUP_BALL_MAX_TIMEOUTS
+}

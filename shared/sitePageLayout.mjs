@@ -483,6 +483,8 @@ export const HOMEPAGE_BLOCK_LABELS = {
   hero_prizes: 'Prize images & enter button',
   hero_details: 'Bundle details card',
   ticket_bundles: 'Ticket bundle prices',
+  iphone_17_pro_panel: 'iPhone 17 Pro or Cash panel',
+  world_cup_ball_panel: 'World Cup Ball Giveaway panel',
   winners_panel: 'Recent winners',
   competitions_hub: 'Competitions hub (paid + free)',
 }

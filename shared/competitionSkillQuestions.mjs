@@ -63,11 +63,21 @@ function editDistance(a, b) {
 export function answerMatchesAccepted(userAnswer, acceptedList) {
   const normalized = normalizeSkillAnswer(userAnswer)
   if (!normalized) return false
+  const normalizedCompact = compact(userAnswer)
 
   for (const raw of acceptedList || []) {
     const accepted = normalizeSkillAnswer(raw)
     if (!accepted) continue
+    const acceptedCompact = compact(raw)
     if (normalized === accepted) return true
+
+    const userIsDigits = /^\d+$/.test(normalizedCompact)
+    const acceptedIsDigits = /^\d+$/.test(acceptedCompact)
+    if (userIsDigits && acceptedIsDigits) {
+      if (normalizedCompact === acceptedCompact) return true
+      continue
+    }
+
     if (normalized.includes(accepted) || accepted.includes(normalized)) {
       if (accepted.length >= 2 || normalized.length >= 2) return true
     }

@@ -18,6 +18,7 @@ const {
   createCompetition,
 } = await import('../backend/api/lib/competitionCatalog.mjs')
 const { DRAW_COMPETITION_SLUG } = await import('../shared/competitionPeriods.mjs')
+const { IPHONE_17_PRO_COMPETITION_SLUG } = await import('../shared/iphone17ProCompetition.mjs')
 const { TICKET_BUNDLES } = await import('../shared/ticketBundles.mjs')
 const { listCompetitionPeriods } = await import('../backend/api/lib/competitionPeriods.mjs')
 const { resolveAdminMainDrawCompetition } = await import('../backend/api/lib/checkoutBundle.mjs')
@@ -44,7 +45,7 @@ assert.ok(medium)
 assert.equal(medium.qty, 10)
 
 const updated = await upsertCompetitionBundle(DRAW_COMPETITION_SLUG, {
-  bundleKey: 'catalogTestMedium',
+  bundleKey: 'catalogtestmedium',
   title: 'Medium bundle (catalog test)',
   qty: 10,
   totalPence: 599,
@@ -52,7 +53,7 @@ const updated = await upsertCompetitionBundle(DRAW_COMPETITION_SLUG, {
   active: true,
 })
 assert.ok(updated.ok)
-const medium2 = await resolveTicketBundle(DRAW_COMPETITION_SLUG, 'catalogTestMedium')
+const medium2 = await resolveTicketBundle(DRAW_COMPETITION_SLUG, 'catalogtestmedium')
 assert.equal(medium2.totalPence, 599)
 
 const canonicalMedium = TICKET_BUNDLES.find((b) => b.id === 'medium10')
@@ -73,6 +74,20 @@ await updateCompetition(DRAW_COMPETITION_SLUG, {
 })
 const legacy2 = await getCompetitionBySlug(DRAW_COMPETITION_SLUG)
 assert.equal(legacy2.summary, 'Updated from catalog test')
+
+const iphone = await getCompetitionBySlug(IPHONE_17_PRO_COMPETITION_SLUG)
+assert.ok(iphone, 'iPhone 17 Pro competition seeded')
+assert.equal(iphone.status, 'published')
+assert.equal(iphone.allowPaidEntry, true)
+assert.equal(iphone.allowFreeOnline, true)
+assert.equal(iphone.allowPostalEntry, true)
+
+const iphoneBundles = await listCompetitionBundles(IPHONE_17_PRO_COMPETITION_SLUG, { activeOnly: true })
+assert.equal(iphoneBundles.length, 6)
+const iphoneSingle = await resolveTicketBundle(IPHONE_17_PRO_COMPETITION_SLUG, 'single')
+assert.ok(iphoneSingle)
+assert.equal(iphoneSingle.totalPence, 29)
+assert.equal(iphoneSingle.qty, 1)
 
 const opens = new Date('2026-06-01T10:00:00.000Z').toISOString()
 const closes = new Date('2026-07-01T22:00:00.000Z').toISOString()

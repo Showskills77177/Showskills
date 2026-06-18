@@ -26,7 +26,8 @@ test.describe('C) Free shirt giveaway', () => {
     expect(res.ok(), `kickups POST ${res.status()}: ${JSON.stringify(body)}`).toBeTruthy()
     expect(body.ok).toBe(true)
     expect(body.id).toBeTruthy()
-    await expect(page.getByText(/Thanks — your submission was received/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/You're in the draw/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Entry number:/i)).toBeVisible()
 
     const db = openE2eDb()
     const row = kickupById(db, body.id)

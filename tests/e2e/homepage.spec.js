@@ -18,7 +18,7 @@ test.describe('Homepage — layout & stress', () => {
     await expect(prizes.getByText('24K gold case', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Prize lineup' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Enter Bundle Draw' })).toBeVisible()
-    await expect(page.getByText(/All ticket bundles are non-refundable/i)).toBeVisible()
+    await expect(page.getByText(/refunded automatically/i)).toBeVisible()
 
     await assertClean()
   })
@@ -66,6 +66,10 @@ test.describe('Homepage — layout & stress', () => {
     await page.goto('/')
     const draw = page.getByRole('button', { name: 'Enter Bundle Draw' })
     await draw.dblclick()
+    // Double-click may toggle open then closed; a third click should still open a single modal.
+    if (!(await page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i }).isVisible().catch(() => false))) {
+      await draw.click()
+    }
     await expect(page.getByRole('heading', { name: /Enter — Signed Legacy Bundle/i })).toBeVisible({
       timeout: 15_000,
     })

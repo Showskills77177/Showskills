@@ -15,6 +15,7 @@ import {
 import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
 import { LegacyShirtGiveawayCard } from '../components/LegacyShirtGiveawayCard'
+import { WorldCupBallGiveawayCard } from '../components/WorldCupBallGiveawayCard'
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
 import { resolveLegacyBundlePublicCompetition } from '../../shared/legacyBundlePublic.mjs'
@@ -166,7 +167,7 @@ export default function CompetitionsPage({
 
   const shirtCard = (
     <LegacyShirtGiveawayCard
-      className="h-full min-h-0"
+      className="w-full"
       onEnter={() => openEntry('kickups')}
       cardScale={shirtCardOffset.scale ?? 1}
       cardLayout={shirtGiveawayCard}
@@ -190,7 +191,7 @@ export default function CompetitionsPage({
     const isLegacy = competition.slug === DRAW_COMPETITION_SLUG
     const card = (
       <CompetitionPublicCard
-        className="h-full min-h-0"
+        className="w-full"
         competition={competition}
         preview={false}
         editorMode={editorMode && isLegacy}
@@ -212,7 +213,7 @@ export default function CompetitionsPage({
     return (
       <div
         ref={index === 0 ? paidCardRef : undefined}
-        className="ss-competition-paid-slot flex h-full min-h-0 w-full flex-col"
+        className="ss-competition-paid-slot w-full"
       >
         {wrapped}
       </div>
@@ -220,14 +221,17 @@ export default function CompetitionsPage({
   }
 
   const paidColumn = (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="min-w-0">
       <SectionHeading id="paid-competitions-heading">
         {layout.sections.paid?.title || 'Prize draw competitions'}
       </SectionHeading>
       <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">{layout.sections.paid?.subtitle}</p>
-      <ul className="mt-4 grid list-none gap-6">
+      <ul className="ss-competitions-paid-list mt-4 flex list-none flex-col">
         {paidCompetitions.map((c, index) => (
-          <li key={c.slug} className={index === 0 ? 'ss-competition-paid-primary' : ''}>
+          <li
+            key={c.slug}
+            className={index === 0 ? 'ss-competition-paid-primary' : 'ss-competition-paid-follow'}
+          >
             {renderPaidCard(c, index)}
           </li>
         ))}
@@ -236,7 +240,7 @@ export default function CompetitionsPage({
   )
 
   const freeColumn = (
-    <div className="flex min-h-0 flex-1 flex-col" id="free-giveaways">
+    <div className="min-w-0" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">
         {layout.sections.free?.title || 'Free giveaways'}
       </SectionHeading>
@@ -245,10 +249,13 @@ export default function CompetitionsPage({
         <li className="ss-competition-free-primary w-full">
           <div
             ref={shirtCardRef}
-            className="ss-competition-shirt-slot flex h-full min-h-0 w-full flex-col [&_[data-editor-drag]]:flex [&_[data-editor-drag]]:h-full [&_[data-editor-drag]]:min-h-0 [&_[data-editor-drag]]:w-full [&_[data-editor-drag]]:flex-col"
+            className="ss-competition-shirt-slot w-full [&_[data-editor-drag]]:block [&_[data-editor-drag]]:w-full"
           >
             {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, { cssScaleOnly: true })}
           </div>
+        </li>
+        <li className="ss-competition-free-wc-ball w-full">
+          <WorldCupBallGiveawayCard onEnter={() => openEntry('worldCupBall')} />
         </li>
         {giveaways.map((g) => (
           <li key={g.slug}>
@@ -329,7 +336,7 @@ export default function CompetitionsPage({
           <div
             className={`ss-competitions-columns grid gap-8 ${loading ? 'mt-6' : 'mt-12'} ${
               visibleSectionCount > 1
-                ? 'ss-competitions-columns--paired md:grid-cols-2 md:items-stretch'
+                ? 'ss-competitions-columns--paired md:grid-cols-2 md:items-start'
                 : 'max-w-xl'
             }`}
           >

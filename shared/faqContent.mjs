@@ -1,5 +1,9 @@
 import { TICKET_PURCHASE_NON_REFUND_NOTICE } from './ticketCheckoutNotice.mjs'
 import {
+  minimumSalesThresholdFaqAnswer,
+  ticketRefundsFaqAnswer,
+} from './competitionMinimumSalesPolicy.mjs'
+import {
   CONSOLATION_PRIZE_FREE_APPLIES,
   CONSOLATION_PRIZE_PAID_THRESHOLD,
   CONSOLATION_PRIZE_SUMMARY,
@@ -11,6 +15,15 @@ import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, NO_PURCHASE_ENTRY_NOTICE
 import { SHIRT_GIVEAWAY_SEASON, SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
 import { PRIZE_AUTHENTICITY_FAQ_ANSWER } from './prizeAuthenticityCopy.mjs'
 import { winnerPhotographyConsentFaqAnswer } from './winnerPhotographyConsent.mjs'
+import { WORLD_CUP_BALL_QUESTION_COUNT, WORLD_CUP_BALL_CHOICE_BONUS_NOTICE } from './worldCupBallGiveaway.mjs'
+import {
+  WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
+  WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
+  WORLD_CUP_BALL_WINNER_DETAILS_NOTICE,
+  WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
+  WORLD_CUP_BALL_MIN_AGE,
+} from './worldCupBallGiveawayRules.mjs'
+import { worldCupBallPhotographyFaqAnswer } from './worldCupBallPhotography.mjs'
 
 /** @typedef {{ id: string, question: string, answer: string, popular?: boolean }} FaqItem */
 /** @typedef {{ id: string, title: string, summary: string, items: FaqItem[] }} FaqSection */
@@ -30,6 +43,7 @@ export const FAQ_POPULAR_IDS = [
   'when-quiz',
   'consolation-prize',
   'prize-authenticity',
+  'minimum-ticket-sales',
   'refunds',
 ]
 
@@ -167,9 +181,15 @@ export const FAQ_SECTIONS = [
           ' with your email, approximate purchase time, and payment reference if you have one (from your bank or card statement).',
       },
       {
+        id: 'minimum-ticket-sales',
+        question: 'What happens if not enough tickets are sold?',
+        answer: minimumSalesThresholdFaqAnswer(),
+        popular: true,
+      },
+      {
         id: 'refunds',
         question: 'Can I get a refund on tickets?',
-        answer: TICKET_PURCHASE_NON_REFUND_NOTICE,
+        answer: ticketRefundsFaqAnswer(),
         popular: true,
       },
       {
@@ -290,6 +310,47 @@ export const FAQ_SECTIONS = [
         question: 'I did not win — will there be another draw?',
         answer:
           'New competition periods may open on the website. Follow our competitions page or check back later. Past periods that have already been drawn will not be re-run.',
+      },
+    ],
+  },
+  {
+    id: 'world-cup-ball',
+    title: 'World Cup Ball Giveaway',
+    summary: `Free skill challenge — win the World Cup ball outright by answering ${WORLD_CUP_BALL_QUESTION_COUNT} timed questions correctly.`,
+    items: [
+      {
+        id: 'wc-ball-what',
+        question: 'What is the World Cup Ball Giveaway?',
+        answer:
+          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed). Answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win immediately. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} There is no random draw and no payment.`,
+      },
+      {
+        id: 'wc-ball-how-win',
+        question: 'How do I win the ball?',
+        answer:
+          `You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} questions correctly in your single attempt. Each question has a 15-second timer. If you run out of time once, you receive a one-off 5-second bonus on that question. A second timeout disqualifies you. One incorrect answer means you do not win.`,
+      },
+      {
+        id: 'wc-ball-details',
+        question: 'When do I enter my name, phone, and address?',
+        answer:
+          `Only if you win. After a perfect score, complete the winner delivery form with your full name, email, UK mobile number, and UK postal address. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Entrants aged ${WORLD_CUP_BALL_MIN_AGE}–17 must also provide a parent or guardian’s delivery details. ${WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}`,
+      },
+      {
+        id: 'wc-ball-eligibility',
+        question: 'Who can enter?',
+        answer: WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
+      },
+      {
+        id: 'wc-ball-photo',
+        question: 'Do I have to be photographed with the ball?',
+        answer: worldCupBallPhotographyFaqAnswer(),
+      },
+      {
+        id: 'wc-ball-attempts',
+        question: 'Can I try again if I fail?',
+        answer:
+          'No. You get one quiz attempt per device. Wrong answers, a second timeout, or VPN use ends your attempt under the published rules.',
       },
     ],
   },

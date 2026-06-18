@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 
-/** Sync enter button sizes on the competitions page (desktop). Cards keep natural height. */
+/** On desktop, sizes the Ronaldo shirt card to the Signed Legacy Bundle card height (legacy stays natural). */
 export function useMatchedCompetitionCardHeight(syncKey = 0) {
   const paidCardRef = useRef(null)
   const shirtCardRef = useRef(null)
@@ -13,21 +13,33 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const editorPreview = typeof syncKey === 'string' && syncKey.split('|').pop() === 'edit'
 
     const mq = window.matchMedia('(min-width: 768px)')
+    let lastLegacyHeight = 0
 
-    function clearHeights() {
-      for (const slot of [paidSlot, shirtSlot]) {
-        slot.style.removeProperty('height')
-        slot.style.removeProperty('minHeight')
-        slot.style.removeProperty('maxHeight')
-        const card = slot.querySelector('[data-competition-card]')
-        if (card) {
-          card.style.removeProperty('height')
-          card.style.removeProperty('minHeight')
-          card.style.removeProperty('maxHeight')
-          card.style.removeProperty('flex')
-        }
-      }
+    function cardIn(slot) {
+      return slot.querySelector('[data-competition-card]')
+    }
+
+    function measureNatural(slot) {
+      const card = cardIn(slot)
+      const el = card || slot
+      const rectH = Math.round(el.getBoundingClientRect().height)
+      const offsetH = el.offsetHeight ? Math.round(el.offsetHeight) : 0
+      return Math.max(rectH, offsetH, 1)
+    }
+
+    function clearShirtSizing() {
+      shirtSlot.style.removeProperty('height')
+      shirtSlot.style.removeProperty('minHeight')
+      shirtSlot.style.removeProperty('maxHeight')
+      shirtSlot.removeAttribute('data-matched-height')
       shirtSlot.style.removeProperty('--ss-matched-comp-card-h')
+      const shirtCard = cardIn(shirtSlot)
+      if (shirtCard) {
+        shirtCard.style.removeProperty('height')
+        shirtCard.style.removeProperty('minHeight')
+        shirtCard.style.removeProperty('maxHeight')
+        shirtCard.style.removeProperty('overflow')
+      }
     }
 
     function clearButtonStyles() {
@@ -39,6 +51,24 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
           btn.style.removeProperty('minHeight')
           btn.style.removeProperty('marginInline')
         })
+      }
+    }
+
+    function applyShirtToLegacyHeight(legacyH) {
+      shirtSlot.style.height = `${legacyH}px`
+      shirtSlot.style.minHeight = `${legacyH}px`
+      shirtSlot.style.maxHeight = `${legacyH}px`
+      shirtSlot.style.boxSizing = 'border-box'
+      shirtSlot.dataset.matchedHeight = 'true'
+      shirtSlot.style.setProperty('--ss-matched-comp-card-h', `${legacyH}px`)
+
+      const shirtCard = cardIn(shirtSlot)
+      if (shirtCard) {
+        shirtCard.style.height = '100%'
+        shirtCard.style.minHeight = '0'
+        shirtCard.style.maxHeight = '100%'
+        shirtCard.style.overflow = 'hidden'
+        shirtCard.style.boxSizing = 'border-box'
       }
     }
 
@@ -69,12 +99,23 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
 
     function sync() {
       if (editorPreview || !mq.matches) {
-        clearHeights()
+        clearShirtSizing()
         clearButtonStyles()
         return
       }
 
-      clearHeights()
+      clearShirtSizing()
+
+      const legacyH = measureNatural(paidSlot)
+      if (legacyH < 2) return
+
+      if (legacyH === lastLegacyHeight && shirtSlot.dataset.matchedHeight === 'true') {
+        syncEnterButtons()
+        return
+      }
+      lastLegacyHeight = legacyH
+
+      applyShirtToLegacyHeight(legacyH)
       syncEnterButtons()
     }
 
@@ -87,6 +128,16 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
     const ro = new ResizeObserver(() => sync())
     ro.observe(paidSlot)
     ro.observe(shirtSlot)
+    const paidCard = cardIn(paidSlot)
+    const shirtCard = cardIn(shirtSlot)
+    if (paidCard) ro.observe(paidCard)
+    if (shirtCard) ro.observe(shirtCard)
+
+    for (const slot of [paidSlot, shirtSlot]) {
+      slot.querySelectorAll('img').forEach((img) => {
+        if (!img.complete) img.addEventListener('load', sync, { once: true })
+      })
+    }
 
     mq.addEventListener('change', sync)
     window.addEventListener('resize', sync)
@@ -98,7 +149,7 @@ export function useMatchedCompetitionCardHeight(syncKey = 0) {
       ro.disconnect()
       mq.removeEventListener('change', sync)
       window.removeEventListener('resize', sync)
-      clearHeights()
+      clearShirtSizing()
       clearButtonStyles()
     }
   }, [syncKey])
