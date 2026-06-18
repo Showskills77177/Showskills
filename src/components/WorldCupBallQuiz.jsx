@@ -610,7 +610,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
               value={currentAnswer}
               onChange={(e) => setCurrentAnswer(e.target.value)}
               className="ss-entry-field ss-quiz-answer-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
-              placeholder="Type your answer (capitals optional)"
+              placeholder="Type your answer (any capitals OK)"
               disabled={submitting}
             />
             <button

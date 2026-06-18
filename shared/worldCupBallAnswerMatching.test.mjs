@@ -78,6 +78,7 @@ describe('worldCupBallAnswerMatching', () => {
     assert.equal(answerMatchesWorldCupBallAnswer('mAn ChItY', ['Manchester City', 'Man City']), true)
     assert.equal(answerMatchesWorldCupBallAnswer('lfc', ['Liverpool', 'LFC']), true)
     assert.equal(answerMatchesWorldCupBallAnswer('GEORGE WEAH', ['George Weah', 'Weah']), true)
+    assert.equal(answerMatchesWorldCupBallAnswer('Ryan Giggs', ['Ryan Giggs', 'Giggs']), true)
   })
 
   it('rejects clearly wrong answers', () => {

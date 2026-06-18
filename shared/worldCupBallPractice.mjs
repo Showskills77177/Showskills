@@ -36,9 +36,8 @@ export function worldCupBallPracticeCompleteTips({ timedOutOnce = false, answere
   tips.push(
     `The real test has ${WORLD_CUP_BALL_QUESTION_COUNT} questions and a ${WORLD_CUP_BALL_SESSION_MAX_MINUTES}-minute session limit.`,
     WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
-  WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
-  WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
-  WORLD_CUP_BALL_SALVAGE_NOTICE,
+    WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+    WORLD_CUP_BALL_SALVAGE_NOTICE,
   )
   return tips
 }
