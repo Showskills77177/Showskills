@@ -23,31 +23,35 @@ export function WorldCupBallGiveawayCard({ onEnter, className = '' }) {
         <p className="absolute left-5 top-5 z-[2] rounded-full border border-amber-300/40 bg-black/55 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-100 backdrop-blur-sm">
           Free · Skill
         </p>
-        <WorldCupBallPrizeFrame variant="compact" className="mx-auto w-full max-w-[17.5rem]" />
+        <WorldCupBallPrizeFrame
+          variant="compact"
+          showChips={false}
+          className="ss-world-cup-ball-card__frame mx-auto w-full max-w-[17.5rem]"
+        />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col px-6 pb-6 pt-3 text-left sm:px-8">
-        <h3 className="font-display text-xl uppercase tracking-wide text-amber-50 sm:text-2xl">
+      <div className="ss-world-cup-ball-card__body flex min-h-0 flex-1 flex-col px-6 pb-6 pt-3 text-left sm:px-8">
+        <h3 className="ss-world-cup-ball-card__title font-display text-xl uppercase tracking-wide text-amber-50 sm:text-2xl">
           {WORLD_CUP_BALL_GIVEAWAY_LABEL}
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-stone-400">
+        <p className="ss-world-cup-ball-card__summary mt-2 text-sm leading-relaxed text-stone-400">
           {WORLD_CUP_BALL_PRIZE_TITLE} — beat the clock, nail all {WORLD_CUP_BALL_QUESTION_COUNT} answers, take the ball home.
         </p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <span className="ss-world-cup-ball-card__pill">1 per connection</span>
-          <span className="ss-world-cup-ball-card__pill">{WORLD_CUP_BALL_QUESTION_SECONDS}s each</span>
-          <span className="ss-world-cup-ball-card__pill ss-world-cup-ball-card__pill--gold">No draw</span>
+        <div className="ss-world-cup-ball-card__pills mt-3 flex flex-wrap gap-1.5">
+          <span className="ss-world-cup-ball-card__pill">{WORLD_CUP_BALL_QUESTION_COUNT} questions</span>
+          <span className="ss-world-cup-ball-card__pill">{WORLD_CUP_BALL_QUESTION_SECONDS}s per answer</span>
+          <span className="ss-world-cup-ball-card__pill ss-world-cup-ball-card__pill--gold">Win outright</span>
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-amber-200/65">{WORLD_CUP_BALL_SKILL_NOTICE}</p>
-        <div className="mt-auto flex flex-col gap-2 pt-5">
+        <p className="ss-world-cup-ball-card__notice mt-3 text-xs leading-relaxed text-amber-200/65">{WORLD_CUP_BALL_SKILL_NOTICE}</p>
+        <div className="ss-world-cup-ball-card__actions mt-auto flex flex-col gap-2 pt-5">
           <button type="button" onClick={onEnter} className="ss-world-cup-ball-card__cta">
             Start timed quiz
           </button>
           <Link
             to={WORLD_CUP_BALL_GIVEAWAY_PATH}
-            className="text-center text-xs font-semibold text-amber-400/90 underline underline-offset-2 hover:text-amber-300"
+            className="ss-world-cup-ball-card__rules text-center text-xs font-semibold text-amber-400/90 underline underline-offset-2 hover:text-amber-300"
           >
-            Read full rules
+            Full rules &amp; how to win
           </Link>
         </div>
       </div>

@@ -1911,6 +1911,189 @@ body {
   filter: brightness(1.08);
 }
 
+/* —— Mobile: homepage iPhone panel, WC ball panel, competition cards —— */
+@media (max-width: 767px) {
+  .ss-home-iphone-panel__copy {
+    align-items: center;
+    text-align: center;
+  }
+
+  .ss-home-iphone-panel__copy > .inline-flex {
+    align-self: center;
+  }
+
+  .ss-home-iphone-panel__copy h2 {
+    text-align: center;
+  }
+
+  .ss-home-iphone-panel .ss-competition-countdown {
+    margin-inline: auto;
+  }
+
+  .ss-home-iphone-panel__entry-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .ss-home-iphone-panel__entry-copy > p {
+    text-align: center;
+  }
+
+  .ss-home-iphone-panel__entry-copy .flex.flex-wrap {
+    justify-content: center;
+  }
+
+  .ss-home-iphone-panel__actions {
+    align-items: center;
+    width: 100%;
+  }
+
+  .ss-home-iphone-panel__cta-group {
+    align-self: center;
+    width: min(100%, 20rem);
+  }
+
+  .ss-home-iphone-panel__price {
+    min-height: 3.1rem;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+    padding: 0.7rem 1.25rem;
+  }
+
+  .ss-home-wc-ball-panel__copy {
+    align-items: center;
+    text-align: center;
+  }
+
+  .ss-home-wc-ball-panel__copy > .inline-flex {
+    align-self: center;
+  }
+
+  .ss-home-wc-ball-panel__actions {
+    align-self: center;
+    align-items: center;
+    width: min(100%, 20rem);
+  }
+
+  .ss-home-wc-ball-panel__rules-link {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-competition-card-meta {
+    align-items: center;
+    text-align: center;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-competition-card-headline {
+    align-items: center;
+    text-align: center;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-competition-card-headline .ss-competition-countdown {
+    margin-top: 0.875rem;
+    margin-inline: auto;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-competition-card-headline h2 {
+    text-align: center;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-competition-card-headline > p {
+    text-align: center;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-competition-card-footer__price {
+    align-self: center;
+    width: 100%;
+    max-width: 20rem;
+    justify-content: center;
+    min-height: 3.1rem;
+    font-size: 1.0625rem;
+    line-height: 1.3;
+    padding: 0.7rem 1.25rem;
+  }
+
+  [data-competition-slug='iphone_17_pro'] .ss-iphone17-pro-prize-studio__photo--compact {
+    max-width: min(100%, 15rem);
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__hero {
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(12, 10, 8, 0.98) 0%, rgba(0, 0, 0, 0.95) 100%);
+    padding-bottom: 0.75rem;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__frame {
+    max-width: min(100%, 20.5rem);
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-wc-ball-prize-frame__atmosphere,
+  [data-giveaway-card='world-cup-ball'] .ss-wc-ball-prize-frame__glow--pitch {
+    display: none;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-wc-ball-prize-frame__inner {
+    background: radial-gradient(circle at 50% 38%, rgba(40, 32, 18, 0.35) 0%, rgba(0, 0, 0, 0.72) 68%);
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-wc-ball-prize-frame--compact .ss-wc-ball-prize-frame__inner {
+    min-height: 10.5rem;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-wc-ball-prize-frame__chip {
+    border-radius: 0.625rem;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.05em;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__body {
+    align-items: center;
+    text-align: center;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__title {
+    font-size: 1.625rem;
+    line-height: 1;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__summary {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__notice {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__pills {
+    justify-content: center;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__pill {
+    border-radius: 0.625rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.05em;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__actions {
+    align-items: center;
+    width: 100%;
+    max-width: 20rem;
+  }
+
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__cta,
+  [data-giveaway-card='world-cup-ball'] .ss-world-cup-ball-card__rules {
+    width: 100%;
+  }
+}
+
 .ss-prize-tile-photo .ss-gold-case-photo,
 .ss-prize-tile-photo .ss-gold-case-photo img {
   display: block;

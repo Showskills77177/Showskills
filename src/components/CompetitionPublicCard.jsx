@@ -220,7 +220,7 @@ export function CompetitionPublicCard({
         'comp_paid_card_meta',
         'Meta labels',
         'meta',
-        <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
+        <div className="ss-competition-card-meta flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-400/90 md:text-[10px]">{metaFeaturedLabel}</p>
           {periodMonth ? (
             <>
@@ -329,6 +329,7 @@ export function CompetitionPublicCard({
   return (
     <article
       data-competition-card
+      data-competition-slug={competition.slug}
       className={`flex flex-col rounded-2xl border border-teal-500/25 bg-stone-950/60 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ${
         liveLegacyLayout || (editorMode && isLegacyBundle) ? 'overflow-visible' : 'overflow-hidden'
       } ${liveLegacyLayout ? '' : 'h-full min-h-0'} ${isPageLayout ? 'ss-competition-page-card' : ''} ${preview ? 'pointer-events-none select-none' : ''} ${className}`}
