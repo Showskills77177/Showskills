@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiFetch, apiUrl } from '../../lib/api'
 import { AdminPagination } from '../../components/admin/AdminPagination'
 import { AdminHelpBanner, ADMIN_PAGE_SIZE } from '../../components/admin/AdminHelpBanner'
@@ -6,11 +7,24 @@ import {
   AdminCompetitionSelect,
   competitionFilterLabel,
 } from '../../components/admin/AdminCompetitionSelect'
-import { SUBMISSIONS_PAGE_HELP } from '../../../shared/adminListCopy.mjs'
-import { defaultGiveawayCompetitionSlug } from '../../../shared/adminCompetitions.mjs'
+import {
+  SUBMISSIONS_PAGE_HELP,
+  WORLD_CUP_BALL_ADMIN_HELP,
+} from '../../../shared/adminListCopy.mjs'
+import {
+  defaultGiveawayCompetitionSlug,
+  isGiveawayCompetitionSlug,
+} from '../../../shared/adminCompetitions.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_SLUG } from '../../../shared/worldCupBallGiveaway.mjs'
 
 export default function AdminSubmissionsPage() {
-  const [giveaway, setGiveaway] = useState(defaultGiveawayCompetitionSlug())
+  const [searchParams] = useSearchParams()
+  const initialGiveaway =
+    (searchParams.get('competition') || '').trim() &&
+    isGiveawayCompetitionSlug(searchParams.get('competition'))
+      ? searchParams.get('competition').trim()
+      : defaultGiveawayCompetitionSlug()
+  const [giveaway, setGiveaway] = useState(initialGiveaway)
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
   const [page, setPage] = useState(1)
@@ -116,7 +130,9 @@ export default function AdminSubmissionsPage() {
       </div>
 
       <AdminHelpBanner title={`${competitionFilterLabel('giveaway', giveaway)} — separate from main draw`}>
-        {SUBMISSIONS_PAGE_HELP}
+        {giveaway === WORLD_CUP_BALL_GIVEAWAY_SLUG
+          ? `${WORLD_CUP_BALL_ADMIN_HELP.submissions} ${SUBMISSIONS_PAGE_HELP}`
+          : SUBMISSIONS_PAGE_HELP}
       </AdminHelpBanner>
 
       {err ? <p className="text-sm text-red-400">{err}</p> : null}
@@ -140,6 +156,7 @@ export default function AdminSubmissionsPage() {
                 {rows.map((s) => {
                   const open = expandedId === s.id
                   const hasMedia = Boolean(s.video_ref)
+                  const hasDetails = hasMedia || isWorldCupBallWinnerEntry(s)
                   return (
                     <Fragment key={s.id}>
                       <tr className="hover:bg-white/[0.03]">
@@ -156,9 +173,9 @@ export default function AdminSubmissionsPage() {
                         <td className="whitespace-nowrap px-2.5 py-2 text-stone-500">{formatDate(s.created_at)}</td>
                         <td className="px-2.5 py-2">
                           <div className="flex flex-wrap gap-1">
-                            {hasMedia ? (
+                            {hasDetails ? (
                               <MiniBtn onClick={() => setExpandedId(open ? null : s.id)}>
-                                {open ? 'Hide' : 'View'}
+                                {open ? 'Hide' : 'Details'}
                               </MiniBtn>
                             ) : null}
                             <MiniBtn onClick={() => setStatus(s.id, 'approved')}>Approve</MiniBtn>
@@ -169,7 +186,7 @@ export default function AdminSubmissionsPage() {
                           </div>
                         </td>
                       </tr>
-                      {open && hasMedia ? (
+                      {open && hasDetails ? (
                         <tr className="bg-black/25">
                           <td colSpan={6} className="px-2.5 py-2">
                             <SubmissionMedia s={s} />
@@ -197,7 +214,51 @@ export default function AdminSubmissionsPage() {
   )
 }
 
+function isWorldCupBallWinnerEntry(s) {
+  return (
+    s.competition === WORLD_CUP_BALL_GIVEAWAY_SLUG || s.video_ref === 'skill:world-cup-ball-giveaway'
+  )
+}
+
 function SubmissionMedia({ s }) {
+  if (isWorldCupBallWinnerEntry(s)) {
+    const addressParts = [
+      s.winner_address_line1 || null,
+      s.winner_address_line2 || null,
+      s.winner_city || null,
+      s.winner_postcode || null,
+    ].filter(Boolean)
+    return (
+      <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-3 text-sm">
+        <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/80">World Cup Ball winner</p>
+        <dl className="mt-2 grid gap-1.5 text-stone-300 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-stone-500">Win reference</dt>
+            <dd className="font-mono text-amber-100">{s.entry_number || '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-stone-500">Phone</dt>
+            <dd>{s.winner_phone || String(s.video_filename || '').replace(/^Phone:\s*/i, '') || '—'}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-stone-500">UK delivery address</dt>
+            <dd>{addressParts.length ? addressParts.join(', ') : '—'}</dd>
+          </div>
+          {s.winner_email_sent_at ? (
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-stone-500">Winner email sent</dt>
+              <dd className="text-stone-400">{formatDate(s.winner_email_sent_at)}</dd>
+            </div>
+          ) : null}
+        </dl>
+        {s.admin_notes ? (
+          <pre className="mt-3 whitespace-pre-wrap rounded-md border border-white/5 bg-black/20 p-2.5 text-xs text-stone-500">
+            {s.admin_notes}
+          </pre>
+        ) : null}
+      </div>
+    )
+  }
   if (s.video_ref?.startsWith('answer:')) {
     return (
       <div className="rounded-lg border border-lime-500/25 bg-lime-950/20 px-3 py-2 text-sm">

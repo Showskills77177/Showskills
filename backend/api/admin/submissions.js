@@ -4,6 +4,7 @@ import { json, readJsonBody } from '../lib/http.mjs'
 import { deleteLocalKickupFileFromRef } from '../lib/kickupUploads.mjs'
 import { parseAdminListQuery, adminListMeta } from '../lib/adminPagination.mjs'
 import { ensureShirtEntrySchema } from '../lib/shirtEntryNumbers.mjs'
+import { ensureWorldCupBallSchema } from '../lib/worldCupBallSchema.mjs'
 
 /** Express: use native .status().json() so the response always completes (avoids subtle res.end issues). */
 function sendJson(res, status, data) {
@@ -75,22 +76,38 @@ export default async function handler(req, res) {
       })
 
       await ensureShirtEntrySchema()
+      await ensureWorldCupBallSchema()
 
       let where = 'WHERE 1=1'
       const params = []
       if (competition) {
         params.push(competition)
-        where += ` AND COALESCE(competition, 'ronaldo_shirt_giveaway') = $${params.length}`
+        where += ` AND COALESCE(ks.competition, 'ronaldo_shirt_giveaway') = $${params.length}`
       }
       if (q) {
         params.push(`%${q}%`, `%${q}%`)
-        where += ` AND (email ILIKE $${params.length - 1} OR full_name ILIKE $${params.length})`
+        where += ` AND (ks.email ILIKE $${params.length - 1} OR ks.full_name ILIKE $${params.length})`
       }
 
-      const countRes = await query(`SELECT COUNT(*)::int AS c FROM kickup_submissions ${where}`, params)
+      const countRes = await query(
+        `SELECT COUNT(*)::int AS c FROM kickup_submissions ks ${where}`,
+        params,
+      )
       const total = Number(countRes.rows[0]?.c ?? 0)
 
-      const sql = `SELECT * FROM kickup_submissions ${where} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${offset}`
+      const sql = `
+        SELECT ks.*,
+          w.phone AS winner_phone,
+          w.address_line1 AS winner_address_line1,
+          w.address_line2 AS winner_address_line2,
+          w.city AS winner_city,
+          w.postcode AS winner_postcode,
+          w.winner_email_sent_at
+        FROM kickup_submissions ks
+        LEFT JOIN world_cup_ball_winners w ON w.submission_id = ks.id
+        ${where}
+        ORDER BY ks.created_at DESC
+        LIMIT ${pageSize} OFFSET ${offset}`
       const r = await query(sql, params)
       res.setHeader('Cache-Control', 'private, no-store')
       return sendJson(res, 200, {

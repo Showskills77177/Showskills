@@ -27,6 +27,7 @@
     "seed:period-split": "node scripts/seed-period-split-test.mjs",
     "seed:test3-bulk": "node scripts/seed-ronaldo-bundle-test3-bulk.mjs 334 --clear",
     "preview:winner-email": "node scripts/preview-winner-email.mjs",
+    "preview:world-cup-ball-winner-email": "node scripts/preview-world-cup-ball-winner-email.mjs",
     "test:period-split": "node scripts/test-period-split-draw.mjs",
     "test:draw-local": "node scripts/test-draw-local.mjs",
     "test": "playwright test",

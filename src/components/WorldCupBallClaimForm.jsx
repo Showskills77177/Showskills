@@ -15,7 +15,7 @@ import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 /**
  * Winner fulfilment form — name, phone, and address collected only after a perfect score.
  */
-export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onError }) {
+export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onError, preview = false }) {
   const [entrantAgeBand, setEntrantAgeBand] = useState('18plus')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -42,6 +42,10 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
     e.preventDefault()
     setLocalError('')
     onError('')
+    if (preview) {
+      setLocalError('Preview only — this form does not save on the test preview page.')
+      return
+    }
     if (!consent) {
       setLocalError('Please agree to the Terms & Conditions and Privacy Policy.')
       return
@@ -114,6 +118,10 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
   const sendClaimLink = async () => {
     setLocalError('')
     onError('')
+    if (preview) {
+      setLocalError('Preview only — email links are not sent from the test preview page.')
+      return
+    }
     if (!email.trim().includes('@')) {
       setLocalError('Enter your email above first so we can send your winner link.')
       return

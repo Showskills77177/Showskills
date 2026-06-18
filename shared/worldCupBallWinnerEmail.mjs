@@ -8,7 +8,11 @@ import {
 } from './worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from './worldCupBallPhotography.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
-import { EMAIL_ICONS, emailIconImg } from './emailIcons.mjs'
+
+const LABEL_STYLE =
+  'font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#a8a29e'
+const VALUE_STYLE = 'font-size:14px;color:#e7e5e4'
+const VALUE_MONO_STYLE = 'font-family:ui-monospace,Menlo,Consolas,monospace;color:#fef3c7;font-size:13px'
 
 export function worldCupBallWinnerEmailSubject(detailsComplete = true) {
   if (detailsComplete) {
@@ -28,6 +32,7 @@ export function worldCupBallWinnerEmailSubject(detailsComplete = true) {
  *   sandboxNote?: string
  *   claimUrl?: string
  *   detailsComplete?: boolean
+ *   forBrowserPreview?: boolean
  * }} props
  */
 export function buildWorldCupBallWinnerEmailHtml(props) {
@@ -40,22 +45,17 @@ export function buildWorldCupBallWinnerEmailHtml(props) {
     sandboxNote,
     claimUrl,
     detailsComplete = true,
+    forBrowserPreview = false,
   } = props
+
   const sandboxBanner = sandboxNote
-    ? `<p style="margin:0 0 12px;padding:10px 12px;font-size:12px;line-height:1.45;color:#fde68a;background:rgba(120,53,15,0.35);border-radius:8px;border:1px solid rgba(251,191,36,0.4)">${escapeHtml(sandboxNote)}</p>`
+    ? `<p style="margin:0 0 16px;padding:12px 14px;font-size:13px;line-height:1.5;color:#fde68a;background:rgba(120,53,15,0.25);border-radius:10px;border:1px solid rgba(251,191,36,0.35)">${escapeHtml(sandboxNote)}</p>`
     : ''
-  const phoneLine = customerPhone
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px"><tr>
-        <td style="padding-right:10px;vertical-align:top">${emailIconImg(EMAIL_ICONS.phone, 'Phone', 28)}</td>
-        <td style="font-size:13px;line-height:1.5;color:#e7e5e4;vertical-align:middle">
-          Contact number on file: <strong style="color:#fef3c7">${escapeHtml(customerPhone)}</strong>.
-        </td></tr></table>`
-    : ''
-  const logoSrc = emailLogoUrl(siteUrl)
+
+  const logoSrc = emailLogoUrl(siteUrl, { forBrowserPreview })
   const name = escapeHtml(customerFullName || 'Winner')
   const prize = escapeHtml(WORLD_CUP_BALL_PRIZE_TITLE)
   const promotion = escapeHtml(WORLD_CUP_BALL_GIVEAWAY_LABEL)
-  const ref = winReference ? escapeHtml(winReference) : ''
   const claimHref = claimUrl ? escapeHtml(claimUrl) : ''
   const won =
     wonAt &&
@@ -65,108 +65,116 @@ export function buildWorldCupBallWinnerEmailHtml(props) {
       timeZone: 'Europe/London',
     }).format(new Date(wonAt))
 
-  const introComplete = `Congratulations — you have won the <strong style="color:#fef3c7">${prize}</strong> in the
-                <strong style="color:#fffbeb">${promotion}</strong>. You answered every skill question correctly within the time limits.
-                Your delivery details are saved and we will arrange <strong style="color:#fef3c7">free UK shipping</strong> of your football.`
+  const introComplete = `You answered every skill question correctly within the time limits and have won the <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. Your delivery details are saved and we will arrange <strong style="color:#fef3c7">free UK shipping</strong> of your football.`
 
-  const introPending = `Congratulations — you have won the <strong style="color:#fef3c7">${prize}</strong> in the
-                <strong style="color:#fffbeb">${promotion}</strong>. You answered every skill question correctly within the time limits.
-                <strong style="color:#fef3c7">Please provide your delivery details</strong> using the secure link below so we can ship your football — UK delivery is <strong style="color:#fef3c7">free</strong> for the winner.`
+  const introPending = `You answered every skill question correctly within the time limits and have won the <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. <strong style="color:#fef3c7">Please provide your delivery details</strong> using the secure link below so we can ship your football — UK delivery is free for the winner.`
+
+  const detailRows = []
+  if (winReference) {
+    detailRows.push(
+      `<tr><td style="padding:6px 0;${LABEL_STYLE}">Win reference</td><td align="right" style="padding:6px 0;${VALUE_MONO_STYLE}">${escapeHtml(winReference)}</td></tr>`,
+    )
+  }
+  if (won) {
+    detailRows.push(
+      `<tr><td style="padding:6px 0;${LABEL_STYLE}">Won</td><td align="right" style="padding:6px 0;${VALUE_STYLE}">${escapeHtml(won)} (UK)</td></tr>`,
+    )
+  }
+  if (customerPhone) {
+    detailRows.push(
+      `<tr><td style="padding:6px 0;${LABEL_STYLE}">Contact number</td><td align="right" style="padding:6px 0;${VALUE_STYLE}">${escapeHtml(customerPhone)}</td></tr>`,
+    )
+  }
+  detailRows.push(
+    `<tr><td style="padding:6px 0;${LABEL_STYLE}">Prize</td><td align="right" style="padding:6px 0;${VALUE_STYLE}">${prize}</td></tr>`,
+  )
+
+  const detailsBox =
+    detailRows.length > 0
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:rgba(0,0,0,0.22);border-radius:12px;border:1px solid rgba(251,191,36,0.25)">
+          <tr><td style="padding:16px 18px">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${detailRows.join('')}</table>
+          </td></tr>
+        </table>`
+      : ''
 
   const claimButton = claimHref
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px"><tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#d97706,#fbbf24)">
-          <a href="${claimHref}" style="display:inline-block;padding:14px 28px;font-family:system-ui,sans-serif;font-size:15px;font-weight:800;color:#1c1917;text-decoration:none">
-            ${detailsComplete ? 'View your winner delivery form' : 'Complete your delivery details'}
-          </a>
-        </td></tr></table>
-        <p style="margin:0 0 16px;font-size:12px;line-height:1.5;color:#78716c;word-break:break-all">
-          Or copy this link: <a href="${claimHref}" style="color:#fbbf24">${claimHref}</a>
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px">
+          <tr><td style="border-radius:10px;background:#b45309">
+            <a href="${claimHref}" style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none">
+              ${detailsComplete ? 'View your delivery form' : 'Complete your delivery details'}
+            </a>
+          </td></tr>
+        </table>
+        <p style="margin:0 0 20px;font-size:12px;line-height:1.55;color:#78716c">
+          Or use this link: <a href="${claimHref}" style="color:#fbbf24;word-break:break-all">${claimHref}</a>
         </p>`
     : ''
 
-  const iconRow = [
-    emailIconImg(EMAIL_ICONS.fireworks, 'Celebration', 36),
-    emailIconImg(EMAIL_ICONS.sparkles, 'Sparkles', 32),
-    emailIconImg(EMAIL_ICONS.crown, 'Winner', 40),
-    emailIconImg(EMAIL_ICONS.sparkles, 'Sparkles', 32),
-    emailIconImg(EMAIL_ICONS.fireworks, 'Celebration', 36),
-  ].join('<span style="display:inline-block;width:8px"></span>')
+  const nextSteps = [
+    detailsComplete
+      ? '<strong style="color:#fef3c7">Your delivery details are saved.</strong> We will ship your football to the UK address you provided.'
+      : '<strong style="color:#fef3c7">Complete the delivery form</strong> with your name, email, mobile number, and UK postal address (parent or guardian details if you are 16 or 17).',
+    escapeHtml(WORLD_CUP_BALL_FREE_SHIPPING_NOTICE),
+    escapeHtml(WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY),
+    `Questions? Email <a href="mailto:${SHOWSKILLS_CONTACT_EMAIL}" style="color:#fbbf24;text-decoration:none">${SHOWSKILLS_CONTACT_EMAIL}</a>.`,
+  ]
+
+  const nextStepsHtml = nextSteps
+    .map(
+      (step) =>
+        `<tr><td style="padding:8px 0 8px 14px;border-left:2px solid rgba(251,191,36,0.4);font-size:13px;line-height:1.6;color:#d6d3d1">${step}</td></tr>`,
+    )
+    .join('')
 
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
-<body style="margin:0;padding:0;background:#0a0908;font-family:Georgia,'Times New Roman',Times,serif">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#1f1608 0%,#0c0a09 50%,#050504 100%);padding:32px 12px">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
-        <tr><td style="padding:0 0 16px;text-align:center;line-height:1">${iconRow}</td></tr>
-        <tr><td>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:22px;overflow:hidden;border:1px solid rgba(212,175,55,0.5);box-shadow:0 12px 48px rgba(0,0,0,0.6),0 0 80px rgba(212,175,55,0.15)">
-            <tr><td style="padding:0;background:linear-gradient(135deg,#4a3a12 0%,#292524 40%,#141210 100%);text-align:center;border-bottom:1px solid rgba(212,175,55,0.4)">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr><td style="padding:20px 24px 10px">
-                  <p style="margin:0;font-family:system-ui,-apple-system,sans-serif;font-size:10px;font-weight:700;letter-spacing:0.24em;text-transform:uppercase;color:#fbbf24">Official winner notification</p>
-                </td></tr>
-                <tr><td style="padding:6px 24px 8px">
-                  <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
-                    <td style="padding-right:12px;vertical-align:middle">${emailIconImg(EMAIL_ICONS.trophy, 'Trophy', 52)}</td>
-                    <td style="vertical-align:middle;text-align:left">
-                      <p style="margin:0;font-family:system-ui,-apple-system,sans-serif;font-size:26px;line-height:1.2;font-weight:800;color:#fffbeb">You&apos;re the winner</p>
-                      <p style="margin:6px 0 0;font-family:system-ui,sans-serif;font-size:13px;color:#fcd34d">Skill challenge · ShowSkills Rewards</p>
-                    </td>
-                  </tr></table>
-                </td></tr>
-                <tr><td style="padding:8px 24px 22px">
-                  <img src="${logoSrc}" alt="ShowSkills Rewards" width="148" style="max-width:148px;height:auto;opacity:0.96" />
-                </td></tr>
-              </table>
-            </td></tr>
-            <tr><td style="padding:24px 26px 28px;background:#141210;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Winner notification — ${promotion}</title>
+</head>
+<body style="margin:0;padding:0;background:#0c1a16;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0c1a16;padding:36px 16px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px">
+          <tr>
+            <td style="padding:0 0 24px;text-align:center">
+              <img src="${escapeHtml(logoSrc)}" alt="ShowSkills Rewards" width="156" style="display:block;margin:0 auto 16px;max-width:156px;height:auto;border:0" />
+              <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#d97706">Official winner notification</p>
+              <p style="margin:0;font-size:24px;font-weight:700;line-height:1.3;color:#fef3c7">You have won</p>
+              <p style="margin:8px 0 0;font-size:14px;color:#a8a29e">${promotion}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:linear-gradient(180deg,#0f2922 0%,#0a1f19 100%);border:1px solid rgba(251,191,36,0.35);border-radius:16px;padding:28px 24px">
               ${sandboxBanner}
-              <p style="margin:0 0 6px;font-size:14px;color:#a8a29e">Dear ${name},</p>
-              <p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:#e7e5e4">
+              <p style="margin:0 0 14px;font-size:16px;color:#e7e5e4">Dear ${name},</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#d6d3d1">
                 ${detailsComplete ? introComplete : introPending}
                 This is a formal notification under our published terms and conditions.
               </p>
-              ${ref ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;border-radius:16px;background:linear-gradient(145deg,rgba(212,175,55,0.25) 0%,rgba(5,46,22,0.35) 100%);border:1px solid rgba(212,175,55,0.55)">
-                <tr><td style="padding:18px 20px;text-align:center">
-                  <p style="margin:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:30px;font-weight:800;letter-spacing:0.08em;color:#fffbeb">${ref}</p>
-                  ${won ? `<p style="margin:10px 0 0;font-size:11px;color:#78716c">Won: ${escapeHtml(won)} (UK)</p>` : ''}
-                </td></tr>
-              </table>` : ''}
+              ${detailsBox}
               ${claimButton}
-              ${phoneLine}
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px"><tr>
-                <td style="padding-right:8px;vertical-align:middle">${emailIconImg(EMAIL_ICONS.star, 'Next steps', 24)}</td>
-                <td style="font-size:14px;font-weight:600;color:#fafaf9;vertical-align:middle">What happens next</td>
-              </tr></table>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px">
-                <tr><td style="padding:9px 0 9px 14px;border-left:2px solid rgba(212,175,55,0.65);font-size:13px;line-height:1.55;color:#d6d3d1">
-                  ${detailsComplete ? '<strong style="color:#fef3c7">Your delivery details are saved.</strong> We will ship your football to the UK address you provided.' : '<strong style="color:#fef3c7">Please complete the delivery form</strong> with your name, email, mobile number, and UK postal address (parent/guardian details if you are 16 or 17).'}
-                </td></tr>
-                <tr><td style="padding:9px 0 9px 14px;border-left:2px solid rgba(212,175,55,0.35);font-size:13px;line-height:1.55;color:#d6d3d1">
-                  ${escapeHtml(WORLD_CUP_BALL_FREE_SHIPPING_NOTICE)}
-                </td></tr>
-                <tr><td style="padding:9px 0 9px 14px;border-left:2px solid rgba(212,175,55,0.35);font-size:13px;line-height:1.55;color:#d6d3d1">
-                  ${escapeHtml(WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY)}
-                </td></tr>
-                <tr><td style="padding:9px 0 9px 14px;border-left:2px solid rgba(212,175,55,0.35);font-size:13px;line-height:1.55;color:#d6d3d1">
-                  Questions or problems? Email <a href="mailto:${SHOWSKILLS_CONTACT_EMAIL}" style="color:#fbbf24;text-decoration:none">${SHOWSKILLS_CONTACT_EMAIL}</a>.
-                </td></tr>
-              </table>
-              <p style="margin:0 0 12px;font-size:12px;line-height:1.5;color:#78716c">
-                If you did not enter, contact us immediately:
+              <p style="margin:0 0 12px;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#a8a29e">What happens next</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px">${nextStepsHtml}</table>
+              <p style="margin:0;font-size:12px;line-height:1.55;color:#78716c">
+                If you did not enter this promotion, contact
                 <a href="mailto:${SHOWSKILLS_CONTACT_EMAIL}" style="color:#fbbf24;text-decoration:none">${SHOWSKILLS_CONTACT_EMAIL}</a>
+                immediately.
               </p>
-              <p style="margin:0;padding-top:14px;border-top:1px solid rgba(255,255,255,0.06);font-size:11px;color:#57534e;text-align:center">
-                ShowSkills Rewards · Premium skill competitions<br/>
-                <a href="${escapeHtml(siteUrl)}" style="color:#a8a29e;text-decoration:none">${escapeHtml(siteUrl.replace(/^https?:\/\//, ''))}</a>
-              </p>
-            </td></tr>
-          </table>
-        </td></tr>
-      </table>
-    </td></tr>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 12px 0;text-align:center;font-size:11px;line-height:1.5;color:#57534e">
+              ShowSkills Rewards · Premium skill competitions<br />
+              <a href="${escapeHtml(siteUrl)}" style="color:#78716c;text-decoration:none">${escapeHtml(siteUrl.replace(/^https?:\/\//, ''))}</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
   </table>
 </body>
 </html>`
@@ -184,7 +192,7 @@ export function buildWorldCupBallWinnerEmailText(props) {
     detailsComplete = true,
   } = props
   const lines = [
-    detailsComplete ? 'CONGRATULATIONS — YOU WON!' : 'ACTION REQUIRED — COMPLETE YOUR WINNER DETAILS',
+    detailsComplete ? 'You have won — ShowSkills Rewards' : 'Action required — complete your winner details',
     '',
     `Dear ${customerFullName || 'Winner'},`,
     '',
@@ -193,20 +201,20 @@ export function buildWorldCupBallWinnerEmailText(props) {
     '',
   ]
   if (sandboxNote) lines.push(sandboxNote, '')
-  if (winReference) lines.push(`Skill win reference: ${winReference}`)
-  if (customerPhone) lines.push(`Contact phone on file: ${customerPhone}`)
+  if (winReference) lines.push(`Win reference: ${winReference}`)
+  if (customerPhone) lines.push(`Contact number: ${customerPhone}`)
   if (wonAt) lines.push(`Won: ${wonAt}`)
   if (claimUrl) {
-    lines.push('', detailsComplete ? 'Your delivery form link:' : 'Complete your delivery details here:', claimUrl)
+    lines.push('', detailsComplete ? 'Your delivery form:' : 'Complete your delivery details:', claimUrl)
   }
   lines.push(
     '',
+    'What happens next:',
     detailsComplete
-      ? 'Your delivery details are saved. We will arrange free UK shipping of your football.'
-      : 'Please provide your name, email, mobile number, and UK postal address using the link above so we can ship your football.',
-    WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
-    '',
-    WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY,
+      ? '• Your delivery details are saved. We will arrange free UK shipping of your football.'
+      : '• Please provide your name, email, mobile number, and UK postal address using the link above.',
+    `• ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}`,
+    `• ${WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY}`,
     '',
     `Questions: ${SHOWSKILLS_CONTACT_EMAIL}`,
     '',

@@ -57,6 +57,10 @@ export default function App() {
                     <p className="mb-6 text-sm text-amber-800">
                       Local dev only — same previews as{' '}
                       <span className="font-mono text-stone-400">/admin/test-email</span> (no login).
+                      Winner delivery form after a perfect score:{' '}
+                      <a href="/?preview-wc-ball=won" className="font-mono text-amber-700 underline">
+                        /?preview-wc-ball=won
+                      </a>
                     </p>
                     <PurchaseEmailPreview />
                   </div>

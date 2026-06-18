@@ -3,6 +3,10 @@
 import { DRAW_COMPETITION_SLUG, DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
 import { IPHONE_17_PRO_COMPETITION_LABEL, IPHONE_17_PRO_COMPETITION_SLUG } from './iphone17ProCompetition.mjs'
 import { COMPETITION_SHIRT_GIVEAWAY } from './freeEntryLimits.mjs'
+import {
+  WORLD_CUP_BALL_GIVEAWAY_LABEL,
+  WORLD_CUP_BALL_GIVEAWAY_SLUG,
+} from './worldCupBallGiveaway.mjs'
 
 export const MJ_COMPETITION_SLUG = 'michael_jackson_album'
 export const MJ_COMPETITION_LABEL = 'Michael Jackson Signed Album'
@@ -17,8 +21,9 @@ export const MAIN_DRAW_COMPETITIONS = [
   },
 ]
 
-/** Side promotions (shirt sign-ups, consolation rows) — not Legacy draw pool. */
+/** Side promotions (shirt sign-ups, World Cup Ball skill win, consolation rows). */
 export const GIVEAWAY_COMPETITIONS = [
+  { slug: WORLD_CUP_BALL_GIVEAWAY_SLUG, label: WORLD_CUP_BALL_GIVEAWAY_LABEL },
   { slug: COMPETITION_SHIRT_GIVEAWAY, label: 'Free Ronaldo shirt giveaway' },
 ]
 

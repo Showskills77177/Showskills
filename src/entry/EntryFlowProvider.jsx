@@ -34,6 +34,7 @@ import { resolvePublicSocialLinks } from '../../shared/socialLinks.mjs'
 import { SHIRT_GIVEAWAY_SOCIAL_PLATFORMS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { WORLD_CUP_BALL_CLAIM_QUERY_PARAM } from '../../shared/worldCupBallClaim.mjs'
+import { DEV_PREVIEW_WC_BALL_CLAIM_TOKEN } from '../../shared/devEmailPreview.mjs'
 
 function readInitialQuizSession() {
   if (typeof window === 'undefined') return null
@@ -610,6 +611,30 @@ export function EntryFlowProvider({ children }) {
     beginPaidQuizPending,
     restorePaidQuizFromSession,
   ])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const preview = searchParams.get('preview-wc-ball')
+    if (preview !== 'won' && preview !== 'claimed') return
+
+    setWcBallError('')
+    setWcBallVpnBlocked(false)
+    setWcBallCheckingVpn(false)
+    setWcBallClaimToken(DEV_PREVIEW_WC_BALL_CLAIM_TOKEN)
+    setWcBallOutcome({ result: 'won' })
+    if (preview === 'claimed') {
+      setWcBallClaimed(true)
+      setWcBallWinnerEmail({ sent: true, detailsComplete: true })
+    } else {
+      setWcBallClaimed(false)
+      setWcBallWinnerEmail(null)
+    }
+    setEntryModalType('worldCupBall')
+
+    const next = new URLSearchParams(searchParams)
+    next.delete('preview-wc-ball')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)

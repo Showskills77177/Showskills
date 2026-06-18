@@ -6,7 +6,8 @@ import {
   AdminCompetitionSelect,
   competitionFilterLabel,
 } from '../../components/admin/AdminCompetitionSelect'
-import { ENTRY_ATTEMPTS_PAGE_HELP } from '../../../shared/adminListCopy.mjs'
+import { ENTRY_ATTEMPTS_PAGE_HELP, WORLD_CUP_BALL_ADMIN_HELP } from '../../../shared/adminListCopy.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_SLUG } from '../../../shared/worldCupBallGiveaway.mjs'
 
 export default function EntryAttemptsPage() {
   const [competition, setCompetition] = useState('')
@@ -53,7 +54,9 @@ export default function EntryAttemptsPage() {
       </div>
 
       <AdminHelpBanner title={`Free-route security log — ${competitionFilterLabel('any', competition)}`}>
-        {ENTRY_ATTEMPTS_PAGE_HELP}
+        {competition === WORLD_CUP_BALL_GIVEAWAY_SLUG
+          ? `${WORLD_CUP_BALL_ADMIN_HELP.entryLog} ${ENTRY_ATTEMPTS_PAGE_HELP}`
+          : ENTRY_ATTEMPTS_PAGE_HELP}
       </AdminHelpBanner>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -72,6 +75,9 @@ export default function EntryAttemptsPage() {
           <option value="">All flows</option>
           <option value="legacy_free_online">Legacy free online</option>
           <option value="shirt_giveaway">Shirt giveaway</option>
+          <option value="world_cup_ball_start">World Cup Ball — quiz start</option>
+          <option value="world_cup_ball_submit">World Cup Ball — quiz result</option>
+          <option value="world_cup_ball_claim">World Cup Ball — delivery form saved</option>
         </select>
         <select
           value={outcome}

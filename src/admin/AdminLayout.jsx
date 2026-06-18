@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { to: '/admin/tickets', label: 'Tickets', competition: 'legacy' },
   { to: '/admin/draw', label: 'Draw winner', competition: 'legacy' },
   { to: '/admin/payments', label: 'Payments', competition: 'legacy' },
-  { to: '/admin/submissions', label: 'Shirt giveaway', competition: 'shirt' },
+  { to: '/admin/submissions', label: 'Giveaway entries', competition: 'shirt' },
   { to: '/admin/entry-attempts', label: 'Entry log', competition: 'shirt' },
   { to: '/admin/test-email', label: 'Test email', competition: 'both' },
   { to: '/admin/newsletter', label: 'Newsletter', competition: 'both' },

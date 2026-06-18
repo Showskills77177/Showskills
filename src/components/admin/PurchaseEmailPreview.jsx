@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EmailHtmlPreviewFrame } from './EmailHtmlPreviewFrame'
-import { NewsletterEmailPreview } from './NewsletterEmailPreview'
+import { WorldCupBallGiveawayPreview } from './WorldCupBallGiveawayPreview'
 import { defaultEmailLayout } from '../../../shared/emailLayout.mjs'
 import { AdminCompetitionSelect } from './AdminCompetitionSelect'
 import { defaultMainDrawCompetitionSlug, getMainDrawCompetitionLabel } from '../../../shared/adminCompetitions.mjs'
@@ -40,6 +40,7 @@ const EMAIL_TYPES = [
 
 const EMAIL_GROUPS = [
   { id: 'tickets', label: 'Ticket & quiz emails' },
+  { id: 'world_cup_ball', label: 'World Cup Ball giveaway' },
   { id: 'newsletter', label: 'Newsletter emails' },
 ]
 
@@ -116,6 +117,31 @@ export function PurchaseEmailPreview({ newsletterLayout = null }) {
           : 'Sent after wrong answers when spend is under £10 in one purchase. No consolation shirt entries — explains the £10 threshold.',
     }
   }, [emailType, siteUrl, ticketCount, ticketNumbers, completeQuizUrl, prizeRevealUrl])
+
+  if (emailGroup === 'world_cup_ball') {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div />
+          <label className="flex items-center gap-2 text-sm text-stone-400">
+            Group
+            <select
+              value={emailGroup}
+              onChange={(e) => setEmailGroup(e.target.value)}
+              className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-stone-200"
+            >
+              {EMAIL_GROUPS.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <WorldCupBallGiveawayPreview />
+      </div>
+    )
+  }
 
   if (emailGroup === 'newsletter') {
     return (
