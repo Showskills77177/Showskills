@@ -85,17 +85,15 @@ export function HomeIphone17ProPanel({ block = {}, onEnter, editorMode = false, 
                 </div>
                 {!preview ? (
                   <div className="ss-home-iphone-panel__actions mt-7 sm:mt-8">
-                    <div className="ss-home-iphone-panel__cta-group">
-                      <p className="ss-home-iphone-panel__price">{priceLine}</p>
-                      <button
-                        type="button"
-                        onClick={onEnter}
-                        tabIndex={editorMode ? -1 : undefined}
-                        className="ss-hero-bundle-draw-btn ss-home-iphone-panel__enter-btn"
-                      >
-                        {ctaLabel}
-                      </button>
-                    </div>
+                    <p className="ss-home-iphone-panel__price">{priceLine}</p>
+                    <button
+                      type="button"
+                      onClick={onEnter}
+                      tabIndex={editorMode ? -1 : undefined}
+                      className="ss-hero-bundle-draw-btn ss-home-iphone-panel__enter-btn"
+                    >
+                      {ctaLabel}
+                    </button>
                   </div>
                 ) : (
                   <p className="ss-home-iphone-panel__price mt-4">{priceLine}</p>

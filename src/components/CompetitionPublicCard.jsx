@@ -237,13 +237,15 @@ export function CompetitionPublicCard({
         'Countdown timer',
         'timer',
         countdownPeriod ? (
-          <CompetitionCountdown
-            opensAt={countdownPeriod.entryOpensAt}
-            closesAt={countdownPeriod.entryClosesAt}
-            showDot={false}
-            live={!editorMode}
-            className="!m-0 max-w-[min(100%,22rem)] text-center sm:max-w-xl"
-          />
+          <div className="ss-competition-card-timer-slot">
+            <CompetitionCountdown
+              opensAt={countdownPeriod.entryOpensAt}
+              closesAt={countdownPeriod.entryClosesAt}
+              showDot={false}
+              live={!editorMode}
+              className="!m-0 max-w-[min(100%,22rem)] text-center sm:max-w-xl"
+            />
+          </div>
         ) : (
           <p className="text-xs text-amber-200/80">No entry period dates yet — set them in admin.</p>
         ),
