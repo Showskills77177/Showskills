@@ -8,6 +8,12 @@ import {
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
+import {
+  WORLD_CUP_BALL_PRACTICE_QUESTION,
+  WORLD_CUP_BALL_PRACTICE_INTRO,
+  WORLD_CUP_BALL_PRACTICE_TIMER_TIP,
+  worldCupBallPracticeCompleteTips,
+} from '../../shared/worldCupBallPractice.mjs'
 import { apiUrl } from '../lib/api'
 import {
   clearWorldCupBallQuizProgress,
@@ -35,8 +41,23 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   const [secondsLeft, setSecondsLeft] = useState(WORLD_CUP_BALL_QUESTION_SECONDS)
   const [submitting, setSubmitting] = useState(false)
   const [salvageQuestion, setSalvageQuestion] = useState(null)
+  const [practiceSecondsLeft, setPracticeSecondsLeft] = useState(WORLD_CUP_BALL_QUESTION_SECONDS)
+  const [practiceBonusActive, setPracticeBonusActive] = useState(false)
+  const [practiceTimeouts, setPracticeTimeouts] = useState(0)
+  const [practiceSummary, setPracticeSummary] = useState({ timedOutOnce: false, answered: false })
   const disqualifiedRef = useRef(false)
   const answersRef = useRef({})
+  const practiceCompletedRef = useRef(false)
+  const [hasSavedProgress, setHasSavedProgress] = useState(false)
+
+  const practiceChoices = useMemo(() => {
+    const list = [...WORLD_CUP_BALL_PRACTICE_QUESTION.choices]
+    for (let i = list.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[list[i], list[j]] = [list[j], list[i]]
+    }
+    return list
+  }, [])
 
   const q = questions[index]
   const shuffledChoices = useMemo(() => {
@@ -314,6 +335,48 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
     return () => window.clearTimeout(t)
   }, [phase, secondsLeft, handleTimeout, disabled, persistProgress, submitSalvageAnswer])
 
+  useEffect(() => {
+    if (phase !== 'practice' || disabled) return undefined
+    if (practiceSecondsLeft <= 0) {
+      if (practiceTimeouts >= WORLD_CUP_BALL_MAX_TIMEOUTS) {
+        practiceCompletedRef.current = true
+        setPracticeSummary({ timedOutOnce: true, answered: false })
+        setPhase('practice_complete')
+        return undefined
+      }
+      setPracticeTimeouts((count) => count + 1)
+      setPracticeBonusActive(true)
+      setPracticeSecondsLeft(WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS)
+      return undefined
+    }
+    const t = window.setTimeout(() => setPracticeSecondsLeft((s) => s - 1), 1000)
+    return () => window.clearTimeout(t)
+  }, [phase, practiceSecondsLeft, practiceTimeouts, disabled])
+
+  useEffect(() => {
+    const saved = loadWorldCupBallQuizProgress()
+    setHasSavedProgress(Boolean(saved?.sessionId))
+  }, [])
+
+  const startPractice = () => {
+    if (disabled) return
+    onError('')
+    setPracticeSecondsLeft(WORLD_CUP_BALL_QUESTION_SECONDS)
+    setPracticeBonusActive(false)
+    setPracticeTimeouts(0)
+    setPracticeSummary({ timedOutOnce: false, answered: false })
+    setPhase('practice')
+  }
+
+  const finishPractice = (answered) => {
+    practiceCompletedRef.current = true
+    setPracticeSummary({
+      timedOutOnce: practiceTimeouts > 0,
+      answered: Boolean(answered),
+    })
+    setPhase('practice_complete')
+  }
+
   const startQuiz = async () => {
     if (disabled || submitting) return
     setPhase('loading')
@@ -333,7 +396,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
         onError(
           typeof data.error === 'string' ? data.error : `Could not start the quiz.${apiOffline}`,
         )
-        setPhase('idle')
+        setPhase(practiceCompletedRef.current ? 'practice_complete' : 'idle')
         return
       }
       const questionList = Array.isArray(data.questions) ? data.questions : []
@@ -355,7 +418,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       onError(
         'Could not reach the server. If you are developing locally, run npm run dev:all (or npm run dev:api in a second terminal).',
       )
-      setPhase('idle')
+      setPhase(practiceCompletedRef.current ? 'practice_complete' : 'idle')
     }
   }
 
@@ -366,16 +429,110 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   }
 
   if (phase === 'idle') {
+    if (hasSavedProgress) {
+      return (
+        <div className="flex flex-col gap-3">
+          <p className="text-xs leading-relaxed text-stone-400">
+            You have an in-progress quiz in this browser. Resume where you left off — practice is skipped.
+          </p>
+          <button
+            type="button"
+            onClick={() => void startQuiz()}
+            disabled={disabled || submitting}
+            className="w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Resume test
+          </button>
+        </div>
+      )
+    }
+
     return (
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-relaxed text-stone-400">{WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}</p>
+        <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
+          {WORLD_CUP_BALL_PRACTICE_INTRO}
+        </p>
+        <button
+          type="button"
+          onClick={startPractice}
+          disabled={disabled}
+          className="w-full rounded-xl border border-amber-500/40 bg-amber-950/35 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try practice question
+        </button>
+      </div>
+    )
+  }
+
+  if (phase === 'practice') {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-xl border border-teal-500/30 bg-teal-950/25 px-4 py-3 text-sm text-teal-50/95">
+          <p className="font-semibold text-teal-100">Practice — not counted</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-stone-300">{WORLD_CUP_BALL_PRACTICE_INTRO}</p>
+          <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TIMER_TIP}</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
+          <span className="font-semibold text-amber-100">Practice question</span>
+          <span
+            className={`font-mono tabular-nums ${practiceSecondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
+            aria-live="polite"
+          >
+            {practiceBonusActive ? 'Bonus: ' : ''}
+            {practiceSecondsLeft}s
+          </span>
+        </div>
+        {practiceBonusActive ? (
+          <p className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
+            {WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus — in the real quiz you only get this once per attempt.
+          </p>
+        ) : null}
+        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Multiple choice</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
+            Tap one option below before the timer runs out.
+          </p>
+        </div>
+        <p className="text-base font-medium leading-snug text-stone-100">{WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {practiceChoices.map((choice) => (
+            <button
+              key={choice}
+              type="button"
+              onClick={() => finishPractice(true)}
+              className="rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40"
+            >
+              {choice}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'practice_complete') {
+    const tips = worldCupBallPracticeCompleteTips(practiceSummary)
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-4 py-4 text-sm text-emerald-50/95">
+          <p className="font-semibold text-emerald-100">Practice complete</p>
+          <p className="mt-2 text-xs leading-relaxed text-stone-300">
+            Good — you have seen how the timer works. Your real attempt starts when you press the button below.
+          </p>
+          <ul className="mt-3 list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300">
+            {tips.map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        </div>
         <button
           type="button"
           onClick={() => void startQuiz()}
-          disabled={disabled}
+          disabled={disabled || submitting}
           className="w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Start timed quiz ({WORLD_CUP_BALL_QUESTION_COUNT} questions)
+          Start test ({WORLD_CUP_BALL_QUESTION_COUNT} questions)
         </button>
       </div>
     )
