@@ -25,9 +25,9 @@ import {
 
 /**
  * Timed skill quiz for the World Cup Ball Giveaway.
- * @param {{ onResult: (result: object) => void, onError: (msg: string) => void, disabled?: boolean }} props
+ * @param {{ onResult: (result: object) => void, onError: (msg: string) => void, onPhaseChange?: (phase: string) => void, disabled?: boolean }} props
  */
-export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
+export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = false }) {
   const [phase, setPhase] = useState('idle')
   const [sessionId, setSessionId] = useState('')
   const [questions, setQuestions] = useState([])
@@ -360,6 +360,12 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
     setHasSavedProgress(Boolean(saved?.sessionId))
   }, [])
 
+  useEffect(() => {
+    onPhaseChange?.(phase)
+  }, [phase, onPhaseChange])
+
+  const quizShellClass = `ss-wc-ball-quiz ss-wc-ball-quiz--${phase}`
+
   const startPractice = () => {
     if (disabled) return
     onError('')
@@ -433,7 +439,8 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   if (phase === 'idle') {
     if (hasSavedProgress) {
       return (
-        <div className="flex flex-col gap-3">
+        <div className={quizShellClass}>
+          <div className="flex flex-col gap-3">
           <p className="text-xs leading-relaxed text-stone-400">
             You have an in-progress quiz in this browser. Resume where you left off — practice is skipped.
           </p>
@@ -445,12 +452,14 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           >
             Resume test
           </button>
+          </div>
         </div>
       )
     }
 
     return (
-      <div className="flex flex-col gap-3">
+      <div className={quizShellClass}>
+        <div className="flex flex-col gap-3">
         <p className="text-xs leading-relaxed text-stone-400">{WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}</p>
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
@@ -463,20 +472,22 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
         >
           Try practice question
         </button>
+        </div>
       </div>
     )
   }
 
   if (phase === 'practice') {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="rounded-xl border border-teal-500/30 bg-teal-950/25 px-4 py-3 text-sm text-teal-50/95">
+      <div className={quizShellClass}>
+        <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
+        <div className="ss-wc-ball-quiz__intro rounded-xl border border-teal-500/30 bg-teal-950/25 px-4 py-3 text-sm text-teal-50/95">
           <p className="font-semibold text-teal-100">Practice — not counted</p>
           <p className="mt-1.5 text-xs leading-relaxed text-stone-300">{WORLD_CUP_BALL_PRACTICE_INTRO}</p>
           <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TIMER_TIP}</p>
           <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TYPING_TIP}</p>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
+        <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
           <span className="font-semibold text-amber-100">Practice question</span>
           <span
             className={`font-mono tabular-nums ${practiceSecondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
@@ -487,28 +498,31 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           </span>
         </div>
         {practiceBonusActive ? (
-          <p className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
+          <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
             {WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus — in the real quiz you only get this once per attempt.
           </p>
         ) : null}
-        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+        <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Multiple choice</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
             Tap one option below before the timer runs out.
           </p>
         </div>
-        <p className="text-base font-medium leading-snug text-stone-100">{WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">
+          {WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}
+        </p>
+        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2">
           {practiceChoices.map((choice) => (
             <button
               key={choice}
               type="button"
               onClick={() => finishPractice(true)}
-              className="rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40"
+              className="ss-wc-ball-quiz__choice-btn rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40"
             >
               {choice}
             </button>
           ))}
+        </div>
         </div>
       </div>
     )
@@ -517,13 +531,17 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   if (phase === 'practice_complete') {
     const tips = worldCupBallPracticeCompleteTips(practiceSummary)
     return (
-      <div className="flex flex-col gap-4">
+      <div className={quizShellClass}>
+        <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-4 py-4 text-sm text-emerald-50/95">
           <p className="font-semibold text-emerald-100">Practice complete</p>
           <p className="mt-2 text-xs leading-relaxed text-stone-300">
             Good — you have seen how the timer works. Your real attempt starts when you press the button below.
           </p>
-          <ul className="mt-3 list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300">
+          <p className="ss-wc-ball-quiz__practice-ready mt-2 text-xs leading-relaxed text-stone-300 sm:hidden">
+            Ready for the real {WORLD_CUP_BALL_QUESTION_COUNT}-question timed test.
+          </p>
+          <ul className="ss-wc-ball-quiz__practice-tips mt-3 hidden list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300 sm:block">
             {tips.map((tip) => (
               <li key={tip}>{tip}</li>
             ))}
@@ -533,19 +551,22 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           type="button"
           onClick={() => void startQuiz()}
           disabled={disabled || submitting}
-          className="w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="ss-wc-ball-quiz__primary-btn w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Start test ({WORLD_CUP_BALL_QUESTION_COUNT} questions)
         </button>
+        </div>
       </div>
     )
   }
 
   if (phase === 'loading' || phase === 'submitting') {
     return (
-      <p className="text-sm text-stone-400">
-        {phase === 'loading' ? 'Preparing your quiz…' : 'Checking your answers…'}
-      </p>
+      <div className={quizShellClass}>
+        <p className="text-sm text-stone-400">
+          {phase === 'loading' ? 'Preparing your quiz…' : 'Checking your answers…'}
+        </p>
+      </div>
     )
   }
 
@@ -558,12 +579,13 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
     const hasSalvageChoices = salvageChoices.length > 0
 
     return (
-      <div className="flex flex-col gap-4">
-        <div className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-4 text-sm text-amber-50/95">
+      <div className={quizShellClass}>
+        <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
+        <div className="ss-wc-ball-quiz__salvage-banner rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-4 text-sm text-amber-50/95">
           <p className="font-semibold text-amber-100">Bonus salvage question</p>
           <p className="mt-2 text-stone-300">{WORLD_CUP_BALL_SALVAGE_NOTICE}</p>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
+        <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
           <span className="font-semibold text-amber-100">One chance to stay in the running</span>
           <span
             className={`font-mono tabular-nums ${secondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
@@ -573,21 +595,21 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           </span>
         </div>
         {hasSalvageChoices ? (
-          <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+          <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
             <p className="mt-1 text-xs leading-relaxed text-amber-100/85">Pick the correct option below.</p>
           </div>
         ) : null}
-        <p className="text-base font-medium leading-snug text-stone-100">{salvageQuestion.prompt}</p>
+        <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">{salvageQuestion.prompt}</p>
         {hasSalvageChoices ? (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2">
             {salvageChoices.map((choice) => (
               <button
                 key={choice}
                 type="button"
                 disabled={submitting}
                 onClick={() => void submitSalvageAnswer(choice)}
-                className="rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40 disabled:opacity-50"
+                className="ss-wc-ball-quiz__choice-btn rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40 disabled:opacity-50"
               >
                 {choice}
               </button>
@@ -602,7 +624,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
               void submitSalvageAnswer(currentAnswer)
             }}
           >
-            <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+            <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Type your answer</p>
               <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE}</p>
             </div>
@@ -628,6 +650,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
             </button>
           </form>
         )}
+        </div>
       </div>
     )
   }
@@ -636,8 +659,9 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
   const hasChoices = shuffledChoices.length > 0
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
+    <div className={quizShellClass}>
+      <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
+      <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
         <span className="font-semibold text-amber-100">
           Question {index + 1} of {total}
         </span>
@@ -661,28 +685,28 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
         </div>
       </div>
       {hasChoices ? (
-        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+        <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
             Pick one of the four options below — you do not need to type an answer on this question.
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+        <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Type your answer</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE}</p>
         </div>
       )}
-      <p className="text-base font-medium leading-snug text-stone-100">{q?.prompt}</p>
+      <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">{q?.prompt}</p>
       {hasChoices ? (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2">
           {shuffledChoices.map((choice) => (
             <button
               key={choice}
               type="button"
               disabled={submitting}
               onClick={() => advanceQuestion(choice)}
-              className="rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40 disabled:opacity-50"
+              className="ss-wc-ball-quiz__choice-btn rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40 disabled:opacity-50"
             >
               {choice}
             </button>
@@ -712,11 +736,12 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           </button>
         </form>
       )}
-      <p className="text-xs leading-relaxed text-stone-500">
+      <p className="ss-wc-ball-quiz__footer-note text-xs leading-relaxed text-stone-500">
         {questionSeconds} seconds per question. One {timeoutBonusSeconds}-second bonus if you run out of time once; a
         second timeout disqualifies your attempt. {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
         You have {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
       </p>
+      </div>
     </div>
   )
 }

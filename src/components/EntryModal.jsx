@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
@@ -179,6 +179,26 @@ export function EntryModal() {
 
   const panelRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
+  const [wcBallQuizPhase, setWcBallQuizPhase] = useState('idle')
+  const handleWcBallQuizPhaseChange = useCallback((nextPhase) => {
+    setWcBallQuizPhase(nextPhase)
+  }, [])
+
+  const wcBallQuizFocusPhases = ['practice', 'practice_complete', 'loading', 'active', 'salvage', 'submitting']
+  const wcBallQuizFocus =
+    entryModalType === 'worldCupBall' && wcBallQuizFocusPhases.includes(wcBallQuizPhase)
+  const wcBallShowIntro =
+    entryModalType === 'worldCupBall' && !wcBallQuizFocus && !wcBallClaimed && !wcBallOutcome
+
+  useEffect(() => {
+    if (entryModalType !== 'worldCupBall') setWcBallQuizPhase('idle')
+  }, [entryModalType])
+
+  useEffect(() => {
+    if (!wcBallQuizFocus) return
+    const scroll = panelRef.current?.querySelector('.ss-entry-modal-scroll')
+    if (scroll) scroll.scrollTop = 0
+  }, [wcBallQuizFocus, wcBallQuizPhase])
 
   const showPaymentSheet =
     hasEmbeddedCardCheckout &&
@@ -270,6 +290,17 @@ export function EntryModal() {
     worldCupBall: `Enter — ${WORLD_CUP_BALL_GIVEAWAY_LABEL}`,
   }
 
+  const entryModalTitle =
+    entryModalType === 'worldCupBall' && wcBallQuizFocus
+      ? wcBallQuizPhase === 'practice'
+        ? 'Practice question'
+        : wcBallQuizPhase === 'practice_complete'
+          ? 'Ready to start'
+          : wcBallQuizPhase === 'salvage'
+            ? 'Bonus salvage question'
+            : 'Timed quiz'
+      : titles[entryModalType]
+
   const panelWidthClass =
     entryModalType === 'paid'
       ? showPaymentSheet
@@ -296,7 +327,9 @@ export function EntryModal() {
           inert={showPaymentSheet}
           className={`ss-entry-modal-panel relative z-10 flex max-h-[min(96dvh,980px)] w-full max-w-none flex-col rounded-t-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(96vh,1080px)] sm:rounded-2xl lg:max-h-[min(96vh,1160px)] xl:max-h-[min(96vh,1200px)] ${panelWidthClass} ${
             entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
-          } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''}`}
+          } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''} ${
+            wcBallQuizFocus ? 'ss-entry-modal-panel--wc-ball-quiz-focus' : ''
+          }`}
         >
         <div
           className={`h-1 w-full ${
@@ -308,9 +341,13 @@ export function EntryModal() {
           }`}
           aria-hidden
         />
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5 sm:py-4">
+        <div
+          className={`ss-entry-modal-header flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5 sm:py-4 ${
+            wcBallQuizFocus ? 'ss-entry-modal-header--quiz-focus' : ''
+          }`}
+        >
           <h2 id="entry-modal-title" className="text-lg font-semibold leading-snug text-stone-100">
-            {titles[entryModalType]}
+            {entryModalTitle}
           </h2>
           <button
             type="button"
@@ -325,7 +362,11 @@ export function EntryModal() {
         </div>
 
         <div className="ss-entry-modal-body flex min-h-0 flex-1 flex-col">
-          <div className="ss-entry-modal-scroll min-h-0 flex-1 px-4 py-3 sm:px-5 sm:py-4">
+          <div
+            className={`ss-entry-modal-scroll min-h-0 flex-1 px-4 py-3 sm:px-5 sm:py-4 ${
+              wcBallQuizFocus ? 'ss-entry-modal-scroll--quiz-focus' : ''
+            }`}
+          >
           {entryModalType === 'paid' ? (
             <>
               <p className="text-base leading-relaxed text-stone-400 md:hidden">
@@ -928,6 +969,8 @@ export function EntryModal() {
 
           {entryModalType === 'worldCupBall' ? (
             <>
+              {wcBallShowIntro ? (
+                <>
               <WorldCupBallPrizeFrame
                 variant="compact"
                 showChips={false}
@@ -955,6 +998,8 @@ export function EntryModal() {
                   Full rules &amp; how to win
                 </Link>
               </p>
+                </>
+              ) : null}
               {wcBallCheckingVpn ? (
                 <p className="mt-3 text-sm text-stone-500">Checking your connection…</p>
               ) : null}
@@ -1005,9 +1050,10 @@ export function EntryModal() {
                   <WorldCupBallWrongReview wrongReview={wcBallOutcome.wrongReview} />
                 </div>
               ) : (
-                <div className="mt-4">
+                <div className={`ss-wc-ball-quiz-slot ${wcBallQuizFocus ? 'ss-wc-ball-quiz-slot--focus' : 'mt-4'}`}>
                   <WorldCupBallQuiz
                     disabled={wcBallVpnBlocked || wcBallCheckingVpn}
+                    onPhaseChange={handleWcBallQuizPhaseChange}
                     onError={setWcBallError}
                     onResult={(result) => {
                       setWcBallOutcome(result)
