@@ -273,14 +273,14 @@ export function EntryModal() {
   const panelWidthClass =
     entryModalType === 'paid'
       ? showPaymentSheet
-        ? 'sm:max-w-3xl lg:max-w-5xl'
-        : 'sm:max-w-2xl lg:max-w-4xl'
-      : 'sm:max-w-2xl lg:max-w-4xl'
+        ? 'sm:max-w-4xl lg:max-w-6xl xl:max-w-7xl'
+        : 'sm:max-w-3xl lg:max-w-5xl xl:max-w-6xl'
+      : 'sm:max-w-3xl lg:max-w-5xl xl:max-w-6xl'
 
   return (
     <ModalPortal>
       <div
-        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-6"
+        className="ss-entry-modal-overlay fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4 lg:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="entry-modal-title"
@@ -294,7 +294,7 @@ export function EntryModal() {
         <div
           ref={panelRef}
           inert={showPaymentSheet}
-          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(96dvh,980px)] w-full max-w-none flex-col rounded-t-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(94vh,1000px)] sm:rounded-2xl lg:max-h-[min(94vh,1040px)] ${panelWidthClass} ${
+          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(96dvh,980px)] w-full max-w-none flex-col rounded-t-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(96vh,1080px)] sm:rounded-2xl lg:max-h-[min(96vh,1160px)] xl:max-h-[min(96vh,1200px)] ${panelWidthClass} ${
             entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
           } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''}`}
         >

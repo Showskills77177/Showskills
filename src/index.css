@@ -3208,16 +3208,34 @@ body {
 }
 
 .ss-entry-modal-panel--paid {
-  max-width: min(100% - 2rem, 48rem);
+  max-width: min(100% - 2rem, 56rem);
 }
 
 @media (min-width: 1024px) {
-  .ss-entry-modal-panel--paid {
+  .ss-entry-modal-panel {
     max-width: min(100% - 3rem, 64rem);
   }
 
+  .ss-entry-modal-panel--paid {
+    max-width: min(100% - 3rem, 72rem);
+  }
+
   .ss-payment-sheet-panel {
-    max-height: min(94vh, 1000px);
+    max-height: min(96vh, 1160px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .ss-entry-modal-panel {
+    max-width: min(100% - 4rem, 72rem);
+  }
+
+  .ss-entry-modal-panel--paid {
+    max-width: min(100% - 4rem, 80rem);
+  }
+
+  .ss-payment-sheet-panel {
+    max-height: min(96vh, 1200px);
   }
 }
 

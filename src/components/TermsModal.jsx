@@ -285,7 +285,7 @@ export function TermsModal({ open, onClose }) {
         aria-label="Close terms"
         onClick={onClose}
       />
-      <div className="relative z-10 flex max-h-[min(90vh,1000px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-900/40 bg-stone-950 shadow-2xl shadow-emerald-950/20 sm:max-w-3xl lg:max-w-4xl">
+      <div className="relative z-10 flex max-h-[min(92vh,1080px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-900/40 bg-stone-950 shadow-2xl shadow-emerald-950/20 sm:max-w-4xl lg:max-h-[min(94vh,1160px)] lg:max-w-5xl xl:max-w-6xl xl:max-h-[min(94vh,1200px)]">
         <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent" aria-hidden />
         <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4">
           <h2 id="terms-title" className="text-lg font-semibold text-stone-100">

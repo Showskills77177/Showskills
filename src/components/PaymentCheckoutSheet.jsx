@@ -76,7 +76,7 @@ export function PaymentCheckoutSheet({
       />
       <div
         ref={panelRef}
-        className="ss-payment-sheet-panel relative z-10 flex w-full max-w-lg flex-col rounded-xl border border-teal-500/35 bg-stone-950 shadow-2xl sm:max-h-[min(94vh,1000px)] sm:max-w-2xl lg:max-w-4xl"
+        className="ss-payment-sheet-panel relative z-10 flex w-full max-w-lg flex-col rounded-xl border border-teal-500/35 bg-stone-950 shadow-2xl sm:max-h-[min(96vh,1080px)] sm:max-w-3xl lg:max-w-5xl lg:max-h-[min(96vh,1160px)] xl:max-w-6xl xl:max-h-[min(96vh,1200px)]"
       >
         <div
           className="h-1 w-full shrink-0 rounded-t-xl bg-gradient-to-r from-teal-500/80 via-emerald-500/60 to-transparent"
