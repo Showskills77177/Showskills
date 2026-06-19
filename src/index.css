@@ -3211,6 +3211,16 @@ body {
   max-width: min(100% - 2rem, 48rem);
 }
 
+@media (min-width: 1024px) {
+  .ss-entry-modal-panel--paid {
+    max-width: min(100% - 3rem, 64rem);
+  }
+
+  .ss-payment-sheet-panel {
+    max-height: min(94vh, 1000px);
+  }
+}
+
 /* Step 5 — payment overlay above entry (z-61); stripe mount stays static inside panel */
 .ss-payment-sheet {
   pointer-events: auto;

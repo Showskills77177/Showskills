@@ -43,7 +43,6 @@ import {
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
-  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
@@ -274,9 +273,9 @@ export function EntryModal() {
   const panelWidthClass =
     entryModalType === 'paid'
       ? showPaymentSheet
-        ? 'sm:max-w-3xl'
-        : 'sm:max-w-xl'
-      : 'sm:max-w-xl'
+        ? 'sm:max-w-3xl lg:max-w-5xl'
+        : 'sm:max-w-2xl lg:max-w-4xl'
+      : 'sm:max-w-2xl lg:max-w-4xl'
 
   return (
     <ModalPortal>
@@ -295,7 +294,7 @@ export function EntryModal() {
         <div
           ref={panelRef}
           inert={showPaymentSheet}
-          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(96dvh,980px)] w-full max-w-none flex-col rounded-t-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(92vh,920px)] sm:max-w-lg sm:rounded-2xl ${panelWidthClass} ${
+          className={`ss-entry-modal-panel relative z-10 flex max-h-[min(96dvh,980px)] w-full max-w-none flex-col rounded-t-2xl border border-white/10 bg-stone-950 shadow-2xl sm:max-h-[min(94vh,1000px)] sm:rounded-2xl lg:max-h-[min(94vh,1040px)] ${panelWidthClass} ${
             entryModalType === 'paid' ? 'ss-entry-modal-panel--paid' : ''
           } ${showPaymentSheet ? 'ss-entry-modal-panel--behind-payment' : ''}`}
         >
@@ -943,9 +942,6 @@ export function EntryModal() {
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}
-              </p>
-              <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
-                {WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_SKILL_NOTICE}

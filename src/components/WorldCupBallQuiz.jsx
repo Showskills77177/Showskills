@@ -5,7 +5,6 @@ import {
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
-  WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
@@ -454,9 +453,6 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       <div className="flex flex-col gap-3">
         <p className="text-xs leading-relaxed text-stone-400">{WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}</p>
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
-          {WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}
-        </p>
-        <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
         <button
@@ -608,7 +604,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
           >
             <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Type your answer</p>
-              <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}</p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE}</p>
             </div>
             <input
               type="text"
@@ -674,7 +670,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       ) : (
         <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Type your answer</p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION}</p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE}</p>
         </div>
       )}
       <p className="text-base font-medium leading-snug text-stone-100">{q?.prompt}</p>
@@ -718,7 +714,7 @@ export function WorldCupBallQuiz({ onResult, onError, disabled = false }) {
       )}
       <p className="text-xs leading-relaxed text-stone-500">
         {questionSeconds} seconds per question. One {timeoutBonusSeconds}-second bonus if you run out of time once; a
-        second timeout disqualifies your attempt. {WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE} {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
+        second timeout disqualifies your attempt. {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
         You have {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
       </p>
     </div>
