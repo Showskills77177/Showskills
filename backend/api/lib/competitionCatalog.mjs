@@ -91,8 +91,7 @@ async function reconcilePollutedLegacyBundles() {
 }
 
 export async function ensureCompetitionCatalogSchema() {
-  if (schemaEnsured) return
-
+  if (!schemaEnsured) {
   if (dbIsPostgres()) {
     await query(`
       CREATE TABLE IF NOT EXISTS competitions (
@@ -175,10 +174,12 @@ export async function ensureCompetitionCatalogSchema() {
   schemaEnsured = true
   await ensureBuiltinCompetitions()
   await reconcilePollutedLegacyBundles()
-  await backfillLegacyEntryMethods()
-  await backfillIphone17ProCompetition()
   const { backfillSiteLayoutDisplayNames } = await import('./siteLayoutStore.mjs')
   await backfillSiteLayoutDisplayNames()
+  }
+
+  await backfillLegacyEntryMethods()
+  await backfillIphone17ProCompetition()
 }
 
 const BUILTIN_MAIN_DRAWS = [
@@ -281,6 +282,42 @@ async function backfillIphone17ProCompetition() {
   const freeVal = dbIsPostgres() ? true : 1
   const postalVal = dbIsPostgres() ? true : 1
   const now = new Date().toISOString()
+  const existing = await query(`SELECT slug, status FROM competitions WHERE slug = $1`, [
+    IPHONE_17_PRO_COMPETITION_SLUG,
+  ])
+
+  if (!existing.rows[0]) {
+    await query(
+      `INSERT INTO competitions (
+        slug, title, summary, rules_markdown, status, kind, sort_order,
+        allow_paid_entry, allow_free_online, allow_postal_entry, postal_competition_name, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        IPHONE_17_PRO_COMPETITION_SLUG,
+        IPHONE_17_PRO_COMPETITION_LABEL,
+        IPHONE_17_PRO_COMPETITION_SUMMARY,
+        IPHONE_17_PRO_RULES_MARKDOWN,
+        COMPETITION_STATUS.published,
+        COMPETITION_KIND.mainDraw,
+        2,
+        paidVal,
+        freeVal,
+        postalVal,
+        defaultPostalNameForIphone17ProCompetition(),
+        now,
+      ],
+    ).catch(() => {})
+  } else if (
+    existing.rows[0].status !== COMPETITION_STATUS.archived &&
+    existing.rows[0].status !== COMPETITION_STATUS.published
+  ) {
+    await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+      IPHONE_17_PRO_COMPETITION_SLUG,
+      COMPETITION_STATUS.published,
+      now,
+    ]).catch(() => {})
+  }
+
   await query(
     `UPDATE competitions SET
       title = $2,
@@ -304,6 +341,10 @@ async function backfillIphone17ProCompetition() {
       now,
     ],
   ).catch(() => {})
+
+  await ensureDefaultCompetitionPeriod(IPHONE_17_PRO_COMPETITION_SLUG, {
+    title: IPHONE_17_PRO_COMPETITION_LABEL,
+  })
 
   const bundleCount = await query(
     `SELECT COUNT(*)::int AS c FROM competition_bundles WHERE competition = $1`,
@@ -410,7 +451,7 @@ async function ensureBuiltinCompetitions() {
         [c.slug, c.title, c.summary, c.rulesMarkdown, c.status, c.kind, c.sortOrder, now],
       )
     } else if (
-      c.slug === DRAW_COMPETITION_SLUG &&
+      (c.slug === DRAW_COMPETITION_SLUG || c.slug === IPHONE_17_PRO_COMPETITION_SLUG) &&
       existing.rows[0].status !== COMPETITION_STATUS.archived &&
       existing.rows[0].status !== COMPETITION_STATUS.published
     ) {

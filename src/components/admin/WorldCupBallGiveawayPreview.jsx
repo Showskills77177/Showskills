@@ -57,7 +57,7 @@ export function WorldCupBallGiveawayPreview() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-stone-100">World Cup Ball giveaway</h1>
+          <h1 className="text-2xl font-semibold text-stone-100">{WORLD_CUP_BALL_GIVEAWAY_LABEL}</h1>
           <p className="mt-2 max-w-2xl text-sm text-stone-500">
             {isEmail
               ? description
@@ -94,7 +94,7 @@ export function WorldCupBallGiveawayPreview() {
           <div className="grid gap-8 xl:grid-cols-2">
             <section className="min-w-0">
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">HTML preview</h2>
-              <EmailHtmlPreviewFrame html={html} title="World Cup Ball winner email" />
+              <EmailHtmlPreviewFrame html={html} title={`${WORLD_CUP_BALL_GIVEAWAY_LABEL} winner email`} />
             </section>
             <section>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-500">Plain text</h2>

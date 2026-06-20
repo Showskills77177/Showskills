@@ -20,6 +20,7 @@ import {
   pickRandomWorldCupBallCombination,
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
   WORLD_CUP_BALL_GIVEAWAY_SLUG,
+  WORLD_CUP_BALL_GIVEAWAY_LABEL,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_QUESTION_SECONDS,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
@@ -577,7 +578,7 @@ export async function claimWorldCupBallPrize(req, res) {
   try {
     const submissionId = randomUUID()
     const winReference = `WC-${submissionId.slice(0, 8).toUpperCase()}`
-    let adminNotes = `World Cup Ball Giveaway — instant skill win.\nAll ${WORLD_CUP_BALL_QUESTION_COUNT} answers correct.\nTimeouts used: ${session.timeouts_used ?? 0}\nEntrant age band: ${entrantAgeBand} (${WORLD_CUP_BALL_MIN_AGE}+ required).\nEmail: ${email}\nContact phone: ${phoneCheck.phone}\nDelivery address: ${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}, ${address.postcode}`
+    let adminNotes = `${WORLD_CUP_BALL_GIVEAWAY_LABEL} — instant skill win.\nAll ${WORLD_CUP_BALL_QUESTION_COUNT} answers correct.\nTimeouts used: ${session.timeouts_used ?? 0}\nEntrant age band: ${entrantAgeBand} (${WORLD_CUP_BALL_MIN_AGE}+ required).\nEmail: ${email}\nContact phone: ${phoneCheck.phone}\nDelivery address: ${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}, ${address.postcode}`
     if (entrantAgeBand === '16-17') {
       const guardianPhoneCheck = validateContactPhone(guardianPhoneRaw)
       adminNotes += `\nParent/guardian: ${guardianName}\nGuardian phone: ${guardianPhoneCheck.phone}\nGuardian address: ${guardianAddress.addressLine1}${guardianAddress.addressLine2 ? `, ${guardianAddress.addressLine2}` : ''}, ${guardianAddress.city}, ${guardianAddress.postcode}`

@@ -19,6 +19,10 @@ import { WorldCupBallGiveawayCard } from '../components/WorldCupBallGiveawayCard
 import { EditableDragFrame } from '../components/admin/EditableDragFrame'
 import { resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
 import { resolveLegacyBundlePublicCompetition } from '../../shared/legacyBundlePublic.mjs'
+import {
+  IPHONE_17_PRO_COMPETITION_SLUG,
+} from '../../shared/iphone17ProCompetition.mjs'
+import { resolveIphone17ProPublicCompetition } from '../../shared/iphone17ProPublic.mjs'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 
 function SectionHeading({ id, children }) {
@@ -78,8 +82,11 @@ export default function CompetitionsPage({
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
   const paidCompetitions = useMemo(() => {
     const legacy = resolveLegacyBundlePublicCompetition({ listItems: competitions })
-    const extras = competitions.filter((c) => c.slug !== DRAW_COMPETITION_SLUG)
-    return [legacy, ...extras]
+    const iphone = resolveIphone17ProPublicCompetition({ listItems: competitions })
+    const extras = competitions.filter(
+      (c) => c.slug !== DRAW_COMPETITION_SLUG && c.slug !== IPHONE_17_PRO_COMPETITION_SLUG,
+    )
+    return [legacy, iphone, ...extras]
   }, [competitions])
   const loading = layoutLoading || loadingCompetitions || loadingGiveaways
 

@@ -4,10 +4,10 @@ import {
   WORLD_CUP_BALL_GIVEAWAY_PATH,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_PRIZE_TITLE,
-  WORLD_CUP_BALL_QUESTION_SECONDS,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import { WORLD_CUP_BALL_SKILL_NOTICE } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
+import { WorldCupBallTimingCallout } from './WorldCupBallTimingCallout'
 
 /**
  * Free giveaways column card — World Cup Ball skill challenge.
@@ -34,12 +34,12 @@ export function WorldCupBallGiveawayCard({ onEnter, className = '' }) {
         <h3 className="ss-world-cup-ball-card__title font-display text-xl uppercase tracking-wide text-amber-50 sm:text-2xl">
           {WORLD_CUP_BALL_GIVEAWAY_LABEL}
         </h3>
-        <p className="ss-world-cup-ball-card__summary mt-2 text-sm leading-relaxed text-stone-400">
+        <WorldCupBallTimingCallout className="ss-world-cup-ball-card__timing-banner mt-3" />
+        <p className="ss-world-cup-ball-card__summary mt-3 text-sm leading-relaxed text-stone-400">
           {WORLD_CUP_BALL_PRIZE_TITLE} — beat the clock, nail all {WORLD_CUP_BALL_QUESTION_COUNT} answers, take the ball home.
         </p>
         <div className="ss-world-cup-ball-card__pills mt-3 flex flex-wrap gap-1.5">
           <span className="ss-world-cup-ball-card__pill">{WORLD_CUP_BALL_QUESTION_COUNT} questions</span>
-          <span className="ss-world-cup-ball-card__pill">{WORLD_CUP_BALL_QUESTION_SECONDS}s per answer</span>
           <span className="ss-world-cup-ball-card__pill ss-world-cup-ball-card__pill--gold">Win outright</span>
         </div>
         <p className="ss-world-cup-ball-card__notice mt-3 text-xs leading-relaxed text-amber-200/65">{WORLD_CUP_BALL_SKILL_NOTICE}</p>

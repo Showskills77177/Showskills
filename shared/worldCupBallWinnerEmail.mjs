@@ -18,7 +18,7 @@ export function worldCupBallWinnerEmailSubject(detailsComplete = true) {
   if (detailsComplete) {
     return `You have won — ${WORLD_CUP_BALL_GIVEAWAY_LABEL} | ShowSkills Rewards`
   }
-  return `Action required — complete your World Cup Ball winner details | ShowSkills Rewards`
+  return `Action required — complete your ${WORLD_CUP_BALL_GIVEAWAY_LABEL} winner details | ShowSkills Rewards`
 }
 
 /**

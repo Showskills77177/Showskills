@@ -5,6 +5,7 @@ import { FAQ_PAGE_TITLE, FAQ_PAGE_SUBTITLE } from './faqContent.mjs'
 import { DEFAULT_SOCIAL_LINKS, mergeSocialLinks } from './socialLinks.mjs'
 import { EMAIL_LAYOUT_PAGE_ID } from './emailLayout.mjs'
 import { SHIRT_GIVEAWAY_SEASON, refreshShirtGiveawaySeasonInText } from './shirtGiveaway.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from './worldCupBallGiveaway.mjs'
 
 export { EMAIL_LAYOUT_PAGE_ID }
 
@@ -484,7 +485,7 @@ export const HOMEPAGE_BLOCK_LABELS = {
   hero_details: 'Bundle details card',
   ticket_bundles: 'Ticket bundle prices',
   iphone_17_pro_panel: 'iPhone 17 Pro or Cash panel',
-  world_cup_ball_panel: 'World Cup Ball Giveaway panel',
+  world_cup_ball_panel: `${WORLD_CUP_BALL_GIVEAWAY_LABEL} panel`,
   winners_panel: 'Recent winners',
   competitions_hub: 'Competitions hub (paid + free)',
 }

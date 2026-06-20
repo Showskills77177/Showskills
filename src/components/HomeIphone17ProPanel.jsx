@@ -9,6 +9,7 @@ import {
   IPHONE_17_PRO_COMPETITION_SLUG,
   IPHONE_17_PRO_COMPETITION_SUMMARY,
 } from '../../shared/iphone17ProCompetition.mjs'
+import { resolveIphone17ProPublicCompetition } from '../../shared/iphone17ProPublic.mjs'
 
 const DEFAULT_SUMMARY =
   'Tickets from 29p. Pay online, enter free by post, or verify your card online (£0) — then answer three skill questions.'
@@ -17,11 +18,11 @@ const DEFAULT_SUMMARY =
  * Homepage panel for the iPhone 17 Pro or Cash draw — sits below the Signed Legacy Bundle hero.
  */
 export function HomeIphone17ProPanel({ block = {}, onEnter, editorMode = false, preview = false }) {
-  const { competition, loading } = usePublicCompetition(IPHONE_17_PRO_COMPETITION_SLUG)
-  const countdownPeriod = pickCountdownPeriod(competition)
+  const { competition: apiCompetition, loading } = usePublicCompetition(IPHONE_17_PRO_COMPETITION_SLUG)
+  const competition = resolveIphone17ProPublicCompetition({ detail: apiCompetition })
+  const countdownPeriod = pickCountdownPeriod(apiCompetition ?? competition)
 
   if (block.visible === false && !editorMode) return null
-  if (!loading && !competition && !editorMode && !preview) return null
 
   const badgeLabel = block.badgeLabel?.trim() || 'Also live now'
   const titleText = block.title?.trim() || competition?.title || IPHONE_17_PRO_COMPETITION_LABEL

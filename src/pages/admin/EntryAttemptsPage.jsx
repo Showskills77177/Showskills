@@ -7,7 +7,7 @@ import {
   competitionFilterLabel,
 } from '../../components/admin/AdminCompetitionSelect'
 import { ENTRY_ATTEMPTS_PAGE_HELP, WORLD_CUP_BALL_ADMIN_HELP } from '../../../shared/adminListCopy.mjs'
-import { WORLD_CUP_BALL_GIVEAWAY_SLUG } from '../../../shared/worldCupBallGiveaway.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_LABEL, WORLD_CUP_BALL_GIVEAWAY_SLUG } from '../../../shared/worldCupBallGiveaway.mjs'
 
 export default function EntryAttemptsPage() {
   const [competition, setCompetition] = useState('')
@@ -75,9 +75,9 @@ export default function EntryAttemptsPage() {
           <option value="">All flows</option>
           <option value="legacy_free_online">Legacy free online</option>
           <option value="shirt_giveaway">Shirt giveaway</option>
-          <option value="world_cup_ball_start">World Cup Ball — quiz start</option>
-          <option value="world_cup_ball_submit">World Cup Ball — quiz result</option>
-          <option value="world_cup_ball_claim">World Cup Ball — delivery form saved</option>
+          <option value="world_cup_ball_start">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — quiz start</option>
+          <option value="world_cup_ball_submit">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — quiz result</option>
+          <option value="world_cup_ball_claim">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — delivery form saved</option>
         </select>
         <select
           value={outcome}

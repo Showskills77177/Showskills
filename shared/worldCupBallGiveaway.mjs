@@ -10,7 +10,7 @@ import {
 
 export const WORLD_CUP_BALL_GIVEAWAY_SLUG = 'world_cup_ball_giveaway'
 
-export const WORLD_CUP_BALL_GIVEAWAY_LABEL = 'World Cup Ball Giveaway'
+export const WORLD_CUP_BALL_GIVEAWAY_LABEL = 'World Cup Ball Question-Challenge Giveaway'
 
 export const WORLD_CUP_BALL_GIVEAWAY_PATH = '/world-cup-ball-giveaway'
 
@@ -34,6 +34,24 @@ export const WORLD_CUP_BALL_QUESTION_SECONDS = 15
 
 /** Extra seconds granted after the first timed-out question only. */
 export const WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS = 5
+
+/** Canonical user-facing label (hyphenated compound adjective + “time-out”). */
+export const WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION = `${WORLD_CUP_BALL_QUESTION_SECONDS}-second time-out per question`
+
+/** Shorter label for chips and timer bars. */
+export const WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL = `${WORLD_CUP_BALL_QUESTION_SECONDS}-second time-out`
+
+/** Short user-facing reminder — each question is timed. */
+export const WORLD_CUP_BALL_QUESTION_TIMING_SHORT = `Each question has a ${WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}. Miss the time-out once and you get ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} extra seconds on that question.`
+
+/** Full timing rules shown before the quiz and in terms. */
+export const WORLD_CUP_BALL_QUESTION_TIMING_NOTICE = `${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. If the time-out expires once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only. A second time-out on any question ends your attempt.`
+
+/** Short callout when the question time-out expires. */
+export const WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT = `Miss the time-out once? You get a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only.`
+
+/** Marketing / UI highlight for the time-out extension. */
+export const WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT = `Time-out expires? +${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} second extension on that question — once per attempt only.`
 
 /** Second timeout ends the attempt immediately. */
 export const WORLD_CUP_BALL_MAX_TIMEOUTS = 1

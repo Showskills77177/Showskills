@@ -1,11 +1,12 @@
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from './worldCupBallGiveaway.mjs'
 import {
   WINNER_PHOTOGRAPHY_VALID_REFUSAL_REASONS,
   WINNER_PHOTOGRAPHY_CONSENT_PRIVACY_POINTS,
 } from './winnerPhotographyConsent.mjs'
 
 export const WORLD_CUP_BALL_PHOTOGRAPHY_INTRO =
-  'If you win the World Cup Ball Giveaway, you agree to provide a photograph of yourself with the football so we can announce the winner on our website and social media.'
+  `If you win the ${WORLD_CUP_BALL_GIVEAWAY_LABEL}, you agree to provide a photograph of yourself with the football so we can announce the winner on our website and social media.`
 
 export const WORLD_CUP_BALL_PHOTOGRAPHY_EMAIL_OPTION = `You may email your photo to ${SHOWSKILLS_CONTACT_EMAIL} instead of taking part in a live shoot, if that is easier.`
 

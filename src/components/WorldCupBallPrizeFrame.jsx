@@ -1,9 +1,9 @@
-import { WORLD_CUP_BALL_QUESTION_COUNT, WORLD_CUP_BALL_QUESTION_SECONDS } from '../../shared/worldCupBallGiveaway.mjs'
+import { WORLD_CUP_BALL_QUESTION_COUNT, WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION } from '../../shared/worldCupBallGiveaway.mjs'
 import { WorldCupBallPrizeImage } from './WorldCupBallPrizeImage'
 
 const CHIPS = [
   { label: `${WORLD_CUP_BALL_QUESTION_COUNT} questions`, accent: 'gold' },
-  { label: `${WORLD_CUP_BALL_QUESTION_SECONDS}s per answer`, accent: 'pitch' },
+  { label: WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION, accent: 'pitch' },
   { label: 'Win outright', accent: 'gold' },
 ]
 

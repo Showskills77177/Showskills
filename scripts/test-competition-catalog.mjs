@@ -89,6 +89,11 @@ assert.ok(iphoneSingle)
 assert.equal(iphoneSingle.totalPence, 29)
 assert.equal(iphoneSingle.qty, 1)
 
+await updateCompetition(IPHONE_17_PRO_COMPETITION_SLUG, { status: 'draft' })
+await ensureCompetitionCatalogSchema()
+const iphoneRepublished = await getCompetitionBySlug(IPHONE_17_PRO_COMPETITION_SLUG)
+assert.equal(iphoneRepublished.status, 'published', 'iPhone draw re-published after draft')
+
 const opens = new Date('2026-06-01T10:00:00.000Z').toISOString()
 const closes = new Date('2026-07-01T22:00:00.000Z').toISOString()
 const created = await createCompetition({

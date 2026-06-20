@@ -23,6 +23,7 @@ import {
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from '../../shared/worldCupBallPhotography.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from '../../shared/worldCupBallGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { LegalDisclaimerNotice } from './LegalDisclaimerNotice'
@@ -97,7 +98,7 @@ function PrivacyPolicySection() {
         </li>
         <li>Answers to skill-based questions (paid entries after purchase and free postal or giveaway routes)</li>
         <li>
-          <strong>World Cup Ball Giveaway:</strong> quiz answers, connection (IP address) checks for one attempt per
+          <strong>{WORLD_CUP_BALL_GIVEAWAY_LABEL}:</strong> quiz answers, connection (IP address) checks for one attempt per
           connection, and — if you do not win — which questions you answered incorrectly (shown to you in your browser
           during the attempt only)
         </li>
@@ -442,7 +443,7 @@ export function TermsModal({ open, onClose }) {
             off your VPN before entering.
           </p>
 
-          <h3 className="mb-2 mt-6 font-semibold text-stone-200">6a. World Cup Ball Giveaway (free skill challenge)</h3>
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200">6a. {WORLD_CUP_BALL_GIVEAWAY_LABEL} (free skill challenge)</h3>
           <p className="mb-3">{WORLD_CUP_BALL_RULES_INTRO}</p>
           <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
             <strong>Eligibility:</strong> {WORLD_CUP_BALL_ELIGIBILITY_NOTICE}

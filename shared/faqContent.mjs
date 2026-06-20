@@ -16,12 +16,12 @@ import { SHIRT_GIVEAWAY_SEASON, SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGivea
 import { PRIZE_AUTHENTICITY_FAQ_ANSWER } from './prizeAuthenticityCopy.mjs'
 import { winnerPhotographyConsentFaqAnswer } from './winnerPhotographyConsent.mjs'
 import {
+  WORLD_CUP_BALL_GIVEAWAY_LABEL,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
-  WORLD_CUP_BALL_QUESTION_SECONDS,
-  WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
+  WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
 } from './worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
@@ -324,12 +324,12 @@ export const FAQ_SECTIONS = [
   },
   {
     id: 'world-cup-ball',
-    title: 'World Cup Ball Giveaway',
+    title: WORLD_CUP_BALL_GIVEAWAY_LABEL,
     summary: `Free skill challenge — win the World Cup ball by answering ${WORLD_CUP_BALL_QUESTION_COUNT} timed questions correctly, or one wrong with a successful salvage question.`,
     items: [
       {
         id: 'wc-ball-what',
-        question: 'What is the World Cup Ball Giveaway?',
+        question: `What is the ${WORLD_CUP_BALL_GIVEAWAY_LABEL}?`,
         answer:
           `A free skill-based promotion for one official-style FIFA World Cup ball (not signed). Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win outright, or get exactly one wrong and answer a bonus salvage question correctly. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} There is no random draw and no payment.`,
       },
@@ -337,7 +337,7 @@ export const FAQ_SECTIONS = [
         id: 'wc-ball-how-win',
         question: 'How do I win the ball?',
         answer:
-          `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or answer exactly one incorrectly and then answer the bonus salvage question correctly. Each question has a ${WORLD_CUP_BALL_QUESTION_SECONDS}-second timer. If you run out of time once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus on that question. A second timeout disqualifies you. ${WORLD_CUP_BALL_SALVAGE_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
+          `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or answer exactly one incorrectly and then answer the bonus salvage question correctly. ${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_SALVAGE_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
       },
       {
         id: 'wc-ball-capitals',

@@ -7,11 +7,17 @@ import {
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
+  WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
+  WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL,
+  WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
+  WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT,
+  WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_PRACTICE_QUESTION,
   WORLD_CUP_BALL_PRACTICE_INTRO,
+  WORLD_CUP_BALL_PRACTICE_BONUS_TIP,
   WORLD_CUP_BALL_PRACTICE_TIMER_TIP,
   WORLD_CUP_BALL_PRACTICE_TYPING_TIP,
   worldCupBallPracticeCompleteTips,
@@ -460,6 +466,12 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     return (
       <div className={quizShellClass}>
         <div className="flex flex-col gap-3">
+        <p className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5 text-xs leading-relaxed text-amber-50/95">
+          <strong className="text-amber-100">Timing:</strong> {WORLD_CUP_BALL_QUESTION_TIMING_NOTICE}
+        </p>
+        <p className="rounded-lg border border-amber-400/45 bg-amber-950/35 px-3 py-2.5 text-xs font-semibold leading-relaxed text-amber-50/95">
+          <strong className="text-amber-200">Time-out extension:</strong> {WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT}
+        </p>
         <p className="text-xs leading-relaxed text-stone-400">{WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}</p>
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
@@ -485,10 +497,16 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <p className="font-semibold text-teal-100">Practice — not counted</p>
           <p className="mt-1.5 text-xs leading-relaxed text-stone-300">{WORLD_CUP_BALL_PRACTICE_INTRO}</p>
           <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TIMER_TIP}</p>
+          <p className="mt-2 rounded-md border border-amber-400/35 bg-amber-950/30 px-2.5 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
+            {WORLD_CUP_BALL_PRACTICE_BONUS_TIP}
+          </p>
           <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TYPING_TIP}</p>
         </div>
         <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
-          <span className="font-semibold text-amber-100">Practice question</span>
+          <span className="font-semibold text-amber-100">
+            Practice question
+            <span className="ml-1.5 font-normal text-stone-400">· {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}</span>
+          </span>
           <span
             className={`font-mono tabular-nums ${practiceSecondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
             aria-live="polite"
@@ -498,14 +516,19 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           </span>
         </div>
         {practiceBonusActive ? (
-          <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
-            {WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second bonus — in the real quiz you only get this once per attempt.
+          <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/40 bg-amber-950/35 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-50">
+            <strong className="text-amber-200">+{WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} second extension active.</strong> Answer now
+            — in the real quiz you only get this once per attempt.
           </p>
-        ) : null}
+        ) : (
+          <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
+            {WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT}
+          </p>
+        )}
         <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Multiple choice</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
-            Tap one option below before the timer runs out.
+            Tap one option below before the time-out expires.
           </p>
         </div>
         <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">
@@ -536,10 +559,10 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-4 py-4 text-sm text-emerald-50/95">
           <p className="font-semibold text-emerald-100">Practice complete</p>
           <p className="mt-2 text-xs leading-relaxed text-stone-300">
-            Good — you have seen how the timer works. Your real attempt starts when you press the button below.
+            Good — you have seen how the time-out works. Your real attempt starts when you press the button below.
           </p>
           <p className="ss-wc-ball-quiz__practice-ready mt-2 text-xs leading-relaxed text-stone-300 sm:hidden">
-            Ready for the real {WORLD_CUP_BALL_QUESTION_COUNT}-question timed test.
+            Ready for the real {WORLD_CUP_BALL_QUESTION_COUNT}-question test — {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}, with a {WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension if a time-out expires once.
           </p>
           <ul className="ss-wc-ball-quiz__practice-tips mt-3 hidden list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300 sm:block">
             {tips.map((tip) => (
@@ -553,7 +576,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           disabled={disabled || submitting}
           className="ss-wc-ball-quiz__primary-btn w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Start test ({WORLD_CUP_BALL_QUESTION_COUNT} questions)
+          Start test ({WORLD_CUP_BALL_QUESTION_COUNT} questions · {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL} each)
         </button>
         </div>
       </div>
@@ -586,7 +609,10 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <p className="mt-2 text-stone-300">{WORLD_CUP_BALL_SALVAGE_NOTICE}</p>
         </div>
         <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
-          <span className="font-semibold text-amber-100">One chance to stay in the running</span>
+          <span className="font-semibold text-amber-100">
+            One chance to stay in the running
+            <span className="ml-1.5 font-normal text-stone-400">· {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}</span>
+          </span>
           <span
             className={`font-mono tabular-nums ${secondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
             aria-live="polite"
@@ -594,6 +620,9 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             {secondsLeft}s
           </span>
         </div>
+        <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
+          {WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT} A second time-out on any question disqualifies your attempt.
+        </p>
         {hasSalvageChoices ? (
           <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
@@ -664,6 +693,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
       <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
         <span className="font-semibold text-amber-100">
           Question {index + 1} of {total}
+          <span className="ml-1.5 font-normal text-stone-400">· {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}</span>
         </span>
         <div className="flex flex-wrap items-center gap-3">
           {sessionSecondsLeft != null ? (
@@ -684,6 +714,16 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           </span>
         </div>
       </div>
+      {bonusActive ? (
+        <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/40 bg-amber-950/35 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-50">
+            <strong className="text-amber-200">+{WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} second extension active.</strong> The time-out expired on this
+            question — answer now. You only get one extension per attempt; a second time-out disqualifies you.
+        </p>
+      ) : (
+        <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
+          {WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT} A second time-out on any question disqualifies your attempt.
+        </p>
+      )}
       {hasChoices ? (
         <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
@@ -737,8 +777,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         </form>
       )}
       <p className="ss-wc-ball-quiz__footer-note text-xs leading-relaxed text-stone-500">
-        {questionSeconds} seconds per question. One {timeoutBonusSeconds}-second bonus if you run out of time once; a
-        second timeout disqualifies your attempt. {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
+        {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. {WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT} {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
         You have {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
       </p>
       </div>

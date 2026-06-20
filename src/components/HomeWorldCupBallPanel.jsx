@@ -4,10 +4,10 @@ import {
   WORLD_CUP_BALL_GIVEAWAY_PATH,
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
-  WORLD_CUP_BALL_QUESTION_SECONDS,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import { WORLD_CUP_BALL_SKILL_NOTICE } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
+import { WorldCupBallTimingCallout } from './WorldCupBallTimingCallout'
 
 /**
  * Homepage panel promoting the World Cup Ball Giveaway.
@@ -26,7 +26,7 @@ export function HomeWorldCupBallPanel({
   const titleText = block.title?.trim() || WORLD_CUP_BALL_GIVEAWAY_LABEL
   const summary =
     block.summary?.trim() ||
-    `${WORLD_CUP_BALL_QUESTION_COUNT} brutal football questions. ${WORLD_CUP_BALL_QUESTION_SECONDS} seconds each. Answer every one correctly and the ball is yours — no draw, no payment.`
+    `${WORLD_CUP_BALL_QUESTION_COUNT} brutal football questions. Answer every one correctly and the ball is yours — no draw, no payment.`
   const ctaLabel = block.ctaButtonLabel?.trim() || 'Start timed quiz'
 
   const card = (
@@ -42,6 +42,8 @@ export function HomeWorldCupBallPanel({
             {titleText}
           </h2>
 
+          <WorldCupBallTimingCallout />
+
           <p className="max-w-xl text-base leading-relaxed text-stone-300 md:text-[0.9375rem] lg:text-base">
             {summary}
           </p>
@@ -49,7 +51,6 @@ export function HomeWorldCupBallPanel({
           <div className="flex flex-wrap gap-2 pt-1">
             <span className="ss-home-wc-ball-panel__tag">Free entry</span>
             <span className="ss-home-wc-ball-panel__tag">{WORLD_CUP_BALL_QUESTION_COUNT} skill questions</span>
-            <span className="ss-home-wc-ball-panel__tag">{WORLD_CUP_BALL_QUESTION_SECONDS}s timer</span>
             <span className="ss-home-wc-ball-panel__tag ss-home-wc-ball-panel__tag--hot">Win the ball</span>
           </div>
 

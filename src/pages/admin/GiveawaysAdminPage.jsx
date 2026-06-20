@@ -28,7 +28,7 @@ export default function GiveawaysAdminPage() {
                   <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.winners} className="text-amber-400/90 underline">
                     Giveaway entries
                   </Link>{' '}
-                  (filter: World Cup Ball)
+                  (filter: {WORLD_CUP_BALL_GIVEAWAY_LABEL})
                 </li>
                 <li>
                   <strong className="text-stone-400">Quiz starts / wins / form saves</strong> →{' '}
@@ -41,7 +41,7 @@ export default function GiveawaysAdminPage() {
                   <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.testEmail} className="text-amber-400/90 underline">
                     Test email
                   </Link>{' '}
-                  (group: World Cup Ball giveaway)
+                  (group: {WORLD_CUP_BALL_GIVEAWAY_LABEL})
                 </li>
               </ul>
             </div>

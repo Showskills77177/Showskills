@@ -6,8 +6,8 @@ import {
   WORLD_CUP_BALL_PRIZE_DETAIL,
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
-  WORLD_CUP_BALL_QUESTION_SECONDS,
-  WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
+  WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
+  WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_PUBLIC_STEPS,
@@ -92,8 +92,7 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
                   ))}
                 </div>
                 <p className="mt-4 text-xs leading-relaxed text-stone-500">
-                  Timing: {WORLD_CUP_BALL_QUESTION_SECONDS} seconds per question; one {WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}
-                  -second bonus after the first timeout; disqualified on a second timeout. {WORLD_CUP_BALL_SKILL_NOTICE}
+                  {WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} {WORLD_CUP_BALL_SKILL_NOTICE}
                 </p>
               </div>
 
@@ -115,7 +114,7 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
                 {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions
               </p>
               <p className="mt-3 text-sm leading-relaxed text-amber-200/70">
-                Answer every question correctly within the time limits to win the ball immediately.{' '}
+                Answer every question correctly — {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win the ball immediately.{' '}
                 {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. No VPNs. You only share your name, phone, and address if
                 you win.
               </p>

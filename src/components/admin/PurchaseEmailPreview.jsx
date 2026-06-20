@@ -5,6 +5,7 @@ import { WorldCupBallGiveawayPreview } from './WorldCupBallGiveawayPreview'
 import { defaultEmailLayout } from '../../../shared/emailLayout.mjs'
 import { AdminCompetitionSelect } from './AdminCompetitionSelect'
 import { defaultMainDrawCompetitionSlug, getMainDrawCompetitionLabel } from '../../../shared/adminCompetitions.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from '../../../shared/worldCupBallGiveaway.mjs'
 import {
   PURCHASE_EMAIL_SAMPLE,
   buildPurchaseConfirmationHtml,
@@ -40,7 +41,7 @@ const EMAIL_TYPES = [
 
 const EMAIL_GROUPS = [
   { id: 'tickets', label: 'Ticket & quiz emails' },
-  { id: 'world_cup_ball', label: 'World Cup Ball giveaway' },
+  { id: 'world_cup_ball', label: WORLD_CUP_BALL_GIVEAWAY_LABEL },
   { id: 'newsletter', label: 'Newsletter emails' },
 ]
 

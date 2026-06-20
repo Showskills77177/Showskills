@@ -15,7 +15,7 @@ import {
   defaultGiveawayCompetitionSlug,
   isGiveawayCompetitionSlug,
 } from '../../../shared/adminCompetitions.mjs'
-import { WORLD_CUP_BALL_GIVEAWAY_SLUG } from '../../../shared/worldCupBallGiveaway.mjs'
+import { WORLD_CUP_BALL_GIVEAWAY_LABEL, WORLD_CUP_BALL_GIVEAWAY_SLUG } from '../../../shared/worldCupBallGiveaway.mjs'
 
 export default function AdminSubmissionsPage() {
   const [searchParams] = useSearchParams()
@@ -230,7 +230,7 @@ function SubmissionMedia({ s }) {
     ].filter(Boolean)
     return (
       <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-3 text-sm">
-        <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/80">World Cup Ball winner</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/80">{WORLD_CUP_BALL_GIVEAWAY_LABEL} winner</p>
         <dl className="mt-2 grid gap-1.5 text-stone-300 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-stone-500">Win reference</dt>
