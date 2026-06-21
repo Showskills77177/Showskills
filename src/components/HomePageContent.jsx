@@ -35,7 +35,6 @@ import {
   mergeHomepageLayout,
 } from '../../shared/homepageLayout.mjs'
 import { HOMEPAGE_BLOCK_LABELS } from '../../shared/sitePageLayout.mjs'
-import { EditorTestLogin } from './EditorTestLogin'
 
 const HERO_INNER_BLOCK_IDS = new Set([
   'promo_strip',
@@ -875,7 +874,6 @@ export function HomePageContent({
         }
         return null
       })}
-      <EditorTestLogin />
     </main>
   )
 }
