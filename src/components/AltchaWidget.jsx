@@ -5,7 +5,7 @@ import { apiUrl } from '../lib/api'
 /**
  * Self-hosted ALTCHA proof-of-work widget — no Cloudflare/Google account required.
  */
-export function AltchaWidget({ challengePath = '/api/captcha/challenge', onPayload, onExpire, onError, className = '' }) {
+export function AltchaWidget({ challengePath = '/api/captcha-challenge', onPayload, onExpire, onError, className = '' }) {
   const widgetRef = useRef(null)
   const challengeUrl = apiUrl(challengePath)
 

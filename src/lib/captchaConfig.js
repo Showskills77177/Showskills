@@ -10,10 +10,10 @@ export async function fetchCaptchaConfig() {
     const data = await res.json().catch(() => ({}))
     cached = {
       enabled: Boolean(data.enabled),
-      challengeUrl: typeof data.challengeUrl === 'string' ? data.challengeUrl : '/api/captcha/challenge',
+      challengeUrl: typeof data.challengeUrl === 'string' ? data.challengeUrl : '/api/captcha-challenge',
     }
   } catch {
-    cached = { enabled: false, challengeUrl: '/api/captcha/challenge' }
+    cached = { enabled: false, challengeUrl: '/api/captcha-challenge' }
   }
   return cached
 }

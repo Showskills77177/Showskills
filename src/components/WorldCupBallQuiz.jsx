@@ -60,7 +60,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const answersRef = useRef({})
   const practiceCompletedRef = useRef(false)
   const [hasSavedProgress, setHasSavedProgress] = useState(false)
-  const [captchaConfig, setCaptchaConfig] = useState({ enabled: false, challengeUrl: '/api/captcha/challenge', loading: true })
+  const [captchaConfig, setCaptchaConfig] = useState({ enabled: false, challengeUrl: '/api/captcha-challenge', loading: true })
   const [captchaPayload, setCaptchaPayload] = useState('')
   const [captchaError, setCaptchaError] = useState('')
 

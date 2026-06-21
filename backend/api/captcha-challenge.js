@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   try {
     const challenge = await createCaptchaChallengeResponse()
     res.setHeader('Cache-Control', 'no-store')
-    return json(res, 200, { ok: true, enabled: true, ...challenge })
+    return json(res, 200, challenge)
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not create security challenge.' })

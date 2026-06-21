@@ -17,7 +17,7 @@ import {
 describe('captcha', () => {
   it('exports stable constants', () => {
     assert.equal(CAPTCHA_BODY_FIELD, 'captchaPayload')
-    assert.equal(CAPTCHA_CHALLENGE_PATH, '/api/captcha/challenge')
+    assert.equal(CAPTCHA_CHALLENGE_PATH, '/api/captcha-challenge')
   })
 
   it('skips verification in E2E mode', async () => {
