@@ -182,6 +182,7 @@ async function checkCriticalFiles() {
     ['Admin — login', 'backend/api/admin/login.js'],
     ['Admin — competitions', 'backend/api/admin/competitions.js'],
     ['Admin — draw winner', 'backend/api/admin/draw-winner.js'],
+    ['Admin — World Cup Ball monthly draw', 'backend/api/admin/world-cup-ball-draw.js'],
     ['Database — client', 'backend/api/lib/db.mjs'],
     ['Database — schema SQL', 'backend/api/db/schema.sql'],
     ['Admin UI — layout', 'src/admin/AdminLayout.jsx'],

@@ -15,6 +15,10 @@ import {
 } from './worldCupBallGiveaway.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from './worldCupBallPhotography.mjs'
+import {
+  WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY,
+  WORLD_CUP_BALL_MONTHLY_DRAW_SHORT,
+} from './worldCupBallMonthlyDraw.mjs'
 
 export const WORLD_CUP_BALL_GIVEAWAY_PAGE_ID = 'world_cup_ball_giveaway'
 
@@ -37,7 +41,7 @@ export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
   `Open to UK residents aged ${WORLD_CUP_BALL_MIN_AGE} or over. This is a free skill challenge, not gambling or a lottery. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} VPNs, proxies, and similar anonymising tools are not allowed. Entrants aged 16 or 17 may take part, but prize delivery must go to a parent or legal guardian’s UK postal address with their contact details (see Winner details below).`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
-  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
+  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. ${WORLD_CUP_BALL_MONTHLY_DRAW_SHORT} Monthly draws run in June and July 2026 during the FIFA World Cup in the USA, Canada, and Mexico. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
 
 export const WORLD_CUP_BALL_SKILL_NOTICE =
   `${WORLD_CUP_BALL_QUESTION_TIMING_SHORT} This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second time-out, or use of a VPN means you do not win the ball.`
@@ -77,7 +81,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
     num: 3,
     title: 'Win only if every answer is correct (one salvage chance)',
     detail:
-      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct to win outright. If you get exactly one answer wrong, you receive one bonus salvage question — answer it correctly and you still win. Two or more wrong answers mean you do not win. There is no consolation prize and no random draw.`,
+      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct to win outright. If you get exactly one answer wrong, you receive one bonus salvage question — answer it correctly and you still win. Two or more wrong answers mean you do not win on the skill attempt, but you still receive one free automatic entry into that month’s World Cup Ball draw (June or July 2026).`,
   },
   {
     num: 4,
@@ -114,8 +118,8 @@ export const WORLD_CUP_BALL_RULES_SECTIONS = [
     body: WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
   },
   {
-    title: 'If you do not win',
-    body: WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
+    title: 'If you do not win outright',
+    body: `${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY}`,
   },
   {
     title: 'One attempt per connection',

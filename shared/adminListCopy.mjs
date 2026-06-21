@@ -27,6 +27,7 @@ export const SUBMISSIONS_PAGE_HELP =
 /** Where World Cup Ball winner data lives in admin — shown on Giveaways hub and filtered list pages. */
 export const WORLD_CUP_BALL_ADMIN_ROUTES = {
   winners: '/admin/submissions?competition=world_cup_ball_giveaway',
+  monthlyDraw: '/admin/world-cup-ball-draw',
   entryLog: '/admin/entry-attempts?competition=world_cup_ball_giveaway',
   testEmail: '/admin/test-email',
   liveRules: '/world-cup-ball-giveaway',
@@ -35,9 +36,9 @@ export const WORLD_CUP_BALL_ADMIN_ROUTES = {
 
 export const WORLD_CUP_BALL_ADMIN_HELP = {
   hub:
-    `Instant skill win — no draw. When someone answers all 10 questions correctly, they complete the delivery form in the entry modal. Their details then appear under Giveaway entries (${WORLD_CUP_BALL_GIVEAWAY_LABEL} filter). Quiz activity is in Entry log.`,
+    `Instant skill win — no draw. When someone answers all 10 questions correctly, they complete the delivery form in the entry modal. Failed attempts get one automatic entry into the monthly World Cup Ball draw (June / July 2026) — run that draw in WC Ball draw admin. Winner delivery details appear under Giveaway entries.`,
   submissions:
     'Each row is a confirmed winner who submitted delivery details. Win reference is WC-… in the Entry # column. Open Details for phone, UK address, age band, and guardian info (16–17). Approve when ready to ship the ball.',
   entryLog:
-    'world_cup_ball_start = quiz opened. world_cup_ball_submit = finished quiz (outcome won, lost, or disqualified). world_cup_ball_claim = delivery form saved successfully.',
+    'world_cup_ball_start = quiz opened. world_cup_ball_submit = finished quiz (outcome won, lost, or disqualified). world_cup_ball_monthly_draw = automatic monthly draw entry after a failed attempt. world_cup_ball_claim = delivery form saved successfully.',
 }

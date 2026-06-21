@@ -133,7 +133,43 @@ export async function ensureWorldCupBallSchema() {
     }
   }
 
+  await ensureWorldCupBallMonthlyDrawSchema()
+
   ensured = true
+}
+
+async function ensureWorldCupBallMonthlyDrawSchema() {
+  if (dbIsPostgres()) {
+    await query(`
+      CREATE TABLE IF NOT EXISTS world_cup_ball_monthly_draw_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        session_id UUID NOT NULL UNIQUE,
+        draw_month TEXT NOT NULL,
+        entry_number TEXT NOT NULL UNIQUE,
+        ip_address TEXT NOT NULL DEFAULT '',
+        outcome TEXT NOT NULL DEFAULT 'lost',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `)
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_wc_ball_draw_month ON world_cup_ball_monthly_draw_entries (draw_month, created_at DESC)`,
+    )
+  } else {
+    await query(`
+      CREATE TABLE IF NOT EXISTS world_cup_ball_monthly_draw_entries (
+        id TEXT PRIMARY KEY NOT NULL,
+        session_id TEXT NOT NULL UNIQUE,
+        draw_month TEXT NOT NULL,
+        entry_number TEXT NOT NULL UNIQUE,
+        ip_address TEXT NOT NULL DEFAULT '',
+        outcome TEXT NOT NULL DEFAULT 'lost',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `)
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_wc_ball_draw_month ON world_cup_ball_monthly_draw_entries (draw_month, created_at)`,
+    )
+  }
 }
 
 export async function createWorldCupBallSession(ipAddress, { questionKeys, combinationIndex } = {}) {

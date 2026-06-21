@@ -37,6 +37,7 @@ import { ShirtGiveawayJerseyImagery } from './ShirtGiveawayJerseyImagery'
 import { WorldCupBallQuiz } from './WorldCupBallQuiz'
 import { WorldCupBallClaimForm } from './WorldCupBallClaimForm'
 import { WorldCupBallWrongReview } from './WorldCupBallWrongReview'
+import { WorldCupBallMonthlyDrawEntryCallout } from './WorldCupBallMonthlyDrawEntryCallout'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
 import {
   WORLD_CUP_BALL_GIVEAWAY_LABEL,
@@ -1082,6 +1083,7 @@ export function EntryModal() {
                         : 'You did not answer every question correctly. See the questions you missed below.'}
                   </p>
                   <WorldCupBallWrongReview wrongReview={wcBallOutcome.wrongReview} />
+                  <WorldCupBallMonthlyDrawEntryCallout monthlyDraw={wcBallOutcome.monthlyDraw} />
                 </div>
               ) : (
                 <div className={`ss-wc-ball-quiz-slot ${wcBallQuizFocus ? 'ss-wc-ball-quiz-slot--focus' : 'mt-4'}`}>

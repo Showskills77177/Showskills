@@ -20,6 +20,7 @@ import AdminTestEmailPage from './pages/admin/TestEmailPage'
 import AdminCompetitionsAdminPage from './pages/admin/CompetitionsAdminPage'
 import AdminGiveawaysAdminPage from './pages/admin/GiveawaysAdminPage'
 import AdminDrawWinnerPage from './pages/admin/DrawWinnerPage'
+import AdminWorldCupBallDrawPage from './pages/admin/WorldCupBallDrawPage'
 import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import AdminThemeDesignerPage from './pages/admin/ThemeDesignerPage'
 import AdminPageEditorPage from './pages/admin/PageEditorPage'
@@ -84,6 +85,7 @@ export default function App() {
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="tickets" element={<AdminTicketsPage />} />
                 <Route path="draw" element={<AdminDrawWinnerPage />} />
+                <Route path="world-cup-ball-draw" element={<AdminWorldCupBallDrawPage />} />
                 <Route path="entry-attempts" element={<AdminEntryAttemptsPage />} />
                 <Route path="payments" element={<AdminPaymentsPage />} />
                 <Route path="submissions" element={<AdminSubmissionsPage />} />

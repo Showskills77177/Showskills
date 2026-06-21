@@ -53,6 +53,19 @@ import { WORLD_CUP_BALL_MIN_AGE } from '../../../shared/worldCupBallGiveawayRule
 import { isWorldCupBallQuizBypass } from '../lib/worldCupBallDev.mjs'
 import { verifyCaptchaPayload } from '../lib/captcha.mjs'
 import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
+import { maybeAwardWorldCupBallMonthlyDrawEntry } from '../lib/awardWorldCupBallMonthlyDrawEntry.mjs'
+
+function monthlyDrawApiPayload(award) {
+  if (!award?.awarded || !Array.isArray(award.entryNumbers) || !award.entryNumbers.length) {
+    return null
+  }
+  return {
+    entryCount: award.entryCount,
+    entryNumbers: award.entryNumbers,
+    drawMonth: award.drawMonth,
+    drawMonthLabel: award.drawMonthLabel,
+  }
+}
 
 function sessionExpired(startedAt) {
   const start = new Date(startedAt).getTime()
@@ -346,6 +359,13 @@ export async function submitWorldCupBallQuiz(req, res) {
         },
       })
 
+      const monthlyDraw = await maybeAwardWorldCupBallMonthlyDrawEntry({
+        req,
+        sessionId,
+        ip,
+        status,
+      })
+
       return json(res, 200, {
         ok: true,
         result: status,
@@ -354,6 +374,7 @@ export async function submitWorldCupBallQuiz(req, res) {
         claimToken: status === 'won' ? claimToken : null,
         wrongReview: status === 'won' ? [] : wrongReview,
         salvageCorrect,
+        monthlyDraw: monthlyDrawApiPayload(monthlyDraw),
       })
     } catch (e) {
       console.error(e)
@@ -429,6 +450,13 @@ export async function submitWorldCupBallQuiz(req, res) {
       },
     })
 
+    const monthlyDraw = await maybeAwardWorldCupBallMonthlyDrawEntry({
+      req,
+      sessionId,
+      ip,
+      status,
+    })
+
     return json(res, 200, {
       ok: true,
       result: status,
@@ -437,6 +465,7 @@ export async function submitWorldCupBallQuiz(req, res) {
       claimToken: status === 'won' ? claimToken : null,
       wrongReview,
       wrongCount,
+      monthlyDraw: monthlyDrawApiPayload(monthlyDraw),
     })
   } catch (e) {
     console.error(e)

@@ -24,6 +24,12 @@ export default function GiveawaysAdminPage() {
               <p className="mt-1 max-w-2xl text-sm leading-relaxed text-stone-400">{WORLD_CUP_BALL_ADMIN_HELP.hub}</p>
               <ul className="mt-3 space-y-1 text-xs text-stone-500">
                 <li>
+                  <strong className="text-stone-400">Monthly draw (failed quizzes)</strong> →{' '}
+                  <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.monthlyDraw} className="text-amber-400/90 underline">
+                    WC Ball draw
+                  </Link>
+                </li>
+                <li>
                   <strong className="text-stone-400">Winner delivery details</strong> →{' '}
                   <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.winners} className="text-amber-400/90 underline">
                     Giveaway entries
@@ -47,6 +53,12 @@ export default function GiveawaysAdminPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              to={WORLD_CUP_BALL_ADMIN_ROUTES.monthlyDraw}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/35 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-950/40"
+            >
+              Monthly draw
+            </Link>
             <Link
               to={WORLD_CUP_BALL_ADMIN_ROUTES.winners}
               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-500"

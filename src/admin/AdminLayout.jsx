@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/admin/editor', label: 'Site editor' },
   { to: '/admin/competitions', label: 'Competitions' },
   { to: '/admin/giveaways', label: 'Giveaways' },
+  { to: '/admin/world-cup-ball-draw', label: 'WC Ball draw', competition: 'shirt' },
   { to: '/admin/users', label: 'Users & entries', competition: 'legacy' },
   { to: '/admin/tickets', label: 'Tickets', competition: 'legacy' },
   { to: '/admin/draw', label: 'Draw winner', competition: 'legacy' },

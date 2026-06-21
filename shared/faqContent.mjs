@@ -32,6 +32,7 @@ import {
   WORLD_CUP_BALL_TERMS_WIN_NOTICE,
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
 } from './worldCupBallGiveawayRules.mjs'
+import { WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY } from './worldCupBallMonthlyDraw.mjs'
 import { worldCupBallPhotographyFaqAnswer } from './worldCupBallPhotography.mjs'
 
 /** @typedef {{ id: string, question: string, answer: string, popular?: boolean }} FaqItem */
@@ -331,13 +332,18 @@ export const FAQ_SECTIONS = [
         id: 'wc-ball-what',
         question: `What is the ${WORLD_CUP_BALL_GIVEAWAY_LABEL}?`,
         answer:
-          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed). Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win outright, or get exactly one wrong and answer a bonus salvage question correctly. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} There is no random draw and no payment.`,
+          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed). Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win outright, or get exactly one wrong and answer a bonus salvage question correctly. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY} No payment is required.`,
       },
       {
         id: 'wc-ball-how-win',
         question: 'How do I win the ball?',
         answer:
           `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or answer exactly one incorrectly and then answer the bonus salvage question correctly. ${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_SALVAGE_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
+      },
+      {
+        id: 'wc-ball-monthly-draw',
+        question: 'What happens if I fail the skill quiz?',
+        answer: WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY,
       },
       {
         id: 'wc-ball-capitals',

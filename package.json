@@ -47,6 +47,7 @@
     "test:consolation-shirt": "node scripts/test-consolation-shirt.mjs",
     "test:competition-catalog": "node scripts/test-competition-catalog.mjs",
     "test:world-cup-ball": "node scripts/test-world-cup-ball-api.mjs",
+    "test:world-cup-ball-monthly-draw": "node scripts/test-world-cup-ball-monthly-draw.mjs",
     "reset:world-cup-ball": "node scripts/reset-world-cup-ball-local.mjs",
     "test:admin-email": "node scripts/test-admin-otp-email.mjs"
   },

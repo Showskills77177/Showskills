@@ -179,6 +179,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           disqualified: data.disqualified,
           claimToken: data.claimToken || null,
           wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
+          monthlyDraw: data.monthlyDraw || null,
         })
       } catch {
         onError('Could not submit your answers. Check your connection and try again.')
@@ -220,6 +221,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           claimToken: data.claimToken || null,
           wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
           salvageCorrect: data.salvageCorrect,
+          monthlyDraw: data.monthlyDraw || null,
         })
       } catch {
         onError('Could not submit your bonus answer. Check your connection and try again.')
