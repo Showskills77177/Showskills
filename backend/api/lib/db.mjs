@@ -19,11 +19,23 @@ if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') {
 let pool
 let sqliteDb
 
+/** Neon/Vercel integration sets POSTGRES_URL; we also accept DATABASE_URL. */
+export function getPostgresUrl() {
+  return (
+    process.env.DATABASE_URL?.trim() ||
+    process.env.POSTGRES_URL?.trim() ||
+    ''
+  )
+}
+
+function isPostgresConnectionString(url) {
+  return Boolean(url && (url.startsWith('postgres://') || url.startsWith('postgresql://')))
+}
+
 /** True when we should use node-pg (e.g. Vercel). SQLite wins if SQLITE_PATH is set. */
 export function dbIsPostgres() {
   if (process.env.SQLITE_PATH?.trim()) return false
-  const u = process.env.DATABASE_URL?.trim()
-  return Boolean(u && (u.startsWith('postgres://') || u.startsWith('postgresql://')))
+  return isPostgresConnectionString(getPostgresUrl())
 }
 
 export function getSqlitePath() {
@@ -32,7 +44,7 @@ export function getSqlitePath() {
 }
 
 function getPool() {
-  const url = process.env.DATABASE_URL
+  const url = getPostgresUrl()
   if (!url) return null
   if (!pool) {
     const ssl =
@@ -138,7 +150,7 @@ function runSqliteQuery(text, params) {
 }
 
 export function isDbConfigured() {
-  if (dbIsPostgres()) return Boolean(process.env.DATABASE_URL?.trim())
+  if (dbIsPostgres()) return Boolean(getPostgresUrl())
   try {
     openSqlite()
     return true
@@ -151,7 +163,7 @@ export async function query(text, params = []) {
   if (dbIsPostgres()) {
     const p = getPool()
     if (!p) {
-      const err = new Error('DATABASE_URL is not configured')
+      const err = new Error('Postgres connection URL is not configured (DATABASE_URL or POSTGRES_URL)')
       err.code = 'NO_DATABASE'
       throw err
     }

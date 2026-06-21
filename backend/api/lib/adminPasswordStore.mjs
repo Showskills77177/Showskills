@@ -1,9 +1,9 @@
-import { query } from './db.mjs'
+import { query, dbIsPostgres } from './db.mjs'
 
 const PASSWORD_KEY = 'password_hash'
 
 export async function ensureAdminPasswordSchema() {
-  if (process.env.DATABASE_URL?.trim() && !process.env.SQLITE_PATH?.trim()) {
+  if (dbIsPostgres()) {
     await query(`
       CREATE TABLE IF NOT EXISTS admin_settings (
         key TEXT PRIMARY KEY,
@@ -32,7 +32,7 @@ export async function getStoredAdminPasswordHash() {
 
 export async function setStoredAdminPasswordHash(hash) {
   await ensureAdminPasswordSchema()
-  if (process.env.DATABASE_URL?.trim() && !process.env.SQLITE_PATH?.trim()) {
+  if (dbIsPostgres()) {
     await query(
       `
       INSERT INTO admin_settings (key, value, updated_at)

@@ -1,8 +1,7 @@
 import { createChallenge, randomInt } from 'altcha-lib'
 import { deriveKey } from 'altcha-lib/algorithms/pbkdf2'
-import { create, deriveHmacKeySecret } from 'altcha-lib/frameworks/express'
+import { deriveHmacKeySecret, verify } from 'altcha-lib/frameworks/shared'
 
-let altchaInstance = null
 let hmacKeySignatureSecretPromise = null
 
 /** Uses ALTCHA_HMAC_KEY, else ADMIN_JWT_SECRET, else a local-only dev fallback. */
@@ -25,24 +24,6 @@ async function getHmacKeySignatureSecret(hmacSignatureSecret) {
     hmacKeySignatureSecretPromise = deriveHmacKeySecret(hmacSignatureSecret)
   }
   return hmacKeySignatureSecretPromise
-}
-
-async function getAltcha() {
-  if (altchaInstance) return altchaInstance
-  const hmacSignatureSecret = getCaptchaHmacSecret()
-  const hmacKeySignatureSecret = await getHmacKeySignatureSecret(hmacSignatureSecret)
-  altchaInstance = create({
-    hmacSignatureSecret,
-    hmacKeySignatureSecret,
-    deriveKey,
-    createChallengeParameters: () => ({
-      algorithm: 'PBKDF2/SHA-256',
-      cost: 5_000,
-      counter: randomInt(5_000, 10_000),
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-    }),
-  })
-  return altchaInstance
 }
 
 export async function createCaptchaChallengeResponse() {
@@ -78,15 +59,9 @@ export async function verifyCaptchaPayload(payloadBase64) {
   }
 
   try {
-    const altcha = await getAltcha()
     const hmacSignatureSecret = getCaptchaHmacSecret()
     const hmacKeySignatureSecret = await getHmacKeySignatureSecret(hmacSignatureSecret)
-    const result = await altcha.verify(
-      payload,
-      deriveKey,
-      hmacSignatureSecret,
-      hmacKeySignatureSecret,
-    )
+    const result = await verify(payload, deriveKey, hmacSignatureSecret, hmacKeySignatureSecret)
     if (result?.verification?.verified) return { ok: true }
   } catch (e) {
     console.error('[captcha] verify failed:', e)

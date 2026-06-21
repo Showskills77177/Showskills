@@ -88,41 +88,47 @@ async function resolveWorldCupBallWinStatus() {
 }
 
 async function enforceVpnAndDevice(req, res, flow) {
-  const vpn = await checkVpnForRequest(req)
-  if (!vpn.ok) {
-    await logEntryAttempt(req, {
-      competition: COMPETITION_WORLD_CUP_BALL,
-      flow,
-      outcome: 'blocked',
-      blockReason: 'vpn_not_allowed',
-    })
-    json(res, 403, { error: vpn.error, code: vpn.code })
-    return false
-  }
-
-  const ip = clientIp(req)
-  if (!isWorldCupBallLocalDevBypass()) {
-    const attempts = await countWorldCupBallFinalizedAttemptsByIp(ip)
-    if (attempts >= MAX_WORLD_CUP_BALL_PER_DEVICE) {
+  try {
+    const vpn = await checkVpnForRequest(req)
+    if (!vpn.ok) {
       await logEntryAttempt(req, {
         competition: COMPETITION_WORLD_CUP_BALL,
         flow,
-        ip,
         outcome: 'blocked',
-        blockReason: 'device_used',
-      })
-      json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallDeviceUsed, code: 'device_used' })
+        blockReason: 'vpn_not_allowed',
+      }).catch(() => {})
+      json(res, 403, { error: vpn.error, code: vpn.code })
       return false
     }
 
-    const winners = await countWorldCupBallWinners()
-    if (winners >= 1) {
-      json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAlreadyWon, code: 'prize_claimed' })
-      return false
+    const ip = clientIp(req)
+    if (!isWorldCupBallLocalDevBypass()) {
+      const attempts = await countWorldCupBallFinalizedAttemptsByIp(ip)
+      if (attempts >= MAX_WORLD_CUP_BALL_PER_DEVICE) {
+        await logEntryAttempt(req, {
+          competition: COMPETITION_WORLD_CUP_BALL,
+          flow,
+          ip,
+          outcome: 'blocked',
+          blockReason: 'device_used',
+        }).catch(() => {})
+        json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallDeviceUsed, code: 'device_used' })
+        return false
+      }
+
+      const winners = await countWorldCupBallWinners()
+      if (winners >= 1) {
+        json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallAlreadyWon, code: 'prize_claimed' })
+        return false
+      }
     }
+
+    return true
+  } catch (e) {
+    console.error('[world-cup-ball] pre-start checks failed:', e)
+    json(res, 503, { error: 'Could not start quiz session. Please try again.' })
+    return false
   }
-
-  return true
 }
 
 /** POST /api/submissions/world-cup-ball/start */
@@ -143,13 +149,14 @@ export async function startWorldCupBallSession(req, res) {
 
   if (!isDbConfigured()) return json(res, 503, { error: 'Database not configured' })
 
-  const ok = await enforceVpnAndDevice(req, res, 'world_cup_ball_start')
-  if (!ok) return
-
-  const body = parseJsonBody(req)
-  const ip = clientIp(req)
-
+  let body
+  let ip
   try {
+    const ok = await enforceVpnAndDevice(req, res, 'world_cup_ball_start')
+    if (!ok) return
+
+    body = parseJsonBody(req)
+    ip = clientIp(req)
     const existing = await getInProgressWorldCupBallSessionByIp(ip)
     if (existing) {
       if (sessionExpired(existing.started_at)) {
