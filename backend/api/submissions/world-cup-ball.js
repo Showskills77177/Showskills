@@ -31,6 +31,8 @@ import {
   pickWorldCupBallSalvageQuestion,
   publicWorldCupBallQuestion,
   getWorldCupBallQuestionsByKeys,
+  worldCupBallAnsweredKeys,
+  shouldEndWorldCupBallQuizEarly,
 } from '../../../shared/worldCupBallGiveaway.mjs'
 import { answerMatchesWorldCupBallAnswer } from '../../../shared/worldCupBallAnswerMatching.mjs'
 import {
@@ -45,6 +47,7 @@ import {
   recordWorldCupBallWinner,
   markWorldCupBallWinnerEmailSent,
   saveWorldCupBallSalvageOffer,
+  saveWorldCupBallPartialProgress,
 } from '../lib/worldCupBallSchema.mjs'
 import { sendWorldCupBallWinnerEmail } from '../lib/sendWorldCupBallWinnerEmail.mjs'
 import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs'
@@ -286,6 +289,7 @@ export async function submitWorldCupBallQuiz(req, res) {
   const timeoutsUsed = Number(body.timeoutsUsed)
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
   const salvageAnswer = typeof body.salvageAnswer === 'string' ? body.salvageAnswer.trim() : ''
+  const partialCheck = body.partialCheck === true
 
   if (!sessionId) return json(res, 400, { error: 'sessionId required' })
 
@@ -319,6 +323,77 @@ export async function submitWorldCupBallQuiz(req, res) {
     ? timeoutsUsed
     : Number(session.timeouts_used) || 0
   const disqualified = isWorldCupBallDisqualifiedByTimeouts(effectiveTimeouts)
+
+  if (partialCheck) {
+    const answeredKeys = worldCupBallAnsweredKeys(answers, questionKeys)
+    if (!answeredKeys.length || answeredKeys.length >= questionKeys.length) {
+      return json(res, 400, { error: 'Invalid partial quiz check.', code: 'invalid_partial_check' })
+    }
+
+    if (shouldEndWorldCupBallQuizEarly(answers, questionKeys)) {
+      const wrongReview = buildWorldCupBallWrongReview(answers, answeredKeys)
+      try {
+        await finalizeWorldCupBallSession({
+          sessionId,
+          status: 'lost',
+          timeoutsUsed: effectiveTimeouts,
+          answers,
+        })
+
+        await logEntryAttempt(req, {
+          competition: COMPETITION_WORLD_CUP_BALL,
+          flow: 'world_cup_ball_submit',
+          ip,
+          outcome: 'lost',
+          metadata: {
+            session_id: sessionId,
+            early_exit: true,
+            wrong_count: wrongReview.length,
+          },
+        })
+
+        const monthlyDraw = await maybeAwardWorldCupBallMonthlyDrawEntry({
+          req,
+          sessionId,
+          ip,
+          status: 'lost',
+        })
+
+        return json(res, 200, {
+          ok: true,
+          result: 'lost',
+          allCorrect: false,
+          disqualified: false,
+          claimToken: null,
+          wrongReview,
+          wrongCount: wrongReview.length,
+          earlyExit: true,
+          monthlyDraw: monthlyDrawApiPayload(monthlyDraw),
+        })
+      } catch (e) {
+        console.error(e)
+        return json(res, 500, { error: 'Could not save quiz result' })
+      }
+    }
+
+    try {
+      await saveWorldCupBallPartialProgress({
+        sessionId,
+        answers,
+        timeoutsUsed: effectiveTimeouts,
+      })
+    } catch (e) {
+      console.error('[world-cup-ball] partial progress save failed:', e)
+    }
+
+    const validation = validateWorldCupBallAnswers(answers, answeredKeys)
+    const wrongCount = countWorldCupBallWrongAnswers(validation, answeredKeys)
+    return json(res, 200, {
+      ok: true,
+      continue: true,
+      wrongCount,
+    })
+  }
 
   if (salvageAnswer && session.salvage_question_key) {
     const mainAnswers = parseSessionAnswers(session)

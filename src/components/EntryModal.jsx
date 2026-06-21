@@ -1080,7 +1080,9 @@ export function EntryModal() {
                       ? 'You ran out of time twice. Under the rules, your single attempt has ended.'
                       : wcBallOutcome.salvageCorrect === false
                         ? 'Your bonus salvage answer was incorrect, so you do not win the ball on this attempt.'
-                        : 'You did not answer every question correctly. See the questions you missed below.'}
+                        : wcBallOutcome.earlyExit
+                          ? 'Two incorrect answers ended your attempt. See the questions you missed below.'
+                          : 'You did not answer every question correctly. See the questions you missed below.'}
                   </p>
                   <WorldCupBallWrongReview wrongReview={wcBallOutcome.wrongReview} />
                   <WorldCupBallMonthlyDrawEntryCallout monthlyDraw={wcBallOutcome.monthlyDraw} />

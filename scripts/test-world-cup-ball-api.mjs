@@ -96,12 +96,66 @@ async function main() {
       throw new Error(`expected at least 2 MC questions, got ${mc.length}`)
     }
 
-    const answers = buildCorrectAnswers(start.questions)
-    const submitRes = await fetch(`${base}/api/submissions/world-cup-ball/submit`, {
+    if (mc.length < 2) {
+      throw new Error(`expected at least 2 MC questions, got ${mc.length}`)
+    }
+
+    const [q1, q2, q3] = start.questions
+    const oneWrongRes = await fetch(`${base}/api/submissions/world-cup-ball/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: start.sessionId,
+        timeoutsUsed: 0,
+        partialCheck: true,
+        answers: {
+          [q1.questionKey]: bankByKey.get(q1.questionKey).acceptedAnswers[0],
+          [q2.questionKey]: 'definitely wrong',
+        },
+      }),
+    })
+    const oneWrong = await oneWrongRes.json()
+    if (!oneWrongRes.ok || !oneWrong.continue) {
+      throw new Error(`partial check after one wrong failed: ${oneWrongRes.status} ${JSON.stringify(oneWrong)}`)
+    }
+
+    const twoWrongRes = await fetch(`${base}/api/submissions/world-cup-ball/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: start.sessionId,
+        timeoutsUsed: 0,
+        partialCheck: true,
+        answers: {
+          [q1.questionKey]: bankByKey.get(q1.questionKey).acceptedAnswers[0],
+          [q2.questionKey]: 'definitely wrong',
+          [q3.questionKey]: 'also wrong',
+        },
+      }),
+    })
+    const twoWrong = await twoWrongRes.json()
+    if (!twoWrongRes.ok || twoWrong.result !== 'lost' || !twoWrong.earlyExit) {
+      throw new Error(`early exit after two wrong failed: ${twoWrongRes.status} ${JSON.stringify(twoWrong)}`)
+    }
+    if (!Array.isArray(twoWrong.wrongReview) || twoWrong.wrongReview.length !== 2) {
+      throw new Error(`expected two wrong-review rows, got ${JSON.stringify(twoWrong.wrongReview)}`)
+    }
+
+    const start2Res = await fetch(`${base}/api/submissions/world-cup-ball/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    const start2 = await start2Res.json()
+    if (!start2Res.ok || !start2.sessionId) {
+      throw new Error(`second start failed: ${start2Res.status} ${JSON.stringify(start2)}`)
+    }
+
+    const answers = buildCorrectAnswers(start2.questions)
+    const submitRes = await fetch(`${base}/api/submissions/world-cup-ball/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: start2.sessionId,
         timeoutsUsed: 0,
         answers,
       }),

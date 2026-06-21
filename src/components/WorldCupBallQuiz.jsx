@@ -140,6 +140,23 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     [questionSeconds, timeoutBonusSeconds],
   )
 
+  const deliverQuizResult = useCallback(
+    (data) => {
+      clearWorldCupBallQuizProgress()
+      onResult({
+        result: data.result,
+        allCorrect: data.allCorrect,
+        disqualified: data.disqualified,
+        claimToken: data.claimToken || null,
+        wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
+        salvageCorrect: data.salvageCorrect,
+        monthlyDraw: data.monthlyDraw || null,
+        earlyExit: Boolean(data.earlyExit),
+      })
+    },
+    [onResult],
+  )
+
   const finishQuiz = useCallback(
     async (finalAnswers, finalTimeouts, disqualified) => {
       if (!sessionId || submitting) return
@@ -160,7 +177,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         const data = await res.json().catch(() => ({}))
         if (!res.ok) {
           onError(typeof data.error === 'string' ? data.error : 'Could not submit your answers.')
-          setPhase('idle')
+          setPhase('active')
           setSubmitting(false)
           return
         }
@@ -172,23 +189,50 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           setSubmitting(false)
           return
         }
-        clearWorldCupBallQuizProgress()
-        onResult({
-          result: data.result,
-          allCorrect: data.allCorrect,
-          disqualified: data.disqualified,
-          claimToken: data.claimToken || null,
-          wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
-          monthlyDraw: data.monthlyDraw || null,
-        })
+        deliverQuizResult(data)
       } catch {
         onError('Could not submit your answers. Check your connection and try again.')
-        setPhase('idle')
+        setPhase('active')
       } finally {
         setSubmitting(false)
       }
     },
-    [sessionId, submitting, onResult, onError, resetTimer],
+    [sessionId, submitting, onError, resetTimer, deliverQuizResult],
+  )
+
+  const checkQuizProgress = useCallback(
+    async (currentAnswers, currentTimeouts) => {
+      if (!sessionId || submitting) return false
+      setSubmitting(true)
+      try {
+        const res = await fetch(apiUrl('/api/submissions/world-cup-ball/submit'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            sessionId,
+            answers: currentAnswers,
+            timeoutsUsed: currentTimeouts,
+            partialCheck: true,
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          onError(typeof data.error === 'string' ? data.error : 'Could not check your answer.')
+          return false
+        }
+        if (data.continue) return true
+        setPhase('submitting')
+        deliverQuizResult(data)
+        return false
+      } catch {
+        onError('Could not check your answer. Check your connection and try again.')
+        return false
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [sessionId, submitting, onError, deliverQuizResult],
   )
 
   const submitSalvageAnswer = useCallback(
@@ -214,15 +258,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           return
         }
         clearWorldCupBallQuizProgress()
-        onResult({
-          result: data.result,
-          allCorrect: data.allCorrect,
-          disqualified: data.disqualified,
-          claimToken: data.claimToken || null,
-          wrongReview: Array.isArray(data.wrongReview) ? data.wrongReview : [],
-          salvageCorrect: data.salvageCorrect,
-          monthlyDraw: data.monthlyDraw || null,
-        })
+        deliverQuizResult(data)
       } catch {
         onError('Could not submit your bonus answer. Check your connection and try again.')
         setPhase('salvage')
@@ -230,12 +266,12 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         setSubmitting(false)
       }
     },
-    [sessionId, submitting, salvageQuestion, onResult, onError],
+    [sessionId, submitting, salvageQuestion, onError, deliverQuizResult],
   )
 
   const advanceQuestion = useCallback(
-    (answerText) => {
-      if (disqualifiedRef.current || phase !== 'active') return
+    async (answerText) => {
+      if (disqualifiedRef.current || phase !== 'active' || submitting) return
       const current = questions[index]
       if (!current) return
       const nextAnswers = { ...answersRef.current, [current.questionKey]: answerText.trim() }
@@ -245,13 +281,28 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         void finishQuiz(nextAnswers, timeoutsUsed, false)
         return
       }
+
+      const canContinue = await checkQuizProgress(nextAnswers, timeoutsUsed)
+      if (!canContinue) return
+
       const nextIndex = index + 1
       setCurrentAnswer('')
       setIndex(nextIndex)
       resetTimer(false)
       persistProgress({ index: nextIndex, answers: nextAnswers, bonusActive: false, secondsLeft: questionSeconds })
     },
-    [index, questions, phase, timeoutsUsed, finishQuiz, resetTimer, persistProgress, questionSeconds],
+    [
+      index,
+      questions,
+      phase,
+      submitting,
+      timeoutsUsed,
+      finishQuiz,
+      checkQuizProgress,
+      resetTimer,
+      persistProgress,
+      questionSeconds,
+    ],
   )
 
   const handleTimeout = useCallback(() => {

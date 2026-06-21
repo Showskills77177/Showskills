@@ -8,6 +8,9 @@ import {
   pickWorldCupBallSalvageQuestion,
   countWorldCupBallWrongAnswers,
   WORLD_CUP_BALL_QUESTION_BANK,
+  worldCupBallAnsweredKeys,
+  shouldEndWorldCupBallQuizEarly,
+  WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE,
 } from './worldCupBallGiveaway.mjs'
 
 describe('worldCupBallGiveaway', () => {
@@ -56,5 +59,18 @@ describe('worldCupBallGiveaway', () => {
     const salvage = pickWorldCupBallSalvageQuestion(questionKeys)
     assert.ok(salvage)
     assert.equal(questionKeys.includes(salvage.questionKey), false)
+  })
+
+  it('ends the quiz early after a second wrong answer', () => {
+    const questionKeys = WORLD_CUP_BALL_QUESTION_BANK.slice(0, 4).map((q) => q.questionKey)
+    const answers = {
+      [questionKeys[0]]: WORLD_CUP_BALL_QUESTION_BANK[0].acceptedAnswers[0],
+      [questionKeys[1]]: 'wrong',
+    }
+    assert.equal(shouldEndWorldCupBallQuizEarly(answers, questionKeys), false)
+
+    answers[questionKeys[2]] = 'also wrong'
+    assert.equal(shouldEndWorldCupBallQuizEarly(answers, questionKeys), true)
+    assert.deepEqual(worldCupBallAnsweredKeys(answers, questionKeys), questionKeys.slice(0, 3))
   })
 })

@@ -65,7 +65,7 @@ export const WORLD_CUP_BALL_MAX_TIMEOUTS = 1
 export const WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE = 1
 
 export const WORLD_CUP_BALL_SALVAGE_NOTICE =
-  'One incorrect answer? You receive one bonus salvage question — answer it correctly to still win the ball. Two or more incorrect answers end your attempt.'
+  'One incorrect answer? You receive one bonus salvage question — answer it correctly to still win the ball. A second incorrect answer ends your attempt immediately.'
 
 /** Minimum multiple-choice (four-option) bonus questions per quiz. */
 export const WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS = 2
@@ -246,6 +246,20 @@ export function validateWorldCupBallAnswers(answers, questionKeys) {
 
 export function countWorldCupBallWrongAnswers(validation, questionKeys) {
   return (questionKeys || []).filter((key) => !validation.perQuestion[key]).length
+}
+
+/** Question keys the entrant has submitted so far (in quiz order). */
+export function worldCupBallAnsweredKeys(answers, questionKeys) {
+  return (questionKeys || []).filter((key) => Object.prototype.hasOwnProperty.call(answers ?? {}, key))
+}
+
+/** True when a partial attempt already has too many wrong answers to continue. */
+export function shouldEndWorldCupBallQuizEarly(answers, questionKeys) {
+  const answeredKeys = worldCupBallAnsweredKeys(answers, questionKeys)
+  if (!answeredKeys.length || answeredKeys.length >= (questionKeys || []).length) return false
+  const validation = validateWorldCupBallAnswers(answers, answeredKeys)
+  const wrongCount = countWorldCupBallWrongAnswers(validation, answeredKeys)
+  return wrongCount > WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE
 }
 
 /** Pick the clearest accepted answer to show in the post-quiz review. */

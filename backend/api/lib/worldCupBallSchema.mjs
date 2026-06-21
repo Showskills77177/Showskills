@@ -245,6 +245,15 @@ export async function saveWorldCupBallSalvageOffer({ sessionId, answers, timeout
   )
 }
 
+export async function saveWorldCupBallPartialProgress({ sessionId, answers, timeoutsUsed }) {
+  await ensureWorldCupBallSchema()
+  const answersJson = JSON.stringify(answers ?? {})
+  await query(
+    `UPDATE world_cup_ball_sessions SET answers_json = $2, timeouts_used = $3 WHERE id = $1 AND status = 'in_progress'`,
+    [sessionId, answersJson, timeoutsUsed],
+  )
+}
+
 export async function finalizeWorldCupBallSession({
   sessionId,
   status,

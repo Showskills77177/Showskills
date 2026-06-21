@@ -50,7 +50,7 @@ export const WORLD_CUP_BALL_TERMS_TIMING_NOTICE =
   `${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. VPNs and proxies are not allowed.`
 
 export const WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE =
-  `If you answer exactly one of the ${WORLD_CUP_BALL_QUESTION_COUNT} main questions incorrectly, you receive one bonus salvage question that was not part of your original quiz. ${WORLD_CUP_BALL_SALVAGE_NOTICE} The salvage question has the same ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. Two or more incorrect answers in the main quiz end your attempt without a salvage question.`
+  `If you answer exactly one of the ${WORLD_CUP_BALL_QUESTION_COUNT} main questions incorrectly, you receive one bonus salvage question that was not part of your original quiz. ${WORLD_CUP_BALL_SALVAGE_NOTICE} The salvage question has the same ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. A second incorrect answer in the main quiz ends your attempt immediately without a salvage question.`
 
 export const WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE =
   'If you do not win, we show you which main quiz questions you answered incorrectly and the answers you submitted. This feedback is displayed to you in your browser during the attempt only — it is not emailed automatically.'
@@ -81,7 +81,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
     num: 3,
     title: 'Win only if every answer is correct (one salvage chance)',
     detail:
-      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct to win outright. If you get exactly one answer wrong, you receive one bonus salvage question — answer it correctly and you still win. Two or more wrong answers mean you do not win on the skill attempt, but you still receive one free automatic entry into that month’s World Cup Ball draw (June or July 2026).`,
+      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct to win outright. If you get exactly one answer wrong, you receive one bonus salvage question — answer it correctly and you still win. A second wrong answer ends the attempt immediately; you do not win on the skill attempt, but you still receive one free automatic entry into that month’s World Cup Ball draw (June or July 2026).`,
   },
   {
     num: 4,
