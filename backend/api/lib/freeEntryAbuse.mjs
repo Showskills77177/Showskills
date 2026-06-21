@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { query } from './db.mjs'
-import { ensureFreeEntrySchema } from './ensureFreeEntrySchema.mjs'
+import { ensureEntryAttemptLogSchema } from './ensureFreeEntrySchema.mjs'
 import { clientIp } from './rateLimit.mjs'
 import {
   buildNameAddressKey,
@@ -17,31 +17,35 @@ import {
 export { clientIp }
 
 export async function logEntryAttempt(req, fields) {
-  await ensureFreeEntrySchema()
-  const id = randomUUID()
-  const meta =
-    fields.metadata && typeof fields.metadata === 'object'
-      ? JSON.stringify(fields.metadata)
-      : fields.metadata
-        ? String(fields.metadata)
-        : null
-  await query(
-    `INSERT INTO entry_attempt_logs (
-      id, competition, flow, ip_address, full_name, email, address_key, outcome, block_reason, metadata
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
-      id,
-      fields.competition,
-      fields.flow,
-      fields.ip || clientIp(req),
-      fields.fullName || null,
-      fields.email || null,
-      fields.addressKey || null,
-      fields.outcome,
-      fields.blockReason || null,
-      meta,
-    ],
-  )
+  try {
+    await ensureEntryAttemptLogSchema()
+    const id = randomUUID()
+    const meta =
+      fields.metadata && typeof fields.metadata === 'object'
+        ? JSON.stringify(fields.metadata)
+        : fields.metadata
+          ? String(fields.metadata)
+          : null
+    await query(
+      `INSERT INTO entry_attempt_logs (
+        id, competition, flow, ip_address, full_name, email, address_key, outcome, block_reason, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        id,
+        fields.competition,
+        fields.flow,
+        fields.ip || clientIp(req),
+        fields.fullName || null,
+        fields.email || null,
+        fields.addressKey || null,
+        fields.outcome,
+        fields.blockReason || null,
+        meta,
+      ],
+    )
+  } catch (e) {
+    console.error('[entry-attempt] log failed:', e)
+  }
 }
 
 export function parsePostalAddress(body) {
