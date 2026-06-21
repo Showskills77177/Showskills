@@ -109,6 +109,11 @@ export async function detectVpnOrProxy(ip) {
 
 /** Server-side guard for public entry APIs. */
 export async function checkVpnForRequest(req) {
+  const { isWorldCupBallQuizBypass } = await import('./worldCupBallDev.mjs')
+  if (await isWorldCupBallQuizBypass(req)) {
+    return { ok: true, ip: clientIp(req), detection: { skipped: true, reason: 'editor_test' } }
+  }
+
   const ip = clientIp(req)
   const detection = await detectVpnOrProxy(ip)
   if (!detection.blocked) {

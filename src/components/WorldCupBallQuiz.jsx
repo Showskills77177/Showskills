@@ -21,7 +21,7 @@ import {
   WORLD_CUP_BALL_PRACTICE_TYPING_TIP,
   worldCupBallPracticeCompleteTips,
 } from '../../shared/worldCupBallPractice.mjs'
-import { apiUrl } from '../lib/api'
+import { apiFetch, apiUrl } from '../lib/api'
 import { fetchCaptchaConfig } from '../lib/captchaConfig.js'
 import { AltchaWidget } from './AltchaWidget'
 import { QuizQuestionTimer } from './QuizQuestionTimer'
@@ -63,6 +63,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const [captchaConfig, setCaptchaConfig] = useState({ enabled: false, challengeUrl: '/api/captcha-challenge', loading: true })
   const [captchaPayload, setCaptchaPayload] = useState('')
   const [captchaError, setCaptchaError] = useState('')
+  const [editorTestBypass, setEditorTestBypass] = useState(false)
 
   const practiceChoices = useMemo(() => {
     const list = [...WORLD_CUP_BALL_PRACTICE_QUESTION.choices]
@@ -379,6 +380,14 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
       if (cancelled) return
       setCaptchaConfig({ enabled: cfg.enabled, challengeUrl: cfg.challengeUrl, loading: false })
     })
+    apiFetch('/api/editor-test-me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setEditorTestBypass(Boolean(data.quizBypass))
+      })
+      .catch(() => {
+        if (!cancelled) setEditorTestBypass(false)
+      })
     return () => {
       cancelled = true
     }
@@ -414,7 +423,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     if (disabled || submitting) return
     primeQuizTimerAudio()
     const resumingInProgress = hasSavedProgress && phase === 'idle'
-    if (captchaConfig.enabled && !captchaPayload && !resumingInProgress) {
+    const captchaNeeded = captchaConfig.enabled && !editorTestBypass && !resumingInProgress
+    if (captchaNeeded && !captchaPayload) {
       setCaptchaError('Please wait for the security check to finish.')
       return
     }
@@ -474,7 +484,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   }
 
   const resumingInProgress = hasSavedProgress && phase === 'idle'
-  const captchaRequired = captchaConfig.enabled && !resumingInProgress
+  const captchaRequired = captchaConfig.enabled && !resumingInProgress && !editorTestBypass
   const startBlocked = disabled || submitting || (captchaRequired && !captchaPayload)
 
   const renderStartSecurityCheck = () => {

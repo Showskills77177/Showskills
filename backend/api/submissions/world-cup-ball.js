@@ -50,7 +50,7 @@ import { sendWorldCupBallWinnerEmail } from '../lib/sendWorldCupBallWinnerEmail.
 import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs'
 import { resolveSiteUrl } from '../lib/resendConfig.mjs'
 import { WORLD_CUP_BALL_MIN_AGE } from '../../../shared/worldCupBallGiveawayRules.mjs'
-import { isWorldCupBallLocalDevBypass } from '../lib/worldCupBallDev.mjs'
+import { isWorldCupBallQuizBypass } from '../lib/worldCupBallDev.mjs'
 import { verifyCaptchaPayload } from '../lib/captcha.mjs'
 import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
 
@@ -79,9 +79,10 @@ function parseSessionAnswers(session) {
   return {}
 }
 
-async function resolveWorldCupBallWinStatus() {
+async function resolveWorldCupBallWinStatus(req) {
   const winners = await countWorldCupBallWinners()
-  if (!isWorldCupBallLocalDevBypass() && winners >= 1) {
+  const bypass = await isWorldCupBallQuizBypass(req)
+  if (!bypass && winners >= 1) {
     return { status: 'lost', claimToken: null }
   }
   return { status: 'won', claimToken: newClaimToken() }
@@ -89,20 +90,23 @@ async function resolveWorldCupBallWinStatus() {
 
 async function enforceVpnAndDevice(req, res, flow) {
   try {
-    const vpn = await checkVpnForRequest(req)
-    if (!vpn.ok) {
-      await logEntryAttempt(req, {
-        competition: COMPETITION_WORLD_CUP_BALL,
-        flow,
-        outcome: 'blocked',
-        blockReason: 'vpn_not_allowed',
-      }).catch(() => {})
-      json(res, 403, { error: vpn.error, code: vpn.code })
-      return false
+    const quizBypass = await isWorldCupBallQuizBypass(req)
+    if (!quizBypass) {
+      const vpn = await checkVpnForRequest(req)
+      if (!vpn.ok) {
+        await logEntryAttempt(req, {
+          competition: COMPETITION_WORLD_CUP_BALL,
+          flow,
+          outcome: 'blocked',
+          blockReason: 'vpn_not_allowed',
+        }).catch(() => {})
+        json(res, 403, { error: vpn.error, code: vpn.code })
+        return false
+      }
     }
 
     const ip = clientIp(req)
-    if (!isWorldCupBallLocalDevBypass()) {
+    if (!quizBypass) {
       const attempts = await countWorldCupBallFinalizedAttemptsByIp(ip)
       if (attempts >= MAX_WORLD_CUP_BALL_PER_DEVICE) {
         await logEntryAttempt(req, {
@@ -157,9 +161,17 @@ export async function startWorldCupBallSession(req, res) {
 
     body = parseJsonBody(req)
     ip = clientIp(req)
+    const quizBypass = await isWorldCupBallQuizBypass(req)
     const existing = await getInProgressWorldCupBallSessionByIp(ip)
     if (existing) {
-      if (sessionExpired(existing.started_at)) {
+      if (quizBypass) {
+        await finalizeWorldCupBallSession({
+          sessionId: existing.id,
+          status: 'abandoned',
+          timeoutsUsed: existing.timeouts_used ?? 0,
+          answers: parseSessionAnswers(existing),
+        })
+      } else if (sessionExpired(existing.started_at)) {
         await finalizeWorldCupBallSession({
           sessionId: existing.id,
           status: 'expired',
@@ -194,16 +206,18 @@ export async function startWorldCupBallSession(req, res) {
 
     const captchaPayload =
       typeof body[CAPTCHA_BODY_FIELD] === 'string' ? body[CAPTCHA_BODY_FIELD].trim() : ''
-    const captcha = await verifyCaptchaPayload(captchaPayload)
-    if (!captcha.ok) {
-      await logEntryAttempt(req, {
-        competition: COMPETITION_WORLD_CUP_BALL,
-        flow: 'world_cup_ball_start',
-        ip,
-        outcome: 'blocked',
-        blockReason: captcha.code,
-      }).catch(() => {})
-      return json(res, 403, { error: captcha.error, code: captcha.code })
+    if (!quizBypass) {
+      const captcha = await verifyCaptchaPayload(captchaPayload)
+      if (!captcha.ok) {
+        await logEntryAttempt(req, {
+          competition: COMPETITION_WORLD_CUP_BALL,
+          flow: 'world_cup_ball_start',
+          ip,
+          outcome: 'blocked',
+          blockReason: captcha.code,
+        }).catch(() => {})
+        return json(res, 403, { error: captcha.error, code: captcha.code })
+      }
     }
 
     const { combinationIndex, questionKeys } = pickRandomWorldCupBallCombination()
@@ -268,7 +282,8 @@ export async function submitWorldCupBallQuiz(req, res) {
   }
 
   const ip = clientIp(req)
-  if (session.ip_address && ip && session.ip_address !== ip) {
+  const quizBypass = await isWorldCupBallQuizBypass(req)
+  if (!quizBypass && session.ip_address && ip && session.ip_address !== ip) {
     return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallInvalidSession, code: 'ip_mismatch' })
   }
 
@@ -304,7 +319,7 @@ export async function submitWorldCupBallQuiz(req, res) {
     let status = 'lost'
     let claimToken = null
     if (!disqualified && wrongCount === WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE && salvageCorrect) {
-      ;({ status, claimToken } = await resolveWorldCupBallWinStatus())
+      ;({ status, claimToken } = await resolveWorldCupBallWinStatus(req))
     } else if (disqualified) {
       status = 'disqualified'
     }
@@ -355,7 +370,7 @@ export async function submitWorldCupBallQuiz(req, res) {
   if (disqualified) {
     status = 'disqualified'
   } else if (won) {
-    ;({ status, claimToken } = await resolveWorldCupBallWinStatus())
+    ;({ status, claimToken } = await resolveWorldCupBallWinStatus(req))
   } else if (
     wrongCount === WORLD_CUP_BALL_MAX_WRONG_FOR_SALVAGE &&
     !session.salvage_question_key
@@ -581,7 +596,8 @@ export async function claimWorldCupBallPrize(req, res) {
   const phoneKey = phoneCheck.phone.replace(/\D/g, '')
   const addressKey = buildNameAddressKey({ fullName, ...address })
 
-  if (!isWorldCupBallLocalDevBypass()) {
+  const quizBypass = await isWorldCupBallQuizBypass(req)
+  if (!quizBypass) {
     if (await hasWorldCupBallWinnerClaim(nameKey, phoneKey, addressKey)) {
       const nameRow = await query(`SELECT 1 FROM world_cup_ball_winners WHERE name_key = $1`, [nameKey])
       if (nameRow.rows[0]) {

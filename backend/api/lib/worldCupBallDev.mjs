@@ -9,3 +9,11 @@ export function isWorldCupBallLocalDevBypass() {
   if (process.env.WC_BALL_DEV_BYPASS === '1' || process.env.WC_BALL_DEV_BYPASS === 'true') return true
   return process.env.NODE_ENV !== 'production'
 }
+
+/** Local dev bypass or signed editor test cookie (home-page login). */
+export async function isWorldCupBallQuizBypass(req) {
+  if (isWorldCupBallLocalDevBypass()) return true
+  if (!req) return false
+  const { isEditorTestSession } = await import('./editorTestAuth.mjs')
+  return isEditorTestSession(req)
+}
