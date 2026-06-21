@@ -1,6 +1,11 @@
 import { answerMatchesWorldCupBallAnswer } from './worldCupBallAnswerMatching.mjs'
 import { WORLD_CUP_BALL_QUESTION_BANK } from './worldCupBallQuestionBank.mjs'
 import {
+  WORLD_CUP_BALL_HISTORICAL_CHOICE_COUNT,
+  WORLD_CUP_BALL_HISTORICAL_MAX_YEAR,
+  worldCupBallChoiceOptionLabel,
+} from './worldCupBallHistoricalChoices.mjs'
+import {
   WORLD_CUP_BALL_COMBINATION_TARGET,
   buildWorldCupBallCombinations,
   combinationCount,
@@ -66,7 +71,9 @@ export const WORLD_CUP_BALL_SALVAGE_NOTICE =
 export const WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS = 2
 
 export const WORLD_CUP_BALL_CHOICE_BONUS_NOTICE =
-  'Each quiz includes at least two bonus questions — tap the correct answer from four options instead of typing. All other questions are free-text and must still be answered correctly.'
+  `Questions about events in ${WORLD_CUP_BALL_HISTORICAL_MAX_YEAR} or earlier are multiple-choice with ${WORLD_CUP_BALL_HISTORICAL_CHOICE_COUNT} options. Newer bonus questions may offer ${worldCupBallChoiceOptionLabel(4)} — tap the correct answer instead of typing. All other questions are free-text.`
+
+export { WORLD_CUP_BALL_HISTORICAL_MAX_YEAR, WORLD_CUP_BALL_HISTORICAL_CHOICE_COUNT } from './worldCupBallHistoricalChoices.mjs'
 
 export const WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE =
   'Capital letters are optional — write names however you prefer (lowercase, mixed case, or ALL CAPS).'

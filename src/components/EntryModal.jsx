@@ -45,7 +45,6 @@ import {
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
   WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
-  WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
@@ -987,9 +986,6 @@ export function EntryModal() {
               </p>
               <p className="mt-2 rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5 text-xs leading-relaxed text-amber-50/95">
                 <strong className="text-amber-100">Timing:</strong> {WORLD_CUP_BALL_QUESTION_TIMING_NOTICE}
-              </p>
-              <p className="mt-2 rounded-lg border border-amber-400/45 bg-amber-950/35 px-3 py-2.5 text-xs font-semibold leading-relaxed text-amber-50/95">
-                <strong className="text-amber-200">Time-out extension:</strong> {WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT}
               </p>
               <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
                 {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}

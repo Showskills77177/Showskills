@@ -1,3 +1,5 @@
+import { enrichWorldCupBallHistoricalChoices } from './worldCupBallHistoricalChoices.mjs'
+
 /**
  * Full World Cup Ball question bank — append new questions here (q26, q27, …).
  * Each quiz serves {@link WORLD_CUP_BALL_QUESTION_COUNT} questions picked from
@@ -5,7 +7,7 @@
  *
  * @type {Array<{ questionKey: string, prompt: string, acceptedAnswers: string[], choices?: string[], exclusionGroup?: string }>}
  */
-export const WORLD_CUP_BALL_QUESTION_BANK = [
+const _RAW_WORLD_CUP_BALL_QUESTION_BANK = [
   {
     questionKey: 'q1',
     prompt: 'Who was the first African player to win the Ballon d’Or?',
@@ -1795,3 +1797,8 @@ export const WORLD_CUP_BALL_QUESTION_BANK = [
     exclusionGroup: 'jose-mourinho',
   },
 ]
+
+/** Historical questions (1980 and earlier) get six-option multiple choice at load time. */
+export const WORLD_CUP_BALL_QUESTION_BANK = enrichWorldCupBallHistoricalChoices(
+  _RAW_WORLD_CUP_BALL_QUESTION_BANK,
+)

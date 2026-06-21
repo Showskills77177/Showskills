@@ -37,7 +37,7 @@ export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
   `Open to UK residents aged ${WORLD_CUP_BALL_MIN_AGE} or over. This is a free skill challenge, not gambling or a lottery. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} VPNs, proxies, and similar anonymising tools are not allowed. Entrants aged 16 or 17 may take part, but prize delivery must go to a parent or legal guardian’s UK postal address with their contact details (see Winner details below).`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
-  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. At least ${WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS} questions are multiple-choice bonus questions with four options; the rest are free-text. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
+  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. There is no random draw. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
 
 export const WORLD_CUP_BALL_SKILL_NOTICE =
   `${WORLD_CUP_BALL_QUESTION_TIMING_SHORT} This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second time-out, or use of a VPN means you do not win the ball.`
@@ -71,7 +71,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   {
     num: 2,
     title: `Answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult questions under time pressure`,
-    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. Type your answer and move on before the time-out — or tap one of four options on the bonus multiple-choice questions. If the time-out expires once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only. If it expires a second time, you are disqualified immediately.`,
+    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. Type your answer and move on before the time-out — or tap one option on multiple-choice questions (six for events in 1980 or earlier; four on some newer bonus questions). If the time-out expires once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only. If it expires a second time, you are disqualified immediately.`,
   },
   {
     num: 3,

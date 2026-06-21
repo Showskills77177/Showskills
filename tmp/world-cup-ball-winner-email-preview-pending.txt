@@ -1,0 +1,24 @@
+Action required — complete your winner details
+
+Dear Alex Morgan,
+
+You have won the Official-style FIFA World Cup ball in the World Cup Ball Giveaway.
+You answered every skill question correctly within the time limits.
+
+Win reference: WC-A1B2C3D4
+Contact number: +447700900456
+Won: 2026-06-18T02:01:51.084Z
+
+Complete your delivery details:
+http://localhost:5173/world-cup-ball-giveaway?claim=preview-token-example
+
+What happens next:
+• Please provide your name, email, mobile number, and UK postal address using the link above.
+• Prize delivery is free within the United Kingdom. We ship the official-style World Cup football to the UK postal address you provide after you win — there is no delivery charge for the winner.
+• If you win the World Cup Ball Giveaway, you agree to provide a photograph of yourself with the football so we can announce the winner on our website and social media. You may email your photo to contact@showskills.co.uk instead of taking part in a live shoot, if that is easier. You may refuse photography or video for valid reasons (for example medical, personal safety, religious, or serious privacy concerns) as set out in our Winner Photography & Promotional Consent in the Terms & Privacy Policy. Refusal without a valid reason may result in another winner being selected.
+
+Questions: contact@showskills.co.uk
+
+If you did not enter this promotion, contact contact@showskills.co.uk immediately.
+
+http://localhost:5173

@@ -24,7 +24,7 @@ export const WORLD_CUP_BALL_PRACTICE_TIMER_TIP = `Each question has a ${WORLD_CU
 export const WORLD_CUP_BALL_PRACTICE_BONUS_TIP = `If the time-out expires, you get a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only — just like the real quiz. A second time-out on any question ends your attempt.`
 
 export const WORLD_CUP_BALL_PRACTICE_CHOICE_TIP =
-  'Some real questions are multiple-choice with four options — tap one to answer instantly, as you did here.'
+  'Historical questions (1980 and earlier) use six multiple-choice options; some newer bonus questions use four — tap one to answer instantly, as you did here.'
 
 export const WORLD_CUP_BALL_PRACTICE_TYPING_TIP =
   'On typed questions in the real test, write your answer however you wish — lowercase, normal capitals, or ALL CAPS all count the same.'

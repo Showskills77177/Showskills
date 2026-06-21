@@ -51,6 +51,8 @@ import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs
 import { resolveSiteUrl } from '../lib/resendConfig.mjs'
 import { WORLD_CUP_BALL_MIN_AGE } from '../../../shared/worldCupBallGiveawayRules.mjs'
 import { isWorldCupBallLocalDevBypass } from '../lib/worldCupBallDev.mjs'
+import { verifyCaptchaPayload } from '../lib/captcha.mjs'
+import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
 
 function sessionExpired(startedAt) {
   const start = new Date(startedAt).getTime()
@@ -144,8 +146,10 @@ export async function startWorldCupBallSession(req, res) {
   const ok = await enforceVpnAndDevice(req, res, 'world_cup_ball_start')
   if (!ok) return
 
+  const body = parseJsonBody(req)
+  const ip = clientIp(req)
+
   try {
-    const ip = clientIp(req)
     const existing = await getInProgressWorldCupBallSessionByIp(ip)
     if (existing) {
       if (sessionExpired(existing.started_at)) {
@@ -179,6 +183,20 @@ export async function startWorldCupBallSession(req, res) {
           answers: existing.answers_json || {},
         })
       }
+    }
+
+    const captchaPayload =
+      typeof body[CAPTCHA_BODY_FIELD] === 'string' ? body[CAPTCHA_BODY_FIELD].trim() : ''
+    const captcha = await verifyCaptchaPayload(captchaPayload)
+    if (!captcha.ok) {
+      await logEntryAttempt(req, {
+        competition: COMPETITION_WORLD_CUP_BALL,
+        flow: 'world_cup_ball_start',
+        ip,
+        outcome: 'blocked',
+        blockReason: captcha.code,
+      }).catch(() => {})
+      return json(res, 403, { error: captcha.error, code: captcha.code })
     }
 
     const { combinationIndex, questionKeys } = pickRandomWorldCupBallCombination()

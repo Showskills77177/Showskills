@@ -11,9 +11,8 @@ import {
   WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL,
   WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
   WORLD_CUP_BALL_SALVAGE_NOTICE,
-  WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT,
-  WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT,
 } from '../../shared/worldCupBallGiveaway.mjs'
+import { worldCupBallChoiceOptionLabel } from '../../shared/worldCupBallHistoricalChoices.mjs'
 import {
   WORLD_CUP_BALL_PRACTICE_QUESTION,
   WORLD_CUP_BALL_PRACTICE_INTRO,
@@ -23,11 +22,16 @@ import {
   worldCupBallPracticeCompleteTips,
 } from '../../shared/worldCupBallPractice.mjs'
 import { apiUrl } from '../lib/api'
+import { fetchCaptchaConfig } from '../lib/captchaConfig.js'
+import { AltchaWidget } from './AltchaWidget'
+import { QuizQuestionTimer } from './QuizQuestionTimer'
+import { CAPTCHA_BODY_FIELD } from '../../shared/captcha.mjs'
 import {
   clearWorldCupBallQuizProgress,
   loadWorldCupBallQuizProgress,
   saveWorldCupBallQuizProgress,
 } from '../lib/worldCupBallQuizProgress.mjs'
+import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
 
 /**
  * Timed skill quiz for the World Cup Ball Giveaway.
@@ -45,7 +49,6 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const [timeoutBonusSeconds, setTimeoutBonusSeconds] = useState(WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS)
   const [maxTimeouts, setMaxTimeouts] = useState(WORLD_CUP_BALL_MAX_TIMEOUTS)
   const [sessionDeadlineMs, setSessionDeadlineMs] = useState(null)
-  const [sessionSecondsLeft, setSessionSecondsLeft] = useState(null)
   const [secondsLeft, setSecondsLeft] = useState(WORLD_CUP_BALL_QUESTION_SECONDS)
   const [submitting, setSubmitting] = useState(false)
   const [salvageQuestion, setSalvageQuestion] = useState(null)
@@ -57,6 +60,9 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const answersRef = useRef({})
   const practiceCompletedRef = useRef(false)
   const [hasSavedProgress, setHasSavedProgress] = useState(false)
+  const [captchaConfig, setCaptchaConfig] = useState({ enabled: false, challengeUrl: '/api/captcha/challenge', loading: true })
+  const [captchaPayload, setCaptchaPayload] = useState('')
+  const [captchaError, setCaptchaError] = useState('')
 
   const practiceChoices = useMemo(() => {
     const list = [...WORLD_CUP_BALL_PRACTICE_QUESTION.choices]
@@ -240,6 +246,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     const nextTimeouts = timeoutsUsed + 1
     setTimeoutsUsed(nextTimeouts)
     resetTimer(true)
+    speakBonusUsed()
     persistProgress({ timeoutsUsed: nextTimeouts, bonusActive: true, secondsLeft: timeoutBonusSeconds })
   }, [phase, timeoutsUsed, maxTimeouts, finishQuiz, resetTimer, persistProgress, timeoutBonusSeconds])
 
@@ -312,7 +319,6 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     if (phase !== 'active' || disabled || !sessionDeadlineMs) return undefined
     const tick = () => {
       const left = Math.max(0, Math.ceil((sessionDeadlineMs - Date.now()) / 1000))
-      setSessionSecondsLeft(left)
       if (left <= 0 && !disqualifiedRef.current && !submitting) {
         disqualifiedRef.current = true
         void finishQuiz(answersRef.current, timeoutsUsed, true)
@@ -355,6 +361,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
       setPracticeTimeouts((count) => count + 1)
       setPracticeBonusActive(true)
       setPracticeSecondsLeft(WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS)
+      speakBonusUsed()
       return undefined
     }
     const t = window.setTimeout(() => setPracticeSecondsLeft((s) => s - 1), 1000)
@@ -367,6 +374,17 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    fetchCaptchaConfig().then((cfg) => {
+      if (cancelled) return
+      setCaptchaConfig({ enabled: cfg.enabled, challengeUrl: cfg.challengeUrl, loading: false })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     onPhaseChange?.(phase)
   }, [phase, onPhaseChange])
 
@@ -374,6 +392,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
 
   const startPractice = () => {
     if (disabled) return
+    primeQuizTimerAudio()
     onError('')
     setPracticeSecondsLeft(WORLD_CUP_BALL_QUESTION_SECONDS)
     setPracticeBonusActive(false)
@@ -393,13 +412,25 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
 
   const startQuiz = async () => {
     if (disabled || submitting) return
+    primeQuizTimerAudio()
+    const resumingInProgress = hasSavedProgress && phase === 'idle'
+    if (captchaConfig.enabled && !captchaPayload && !resumingInProgress) {
+      setCaptchaError('Please wait for the security check to finish.')
+      return
+    }
     setPhase('loading')
     onError('')
+    setCaptchaError('')
     try {
+      const payload = {}
+      if (captchaConfig.enabled && captchaPayload) {
+        payload[CAPTCHA_BODY_FIELD] = captchaPayload
+      }
       const res = await fetch(apiUrl('/api/submissions/world-cup-ball/start'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -442,6 +473,39 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     advanceQuestion(currentAnswer)
   }
 
+  const resumingInProgress = hasSavedProgress && phase === 'idle'
+  const captchaRequired = captchaConfig.enabled && !resumingInProgress
+  const startBlocked = disabled || submitting || (captchaRequired && !captchaPayload)
+
+  const renderStartSecurityCheck = () => {
+    if (captchaConfig.loading || !captchaRequired) return null
+    return (
+      <div className="ss-altcha-widget-wrap flex flex-col gap-2">
+        <AltchaWidget
+          challengePath={captchaConfig.challengeUrl}
+          onPayload={(payload) => {
+            setCaptchaPayload(payload)
+            setCaptchaError('')
+          }}
+          onExpire={() => setCaptchaPayload('')}
+          onError={(msg) => {
+            setCaptchaPayload('')
+            setCaptchaError(msg)
+          }}
+        />
+        {captchaError ? (
+          <p className="text-xs text-red-300" role="alert">
+            {captchaError}
+          </p>
+        ) : captchaPayload ? (
+          <p className="text-xs text-emerald-300/90">Security check complete — you can start the test.</p>
+        ) : (
+          <p className="text-xs text-stone-500">Running a quick security check in your browser…</p>
+        )}
+      </div>
+    )
+  }
+
   if (phase === 'idle') {
     if (hasSavedProgress) {
       return (
@@ -468,9 +532,6 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <div className="flex flex-col gap-3">
         <p className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5 text-xs leading-relaxed text-amber-50/95">
           <strong className="text-amber-100">Timing:</strong> {WORLD_CUP_BALL_QUESTION_TIMING_NOTICE}
-        </p>
-        <p className="rounded-lg border border-amber-400/45 bg-amber-950/35 px-3 py-2.5 text-xs font-semibold leading-relaxed text-amber-50/95">
-          <strong className="text-amber-200">Time-out extension:</strong> {WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT}
         </p>
         <p className="text-xs leading-relaxed text-stone-400">{WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}</p>
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
@@ -502,29 +563,18 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           </p>
           <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{WORLD_CUP_BALL_PRACTICE_TYPING_TIP}</p>
         </div>
-        <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
-          <span className="font-semibold text-amber-100">
-            Practice question
-            <span className="ml-1.5 font-normal text-stone-400">· {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}</span>
-          </span>
-          <span
-            className={`font-mono tabular-nums ${practiceSecondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
-            aria-live="polite"
-          >
-            {practiceBonusActive ? 'Bonus: ' : ''}
-            {practiceSecondsLeft}s
-          </span>
-        </div>
+        <QuizQuestionTimer
+          secondsLeft={practiceSecondsLeft}
+          label={`Practice · ${WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}`}
+          bonusActive={practiceBonusActive}
+          enabled={!disabled}
+        />
         {practiceBonusActive ? (
           <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/40 bg-amber-950/35 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-50">
             <strong className="text-amber-200">+{WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} second extension active.</strong> Answer now
             — in the real quiz you only get this once per attempt.
           </p>
-        ) : (
-          <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
-            {WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT}
-          </p>
-        )}
+        ) : null}
         <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Multiple choice</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
@@ -534,7 +584,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">
           {WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}
         </p>
-        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2">
+        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {practiceChoices.map((choice) => (
             <button
               key={choice}
@@ -573,11 +623,12 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <button
           type="button"
           onClick={() => void startQuiz()}
-          disabled={disabled || submitting}
+          disabled={startBlocked}
           className="ss-wc-ball-quiz__primary-btn w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Start test ({WORLD_CUP_BALL_QUESTION_COUNT} questions · {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL} each)
         </button>
+        {renderStartSecurityCheck()}
         </div>
       </div>
     )
@@ -608,21 +659,11 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <p className="font-semibold text-amber-100">Bonus salvage question</p>
           <p className="mt-2 text-stone-300">{WORLD_CUP_BALL_SALVAGE_NOTICE}</p>
         </div>
-        <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
-          <span className="font-semibold text-amber-100">
-            One chance to stay in the running
-            <span className="ml-1.5 font-normal text-stone-400">· {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}</span>
-          </span>
-          <span
-            className={`font-mono tabular-nums ${secondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
-            aria-live="polite"
-          >
-            {secondsLeft}s
-          </span>
-        </div>
-        <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
-          {WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT} A second time-out on any question disqualifies your attempt.
-        </p>
+        <QuizQuestionTimer
+          secondsLeft={secondsLeft}
+          label={`Salvage · ${WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}`}
+          enabled={!disabled && !submitting}
+        />
         {hasSalvageChoices ? (
           <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
@@ -631,7 +672,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         ) : null}
         <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">{salvageQuestion.prompt}</p>
         {hasSalvageChoices ? (
-          <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2">
+          <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {salvageChoices.map((choice) => (
               <button
                 key={choice}
@@ -690,45 +731,24 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   return (
     <div className={quizShellClass}>
       <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
-      <div className="ss-wc-ball-quiz__timer flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-sm">
-        <span className="font-semibold text-amber-100">
-          Question {index + 1} of {total}
-          <span className="ml-1.5 font-normal text-stone-400">· {WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}</span>
-        </span>
-        <div className="flex flex-wrap items-center gap-3">
-          {sessionSecondsLeft != null ? (
-            <span
-              className={`font-mono text-xs tabular-nums ${sessionSecondsLeft <= 60 ? 'text-red-400' : 'text-stone-400'}`}
-              aria-live="polite"
-            >
-              Session {Math.floor(sessionSecondsLeft / 60)}:
-              {String(sessionSecondsLeft % 60).padStart(2, '0')}
-            </span>
-          ) : null}
-          <span
-            className={`font-mono tabular-nums ${secondsLeft <= 5 ? 'text-red-400' : 'text-amber-200'}`}
-            aria-live="polite"
-          >
-            {bonusActive ? 'Bonus: ' : ''}
-            {secondsLeft}s
-          </span>
-        </div>
-      </div>
+      <QuizQuestionTimer
+        secondsLeft={secondsLeft}
+        label={`Question ${index + 1} of ${total} · ${WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL}`}
+        bonusActive={bonusActive}
+        enabled={!disabled && !submitting}
+      />
       {bonusActive ? (
         <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/40 bg-amber-950/35 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-50">
             <strong className="text-amber-200">+{WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} second extension active.</strong> The time-out expired on this
             question — answer now. You only get one extension per attempt; a second time-out disqualifies you.
         </p>
-      ) : (
-        <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
-          {WORLD_CUP_BALL_TIMEOUT_BONUS_SHORT} A second time-out on any question disqualifies your attempt.
-        </p>
-      )}
+      ) : null}
       {hasChoices ? (
         <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Bonus question</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Multiple choice</p>
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
-            Pick one of the four options below — you do not need to type an answer on this question.
+            Pick one of the {worldCupBallChoiceOptionLabel(shuffledChoices.length)} below — you do not need to type an
+            answer on this question.
           </p>
         </div>
       ) : (
@@ -739,7 +759,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
       )}
       <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">{q?.prompt}</p>
       {hasChoices ? (
-        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2">
+        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {shuffledChoices.map((choice) => (
             <button
               key={choice}
@@ -777,7 +797,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         </form>
       )}
       <p className="ss-wc-ball-quiz__footer-note text-xs leading-relaxed text-stone-500">
-        {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. {WORLD_CUP_BALL_TIMEOUT_BONUS_PROMINENT} {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
+        {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. {WORLD_CUP_BALL_SALVAGE_NOTICE}{' '}
         You have {WORLD_CUP_BALL_SESSION_MAX_MINUTES} minutes to finish the full quiz.
       </p>
       </div>

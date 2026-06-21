@@ -69,6 +69,6 @@ Previous Stripe Checkout / Payment Element code lives in `archive/stripe/` for r
 
 ## Optional hardening (not all implemented)
 
-- **CAPTCHA** (e.g. Turnstile) on entry modal before payment intent creation.
+- **CAPTCHA** — Self-hosted **ALTCHA** proof-of-work on World Cup Ball quiz **start** (uses `ADMIN_JWT_SECRET` automatically; optional `ALTCHA_HMAC_KEY`).
 - **Redis** rate limiting for multi-instance deploys.
 - **WAF** rules for admin paths and webhook endpoints.

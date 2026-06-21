@@ -28,6 +28,7 @@
     "seed:test3-bulk": "node scripts/seed-ronaldo-bundle-test3-bulk.mjs 334 --clear",
     "preview:winner-email": "node scripts/preview-winner-email.mjs",
     "preview:world-cup-ball-winner-email": "node scripts/preview-world-cup-ball-winner-email.mjs",
+    "generate:quiz-voiceover": "node scripts/generate-quiz-voiceover.mjs",
     "test:period-split": "node scripts/test-period-split-draw.mjs",
     "test:draw-local": "node scripts/test-draw-local.mjs",
     "test": "playwright test",
@@ -46,10 +47,13 @@
     "test:consolation-shirt": "node scripts/test-consolation-shirt.mjs",
     "test:competition-catalog": "node scripts/test-competition-catalog.mjs",
     "test:world-cup-ball": "node scripts/test-world-cup-ball-api.mjs",
+    "reset:world-cup-ball": "node scripts/reset-world-cup-ball-local.mjs",
     "test:admin-email": "node scripts/test-admin-otp-email.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "altcha": "^3.1.0",
+    "altcha-lib": "^2.2.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",
     "cashflows-clientlib-js": "^1.0.51",

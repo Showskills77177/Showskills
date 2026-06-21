@@ -3519,8 +3519,10 @@ body {
 
   .ss-wc-ball-quiz__timer {
     flex-shrink: 0;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8125rem;
+  }
+
+  .ss-wc-ball-quiz__timer-value {
+    font-size: clamp(2rem, 12vw, 2.5rem);
   }
 
   .ss-wc-ball-quiz__bonus-note {
@@ -4282,6 +4284,107 @@ input.ss-cf-pay-button.ss-pay-cta {
   font-weight: 600;
   color: #fef3c7;
   background: rgba(12, 10, 9, 0.92);
+}
+
+.ss-altcha {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 65px;
+  margin-inline: auto;
+}
+
+altcha-widget.ss-altcha {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.ss-altcha-widget-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  text-align: center;
+}
+
+.ss-wc-ball-quiz__timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  text-align: center;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background: rgba(69, 26, 3, 0.35);
+}
+
+.ss-wc-ball-quiz__timer-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(253, 230, 138, 0.92);
+}
+
+.ss-wc-ball-quiz__timer-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.ss-wc-ball-quiz__timer-value {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem;
+  font-family: var(--font-display, 'Oswald', system-ui, sans-serif);
+  font-size: clamp(2.25rem, 10vw, 3rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #fcd34d;
+}
+
+.ss-wc-ball-quiz__timer-bonus-tag {
+  margin-right: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fdba74;
+}
+
+.ss-wc-ball-quiz__timer-unit {
+  font-size: 0.55em;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.ss-wc-ball-quiz__timer-value--warning {
+  color: #fb923c;
+}
+
+.ss-wc-ball-quiz__timer-value--danger {
+  color: #ef4444;
+  text-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+  animation: ss-wc-ball-timer-pulse 0.55s ease-in-out infinite alternate;
+}
+
+@keyframes ss-wc-ball-timer-pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
 }
 
 @media print {
