@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
+import { useEntryFlow } from '../entry/entryContext'
 
 function isLikelyTestHost() {
   if (import.meta.env.DEV) return true
@@ -12,6 +13,7 @@ function isLikelyTestHost() {
  * Hidden on live showskills.co.uk production.
  */
 export function EditorTestLogin() {
+  const { resetWorldCupBallQuizAttempt } = useEntryFlow()
   const [enabled, setEnabled] = useState(isLikelyTestHost())
   const [loggedIn, setLoggedIn] = useState(false)
   const [user, setUser] = useState('')
@@ -81,6 +83,10 @@ export function EditorTestLogin() {
     }
   }
 
+  const handleRestartQuiz = () => {
+    resetWorldCupBallQuizAttempt({ openModal: true })
+  }
+
   return (
     <div
       className="pointer-events-none fixed bottom-20 right-3 z-[9999] flex max-w-[min(100vw-1.5rem,20rem)] flex-col items-end gap-2 sm:bottom-4 sm:right-4"
@@ -93,6 +99,14 @@ export function EditorTestLogin() {
             Signed in as <span className="text-stone-200">{user}</span>. VPN and one-attempt IP limits are off —
             retake the World Cup Ball quiz freely.
           </p>
+          <button
+            type="button"
+            data-editor-ui
+            onClick={handleRestartQuiz}
+            className="mt-2 w-full rounded-lg bg-emerald-700/90 py-1.5 text-[11px] font-bold text-emerald-50 transition hover:bg-emerald-600 disabled:opacity-50"
+          >
+            Restart World Cup Ball quiz
+          </button>
           <button
             type="button"
             data-editor-ui

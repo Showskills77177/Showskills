@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
+import { apiFetch } from '../lib/api'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import {
   SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS,
@@ -155,6 +156,8 @@ export function EntryModal() {
     setWcBallWinnerEmail,
     wcBallVpnBlocked,
     wcBallCheckingVpn,
+    wcBallQuizRestartNonce,
+    resetWorldCupBallQuizAttempt,
     freeAddressLine1,
     setFreeAddressLine1,
     freeAddressLine2,
@@ -182,15 +185,42 @@ export function EntryModal() {
   const panelRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
   const [wcBallQuizPhase, setWcBallQuizPhase] = useState('idle')
+  const [editorQuizBypass, setEditorQuizBypass] = useState(false)
   const handleWcBallQuizPhaseChange = useCallback((nextPhase) => {
     setWcBallQuizPhase(nextPhase)
   }, [])
 
   const wcBallQuizFocusPhases = ['practice', 'practice_complete', 'loading', 'active', 'salvage', 'submitting']
   const wcBallQuizFocus =
-    entryModalType === 'worldCupBall' && wcBallQuizFocusPhases.includes(wcBallQuizPhase)
+    entryModalType === 'worldCupBall' &&
+    !wcBallOutcome &&
+    !wcBallClaimed &&
+    wcBallQuizFocusPhases.includes(wcBallQuizPhase)
   const wcBallShowIntro =
     entryModalType === 'worldCupBall' && !wcBallQuizFocus && !wcBallClaimed && !wcBallOutcome
+
+  useEffect(() => {
+    if (entryModalType !== 'worldCupBall') {
+      setEditorQuizBypass(false)
+      return
+    }
+    let cancelled = false
+    void apiFetch('/api/editor-test-me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setEditorQuizBypass(Boolean(data.quizBypass))
+      })
+      .catch(() => {
+        if (!cancelled) setEditorQuizBypass(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [entryModalType, wcBallQuizRestartNonce])
+
+  useEffect(() => {
+    setWcBallQuizPhase('idle')
+  }, [wcBallQuizRestartNonce])
 
   useEffect(() => {
     if (entryModalType !== 'worldCupBall') setWcBallQuizPhase('idle')
@@ -1056,6 +1086,7 @@ export function EntryModal() {
               ) : (
                 <div className={`ss-wc-ball-quiz-slot ${wcBallQuizFocus ? 'ss-wc-ball-quiz-slot--focus' : 'mt-4'}`}>
                   <WorldCupBallQuiz
+                    key={wcBallQuizRestartNonce}
                     disabled={wcBallVpnBlocked || wcBallCheckingVpn}
                     onPhaseChange={handleWcBallQuizPhaseChange}
                     onError={setWcBallError}
@@ -1071,6 +1102,16 @@ export function EntryModal() {
                   />
                 </div>
               )}
+              {editorQuizBypass ? (
+                <button
+                  type="button"
+                  data-editor-ui
+                  onClick={() => resetWorldCupBallQuizAttempt()}
+                  className="mt-3 w-full rounded-xl border border-emerald-500/40 bg-emerald-950/30 py-2.5 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400/55 hover:bg-emerald-900/35"
+                >
+                  Restart quiz (editor)
+                </button>
+              ) : null}
               {wcBallError ? (
                 <div className="mt-2.5">
                   <ErrorBanner message={wcBallError} />

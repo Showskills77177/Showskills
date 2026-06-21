@@ -78,6 +78,11 @@ export { WORLD_CUP_BALL_HISTORICAL_MAX_YEAR, WORLD_CUP_BALL_HISTORICAL_CHOICE_CO
 export const WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE =
   'Capital letters are optional — write names however you prefer (lowercase, mixed case, or ALL CAPS).'
 
+/** Stored answer when the entrant taps “I don’t know” on a free-text question. */
+export const WORLD_CUP_BALL_DONT_KNOW_ANSWER = "I don't know"
+
+export const WORLD_CUP_BALL_DONT_KNOW_LABEL = "I don't know"
+
 /** Shown in quiz and entry instructions before free-text questions. */
 export const WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION =
   'For free-text questions, type your answer however you wish — all lowercase (kane), normal capitals (Kane), or ALL CAPS (KANE). Capital letters are never mandatory, but they are fine if you prefer them. We mark the answer the same either way.'

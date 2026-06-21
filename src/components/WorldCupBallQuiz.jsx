@@ -6,6 +6,8 @@ import {
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
   WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE,
+  WORLD_CUP_BALL_DONT_KNOW_ANSWER,
+  WORLD_CUP_BALL_DONT_KNOW_LABEL,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
   WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL,
@@ -32,6 +34,19 @@ import {
   saveWorldCupBallQuizProgress,
 } from '../lib/worldCupBallQuizProgress.mjs'
 import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
+
+function QuizDontKnowButton({ onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="ss-wc-ball-quiz__dont-know-btn w-full rounded-lg border border-stone-600/80 bg-stone-900/50 py-2.5 text-sm font-semibold text-stone-400 transition hover:border-stone-500 hover:bg-stone-800/60 hover:text-stone-200 disabled:opacity-50"
+    >
+      {WORLD_CUP_BALL_DONT_KNOW_LABEL}
+    </button>
+  )
+}
 
 /**
  * Timed skill quiz for the World Cup Ball Giveaway.
@@ -532,6 +547,19 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           >
             Resume test
           </button>
+          {editorTestBypass ? (
+            <button
+              type="button"
+              data-editor-ui
+              onClick={() => {
+                clearWorldCupBallQuizProgress()
+                setHasSavedProgress(false)
+              }}
+              className="w-full rounded-xl border border-emerald-500/40 bg-emerald-950/30 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-900/35"
+            >
+              Start fresh (editor)
+            </button>
+          ) : null}
           </div>
         </div>
       )
@@ -591,7 +619,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             Tap one option below before the time-out expires.
           </p>
         </div>
-        <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">
+        <p className="ss-wc-ball-quiz__prompt text-stone-100">
           {WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}
         </p>
         <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -680,7 +708,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             <p className="mt-1 text-xs leading-relaxed text-amber-100/85">Pick the correct option below.</p>
           </div>
         ) : null}
-        <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">{salvageQuestion.prompt}</p>
+        <p className="ss-wc-ball-quiz__prompt text-stone-100">{salvageQuestion.prompt}</p>
         {hasSalvageChoices ? (
           <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {salvageChoices.map((choice) => (
@@ -720,6 +748,10 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
               className="ss-entry-field ss-quiz-answer-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
               placeholder="Type your answer (any capitals OK)"
               disabled={submitting}
+            />
+            <QuizDontKnowButton
+              disabled={submitting}
+              onClick={() => void submitSalvageAnswer(WORLD_CUP_BALL_DONT_KNOW_ANSWER)}
             />
             <button
               type="submit"
@@ -767,7 +799,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE}</p>
         </div>
       )}
-      <p className="ss-wc-ball-quiz__prompt text-base font-medium leading-snug text-stone-100">{q?.prompt}</p>
+      <p className="ss-wc-ball-quiz__prompt text-stone-100">{q?.prompt}</p>
       {hasChoices ? (
         <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {shuffledChoices.map((choice) => (
@@ -796,6 +828,10 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             className="ss-entry-field ss-quiz-answer-field w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
             placeholder="Type your answer (any capitals OK)"
             disabled={submitting}
+          />
+          <QuizDontKnowButton
+            disabled={submitting}
+            onClick={() => advanceQuestion(WORLD_CUP_BALL_DONT_KNOW_ANSWER)}
           />
           <button
             type="submit"
