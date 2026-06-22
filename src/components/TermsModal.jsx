@@ -9,18 +9,7 @@ import {
 } from '../../shared/competitionMinimumSalesPolicy.mjs'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import {
-  WORLD_CUP_BALL_RULES_INTRO,
-  WORLD_CUP_BALL_SKILL_NOTICE,
-  WORLD_CUP_BALL_WINNER_DETAILS_NOTICE,
-  WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
-  WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
-  WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
-  WORLD_CUP_BALL_MIN_AGE,
-  WORLD_CUP_BALL_TERMS_TIMING_NOTICE,
-  WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
-  WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
-  WORLD_CUP_BALL_TERMS_WIN_NOTICE,
-  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
+  WORLD_CUP_BALL_TERMS_SECTIONS,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from '../../shared/worldCupBallPhotography.mjs'
 import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from '../../shared/worldCupBallGiveaway.mjs'
@@ -444,34 +433,13 @@ export function TermsModal({ open, onClose }) {
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">6a. {WORLD_CUP_BALL_GIVEAWAY_LABEL} (free skill challenge)</h3>
-          <p className="mb-3">{WORLD_CUP_BALL_RULES_INTRO}</p>
-          <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
-            <strong>Eligibility:</strong> {WORLD_CUP_BALL_ELIGIBILITY_NOTICE}
-          </p>
-          <p className="mb-3 rounded-lg border border-amber-900/35 bg-amber-950/25 px-3 py-2.5 text-zinc-200">
-            <strong>Skill requirement:</strong> {WORLD_CUP_BALL_SKILL_NOTICE}
-          </p>
-          <p className="mb-3 rounded-lg border border-emerald-900/35 bg-emerald-950/20 px-3 py-2.5 text-zinc-200">
-            <strong>Free UK delivery:</strong> {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}
-          </p>
-          <p className="mb-3 rounded-lg border border-stone-700/45 bg-stone-900/35 px-3 py-2.5 text-zinc-200">
-            <strong>One attempt per connection:</strong> {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE}
-          </p>
-          <p className="mb-3">
-            <strong>Timing:</strong> {WORLD_CUP_BALL_TERMS_TIMING_NOTICE}
-          </p>
-          <p className="mb-3">
-            <strong>Salvage question:</strong> {WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE}
-          </p>
-          <p className="mb-3">
-            <strong>If you do not win:</strong> {WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}
-          </p>
-          <p className="mb-3">
-            <strong>If you win:</strong> {WORLD_CUP_BALL_TERMS_WIN_NOTICE} {WORLD_CUP_BALL_WINNER_DETAILS_NOTICE}{' '}
-            {WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}
-          </p>
-          <p className="mb-3">
-            <strong>Winner photography:</strong> {WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY} See also{' '}
+          {WORLD_CUP_BALL_TERMS_SECTIONS.map((section) => (
+            <p key={section.title} className="mb-3 leading-relaxed text-zinc-300">
+              <strong className="text-stone-200">{section.title}:</strong> {section.body}
+            </p>
+          ))}
+          <p className="mb-3 leading-relaxed text-zinc-300">
+            See also{' '}
             <a
               href="#ss-terms-winner-photography-consent"
               className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"

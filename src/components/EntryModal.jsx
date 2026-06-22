@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
-import { apiFetch } from '../lib/api'
 import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import {
   SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS,
@@ -42,16 +41,12 @@ import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
 import {
   WORLD_CUP_BALL_GIVEAWAY_LABEL,
   WORLD_CUP_BALL_GIVEAWAY_PATH,
-  WORLD_CUP_BALL_PRIZE_TITLE,
-  WORLD_CUP_BALL_QUESTION_COUNT,
-  WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
-  WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
-  WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
   WORLD_CUP_BALL_MIN_AGE,
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
+  WORLD_CUP_BALL_PAGE_INTRO,
   WORLD_CUP_BALL_SKILL_NOTICE,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { saveWorldCupBallSession } from '../lib/worldCupBallSession.mjs'
@@ -157,8 +152,6 @@ export function EntryModal() {
     setWcBallWinnerEmail,
     wcBallVpnBlocked,
     wcBallCheckingVpn,
-    wcBallQuizRestartNonce,
-    resetWorldCupBallQuizAttempt,
     freeAddressLine1,
     setFreeAddressLine1,
     freeAddressLine2,
@@ -186,7 +179,6 @@ export function EntryModal() {
   const panelRef = useRef(null)
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false)
   const [wcBallQuizPhase, setWcBallQuizPhase] = useState('idle')
-  const [editorQuizBypass, setEditorQuizBypass] = useState(false)
   const handleWcBallQuizPhaseChange = useCallback((nextPhase) => {
     setWcBallQuizPhase(nextPhase)
   }, [])
@@ -199,29 +191,6 @@ export function EntryModal() {
     wcBallQuizFocusPhases.includes(wcBallQuizPhase)
   const wcBallShowIntro =
     entryModalType === 'worldCupBall' && !wcBallQuizFocus && !wcBallClaimed && !wcBallOutcome
-
-  useEffect(() => {
-    if (entryModalType !== 'worldCupBall') {
-      setEditorQuizBypass(false)
-      return
-    }
-    let cancelled = false
-    void apiFetch('/api/editor-test-me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled) setEditorQuizBypass(Boolean(data.quizBypass))
-      })
-      .catch(() => {
-        if (!cancelled) setEditorQuizBypass(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [entryModalType, wcBallQuizRestartNonce])
-
-  useEffect(() => {
-    setWcBallQuizPhase('idle')
-  }, [wcBallQuizRestartNonce])
 
   useEffect(() => {
     if (entryModalType !== 'worldCupBall') setWcBallQuizPhase('idle')
@@ -1010,19 +979,9 @@ export function EntryModal() {
                 className="mx-auto mb-6 w-full max-w-[14rem]"
               />
               <p className="text-sm leading-relaxed text-stone-400">
-                <strong className="text-amber-100/90">Free skill giveaway:</strong> {WORLD_CUP_BALL_PRIZE_TITLE}. Answer all{' '}
-                {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win outright, or get exactly one wrong and answer the bonus salvage question
-                correctly. {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Open to
-                UK residents aged {WORLD_CUP_BALL_MIN_AGE}+. VPNs are not permitted.
-              </p>
-              <p className="mt-2 rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2.5 text-xs leading-relaxed text-amber-50/95">
-                <strong className="text-amber-100">Timing:</strong> {WORLD_CUP_BALL_QUESTION_TIMING_NOTICE}
-              </p>
-              <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
-                {WORLD_CUP_BALL_CHOICE_BONUS_NOTICE}
-              </p>
-              <p className="mt-2 rounded-lg border border-amber-900/35 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
-                {WORLD_CUP_BALL_SKILL_NOTICE}
+                <strong className="text-amber-100/90">Free skill giveaway:</strong> {WORLD_CUP_BALL_PAGE_INTRO}{' '}
+                {WORLD_CUP_BALL_SKILL_NOTICE} {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}.{' '}
+                {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. UK residents aged {WORLD_CUP_BALL_MIN_AGE}+.
               </p>
               <p className="mt-3 text-center">
                 <Link
@@ -1090,7 +1049,6 @@ export function EntryModal() {
               ) : (
                 <div className={`ss-wc-ball-quiz-slot ${wcBallQuizFocus ? 'ss-wc-ball-quiz-slot--focus' : 'mt-4'}`}>
                   <WorldCupBallQuiz
-                    key={wcBallQuizRestartNonce}
                     disabled={wcBallVpnBlocked || wcBallCheckingVpn}
                     onPhaseChange={handleWcBallQuizPhaseChange}
                     onError={setWcBallError}
@@ -1106,16 +1064,6 @@ export function EntryModal() {
                   />
                 </div>
               )}
-              {editorQuizBypass ? (
-                <button
-                  type="button"
-                  data-editor-ui
-                  onClick={() => resetWorldCupBallQuizAttempt()}
-                  className="mt-3 w-full rounded-xl border border-emerald-500/40 bg-emerald-950/30 py-2.5 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400/55 hover:bg-emerald-900/35"
-                >
-                  Restart quiz (editor)
-                </button>
-              ) : null}
               {wcBallError ? (
                 <div className="mt-2.5">
                   <ErrorBanner message={wcBallError} />

@@ -7,7 +7,6 @@ import { QuizPromptNav } from './QuizPromptNav'
 import { useEntryFlow } from '../entry/entryContext'
 import { useSiteShell } from '../hooks/useSitePages'
 import { SiteFooter } from './SiteFooter'
-import { EditorTestLogin } from './EditorTestLogin'
 import { offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { SITE_PAGE_BACKGROUNDS } from '../../shared/sitePageLayout.mjs'
 
@@ -161,7 +160,6 @@ export function Layout() {
       <Outlet />
 
       <SiteFooter shell={shell} footerLinks={footerLinks} openTerms={openTerms} />
-      <EditorTestLogin />
     </div>
   )
 }

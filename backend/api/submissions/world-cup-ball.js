@@ -274,7 +274,19 @@ export async function submitWorldCupBallQuiz(req, res) {
     return json(res, 405, { error: 'Method not allowed' })
   }
 
-  const limited = applyRateLimit(req, res, { pathKey: 'wc-ball-submit', max: 6, windowMs: 60_000 })
+  let body
+  try {
+    body = parseJsonBody(req)
+  } catch {
+    return json(res, 400, { error: 'Invalid request body' })
+  }
+
+  const partialCheck = body.partialCheck === true
+  const limited = applyRateLimit(req, res, {
+    pathKey: partialCheck ? 'wc-ball-submit-partial' : 'wc-ball-submit',
+    max: partialCheck ? 16 : 5,
+    windowMs: 60_000,
+  })
   if (limited.blocked) return json(res, 429, { error: 'Too many requests. Please wait and try again.' })
 
   if (!isDbConfigured()) return json(res, 503, { error: 'Database not configured' })
@@ -284,12 +296,10 @@ export async function submitWorldCupBallQuiz(req, res) {
     return json(res, 403, { error: vpn.error, code: vpn.code })
   }
 
-  const body = parseJsonBody(req)
   const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
   const timeoutsUsed = Number(body.timeoutsUsed)
   const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
   const salvageAnswer = typeof body.salvageAnswer === 'string' ? body.salvageAnswer.trim() : ''
-  const partialCheck = body.partialCheck === true
 
   if (!sessionId) return json(res, 400, { error: 'sessionId required' })
 

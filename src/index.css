@@ -3763,27 +3763,29 @@ body {
   }
 
   .ss-wc-ball-quiz__prompt {
-    flex: 1 1 auto;
-    min-height: 5.5rem;
-    overflow-y: visible;
-    font-size: clamp(1.125rem, 5.2vw, 1.4375rem);
+    flex: 0 1 auto;
+    max-height: 5.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-size: clamp(1.3125rem, 5.4vw, 1.5625rem);
     font-weight: 600;
-    line-height: 1.45;
+    line-height: 1.38;
     letter-spacing: -0.01em;
   }
 
   .ss-wc-ball-quiz__choices {
     flex-shrink: 0;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     padding-bottom: 0.25rem;
   }
 
   .ss-wc-ball-quiz__choice-btn {
-    min-height: 3rem;
-    padding: 0.75rem 0.875rem;
-    font-size: 0.9375rem;
-    line-height: 1.35;
+    min-height: 2.875rem;
+    padding: 0.625rem 0.75rem;
+    font-size: clamp(1.0625rem, 4vw, 1.1875rem);
+    line-height: 1.32;
+    font-weight: 600;
     text-align: left;
   }
 
@@ -3829,15 +3831,15 @@ body {
 
 @media (max-width: 767px) and (max-height: 700px) {
   .ss-wc-ball-quiz__prompt {
-    min-height: 4.5rem;
-    font-size: clamp(1.0625rem, 4.8vw, 1.25rem);
-    line-height: 1.4;
+    max-height: 4.75rem;
+    font-size: clamp(1.1875rem, 4.8vw, 1.375rem);
+    line-height: 1.35;
   }
 
   .ss-wc-ball-quiz__choice-btn {
-    min-height: 2.75rem;
-    font-size: 0.875rem;
-    padding: 0.625rem 0.75rem;
+    min-height: 2.625rem;
+    font-size: clamp(1rem, 3.8vw, 1.125rem);
+    padding: 0.5rem 0.625rem;
   }
 }
 
@@ -4612,9 +4614,20 @@ altcha-widget.ss-altcha {
 }
 
 .ss-wc-ball-quiz__prompt {
-  font-size: 1.125rem;
+  font-size: clamp(1.25rem, 4.2vw, 1.5rem);
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.4;
+}
+
+.ss-entry-modal-panel--wc-ball-quiz-focus .ss-wc-ball-quiz__prompt {
+  font-size: clamp(1.3125rem, 4.5vw, 1.5625rem);
+  line-height: 1.38;
+}
+
+.ss-entry-modal-panel--wc-ball-quiz-focus .ss-wc-ball-quiz__choice-btn {
+  font-size: clamp(1.0625rem, 3.8vw, 1.1875rem);
+  line-height: 1.32;
+  font-weight: 600;
 }
 
 .ss-wc-ball-quiz__timer-value--warning {

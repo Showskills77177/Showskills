@@ -10,10 +10,7 @@ export function isWorldCupBallLocalDevBypass() {
   return process.env.NODE_ENV !== 'production'
 }
 
-/** Local dev bypass or signed editor test cookie (home-page login). */
-export async function isWorldCupBallQuizBypass(req) {
-  if (isWorldCupBallLocalDevBypass()) return true
-  if (!req) return false
-  const { isEditorTestSession } = await import('./editorTestAuth.mjs')
-  return isEditorTestSession(req)
+/** Local dev / E2E bypass for World Cup Ball VPN, device, and winner limits. */
+export function isWorldCupBallQuizBypass() {
+  return isWorldCupBallLocalDevBypass()
 }

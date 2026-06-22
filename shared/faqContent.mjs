@@ -20,17 +20,13 @@ import {
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
   WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
-  WORLD_CUP_BALL_SALVAGE_NOTICE,
-  WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
 } from './worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
-  WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
-  WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
   WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
   WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
-  WORLD_CUP_BALL_TERMS_WIN_NOTICE,
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
+  WORLD_CUP_BALL_WINNER_NOTICE,
 } from './worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY } from './worldCupBallMonthlyDraw.mjs'
 import { worldCupBallPhotographyFaqAnswer } from './worldCupBallPhotography.mjs'
@@ -338,7 +334,7 @@ export const FAQ_SECTIONS = [
         id: 'wc-ball-how-win',
         question: 'How do I win the ball?',
         answer:
-          `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or answer exactly one incorrectly and then answer the bonus salvage question correctly. ${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_SALVAGE_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
+          `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or get exactly one wrong and pass the bonus salvage question. ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE}`,
       },
       {
         id: 'wc-ball-monthly-draw',
@@ -353,8 +349,7 @@ export const FAQ_SECTIONS = [
       {
         id: 'wc-ball-details',
         question: 'When do I enter my name, phone, and address?',
-        answer:
-          `${WORLD_CUP_BALL_TERMS_WIN_NOTICE} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} ${WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}`,
+        answer: WORLD_CUP_BALL_WINNER_NOTICE,
       },
       {
         id: 'wc-ball-eligibility',
@@ -375,7 +370,7 @@ export const FAQ_SECTIONS = [
         id: 'wc-ball-attempts',
         question: 'Can I try again if I fail?',
         answer:
-          `${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE} Two or more wrong answers, a failed salvage answer, a second timeout, or VPN use ends your attempt under the published rules.`,
+          `${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} ${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE}`,
       },
     ],
   },

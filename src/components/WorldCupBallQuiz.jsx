@@ -23,7 +23,7 @@ import {
   WORLD_CUP_BALL_PRACTICE_TYPING_TIP,
   worldCupBallPracticeCompleteTips,
 } from '../../shared/worldCupBallPractice.mjs'
-import { apiFetch, apiUrl } from '../lib/api'
+import { apiUrl } from '../lib/api'
 import { fetchCaptchaConfig } from '../lib/captchaConfig.js'
 import { AltchaWidget } from './AltchaWidget'
 import { QuizQuestionTimer } from './QuizQuestionTimer'
@@ -78,7 +78,6 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const [captchaConfig, setCaptchaConfig] = useState({ enabled: false, challengeUrl: '/api/captcha-challenge', loading: true })
   const [captchaPayload, setCaptchaPayload] = useState('')
   const [captchaError, setCaptchaError] = useState('')
-  const [editorTestBypass, setEditorTestBypass] = useState(false)
 
   const practiceChoices = useMemo(() => {
     const list = [...WORLD_CUP_BALL_PRACTICE_QUESTION.choices]
@@ -448,14 +447,6 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
       if (cancelled) return
       setCaptchaConfig({ enabled: cfg.enabled, challengeUrl: cfg.challengeUrl, loading: false })
     })
-    apiFetch('/api/editor-test-me')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled) setEditorTestBypass(Boolean(data.quizBypass))
-      })
-      .catch(() => {
-        if (!cancelled) setEditorTestBypass(false)
-      })
     return () => {
       cancelled = true
     }
@@ -491,7 +482,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     if (disabled || submitting) return
     primeQuizTimerAudio()
     const resumingInProgress = hasSavedProgress && phase === 'idle'
-    const captchaNeeded = captchaConfig.enabled && !editorTestBypass && !resumingInProgress
+    const captchaNeeded = captchaConfig.enabled && !resumingInProgress
     if (captchaNeeded && !captchaPayload) {
       setCaptchaError('Please wait for the security check to finish.')
       return
@@ -552,7 +543,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   }
 
   const resumingInProgress = hasSavedProgress && phase === 'idle'
-  const captchaRequired = captchaConfig.enabled && !resumingInProgress && !editorTestBypass
+  const captchaRequired = captchaConfig.enabled && !resumingInProgress
   const startBlocked = disabled || submitting || (captchaRequired && !captchaPayload)
 
   const renderStartSecurityCheck = () => {
@@ -600,19 +591,6 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           >
             Resume test
           </button>
-          {editorTestBypass ? (
-            <button
-              type="button"
-              data-editor-ui
-              onClick={() => {
-                clearWorldCupBallQuizProgress()
-                setHasSavedProgress(false)
-              }}
-              className="w-full rounded-xl border border-emerald-500/40 bg-emerald-950/30 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-900/35"
-            >
-              Start fresh (editor)
-            </button>
-          ) : null}
           </div>
         </div>
       )
@@ -675,7 +653,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <p className="ss-wc-ball-quiz__prompt text-stone-100">
           {WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}
         </p>
-        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
           {practiceChoices.map((choice) => (
             <button
               key={choice}
@@ -702,10 +680,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <p className="mt-2 text-xs leading-relaxed text-stone-300">
             Good — you have seen how the time-out works. Your real attempt starts when you press the button below.
           </p>
-          <p className="ss-wc-ball-quiz__practice-ready mt-2 text-xs leading-relaxed text-stone-300 sm:hidden">
-            Ready for the real {WORLD_CUP_BALL_QUESTION_COUNT}-question test — {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}, with a {WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension if a time-out expires once.
-          </p>
-          <ul className="ss-wc-ball-quiz__practice-tips mt-3 hidden list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300 sm:block">
+          <ul className="ss-wc-ball-quiz__practice-tips mt-3 list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300">
             {tips.map((tip) => (
               <li key={tip}>{tip}</li>
             ))}
@@ -763,7 +738,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         ) : null}
         <p className="ss-wc-ball-quiz__prompt text-stone-100">{salvageQuestion.prompt}</p>
         {hasSalvageChoices ? (
-          <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
             {salvageChoices.map((choice) => (
               <button
                 key={choice}
@@ -854,7 +829,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
       )}
       <p className="ss-wc-ball-quiz__prompt text-stone-100">{q?.prompt}</p>
       {hasChoices ? (
-        <div className="ss-wc-ball-quiz__choices grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
           {shuffledChoices.map((choice) => (
             <button
               key={choice}

@@ -5,14 +5,11 @@ import {
   WORLD_CUP_BALL_PRIZE_DETAIL,
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
-  WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
-  WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
 } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_PUBLIC_STEPS,
-  WORLD_CUP_BALL_RULES_INTRO,
-  WORLD_CUP_BALL_RULES_SECTIONS,
-  WORLD_CUP_BALL_SKILL_NOTICE,
+  WORLD_CUP_BALL_TERMS_SECTIONS,
+  WORLD_CUP_BALL_PAGE_INTRO,
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
   WORLD_CUP_BALL_GIVEAWAY_PAGE_ID,
   mergeWorldCupBallGiveawayPageLayout,
@@ -35,25 +32,32 @@ function HostNationsBadge() {
   )
 }
 
-function StartQuizButton({ onClick, label, editorMode, variant = 'primary' }) {
-  const className =
-    variant === 'primary'
-      ? 'ss-wc-ball-giveaway-page__cta ss-wc-ball-giveaway-page__cta--primary'
-      : 'ss-wc-ball-giveaway-page__cta ss-wc-ball-giveaway-page__cta--secondary'
-
+function StartQuizButton({ onClick, label, editorMode }) {
   return (
-    <button type="button" onClick={onClick} className={className} tabIndex={editorMode ? -1 : undefined}>
+    <button
+      type="button"
+      onClick={onClick}
+      className="ss-wc-ball-giveaway-page__cta ss-wc-ball-giveaway-page__cta--primary"
+      tabIndex={editorMode ? -1 : undefined}
+    >
       {label}
     </button>
   )
 }
 
+const AT_A_GLANCE = [
+  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
+  'Free to enter — UK residents 16+',
+  'No VPNs or proxies',
+  'Delivery details only if you win',
+]
+
 /** Rules and entry hub for the World Cup Ball Giveaway. */
 export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, editorMode = false }) {
-  const { openEntry } = useEntryFlow()
+  const { openEntry, openTerms } = useEntryFlow()
   const { layout: fetchedLayout } = usePageLayout(WORLD_CUP_BALL_GIVEAWAY_PAGE_ID)
   const layout = mergeWorldCupBallGiveawayPageLayout(layoutProp || fetchedLayout)
-  const ctaLabel = layout.ctaButtonLabel || 'Start the timed quiz'
+  const ctaLabel = layout.ctaButtonLabel || 'Enter the quiz'
 
   const handleStart = () => openEntry('worldCupBall')
 
@@ -81,7 +85,7 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
               </h1>
 
               <p className="mt-5 max-w-xl text-base font-medium leading-relaxed text-amber-50/88 sm:text-lg">
-                {layout.intro || WORLD_CUP_BALL_RULES_INTRO}
+                {layout.intro || WORLD_CUP_BALL_PAGE_INTRO}
               </p>
 
               <div className="mt-6 max-w-md">
@@ -95,9 +99,12 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
                 <span className="ss-wc-ball-giveaway-page__pill">Monthly draw if you miss</span>
               </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <StartQuizButton onClick={handleStart} label={ctaLabel} editorMode={editorMode} variant="primary" />
-                <a href="#how-to-enter" className="ss-wc-ball-giveaway-page__scroll-link text-center text-sm font-semibold text-amber-300/90 underline-offset-4 hover:text-amber-200 hover:underline sm:text-left">
+              <div id="enter-quiz" className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <StartQuizButton onClick={handleStart} label={ctaLabel} editorMode={editorMode} />
+                <a
+                  href="#how-to-enter"
+                  className="ss-wc-ball-giveaway-page__scroll-link text-center text-sm font-semibold text-amber-300/90 underline-offset-4 hover:text-amber-200 hover:underline sm:text-left"
+                >
                   How it works ↓
                 </a>
               </div>
@@ -106,7 +113,9 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
             <div className="ss-wc-ball-giveaway-page__prize-spotlight relative mx-auto w-full max-w-[22rem] lg:max-w-none">
               <div className="ss-wc-ball-giveaway-page__prize-ring" aria-hidden />
               <WorldCupBallPrizeFrame variant="hero" className="relative z-[1] w-full" />
-              <p className="relative z-[1] mt-4 text-center text-sm font-semibold text-amber-100/90">{WORLD_CUP_BALL_PRIZE_TITLE}</p>
+              <p className="relative z-[1] mt-4 text-center text-sm font-semibold text-amber-100/90">
+                {WORLD_CUP_BALL_PRIZE_TITLE}
+              </p>
             </div>
           </div>
         </div>
@@ -123,7 +132,11 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
                   <p className="mt-2 text-lg font-semibold leading-snug text-white">{WORLD_CUP_BALL_PRIZE_TITLE}</p>
                   <p className="mt-2 text-sm leading-relaxed text-amber-100/75">{WORLD_CUP_BALL_PRIZE_DETAIL}</p>
                 </div>
-                <WorldCupBallPrizeFrame variant="thumb" showChips={false} className="mx-auto w-full max-w-[10rem] shrink-0 sm:mx-0" />
+                <WorldCupBallPrizeFrame
+                  variant="thumb"
+                  showChips={false}
+                  className="mx-auto w-full max-w-[10rem] shrink-0 sm:mx-0"
+                />
               </div>
 
               <div id="how-to-enter">
@@ -148,35 +161,46 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
               <div className="ss-wc-ball-giveaway-page__glass rounded-2xl p-5 sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/90">Full rules</p>
                 <div className="mt-5 space-y-5">
-                  {WORLD_CUP_BALL_RULES_SECTIONS.map((section) => (
+                  {WORLD_CUP_BALL_TERMS_SECTIONS.map((section) => (
                     <div key={section.title} className="border-b border-white/6 pb-5 last:border-0 last:pb-0">
                       <h2 className="text-sm font-semibold text-amber-50">{section.title}</h2>
                       <p className="mt-1.5 text-sm leading-relaxed text-stone-400">{section.body}</p>
                     </div>
                   ))}
                 </div>
-                <p className="mt-5 text-xs leading-relaxed text-stone-500">
-                  {WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} {WORLD_CUP_BALL_SKILL_NOTICE}
-                </p>
-              </div>
-
-              <div className="flex w-full justify-center lg:hidden">
-                <StartQuizButton onClick={handleStart} label={ctaLabel} editorMode={editorMode} variant="primary" />
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+                  <button
+                    type="button"
+                    onClick={() => openTerms()}
+                    className="text-sm font-semibold text-amber-400/95 underline underline-offset-2 hover:text-amber-300"
+                  >
+                    Open full site terms
+                  </button>
+                  <Link
+                    to="/faq#world-cup-ball"
+                    className="text-sm font-semibold text-amber-400/95 underline underline-offset-2 hover:text-amber-300"
+                  >
+                    FAQ
+                  </Link>
+                </div>
               </div>
             </div>
 
             <aside className="ss-wc-ball-giveaway-page__aside mx-auto w-full max-w-[360px] rounded-2xl p-5 lg:sticky lg:top-24 lg:mx-0 lg:max-w-none lg:self-start lg:p-6">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/90">Ready to play?</p>
-              <p className="mt-3 text-xl font-semibold leading-snug text-white">
-                {WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/90">At a glance</p>
+              <ul className="mt-4 space-y-2.5 text-sm leading-relaxed text-amber-100/78">
+                {AT_A_GLANCE.map((item) => (
+                  <li key={item} className="flex gap-2.5">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/80" aria-hidden />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-5 text-sm leading-relaxed text-amber-200/70">
+                One salvage question if you miss exactly once. Two wrong answers end the attempt — you still enter that
+                month&apos;s draw.
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-amber-200/75">
-                Answer every question correctly — {WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win the ball
-                immediately. {WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. No VPNs. You only share your name, phone,
-                and address if you win.
-              </p>
-              <StartQuizButton onClick={handleStart} label={ctaLabel} editorMode={editorMode} variant="secondary" />
-              <p className="mt-4 text-center text-xs text-stone-500">
+              <p className="mt-5 text-center text-xs text-stone-500 lg:text-left">
                 <Link to="/faq" className="text-amber-400/90 underline underline-offset-2 hover:text-amber-300">
                   Common questions (FAQ)
                 </Link>

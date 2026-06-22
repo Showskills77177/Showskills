@@ -1,19 +1,12 @@
 import {
   WORLD_CUP_BALL_GIVEAWAY_LABEL,
-  WORLD_CUP_BALL_PRIZE_DETAIL,
-  WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
   WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS,
-  WORLD_CUP_BALL_MAX_TIMEOUTS,
   WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION,
   WORLD_CUP_BALL_CHOICE_BONUS_NOTICE,
-  WORLD_CUP_BALL_MIN_CHOICE_QUESTIONS,
   WORLD_CUP_BALL_QUESTION_TIMING_NOTICE,
-  WORLD_CUP_BALL_QUESTION_TIMING_SHORT,
   WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION,
-  WORLD_CUP_BALL_SALVAGE_NOTICE,
 } from './worldCupBallGiveaway.mjs'
-import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from './worldCupBallPhotography.mjs'
 import {
   WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY,
@@ -35,113 +28,109 @@ export const WORLD_CUP_BALL_CONNECTION_USED_ERROR =
   `This internet connection has already been used for the ${WORLD_CUP_BALL_GIVEAWAY_LABEL}. Only one quiz attempt is allowed per IP address (shared Wi‑Fi or hotspot counts as one connection).`
 
 export const WORLD_CUP_BALL_FREE_SHIPPING_NOTICE =
-  'Prize delivery is free within the United Kingdom. We ship the official-style World Cup football to the UK postal address you provide after you win — there is no delivery charge for the winner.'
+  'Prize delivery is free within the United Kingdom to the UK postal address you provide after you win.'
 
-export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
-  `Open to UK residents aged ${WORLD_CUP_BALL_MIN_AGE} or over. This is a free skill challenge, not gambling or a lottery. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} VPNs, proxies, and similar anonymising tools are not allowed. Entrants aged 16 or 17 may take part, but prize delivery must go to a parent or legal guardian’s UK postal address with their contact details (see Winner details below).`
+/** Short hero / card copy — no legal repetition. */
+export const WORLD_CUP_BALL_PAGE_INTRO =
+  `Win an official-style FIFA World Cup football (2026 design, not signed) by passing a free ${WORLD_CUP_BALL_QUESTION_COUNT}-question skill quiz. Separate from our paid prize draws and the Ronaldo shirt giveaway.`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
-  `This is a free, skill-based giveaway for one official-style FIFA World Cup football (2026 tournament design, not signed). It is separate from our paid prize draws and the Ronaldo shirt giveaway. You must answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly — ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — to win outright, or answer exactly one incorrectly and then answer one bonus salvage question correctly. ${WORLD_CUP_BALL_MONTHLY_DRAW_SHORT} Monthly draws run in June and July 2026 during the FIFA World Cup in the USA, Canada, and Mexico. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} VPNs are not permitted.`
+  `${WORLD_CUP_BALL_PAGE_INTRO} ${WORLD_CUP_BALL_MONTHLY_DRAW_SHORT}`
 
+export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
+  `UK residents aged ${WORLD_CUP_BALL_MIN_AGE}+. Genuine skill promotion — not gambling or a lottery. If you are 16 or 17 and win, delivery must go to a parent or legal guardian's UK address with their contact details.`
+
+export const WORLD_CUP_BALL_CONNECTION_AND_VPN_NOTICE =
+  `${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} VPNs, proxies, and similar anonymising tools are not allowed.`
+
+/** Compact summary for cards and entry modal. */
 export const WORLD_CUP_BALL_SKILL_NOTICE =
-  `${WORLD_CUP_BALL_QUESTION_TIMING_SHORT} This promotion is a genuine skill challenge, not a lottery. Success depends on your football knowledge and speed. Minor spelling or grammar differences are accepted when the answer is clearly correct. ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} One incorrect answer gives you one bonus salvage question — answer it correctly to still win. Two or more incorrect answers, a second time-out, or use of a VPN means you do not win the ball.`
+  `${WORLD_CUP_BALL_QUESTION_COUNT} timed questions — all correct to win. Miss exactly one and you get one salvage question.`
 
-export const WORLD_CUP_BALL_TERMS_TIMING_NOTICE =
-  `${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT}. VPNs and proxies are not allowed.`
+/** Timing, question types, and marking — stated once in terms. */
+export const WORLD_CUP_BALL_GAMEPLAY_NOTICE =
+  `${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} Minor spelling differences are accepted when the answer is clearly correct.`
 
 export const WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE =
-  `If you answer exactly one of the ${WORLD_CUP_BALL_QUESTION_COUNT} main questions incorrectly, you receive one bonus salvage question that was not part of your original quiz. ${WORLD_CUP_BALL_SALVAGE_NOTICE} The salvage question has the same ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. A second incorrect answer in the main quiz ends your attempt immediately without a salvage question.`
+  `One wrong answer in the main quiz unlocks one bonus salvage question (${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}). Answer it correctly to win. A second wrong answer ends the attempt immediately. A second time-out on any question also disqualifies you.`
+
+/** @deprecated Use WORLD_CUP_BALL_GAMEPLAY_NOTICE in new copy. */
+export const WORLD_CUP_BALL_TERMS_TIMING_NOTICE = WORLD_CUP_BALL_QUESTION_TIMING_NOTICE
 
 export const WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE =
-  'If you do not win, we show you which main quiz questions you answered incorrectly and the answers you submitted. This feedback is displayed to you in your browser during the attempt only — it is not emailed automatically.'
+  'If you do not win, we show which main questions you missed and what you typed — in your browser only, not by email.'
 
 export const WORLD_CUP_BALL_TERMS_WIN_NOTICE =
-  `If you win (including after a successful salvage question), you must complete the prize delivery form with your full name, email, UK mobile number, and UK postal address so we can ship the football. Entrants aged ${WORLD_CUP_BALL_MIN_AGE}–17 must also provide a parent or legal guardian's name, mobile number, and UK delivery address.`
+  `If you win (including via salvage), complete the prize delivery form with your full name, email, UK mobile number, and UK postal address.`
 
 export const WORLD_CUP_BALL_WINNER_DETAILS_NOTICE =
-  `If you win, you must complete the prize delivery form straight away with your full name, email, UK mobile number, and UK postal address so we can ship the ball (${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE.toLowerCase()}). Entrants aged 16 or 17 must also provide a parent or legal guardian’s full name, mobile number, and UK delivery address. We send a formal winner email to the address you provide. That email includes a personal link so you can return to the form if you need to finish later — once your details are saved, the link confirms delivery information is on file. Each name, email, mobile number, and postal address may only be used once for this giveaway. If you do not provide your details, we cannot send the prize.`
+  `${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Entrants aged 16–17 must provide a parent or guardian's UK delivery details. We send a winner email with a link to return to the form if needed. Each name, email, phone, and address may only be used once — we cannot ship without your details.`
 
 export const WORLD_CUP_BALL_WINNER_EMAIL_REMINDER =
-  `Your winner email includes a secure link back to the delivery form. If you have not yet submitted your details, the email will ask you to complete the form so we can ship your football. Once submitted, the same link confirms your details are saved.`
+  'The winner email includes a secure link back to the delivery form until your details are saved.'
 
-/** Numbered steps for the rules page. */
+/** Single winner block for terms and rules pages. */
+export const WORLD_CUP_BALL_WINNER_NOTICE =
+  `${WORLD_CUP_BALL_TERMS_WIN_NOTICE} ${WORLD_CUP_BALL_WINNER_DETAILS_NOTICE} ${WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}`
+
+/** Non-overlapping blocks for the site-wide Terms modal (section 6a). */
+export const WORLD_CUP_BALL_TERMS_SECTIONS = [
+  { title: 'Overview', body: WORLD_CUP_BALL_RULES_INTRO },
+  { title: 'Eligibility', body: WORLD_CUP_BALL_ELIGIBILITY_NOTICE },
+  { title: 'One attempt per connection & VPN', body: WORLD_CUP_BALL_CONNECTION_AND_VPN_NOTICE },
+  {
+    title: 'How the quiz works',
+    body: `${WORLD_CUP_BALL_GAMEPLAY_NOTICE} ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE}`,
+  },
+  {
+    title: 'If you do not win',
+    body: `${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY}`,
+  },
+  { title: 'If you win', body: WORLD_CUP_BALL_WINNER_NOTICE },
+  { title: 'Winner photography', body: WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY },
+]
+
+/** Numbered steps for the public rules page. */
 export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   {
     num: 1,
-    title: 'Read the rules and start the challenge',
-    detail:
-      `Open the timed quiz from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy. ${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT} on the main ${WORLD_CUP_BALL_QUESTION_COUNT} questions.`,
+    title: 'Start the quiz',
+    detail: `Open the challenge from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy.`,
   },
   {
     num: 2,
-    title: `Answer ${WORLD_CUP_BALL_QUESTION_COUNT} difficult questions under time pressure`,
-    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. Type your answer and move on before the time-out — or tap one option on multiple-choice questions (six for events in 1980 or earlier; four on some newer bonus questions). If the time-out expires once, you receive a one-off ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only. If it expires a second time, you are disqualified immediately.`,
+    title: `${WORLD_CUP_BALL_QUESTION_COUNT} difficult questions under time pressure`,
+    detail: `${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}. If a time-out expires once, you get ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS} extra seconds on that question only.`,
   },
   {
     num: 3,
-    title: 'Win only if every answer is correct (one salvage chance)',
+    title: 'Win, salvage, or monthly draw',
     detail:
-      `All ${WORLD_CUP_BALL_QUESTION_COUNT} answers must be correct to win outright. If you get exactly one answer wrong, you receive one bonus salvage question — answer it correctly and you still win. A second wrong answer ends the attempt immediately; you do not win on the skill attempt, but you still receive one free automatic entry into that month’s World Cup Ball draw (June or July 2026).`,
+      'All correct wins the ball outright. One wrong answer gives a salvage question — answer it correctly to win. Two wrong answers end the attempt; you still get one free entry into that month’s draw (June or July 2026).',
   },
   {
     num: 4,
     title: 'Complete the winner delivery form',
     detail:
-      `If you win (including after one wrong answer and a successful salvage question), complete the winner delivery form with your name, email, mobile number, and UK delivery address. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} If you are 16 or 17, also enter your parent or guardian's delivery details. We email you a confirmation with a link to return to the form if needed. If you do not win, we show which questions you missed.`,
+      'If you win, complete the delivery form with your name, email, mobile number, and UK address. Free UK shipping.',
   },
   {
     num: 5,
-    title: 'Winner photo (optional refusal for valid reasons)',
+    title: 'Winner photo',
     detail: WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY,
   },
 ]
 
-export const WORLD_CUP_BALL_RULES_SECTIONS = [
-  {
-    title: 'Prize',
-    body: `${WORLD_CUP_BALL_PRIZE_TITLE}. ${WORLD_CUP_BALL_PRIZE_DETAIL} ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}`,
-  },
-  {
-    title: 'Eligibility',
-    body: WORLD_CUP_BALL_ELIGIBILITY_NOTICE,
-  },
-  {
-    title: 'Skill requirement',
-    body: WORLD_CUP_BALL_SKILL_NOTICE,
-  },
-  {
-    title: 'Timing',
-    body: WORLD_CUP_BALL_TERMS_TIMING_NOTICE,
-  },
-  {
-    title: 'Salvage question (one wrong answer)',
-    body: WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE,
-  },
-  {
-    title: 'If you do not win outright',
-    body: `${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY}`,
-  },
-  {
-    title: 'One attempt per connection',
-    body: WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
-  },
-  {
-    title: 'Winner details & delivery',
-    body: `${WORLD_CUP_BALL_WINNER_DETAILS_NOTICE} ${WORLD_CUP_BALL_WINNER_EMAIL_REMINDER} Questions: ${SHOWSKILLS_CONTACT_EMAIL}.`,
-  },
-  {
-    title: 'Winner photography',
-    body: WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY,
-  },
-]
+/** @deprecated Use WORLD_CUP_BALL_TERMS_SECTIONS — kept for CMS/admin previews if referenced elsewhere. */
+export const WORLD_CUP_BALL_RULES_SECTIONS = WORLD_CUP_BALL_TERMS_SECTIONS
 
 export function defaultWorldCupBallGiveawayPageLayout() {
   return {
     version: 1,
     badge: 'Free skill giveaway · Not signed',
     title: WORLD_CUP_BALL_GIVEAWAY_LABEL,
-    intro: WORLD_CUP_BALL_RULES_INTRO,
-    ctaButtonLabel: 'Start the timed quiz',
+    intro: WORLD_CUP_BALL_PAGE_INTRO,
+    ctaButtonLabel: 'Enter the quiz',
     howToTitle: 'How to win',
   }
 }
