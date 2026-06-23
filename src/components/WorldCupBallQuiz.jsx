@@ -151,6 +151,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         salvageCorrect: data.salvageCorrect,
         monthlyDraw: data.monthlyDraw || null,
         earlyExit: Boolean(data.earlyExit),
+        sessionId,
       })
     },
     [onResult],

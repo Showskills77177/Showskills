@@ -28,6 +28,7 @@ export const SUBMISSIONS_PAGE_HELP =
 export const WORLD_CUP_BALL_ADMIN_ROUTES = {
   winners: '/admin/submissions?competition=world_cup_ball_giveaway',
   monthlyDraw: '/admin/world-cup-ball-draw',
+  failedAttempts: '/admin/world-cup-ball-failed',
   entryLog: '/admin/entry-attempts?competition=world_cup_ball_giveaway',
   testEmail: '/admin/test-email',
   liveRules: '/world-cup-ball-giveaway',
@@ -40,5 +41,7 @@ export const WORLD_CUP_BALL_ADMIN_HELP = {
   submissions:
     'Each row is a confirmed winner who submitted delivery details. Win reference is WC-… in the Entry # column. Open Details for phone, UK address, age band, and guardian info (16–17). Approve when ready to ship the ball.',
   entryLog:
-    'world_cup_ball_start = quiz opened. world_cup_ball_submit = finished quiz (outcome won, lost, or disqualified). world_cup_ball_monthly_draw = automatic monthly draw entry after a failed attempt. world_cup_ball_claim = delivery form saved successfully.',
+    'world_cup_ball_start = quiz opened. world_cup_ball_submit = finished quiz (outcome won, lost, or disqualified). world_cup_ball_monthly_draw = automatic monthly draw entry after a failed attempt. world_cup_ball_claim = delivery form saved successfully. world_cup_ball_failed_contact = email saved after a failed attempt.',
+  failedAttempts:
+    'One row per failed skill quiz (lost or disqualified). Email is optional — entrants can save it on the fail screen after their attempt. Draw entry # links to the monthly draw pool when awarded.',
 }

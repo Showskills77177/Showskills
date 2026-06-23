@@ -37,6 +37,7 @@ import { WorldCupBallQuiz } from './WorldCupBallQuiz'
 import { WorldCupBallClaimForm } from './WorldCupBallClaimForm'
 import { WorldCupBallWrongReview } from './WorldCupBallWrongReview'
 import { WorldCupBallMonthlyDrawEntryCallout } from './WorldCupBallMonthlyDrawEntryCallout'
+import { WorldCupBallFailedContactForm } from './WorldCupBallFailedContactForm'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
 import {
   WORLD_CUP_BALL_GIVEAWAY_LABEL,
@@ -1045,6 +1046,19 @@ export function EntryModal() {
                   </p>
                   <WorldCupBallWrongReview wrongReview={wcBallOutcome.wrongReview} />
                   <WorldCupBallMonthlyDrawEntryCallout monthlyDraw={wcBallOutcome.monthlyDraw} />
+                  <WorldCupBallFailedContactForm
+                    sessionId={wcBallOutcome.sessionId || ''}
+                    alreadySaved={Boolean(wcBallOutcome.contactEmailSaved)}
+                    onSaved={(email) => {
+                      saveWorldCupBallSession({
+                        outcome: { ...wcBallOutcome, contactEmailSaved: true, contactEmail: email },
+                        claimToken: wcBallClaimToken || '',
+                        claimed: false,
+                        sessionId: wcBallOutcome.sessionId || '',
+                        contactEmailSaved: true,
+                      })
+                    }}
+                  />
                 </div>
               ) : (
                 <div className={`ss-wc-ball-quiz-slot ${wcBallQuizFocus ? 'ss-wc-ball-quiz-slot--focus' : 'mt-4'}`}>
@@ -1059,6 +1073,7 @@ export function EntryModal() {
                         outcome: result,
                         claimToken: result.claimToken || '',
                         claimed: false,
+                        sessionId: result.sessionId || '',
                       })
                     }}
                   />

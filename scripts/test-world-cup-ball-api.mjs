@@ -26,6 +26,7 @@ async function resetWcBallData() {
   const { ensureWorldCupBallSchema } = await import('../backend/api/lib/worldCupBallSchema.mjs')
   await ensureWorldCupBallSchema()
   await query(`DELETE FROM world_cup_ball_winners`)
+  await query(`DELETE FROM world_cup_ball_monthly_draw_entries`)
   await query(`DELETE FROM world_cup_ball_sessions`)
   await query(`DELETE FROM kickup_submissions WHERE competition = 'world_cup_ball_giveaway'`)
 }
@@ -139,6 +140,19 @@ async function main() {
     }
     if (!Array.isArray(twoWrong.wrongReview) || twoWrong.wrongReview.length !== 2) {
       throw new Error(`expected two wrong-review rows, got ${JSON.stringify(twoWrong.wrongReview)}`)
+    }
+
+    const contactRes = await fetch(`${base}/api/submissions/world-cup-ball/failed-contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: start.sessionId,
+        email: 'wc-ball-failed@test.local',
+      }),
+    })
+    const contact = await contactRes.json()
+    if (!contactRes.ok || !contact.ok || contact.email !== 'wc-ball-failed@test.local') {
+      throw new Error(`failed contact save failed: ${contactRes.status} ${JSON.stringify(contact)}`)
     }
 
     const start2Res = await fetch(`${base}/api/submissions/world-cup-ball/start`, {

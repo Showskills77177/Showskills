@@ -7,6 +7,8 @@ const STORAGE_KEY = 'ss_wc_ball_session'
  *   claimed?: boolean
  *   winnerEmailSent?: boolean
  *   winnerEmail?: { sent?: boolean, skipped?: boolean, error?: string | null } | null
+ *   sessionId?: string
+ *   contactEmailSaved?: boolean
  * }} WorldCupBallSession
  */
 
@@ -34,6 +36,8 @@ export function loadWorldCupBallSession() {
               error: typeof data.winnerEmail.error === 'string' ? data.winnerEmail.error : null,
             }
           : null,
+      sessionId: typeof data.sessionId === 'string' ? data.sessionId : '',
+      contactEmailSaved: Boolean(data.contactEmailSaved),
     }
   } catch {
     return null
@@ -52,6 +56,8 @@ export function saveWorldCupBallSession(session) {
         claimed: Boolean(session.claimed),
         winnerEmailSent: Boolean(session.winnerEmailSent),
         winnerEmail: session.winnerEmail || null,
+        sessionId: session.sessionId || '',
+        contactEmailSaved: Boolean(session.contactEmailSaved),
       }),
     )
   } catch {

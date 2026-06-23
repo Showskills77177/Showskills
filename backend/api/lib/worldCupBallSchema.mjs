@@ -100,6 +100,8 @@ export async function ensureWorldCupBallSchema() {
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS question_keys_json JSONB`)
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS combination_index INTEGER`)
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS salvage_question_key TEXT`)
+    await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS contact_email TEXT`)
+    await query(`ALTER TABLE world_cup_ball_monthly_draw_entries ADD COLUMN IF NOT EXISTS email TEXT`)
   } else {
     try {
       await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN email TEXT`)
@@ -128,6 +130,16 @@ export async function ensureWorldCupBallSchema() {
     }
     try {
       await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN salvage_question_key TEXT`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN contact_email TEXT`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_monthly_draw_entries ADD COLUMN email TEXT`)
     } catch {
       /* column exists */
     }
@@ -337,4 +349,38 @@ export async function getWorldCupBallSessionByClaimToken(claimToken) {
   await ensureWorldCupBallSchema()
   const r = await query(`SELECT * FROM world_cup_ball_sessions WHERE claim_token = $1`, [claimToken])
   return r.rows[0] || null
+}
+
+const WORLD_CUP_BALL_FAILED_STATUSES = new Set(['lost', 'disqualified'])
+
+export function isWorldCupBallFailedSessionStatus(status) {
+  return WORLD_CUP_BALL_FAILED_STATUSES.has(String(status || '').trim())
+}
+
+/** Save contact email after a failed skill quiz attempt. */
+export async function saveWorldCupBallFailedContactEmail({ sessionId, email }) {
+  if (!sessionId) return { ok: false, error: 'invalid_session' }
+
+  const normalized = String(email || '').trim().toLowerCase()
+  if (!normalized || !normalized.includes('@') || normalized.length > 254) {
+    return { ok: false, error: 'invalid_email' }
+  }
+
+  await ensureWorldCupBallSchema()
+  const session = await getWorldCupBallSession(sessionId)
+  if (!session) return { ok: false, error: 'session_not_found' }
+  if (!isWorldCupBallFailedSessionStatus(session.status)) {
+    return { ok: false, error: 'not_failed_session' }
+  }
+
+  await query(`UPDATE world_cup_ball_sessions SET contact_email = $2 WHERE id = $1`, [
+    sessionId,
+    normalized,
+  ])
+  await query(`UPDATE world_cup_ball_monthly_draw_entries SET email = $2 WHERE session_id = $1`, [
+    sessionId,
+    normalized,
+  ])
+
+  return { ok: true, email: normalized }
 }

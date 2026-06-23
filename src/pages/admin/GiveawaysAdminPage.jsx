@@ -37,6 +37,12 @@ export default function GiveawaysAdminPage() {
                   (filter: {WORLD_CUP_BALL_GIVEAWAY_LABEL})
                 </li>
                 <li>
+                  <strong className="text-stone-400">Failed attempts &amp; emails</strong> →{' '}
+                  <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.failedAttempts} className="text-amber-400/90 underline">
+                    Failed attempts
+                  </Link>
+                </li>
+                <li>
                   <strong className="text-stone-400">Quiz starts / wins / form saves</strong> →{' '}
                   <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.entryLog} className="text-amber-400/90 underline">
                     Entry log
@@ -64,6 +70,12 @@ export default function GiveawaysAdminPage() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-stone-950 hover:bg-amber-500"
             >
               View winners
+            </Link>
+            <Link
+              to={WORLD_CUP_BALL_ADMIN_ROUTES.failedAttempts}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-4 py-2 text-sm text-stone-300 hover:bg-white/5"
+            >
+              Failed attempts
             </Link>
             <Link
               to={WORLD_CUP_BALL_ADMIN_ROUTES.entryLog}

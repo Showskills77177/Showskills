@@ -78,6 +78,8 @@ export default function EntryAttemptsPage() {
           <option value="world_cup_ball_start">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — quiz start</option>
           <option value="world_cup_ball_submit">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — quiz result</option>
           <option value="world_cup_ball_claim">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — delivery form saved</option>
+          <option value="world_cup_ball_monthly_draw">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — monthly draw entry</option>
+          <option value="world_cup_ball_failed_contact">{WORLD_CUP_BALL_GIVEAWAY_LABEL} — failed attempt email</option>
         </select>
         <select
           value={outcome}

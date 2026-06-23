@@ -698,7 +698,11 @@ export function EntryFlowProvider({ children }) {
         setWcBallClaimed(false)
         setWcBallWinnerEmail(null)
       } else if (saved?.outcome) {
-        setWcBallOutcome(saved.outcome)
+        setWcBallOutcome({
+          ...saved.outcome,
+          sessionId: saved.outcome.sessionId || saved.sessionId || '',
+          contactEmailSaved: Boolean(saved.outcome.contactEmailSaved || saved.contactEmailSaved),
+        })
         setWcBallClaimToken('')
         setWcBallClaimed(false)
         setWcBallWinnerEmail(null)

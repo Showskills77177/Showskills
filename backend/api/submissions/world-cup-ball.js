@@ -48,6 +48,7 @@ import {
   markWorldCupBallWinnerEmailSent,
   saveWorldCupBallSalvageOffer,
   saveWorldCupBallPartialProgress,
+  saveWorldCupBallFailedContactEmail,
 } from '../lib/worldCupBallSchema.mjs'
 import { sendWorldCupBallWinnerEmail } from '../lib/sendWorldCupBallWinnerEmail.mjs'
 import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs'
@@ -809,6 +810,53 @@ export async function claimWorldCupBallPrize(req, res) {
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not record winner details' })
+  }
+}
+
+/** POST /api/submissions/world-cup-ball/failed-contact */
+export async function saveWorldCupBallFailedContact(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    return res.status(204).end()
+  }
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST, OPTIONS')
+    return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  const limited = applyRateLimit(req, res, { pathKey: 'wc-ball-failed-contact', max: 6, windowMs: 60_000 })
+  if (limited.blocked) return json(res, 429, { error: 'Too many requests. Please wait and try again.' })
+
+  if (!isDbConfigured()) return json(res, 503, { error: 'Database not configured' })
+
+  try {
+    const body = parseJsonBody(req)
+    const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
+    const email = typeof body.email === 'string' ? body.email : ''
+    const ip = clientIp(req)
+
+    const result = await saveWorldCupBallFailedContactEmail({ sessionId, email })
+    if (!result.ok) {
+      const status =
+        result.error === 'session_not_found' || result.error === 'not_failed_session' ? 400 : 422
+      return json(res, status, { error: 'Could not save your email. Please check it and try again.' })
+    }
+
+    await logEntryAttempt(req, {
+      competition: COMPETITION_WORLD_CUP_BALL,
+      flow: 'world_cup_ball_failed_contact',
+      ip,
+      email: result.email,
+      outcome: 'success',
+      metadata: { session_id: sessionId },
+    }).catch(() => {})
+
+    return json(res, 200, { ok: true, email: result.email })
+  } catch (e) {
+    console.error(e)
+    return json(res, 500, { error: 'Could not save your email' })
   }
 }
 

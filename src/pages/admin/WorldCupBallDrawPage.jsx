@@ -80,6 +80,10 @@ export default function WorldCupBallDrawPage() {
           (June / July 2026).
         </p>
         <p className="mt-2 text-xs text-stone-500">
+          <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.failedAttempts} className="text-amber-400/90 underline">
+            Failed attempts
+          </Link>{' '}
+          ·{' '}
           <Link to={WORLD_CUP_BALL_ADMIN_ROUTES.entryLog} className="text-amber-400/90 underline">
             Entry log
           </Link>{' '}
