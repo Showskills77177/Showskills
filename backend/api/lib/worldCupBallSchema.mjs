@@ -351,6 +351,26 @@ export async function getWorldCupBallSessionByClaimToken(claimToken) {
   return r.rows[0] || null
 }
 
+/** Staging QA — wipe all World Cup Ball attempt data for one IP. */
+export async function resetWorldCupBallAttemptsForIp(ip) {
+  if (!ip) return { ok: false, sessionsDeleted: 0 }
+  await ensureWorldCupBallSchema()
+
+  const sessionIds = await query(`SELECT id FROM world_cup_ball_sessions WHERE ip_address = $1`, [ip])
+  const ids = sessionIds.rows.map((row) => row.id).filter(Boolean)
+  if (!ids.length) {
+    return { ok: true, sessionsDeleted: 0 }
+  }
+
+  for (const sessionId of ids) {
+    await query(`DELETE FROM world_cup_ball_winners WHERE session_id = $1`, [sessionId])
+    await query(`DELETE FROM world_cup_ball_monthly_draw_entries WHERE session_id = $1`, [sessionId])
+  }
+  const deleted = await query(`DELETE FROM world_cup_ball_sessions WHERE ip_address = $1`, [ip])
+  const count = Number(deleted.rowCount ?? deleted.changes ?? ids.length)
+  return { ok: true, sessionsDeleted: count }
+}
+
 const WORLD_CUP_BALL_FAILED_STATUSES = new Set(['lost', 'disqualified'])
 
 export function isWorldCupBallFailedSessionStatus(status) {

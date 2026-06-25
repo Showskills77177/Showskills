@@ -120,6 +120,7 @@ export default function DashboardPage() {
           </Link>
         </p>
         <ul className="mt-4 flex flex-wrap gap-3 text-sm">
+          <QuickLink to="/admin/site-visits">Site visits</QuickLink>
           <QuickLink to="/admin/users">Users &amp; entries</QuickLink>
           <QuickLink to="/admin/tickets">Ticket purchases</QuickLink>
           <QuickLink to="/admin/draw">Draw winner</QuickLink>

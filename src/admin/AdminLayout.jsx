@@ -7,6 +7,7 @@ import { apiFetch } from '../lib/api'
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard' },
+  { to: '/admin/site-visits', label: 'Site visits' },
   { to: '/admin/editor', label: 'Site editor' },
   { to: '/admin/competitions', label: 'Competitions' },
   { to: '/admin/giveaways', label: 'Giveaways' },

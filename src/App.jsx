@@ -35,6 +35,7 @@ import { PurchaseEmailPreview } from './components/admin/PurchaseEmailPreview'
 import PrizeRevealPage from './pages/PrizeRevealPage'
 import ShirtPrizeRevealPage from './pages/ShirtPrizeRevealPage'
 import WorldCupBallGiveawayPage from './pages/WorldCupBallGiveawayPage'
+import AdminSiteVisitsPage from './pages/admin/SiteVisitsPage'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -88,6 +89,7 @@ export default function App() {
                 <Route path="draw" element={<AdminDrawWinnerPage />} />
                 <Route path="world-cup-ball-draw" element={<AdminWorldCupBallDrawPage />} />
                 <Route path="world-cup-ball-failed" element={<AdminWorldCupBallFailedAttemptsPage />} />
+                <Route path="site-visits" element={<AdminSiteVisitsPage />} />
                 <Route path="entry-attempts" element={<AdminEntryAttemptsPage />} />
                 <Route path="payments" element={<AdminPaymentsPage />} />
                 <Route path="submissions" element={<AdminSubmissionsPage />} />

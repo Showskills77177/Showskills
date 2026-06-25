@@ -18,6 +18,8 @@ import {
   loadWorldCupBallSession,
   saveWorldCupBallSession,
 } from '../lib/worldCupBallSession.mjs'
+import { clearWorldCupBallQuizProgress } from '../lib/worldCupBallQuizProgress.mjs'
+import { isWorldCupBallStagingResetClientEnabled } from '../../shared/worldCupBallStagingReset.mjs'
 import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
@@ -142,6 +144,7 @@ export function EntryFlowProvider({ children }) {
   const [wcBallWinnerEmail, setWcBallWinnerEmail] = useState(null)
   const [wcBallVpnBlocked, setWcBallVpnBlocked] = useState(false)
   const [wcBallCheckingVpn, setWcBallCheckingVpn] = useState(false)
+  const [wcBallQuizRestartNonce, setWcBallQuizRestartNonce] = useState(0)
 
   /** Avoid sending the unanswered ticket email more than once per checkout. */
   const unansweredTicketEmailRequestedRef = useRef(false)
@@ -779,6 +782,26 @@ export function EntryFlowProvider({ children }) {
   }, [paidPostCheckout, paidQuizSubmitted, notifyUnansweredQuizTicketEmail])
 
   const openTerms = useCallback(() => setTermsOpen(true), [])
+
+  const resetWorldCupBallQuizAttempt = useCallback(async () => {
+    if (!isWorldCupBallStagingResetClientEnabled()) return
+    clearWorldCupBallSession()
+    clearWorldCupBallQuizProgress()
+    setWcBallOutcome(null)
+    setWcBallClaimToken('')
+    setWcBallClaimed(false)
+    setWcBallWinnerEmail(null)
+    setWcBallError('')
+    setWcBallQuizRestartNonce((n) => n + 1)
+    try {
+      await fetch(apiUrl('/api/submissions/world-cup-ball/reset-attempt'), {
+        method: 'POST',
+        credentials: 'include',
+      })
+    } catch {
+      /* local UI reset still allows another try on staging */
+    }
+  }, [])
 
   const markPaidCheckoutComplete = useCallback(
     (purchaseInfo) => {
@@ -1453,6 +1476,8 @@ export function EntryFlowProvider({ children }) {
       setWcBallWinnerEmail,
       wcBallVpnBlocked,
       wcBallCheckingVpn,
+      wcBallQuizRestartNonce,
+      resetWorldCupBallQuizAttempt,
       paidQuizNavStatus,
       openResumePaidQuiz,
       freeAddressLine1,
@@ -1554,6 +1579,8 @@ export function EntryFlowProvider({ children }) {
       wcBallWinnerEmail,
       wcBallVpnBlocked,
       wcBallCheckingVpn,
+      wcBallQuizRestartNonce,
+      resetWorldCupBallQuizAttempt,
       paidQuizNavStatus,
       openResumePaidQuiz,
       freeAddressLine1,

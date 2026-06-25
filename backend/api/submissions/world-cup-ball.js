@@ -49,6 +49,7 @@ import {
   saveWorldCupBallSalvageOffer,
   saveWorldCupBallPartialProgress,
   saveWorldCupBallFailedContactEmail,
+  resetWorldCupBallAttemptsForIp,
 } from '../lib/worldCupBallSchema.mjs'
 import { sendWorldCupBallWinnerEmail } from '../lib/sendWorldCupBallWinnerEmail.mjs'
 import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs'
@@ -58,6 +59,7 @@ import { isWorldCupBallQuizBypass } from '../lib/worldCupBallDev.mjs'
 import { verifyCaptchaPayload } from '../lib/captcha.mjs'
 import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
 import { maybeAwardWorldCupBallMonthlyDrawEntry } from '../lib/awardWorldCupBallMonthlyDrawEntry.mjs'
+import { isWorldCupBallStagingResetServerEnabled } from '../../../shared/worldCupBallStagingReset.mjs'
 
 function monthlyDrawApiPayload(award) {
   if (!award?.awarded || !Array.isArray(award.entryNumbers) || !award.entryNumbers.length) {
@@ -810,6 +812,35 @@ export async function claimWorldCupBallPrize(req, res) {
   } catch (e) {
     console.error(e)
     return json(res, 500, { error: 'Could not record winner details' })
+  }
+}
+
+/** POST /api/submissions/world-cup-ball/reset-attempt — staging QA only */
+export async function resetWorldCupBallStagingAttempt(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    return res.status(204).end()
+  }
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST, OPTIONS')
+    return json(res, 405, { error: 'Method not allowed' })
+  }
+
+  if (!isWorldCupBallStagingResetServerEnabled()) {
+    return json(res, 404, { error: 'Not found' })
+  }
+
+  if (!isDbConfigured()) return json(res, 503, { error: 'Database not configured' })
+
+  try {
+    const ip = clientIp(req)
+    const result = await resetWorldCupBallAttemptsForIp(ip)
+    return json(res, 200, { ok: true, sessionsDeleted: result.sessionsDeleted ?? 0 })
+  } catch (e) {
+    console.error(e)
+    return json(res, 500, { error: 'Could not reset quiz attempt' })
   }
 }
 

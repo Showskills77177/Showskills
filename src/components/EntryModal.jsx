@@ -50,6 +50,7 @@ import {
   WORLD_CUP_BALL_PAGE_INTRO,
   WORLD_CUP_BALL_SKILL_NOTICE,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
+import { isWorldCupBallStagingResetClientEnabled } from '../../shared/worldCupBallStagingReset.mjs'
 import { saveWorldCupBallSession } from '../lib/worldCupBallSession.mjs'
 
 export function EntryModal() {
@@ -153,6 +154,8 @@ export function EntryModal() {
     setWcBallWinnerEmail,
     wcBallVpnBlocked,
     wcBallCheckingVpn,
+    wcBallQuizRestartNonce,
+    resetWorldCupBallQuizAttempt,
     freeAddressLine1,
     setFreeAddressLine1,
     freeAddressLine2,
@@ -972,6 +975,17 @@ export function EntryModal() {
 
           {entryModalType === 'worldCupBall' ? (
             <>
+              {isWorldCupBallStagingResetClientEnabled() ? (
+                <div className="mb-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void resetWorldCupBallQuizAttempt()}
+                    className="rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-1.5 text-xs font-semibold text-amber-200/90 hover:bg-amber-900/40"
+                  >
+                    Reset quiz (staging)
+                  </button>
+                </div>
+              ) : null}
               {wcBallShowIntro ? (
                 <>
               <WorldCupBallPrizeFrame
@@ -1063,6 +1077,7 @@ export function EntryModal() {
               ) : (
                 <div className={`ss-wc-ball-quiz-slot ${wcBallQuizFocus ? 'ss-wc-ball-quiz-slot--focus' : 'mt-4'}`}>
                   <WorldCupBallQuiz
+                    key={wcBallQuizRestartNonce}
                     disabled={wcBallVpnBlocked || wcBallCheckingVpn}
                     onPhaseChange={handleWcBallQuizPhaseChange}
                     onError={setWcBallError}
