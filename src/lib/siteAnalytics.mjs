@@ -66,19 +66,20 @@ export function trackPublicPageView(pathname, search = '') {
   })
 
   const url = apiUrl('/api/analytics/page-view')
-  try {
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))
-      return
-    }
-  } catch {
-    /* fall through */
-  }
 
   fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,
     keepalive: true,
-  }).catch(() => {})
+    credentials: 'same-origin',
+  }).catch(() => {
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))
+      }
+    } catch {
+      /* ignore */
+    }
+  })
 }

@@ -1,5 +1,5 @@
 import { recordPageView } from '../lib/recordPageView.mjs'
-import { json } from '../lib/http.mjs'
+import { json, readJsonBody } from '../lib/http.mjs'
 import { isDbConfigured } from '../lib/db.mjs'
 
 export default async function handler(req, res) {
@@ -18,8 +18,8 @@ export default async function handler(req, res) {
     return json(res, 503, { error: 'Analytics unavailable' })
   }
 
-  const body = req.body && typeof req.body === 'object' ? req.body : {}
   try {
+    const body = await readJsonBody(req)
     const result = await recordPageView(req, body)
     return json(res, 200, result)
   } catch (e) {

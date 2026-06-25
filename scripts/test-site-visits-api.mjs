@@ -64,6 +64,16 @@ try {
   const view = await viewRes.json()
   if (!viewRes.ok || !view.ok) throw new Error(`page-view failed: ${viewRes.status} ${JSON.stringify(view)}`)
 
+  const beaconRes = await fetch(`${base}/api/analytics/page-view`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'test-visit-beacon',
+      path: '/competitions',
+    }),
+  })
+  if (!beaconRes.ok) throw new Error(`second page-view failed: ${beaconRes.status}`)
+
   const { signAdminSession } = await import('../backend/api/lib/adminAuth.mjs')
   const token = await signAdminSession()
   const adminRes = await fetch(`${base}/api/admin/site-visits?period=24h`, {
