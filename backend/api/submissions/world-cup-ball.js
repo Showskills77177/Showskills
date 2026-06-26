@@ -55,6 +55,13 @@ import { sendWorldCupBallWinnerEmail } from '../lib/sendWorldCupBallWinnerEmail.
 import { buildWorldCupBallClaimUrl } from '../../../shared/worldCupBallClaim.mjs'
 import { resolveSiteUrl } from '../lib/resendConfig.mjs'
 import { WORLD_CUP_BALL_MIN_AGE } from '../../../shared/worldCupBallGiveawayRules.mjs'
+import {
+  normalizeWorldCupBallCountryCode,
+  resolveWorldCupBallPrizeFulfilment,
+  worldCupBallCashPrizeUsdForCountry,
+  WORLD_CUP_BALL_INTERNATIONAL_CASH_USD,
+} from '../../../shared/worldCupBallInternationalPrize.mjs'
+import { countryDisplayName } from '../../../shared/trafficSource.mjs'
 import { isWorldCupBallQuizBypass } from '../lib/worldCupBallDev.mjs'
 import { verifyCaptchaPayload } from '../lib/captcha.mjs'
 import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
@@ -689,6 +696,17 @@ export async function claimWorldCupBallPrize(req, res) {
   const address = parsePostalAddress(body)
   if (!address.ok) return json(res, 400, { error: address.error })
 
+  const countryCode = normalizeWorldCupBallCountryCode(body.countryCode)
+  if (!countryCode) return json(res, 400, { error: 'Please select your country.' })
+
+  const prizeFulfilment = resolveWorldCupBallPrizeFulfilment(countryCode)
+  const checkPhotoAcknowledged = body.checkPhotoAcknowledged === true
+  if (!checkPhotoAcknowledged) {
+    return json(res, 400, {
+      error: `You must agree to provide a mandatory photograph holding the USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque.`,
+    })
+  }
+
   if (entrantAgeBand === '16-17') {
     if (!guardianName) {
       return json(res, 400, { error: 'Parent or guardian full name is required for entrants aged 16 or 17.' })
@@ -698,7 +716,7 @@ export async function claimWorldCupBallPrize(req, res) {
       return json(res, 400, { error: guardianPhoneCheck.error || 'A valid parent/guardian mobile number is required.' })
     }
     if (!guardianAddress.ok) {
-      return json(res, 400, { error: 'A complete parent or guardian UK delivery address is required for entrants aged 16 or 17.' })
+      return json(res, 400, { error: 'A complete parent or guardian mailing address is required for entrants aged 16 or 17.' })
     }
   }
 
@@ -736,7 +754,10 @@ export async function claimWorldCupBallPrize(req, res) {
   try {
     const submissionId = randomUUID()
     const winReference = `WC-${submissionId.slice(0, 8).toUpperCase()}`
-    let adminNotes = `${WORLD_CUP_BALL_GIVEAWAY_LABEL} — instant skill win.\nAll ${WORLD_CUP_BALL_QUESTION_COUNT} answers correct.\nTimeouts used: ${session.timeouts_used ?? 0}\nEntrant age band: ${entrantAgeBand} (${WORLD_CUP_BALL_MIN_AGE}+ required).\nEmail: ${email}\nContact phone: ${phoneCheck.phone}\nDelivery address: ${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}, ${address.postcode}`
+    const cashPrizeUsd = worldCupBallCashPrizeUsdForCountry(countryCode)
+    const countryName = countryDisplayName(countryCode)
+    let adminNotes = `${WORLD_CUP_BALL_GIVEAWAY_LABEL} — instant skill win.\nAll ${WORLD_CUP_BALL_QUESTION_COUNT} answers correct.\nTimeouts used: ${session.timeouts_used ?? 0}\nEntrant age band: ${entrantAgeBand} (${WORLD_CUP_BALL_MIN_AGE}+ required).\nCountry: ${countryName} (${countryCode})\nPrize fulfilment: ${prizeFulfilment === 'international_cash' ? `USD $${cashPrizeUsd} cash` : 'UK football delivery'}\nEmail: ${email}\nContact phone: ${phoneCheck.phone}\nMailing address: ${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}, ${address.postcode}`
+    adminNotes += `\nWinning-cheque photo: mandatory acknowledgement received at claim.`
     if (entrantAgeBand === '16-17') {
       const guardianPhoneCheck = validateContactPhone(guardianPhoneRaw)
       adminNotes += `\nParent/guardian: ${guardianName}\nGuardian phone: ${guardianPhoneCheck.phone}\nGuardian address: ${guardianAddress.addressLine1}${guardianAddress.addressLine2 ? `, ${guardianAddress.addressLine2}` : ''}, ${guardianAddress.city}, ${guardianAddress.postcode}`
@@ -769,6 +790,10 @@ export async function claimWorldCupBallPrize(req, res) {
       city: address.city,
       postcode: address.postcode,
       email,
+      countryCode,
+      prizeFulfilment,
+      cashPrizeUsd,
+      checkPhotoAcknowledgedAt: new Date().toISOString(),
     })
 
     const claimUrl = buildWorldCupBallClaimUrl(resolveSiteUrl(), claimToken)
@@ -780,6 +805,8 @@ export async function claimWorldCupBallPrize(req, res) {
       wonAt: session.submitted_at || new Date().toISOString(),
       claimUrl,
       detailsComplete: true,
+      prizeFulfilment,
+      countryCode,
     })
     if (emailResult.ok && emailResult.id) {
       await markWorldCupBallWinnerEmailSent(winnerId, emailResult.id)
@@ -800,6 +827,8 @@ export async function claimWorldCupBallPrize(req, res) {
       won: true,
       submissionId,
       winReference,
+      prizeFulfilment,
+      countryCode,
       winnerEmail: {
         sent: Boolean(emailResult.ok),
         skipped: Boolean(emailResult.skipped),

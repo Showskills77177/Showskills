@@ -66,6 +66,7 @@ const COUNTRY_NAMES = {
   DK: 'Denmark',
   FI: 'Finland',
   AE: 'United Arab Emirates',
+  CN: 'China',
   IN: 'India',
   PK: 'Pakistan',
   NG: 'Nigeria',

@@ -9,6 +9,10 @@ import {
 } from './worldCupBallGiveaway.mjs'
 import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from './worldCupBallPhotography.mjs'
 import {
+  WORLD_CUP_BALL_INTERNATIONAL_CASH_NOTICE,
+  WORLD_CUP_BALL_INTERNATIONAL_ENTRY_NOTICE,
+} from './worldCupBallInternationalPrize.mjs'
+import {
   WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY,
   WORLD_CUP_BALL_MONTHLY_DRAW_SHORT,
 } from './worldCupBallMonthlyDraw.mjs'
@@ -32,13 +36,13 @@ export const WORLD_CUP_BALL_FREE_SHIPPING_NOTICE =
 
 /** Short hero / card copy — no legal repetition. */
 export const WORLD_CUP_BALL_PAGE_INTRO =
-  `Win an official-style FIFA World Cup football (2026 design, not signed) by passing a free ${WORLD_CUP_BALL_QUESTION_COUNT}-question skill quiz. Separate from our paid prize draws and the Ronaldo shirt giveaway.`
+  `Win an official-style FIFA World Cup football (2026 design, not signed) by passing a free ${WORLD_CUP_BALL_QUESTION_COUNT}-question skill quiz — or USD $60 cash if you win from outside the UK. Separate from our paid prize draws and the Ronaldo shirt giveaway.`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
   `${WORLD_CUP_BALL_PAGE_INTRO} ${WORLD_CUP_BALL_MONTHLY_DRAW_SHORT}`
 
 export const WORLD_CUP_BALL_ELIGIBILITY_NOTICE =
-  `UK residents aged ${WORLD_CUP_BALL_MIN_AGE}+. Genuine skill promotion — not gambling or a lottery. If you are 16 or 17 and win, delivery must go to a parent or legal guardian's UK address with their contact details.`
+  `${WORLD_CUP_BALL_INTERNATIONAL_ENTRY_NOTICE} Genuine skill promotion — not gambling or a lottery. If you are 16 or 17 and win, fulfilment must go to a parent or legal guardian's mailing address with their contact details.`
 
 export const WORLD_CUP_BALL_CONNECTION_AND_VPN_NOTICE =
   `${WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE} VPNs, proxies, and similar anonymising tools are not allowed.`
@@ -61,10 +65,10 @@ export const WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE =
   'If you do not win, we show which main questions you missed and what you typed — in your browser only, not by email.'
 
 export const WORLD_CUP_BALL_TERMS_WIN_NOTICE =
-  `If you win (including via salvage), complete the prize delivery form with your full name, email, UK mobile number, and UK postal address.`
+  `If you win (including via salvage), complete the prize fulfilment form with your full name, email, contact phone, country, and mailing address.`
 
 export const WORLD_CUP_BALL_WINNER_DETAILS_NOTICE =
-  `${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} Entrants aged 16–17 must provide a parent or guardian's UK delivery details. We send a winner email with a link to return to the form if needed. Each name, email, phone, and address may only be used once — we cannot ship without your details.`
+  `${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} ${WORLD_CUP_BALL_INTERNATIONAL_CASH_NOTICE} Entrants aged 16–17 must provide a parent or guardian's delivery details. We send a winner email with a link to return to the form if needed. Each name, email, phone, and address may only be used once — we cannot fulfil the prize without your details.`
 
 export const WORLD_CUP_BALL_WINNER_EMAIL_REMINDER =
   'The winner email includes a secure link back to the delivery form until your details are saved.'
@@ -87,7 +91,7 @@ export const WORLD_CUP_BALL_TERMS_SECTIONS = [
     body: `${WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY}`,
   },
   { title: 'If you win', body: WORLD_CUP_BALL_WINNER_NOTICE },
-  { title: 'Winner photography', body: WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY },
+  { title: 'Mandatory winning-cheque photo', body: WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY },
 ]
 
 /** Numbered steps for the public rules page. */
@@ -95,7 +99,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   {
     num: 1,
     title: 'Start the quiz',
-    detail: `Open the challenge from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and a UK resident. Turn off any VPN or proxy.`,
+    detail: `Open the challenge from this page or Competitions. You must be at least ${WORLD_CUP_BALL_MIN_AGE} and eligible in your country. Turn off any VPN or proxy.`,
   },
   {
     num: 2,
@@ -110,13 +114,13 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
   },
   {
     num: 4,
-    title: 'Complete the winner delivery form',
+    title: 'Complete the winner fulfilment form',
     detail:
-      'If you win, complete the delivery form with your name, email, mobile number, and UK address. Free UK shipping.',
+      'If you win, complete the form with your name, email, phone, country, and mailing address. UK winners get free ball delivery; international winners receive USD $60 cash.',
   },
   {
     num: 5,
-    title: 'Winner photo',
+    title: 'Mandatory winning-cheque photo',
     detail: WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY,
   },
 ]

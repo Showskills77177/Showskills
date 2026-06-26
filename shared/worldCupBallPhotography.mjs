@@ -1,22 +1,29 @@
 import { SHOWSKILLS_CONTACT_EMAIL } from './siteContact.mjs'
 import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from './worldCupBallGiveaway.mjs'
-import {
-  WINNER_PHOTOGRAPHY_VALID_REFUSAL_REASONS,
-  WINNER_PHOTOGRAPHY_CONSENT_PRIVACY_POINTS,
-} from './winnerPhotographyConsent.mjs'
-
-export const WORLD_CUP_BALL_PHOTOGRAPHY_INTRO =
-  `If you win the ${WORLD_CUP_BALL_GIVEAWAY_LABEL}, you agree to provide a photograph of yourself with the football so we can announce the winner on our website and social media.`
+import { WORLD_CUP_BALL_INTERNATIONAL_CASH_USD } from './worldCupBallInternationalPrize.mjs'
+import { WINNER_PHOTOGRAPHY_CONSENT_PRIVACY_POINTS } from './winnerPhotographyConsent.mjs'
 
 export const WORLD_CUP_BALL_PHOTOGRAPHY_EMAIL_OPTION = `You may email your photo to ${SHOWSKILLS_CONTACT_EMAIL} instead of taking part in a live shoot, if that is easier.`
 
-export const WORLD_CUP_BALL_PHOTOGRAPHY_REFUSAL =
-  'You may refuse photography or video for valid reasons (for example medical, personal safety, religious, or serious privacy concerns) as set out in our Winner Photography & Promotional Consent in the Terms & Privacy Policy. Refusal without a valid reason may result in another winner being selected.'
+export const WORLD_CUP_BALL_WINNING_CHECK_PHOTO_INTRO =
+  `Every winner of the ${WORLD_CUP_BALL_GIVEAWAY_LABEL} must provide a clear photograph of themselves holding the official ShowSkills winning cheque for USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD}.`
 
-/** Short block for rules, FAQ, and claim form. */
-export const WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY = `${WORLD_CUP_BALL_PHOTOGRAPHY_INTRO} ${WORLD_CUP_BALL_PHOTOGRAPHY_EMAIL_OPTION} ${WORLD_CUP_BALL_PHOTOGRAPHY_REFUSAL}`
+export const WORLD_CUP_BALL_WINNING_CHECK_PHOTO_MANDATORY =
+  'This winning-cheque photograph is absolutely mandatory for all winners — there are no exceptions. Refusal or failure to provide it forfeits the prize and we may select another winner.'
+
+export const WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY = `${WORLD_CUP_BALL_WINNING_CHECK_PHOTO_INTRO} ${WORLD_CUP_BALL_WINNING_CHECK_PHOTO_MANDATORY} ${WORLD_CUP_BALL_PHOTOGRAPHY_EMAIL_OPTION}`
+
+/** @deprecated Use WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY */
+export const WORLD_CUP_BALL_INTERNATIONAL_WINNING_CHECK_PHOTO_SUMMARY = WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY
+
+/** Short block for rules, FAQ, claim form, and terms. */
+export const WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY = WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY
+
+/** @param {'uk_ball' | 'international_cash'} [_fulfilment] */
+export function worldCupBallPhotographySummaryForFulfilment(_fulfilment) {
+  return WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY
+}
 
 export function worldCupBallPhotographyFaqAnswer() {
-  const reasons = WINNER_PHOTOGRAPHY_VALID_REFUSAL_REASONS.map((r) => `• ${r}`).join(' ')
-  return `${WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY} Valid refusal reasons include: ${reasons}. ${WINNER_PHOTOGRAPHY_CONSENT_PRIVACY_POINTS[4]}`
+  return `${WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY} ${WINNER_PHOTOGRAPHY_CONSENT_PRIVACY_POINTS[4]}`
 }

@@ -21,6 +21,8 @@ export async function sendWorldCupBallWinnerEmail({
   wonAt,
   claimUrl,
   detailsComplete = true,
+  prizeFulfilment,
+  countryCode,
 }) {
   const apiKey = getResendApiKey()
   if (!apiKey) {
@@ -41,6 +43,8 @@ export async function sendWorldCupBallWinnerEmail({
     wonAt,
     claimUrl,
     detailsComplete: Boolean(detailsComplete),
+    prizeFulfilment,
+    countryCode,
     sandboxNote: redirected
       ? `[Local test] This notification was sent to your Resend account inbox (${deliverTo}) instead of ${intendedTo}.`
       : undefined,

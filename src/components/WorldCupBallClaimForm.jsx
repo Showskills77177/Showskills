@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { EntryTermsConsent } from './EntryTermsConsent'
 import { ErrorBanner } from './ErrorBanner'
 import { apiUrl } from '../lib/api'
@@ -9,14 +9,25 @@ import {
   WORLD_CUP_BALL_MIN_AGE,
   WORLD_CUP_BALL_WINNER_EMAIL_REMINDER,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
-import { WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY } from '../../shared/worldCupBallPhotography.mjs'
-import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
+import {
+  WORLD_CUP_BALL_INTERNATIONAL_CASH_NOTICE,
+  WORLD_CUP_BALL_INTERNATIONAL_CASH_USD,
+  isWorldCupBallUkCountry,
+  resolveWorldCupBallPrizeFulfilment,
+  worldCupBallCountryOptions,
+  worldCupBallPrizeHeadlineForCountry,
+} from '../../shared/worldCupBallInternationalPrize.mjs'
+import {
+  WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY,
+} from '../../shared/worldCupBallPhotography.mjs'
 
 /**
  * Winner fulfilment form — name, phone, and address collected only after a perfect score.
  */
 export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onError, preview = false }) {
+  const countryOptions = useMemo(() => worldCupBallCountryOptions(), [])
   const [entrantAgeBand, setEntrantAgeBand] = useState('18plus')
+  const [countryCode, setCountryCode] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -30,6 +41,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
   const [guardianAddressLine2, setGuardianAddressLine2] = useState('')
   const [guardianCity, setGuardianCity] = useState('')
   const [guardianPostcode, setGuardianPostcode] = useState('')
+  const [checkPhotoAcknowledged, setCheckPhotoAcknowledged] = useState(false)
   const [consent, setConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [linkLoading, setLinkLoading] = useState(false)
@@ -37,6 +49,10 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
   const [localError, setLocalError] = useState('')
 
   const needsGuardian = entrantAgeBand === '16-17'
+  const prizeFulfilment = countryCode ? resolveWorldCupBallPrizeFulfilment(countryCode) : null
+  const isUkWinner = countryCode ? isWorldCupBallUkCountry(countryCode) : false
+  const isInternationalCash = prizeFulfilment === 'international_cash'
+  const prizeHeadline = countryCode ? worldCupBallPrizeHeadlineForCountry(countryCode) : WORLD_CUP_BALL_PRIZE_TITLE
 
   const submit = async (e) => {
     e.preventDefault()
@@ -46,8 +62,18 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
       setLocalError('Preview only — this form does not save on the test preview page.')
       return
     }
+    if (!countryCode) {
+      setLocalError('Please select your country.')
+      return
+    }
     if (!consent) {
       setLocalError('Please agree to the Terms & Conditions and Privacy Policy.')
+      return
+    }
+    if (!checkPhotoAcknowledged) {
+      setLocalError(
+        `You must agree to provide a mandatory photograph holding the USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque.`,
+      )
       return
     }
     if (!fullName.trim()) {
@@ -59,16 +85,16 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
       return
     }
     if (!phone.trim()) {
-      setLocalError('Please enter your UK mobile number.')
+      setLocalError('Please enter your contact phone number.')
       return
     }
     if (!addressLine1.trim() || !city.trim() || !postcode.trim()) {
-      setLocalError('Please enter your full UK delivery address.')
+      setLocalError('Please enter your full mailing address.')
       return
     }
     if (needsGuardian) {
       if (!guardianName.trim() || !guardianPhone.trim() || !guardianAddressLine1.trim() || !guardianCity.trim() || !guardianPostcode.trim()) {
-        setLocalError('Please enter your parent or guardian’s full contact and UK delivery details.')
+        setLocalError('Please enter your parent or guardian’s full contact and mailing details.')
         return
       }
     }
@@ -81,6 +107,8 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
         body: JSON.stringify({
           claimToken,
           entrantAgeBand,
+          countryCode,
+          checkPhotoAcknowledged,
           fullName: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
@@ -105,8 +133,18 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
       }
       onClaimed(
         data.winnerEmail && typeof data.winnerEmail === 'object'
-          ? { ...data.winnerEmail, claimUrl: data.claimUrl || null, detailsComplete: true }
-          : { sent: false, detailsComplete: true, claimUrl: data.claimUrl || null },
+          ? {
+              ...data.winnerEmail,
+              claimUrl: data.claimUrl || null,
+              detailsComplete: true,
+              prizeFulfilment: data.prizeFulfilment || prizeFulfilment,
+            }
+          : {
+              sent: false,
+              detailsComplete: true,
+              claimUrl: data.claimUrl || null,
+              prizeFulfilment: data.prizeFulfilment || prizeFulfilment,
+            },
       )
     } catch {
       setLocalError('Could not save your details. Check your connection and try again.')
@@ -152,12 +190,41 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
   return (
     <form className="flex flex-col gap-4" onSubmit={(e) => void submit(e)}>
       <div className="rounded-xl border border-amber-500/35 bg-amber-950/25 px-4 py-4 text-sm text-amber-50/95">
-        <p className="font-semibold text-amber-100">You won the {WORLD_CUP_BALL_PRIZE_TITLE}!</p>
+        <p className="font-semibold text-amber-100">You won the {prizeHeadline}!</p>
         <p className="mt-2 text-stone-300">
-          Complete this form now with your delivery details so we can ship your football.{' '}
-          {WORLD_CUP_BALL_FREE_SHIPPING_NOTICE} You must be at least {WORLD_CUP_BALL_MIN_AGE} and a UK resident.
+          {isInternationalCash
+            ? `Complete this form with your fulfilment details so we can process your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} cash prize. ${WORLD_CUP_BALL_INTERNATIONAL_CASH_NOTICE}`
+            : `Complete this form now with your delivery details so we can ship your football. ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}`}{' '}
+          You must be at least {WORLD_CUP_BALL_MIN_AGE} and eligible in your country.
         </p>
         <p className="mt-2 text-xs leading-relaxed text-amber-100/80">{WORLD_CUP_BALL_WINNER_EMAIL_REMINDER}</p>
+      </div>
+
+      <div>
+        <label htmlFor="wc-ball-country" className="block text-sm font-medium text-stone-300">
+          Country
+        </label>
+        <select
+          id="wc-ball-country"
+          value={countryCode}
+          onChange={(e) => {
+            setCountryCode(e.target.value)
+            setCheckPhotoAcknowledged(false)
+          }}
+          className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
+        >
+          <option value="">Select your country</option>
+          {countryOptions.map((option) => (
+            <option key={option.code} value={option.code}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+        {countryCode ? (
+          <p className="mt-2 text-xs leading-relaxed text-stone-500">
+            Prize for your country: <span className="text-amber-100/90">{prizeHeadline}</span>
+          </p>
+        ) : null}
       </div>
 
       <fieldset className="rounded-lg border border-white/10 bg-black/20 px-3 py-3">
@@ -181,7 +248,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
               onChange={() => setEntrantAgeBand('16-17')}
               className="mt-1"
             />
-            <span>I am 16 or 17 (parent/guardian delivery details required below)</span>
+            <span>I am 16 or 17 (parent/guardian details required below)</span>
           </label>
         </div>
       </fieldset>
@@ -227,13 +294,13 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 focus:border-amber-600/50 focus:outline-none focus:ring-2 focus:ring-amber-900/40"
-          placeholder="e.g. 07XXX XXXXXX"
+          placeholder={isUkWinner ? 'e.g. 07XXX XXXXXX' : 'Include country code if outside the UK'}
         />
         <p className="mt-2 text-xs leading-relaxed text-stone-500">{PHONE_COLLECTION_NOTICE}</p>
       </div>
       <div>
         <label htmlFor="wc-ball-line1" className="block text-sm font-medium text-stone-300">
-          UK delivery address line 1
+          {isUkWinner ? 'UK delivery address line 1' : 'Mailing address line 1'}
         </label>
         <input
           id="wc-ball-line1"
@@ -273,7 +340,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
         </div>
         <div>
           <label htmlFor="wc-ball-postcode" className="block text-sm font-medium text-stone-300">
-            Postcode
+            {isUkWinner ? 'Postcode' : 'Postcode / ZIP'}
           </label>
           <input
             id="wc-ball-postcode"
@@ -288,9 +355,9 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
 
       {needsGuardian ? (
         <div className="rounded-lg border border-amber-500/25 bg-amber-950/15 p-4">
-          <p className="text-sm font-semibold text-amber-100">Parent or legal guardian (delivery)</p>
+          <p className="text-sm font-semibold text-amber-100">Parent or legal guardian</p>
           <p className="mt-1 text-xs leading-relaxed text-stone-400">
-            If you are 16 or 17, we ship to your parent or guardian&apos;s UK address using their contact details.
+            If you are 16 or 17, we use your parent or guardian&apos;s mailing address and contact details for prize fulfilment.
           </p>
           <div className="mt-4 flex flex-col gap-4">
             <div>
@@ -356,7 +423,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
               </div>
               <div>
                 <label htmlFor="wc-ball-guardian-postcode" className="block text-sm font-medium text-stone-300">
-                  Postcode
+                  Postcode / ZIP
                 </label>
                 <input
                   id="wc-ball-guardian-postcode"
@@ -371,13 +438,21 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
         </div>
       ) : null}
 
-      <p className="text-xs leading-relaxed text-stone-500">
-        {WORLD_CUP_BALL_PHOTOGRAPHY_SUMMARY} Photos may also be emailed to{' '}
-        <a href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`} className="text-amber-400/90 underline">
-          {SHOWSKILLS_CONTACT_EMAIL}
-        </a>
-        .
-      </p>
+      <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-4">
+        <p className="text-xs leading-relaxed text-amber-100/90">{WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY}</p>
+        <label className="mt-3 flex items-start gap-2 text-sm text-stone-300">
+          <input
+            type="checkbox"
+            checked={checkPhotoAcknowledged}
+            onChange={(e) => setCheckPhotoAcknowledged(e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            I agree to provide a mandatory photograph of myself holding the official ShowSkills USD $
+            {WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque before my prize is released.
+          </span>
+        </label>
+      </div>
 
       <EntryTermsConsent checked={consent} onChange={setConsent} onOpenTerms={onOpenTerms} variant="emerald" />
       {localError ? <ErrorBanner message={localError} /> : null}
@@ -399,7 +474,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
         disabled={loading}
         className="w-full rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 py-3 text-sm font-bold text-stone-950 hover:brightness-110 disabled:opacity-50"
       >
-        {loading ? 'Saving…' : 'Confirm prize delivery details'}
+        {loading ? 'Saving…' : 'Confirm prize details'}
       </button>
     </form>
   )

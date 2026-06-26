@@ -143,6 +143,33 @@ export async function ensureWorldCupBallSchema() {
     } catch {
       /* column exists */
     }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN country_code TEXT`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN prize_fulfilment TEXT`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN cash_prize_usd INTEGER`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN check_photo_acknowledged_at TEXT`)
+    } catch {
+      /* column exists */
+    }
+  }
+
+  if (dbIsPostgres()) {
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS country_code TEXT`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS prize_fulfilment TEXT`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS cash_prize_usd INTEGER`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS check_photo_acknowledged_at TIMESTAMPTZ`)
   }
 
   await ensureWorldCupBallMonthlyDrawSchema()
@@ -303,6 +330,10 @@ export async function recordWorldCupBallWinner({
   city,
   postcode,
   email,
+  countryCode,
+  prizeFulfilment,
+  cashPrizeUsd = null,
+  checkPhotoAcknowledgedAt = null,
 }) {
   await ensureWorldCupBallSchema()
   const id = randomUUID()
@@ -310,8 +341,9 @@ export async function recordWorldCupBallWinner({
   await query(
     `INSERT INTO world_cup_ball_winners (
       id, session_id, submission_id, full_name, phone, name_key, phone_key, address_key,
-      address_line1, address_line2, city, postcode, email, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      address_line1, address_line2, city, postcode, email, country_code, prize_fulfilment,
+      cash_prize_usd, check_photo_acknowledged_at, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
     [
       id,
       sessionId,
@@ -326,6 +358,10 @@ export async function recordWorldCupBallWinner({
       city,
       postcode,
       email || null,
+      countryCode || null,
+      prizeFulfilment || null,
+      cashPrizeUsd,
+      checkPhotoAcknowledgedAt,
       now,
     ],
   )

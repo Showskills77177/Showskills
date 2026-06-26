@@ -47,7 +47,7 @@ function StartQuizButton({ onClick, label, editorMode }) {
 
 const AT_A_GLANCE = [
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
-  'Free to enter — UK residents 16+',
+  'Free to enter — worldwide, ages 16+',
   'No VPNs or proxies',
   'Delivery details only if you win',
 ]
