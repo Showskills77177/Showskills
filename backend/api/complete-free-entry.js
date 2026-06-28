@@ -14,6 +14,7 @@ import { sendQuizResultEmail } from './lib/sendQuizResultEmail.mjs'
 import { awardConsolationShirtEntries } from './lib/awardConsolationShirtEntries.mjs'
 import { assertCompetitionEntryMethod } from './lib/competitionCatalog.mjs'
 import { parseCheckoutCompetition } from './lib/checkoutBundle.mjs'
+import { requireUkForPaidTickets } from './lib/requireUkForPaidTickets.mjs'
 
 /** Step 2 — submit skill answers after £0 card verification. */
 export default async function handler(req, res) {
@@ -36,6 +37,9 @@ export default async function handler(req, res) {
   if (!isDbConfigured()) {
     return json(res, 503, { error: 'Database not configured' })
   }
+
+  const ukBlock = requireUkForPaidTickets(req)
+  if (ukBlock) return json(res, 403, { error: ukBlock.error, code: ukBlock.code })
 
   const body = parseJsonBody(req)
   const competition = await parseCheckoutCompetition(body)

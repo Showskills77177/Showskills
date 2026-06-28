@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
-import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
 import { POSTAL_ENTRY_ADDRESS, FOOTER_NO_PURCHASE_NOTICE } from '../competitionData'
 import { FooterSocialLinks } from './FooterSocialLinks'
 import { NewsletterSignupForm } from './NewsletterSignupForm'
 import { TrustpilotReviewCollector } from './TrustpilotFeedback'
 import { NEWSLETTER_SOURCES } from '../../shared/newsletter.mjs'
 import { offsetStyle } from '../../shared/layoutOffsets.mjs'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 
 function LogoMark({ className = 'h-7 sm:h-8' }) {
   return (
@@ -78,6 +78,7 @@ function withOffset(offsets, key, node) {
 export function SiteFooter({ shell, footerLinks, openTerms }) {
   if (shell.footer?.visible === false) return null
 
+  const { t, region } = useSiteLocale()
   const footerOffsets = shell.footerOffsets || {}
   const footerSocial = shell.footer?.socialLinks || {}
   const legalMain = shell.footer?.legalNotice?.trim() || FOOTER_NO_PURCHASE_NOTICE
@@ -122,8 +123,9 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
             <p className="text-sm leading-relaxed text-stone-400 sm:text-[13px]">{legalMain}</p>,
           )}
           <p className="text-sm leading-relaxed text-stone-500 sm:text-[13px]">
-            Skill-based paid draw — winner picked at random from correct entries only. Free postal entry — post to{' '}
-            {POSTAL_ENTRY_ADDRESS}. {UK_AVAILABILITY_NOTICE}
+            {region.paidBundlesAvailable
+              ? `${t('footer.paidUkOnly')} ${POSTAL_ENTRY_ADDRESS}`
+              : t('footer.giveawaysInternational')}
           </p>
         </div>
 

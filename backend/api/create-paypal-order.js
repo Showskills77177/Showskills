@@ -10,6 +10,7 @@ import { validateContactPhone } from '../../shared/contactPhone.mjs'
 import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
 import { parseCheckoutCompetition, resolveCheckoutBundle } from './lib/checkoutBundle.mjs'
 import { applyRateLimit } from './lib/rateLimit.mjs'
+import { requireUkForPaidTickets } from './lib/requireUkForPaidTickets.mjs'
 
 function parseBody(req) {
   const b = req.body
@@ -42,6 +43,9 @@ export default async function handler(req, res) {
   if (limited.blocked) {
     return res.status(429).json({ error: 'Too many payment attempts. Please wait and try again.' })
   }
+
+  const ukBlock = requireUkForPaidTickets(req)
+  if (ukBlock) return res.status(403).json({ error: ukBlock.error, code: ukBlock.code })
 
   const creds = getPayPalCredentials()
   if (!creds) {

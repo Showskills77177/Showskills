@@ -26,6 +26,7 @@ import { mergePrizeImages } from '../../shared/homepageLayout.mjs'
 import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '../../shared/layoutOffsets.mjs'
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import { IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
 import {
@@ -206,6 +207,8 @@ export function HomePageContent({
   const { layout: fetchedLayout } = useHomepageLayout()
   const layout = mergeHomepageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
+  const { region, t } = useSiteLocale()
+  const showPaidBundles = editorMode || region.paidBundlesAvailable
   const winners = usePublicWinners()
   const enterPaid = editorMode ? () => {} : (slug) => openEntry('paid', slug ? { competitionSlug: slug } : undefined)
   const enterGiveaway = editorMode ? () => {} : () => openEntry('kickups')
@@ -649,15 +652,24 @@ export function HomePageContent({
           'hero_prizes',
           'ctaButton',
           prizes,
-          <div className="ss-hero-bundle-cta-actions flex w-full justify-center md:border-t md:border-white/10 md:pt-3 lg:pt-4">
-            <button
-              type="button"
-              onClick={() => enterPaid()}
-              className="ss-hero-bundle-draw-btn"
-              tabIndex={editorMode ? -1 : undefined}
-            >
-              {prizes.ctaButtonLabel || 'Enter Bundle Draw'}
-            </button>
+          <div className="ss-hero-bundle-cta-actions flex w-full flex-col items-center justify-center gap-2 md:border-t md:border-white/10 md:pt-3 lg:pt-4">
+            {showPaidBundles ? (
+              <button
+                type="button"
+                onClick={() => enterPaid()}
+                className="ss-hero-bundle-draw-btn"
+                tabIndex={editorMode ? -1 : undefined}
+              >
+                {prizes.ctaButtonLabel || 'Enter Bundle Draw'}
+              </button>
+            ) : (
+              <p className="max-w-md text-center text-sm leading-relaxed text-amber-100/85">
+                {t('home.enterBundleUnavailable')}{' '}
+                <Link to="/competitions#free-giveaways" className="font-semibold text-amber-300 underline">
+                  {t('competitions.freeSection')}
+                </Link>
+              </p>
+            )}
           </div>,
           1,
           { className: 'w-full', transformOrigin: 'top center' },
@@ -773,7 +785,7 @@ export function HomePageContent({
           {details.visible !== false
             ? wrapBlock('hero_details', HOMEPAGE_BLOCK_LABELS.hero_details, detailsBlock)
             : null}
-          {bundles.visible !== false
+          {bundles.visible !== false && showPaidBundles
             ? wrapBlock('ticket_bundles', HOMEPAGE_BLOCK_LABELS.ticket_bundles, bundlesBlock)
             : null}
           {wcBallPanelVisible || editorMode

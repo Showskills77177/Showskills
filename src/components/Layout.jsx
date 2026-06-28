@@ -9,6 +9,10 @@ import { useSiteShell } from '../hooks/useSitePages'
 import { SiteFooter } from './SiteFooter'
 import { offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { resolveSiteShellRootClassName } from '../../shared/siteShellPresentation.mjs'
+import { translateNavLabel } from '../../shared/i18n/translate.mjs'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { LanguagePicker } from './LanguagePicker'
+import { RegionNoticeBanner } from './RegionNoticeBanner'
 
 function desktopNavClass({ isActive }) {
   return `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
@@ -36,8 +40,9 @@ function LogoMark({ className = 'h-10 sm:h-12' }) {
   )
 }
 
-function DesktopNavLink({ item, openTerms }) {
+function DesktopNavLink({ item, openTerms, locale }) {
   if (item.visible === false) return null
+  const label = translateNavLabel(locale, item)
   if (item.action === 'terms') {
     return (
       <button
@@ -45,13 +50,13 @@ function DesktopNavLink({ item, openTerms }) {
         onClick={() => openTerms()}
         className="ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white opacity-90 transition hover:opacity-100"
       >
-        {item.label}
+        {label}
       </button>
     )
   }
   return (
     <NavLink to={item.path || '/'} end={item.path === '/'} className={desktopNavClass}>
-      {item.label}
+      {label}
     </NavLink>
   )
 }
@@ -59,6 +64,7 @@ function DesktopNavLink({ item, openTerms }) {
 export function Layout() {
   const { termsOpen, setTermsOpen, openTerms, paidQuizNavStatus } = useEntryFlow()
   const { shell } = useSiteShell()
+  const { locale } = useSiteLocale()
   const showQuizPrompt = paidQuizNavStatus !== 'none'
   const rootClassName = resolveSiteShellRootClassName(shell)
   const navItems = shell.navOrder
@@ -79,6 +85,7 @@ export function Layout() {
     <div className={rootClassName}>
       <EntryModal />
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
+      <RegionNoticeBanner />
 
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] backdrop-blur-md">
         <div className="overflow-visible sm:hidden">
@@ -92,10 +99,15 @@ export function Layout() {
             </Link>
           </div>
           {showQuizPrompt ? (
-            <div className="flex justify-center px-4 pb-2 sm:hidden">
+            <div className="flex justify-center gap-2 px-4 pb-2 sm:hidden">
+              <LanguagePicker />
               <QuizPromptNav className="w-full max-w-xs" />
             </div>
-          ) : null}
+          ) : (
+            <div className="flex justify-center px-4 pb-2 sm:hidden">
+              <LanguagePicker />
+            </div>
+          )}
           <MobileNavDock navItems={navItems} />
         </div>
 
@@ -115,7 +127,7 @@ export function Layout() {
                         —
                       </span>
                     ) : null}
-                    <DesktopNavLink item={item} openTerms={openTerms} />
+                    <DesktopNavLink item={item} openTerms={openTerms} locale={locale} />
                   </span>
                 ))}
                 {showQuizPrompt ? (
@@ -146,13 +158,20 @@ export function Layout() {
             ? withOffset(
                 headerOffsets,
                 'tagline',
-                <p className="hidden justify-self-end -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95 md:block">
-                  {shell.headerTagline}
-                </p>,
+                <div className="flex items-center justify-end gap-3 justify-self-end">
+                  <LanguagePicker className="hidden md:inline-flex" />
+                  <p className="hidden -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95 md:block">
+                    {shell.headerTagline}
+                  </p>
+                </div>,
               )
-            : (
-              <span aria-hidden />
-            )}
+            : withOffset(
+                headerOffsets,
+                'tagline',
+                <div className="hidden justify-self-end md:flex">
+                  <LanguagePicker />
+                </div>,
+              )}
         </div>
       </header>
 

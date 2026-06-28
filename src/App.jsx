@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { SiteAnalytics } from './components/SiteAnalytics'
+import { SiteLocaleProvider } from './i18n/SiteLocaleProvider.jsx'
 import { EntryFlowProvider } from './entry/EntryFlowProvider'
 import { AdminThemeProvider } from './admin/AdminThemeContext'
 import { AdminLayout } from './admin/AdminLayout'
@@ -46,6 +47,7 @@ export default function App() {
     <>
       <Analytics />
       <BrowserRouter basename={routerBasename}>
+      <SiteLocaleProvider>
       <EntryFlowProvider>
         <SiteAnalytics />
         <Routes>
@@ -115,6 +117,7 @@ export default function App() {
           </Route>
         </Routes>
       </EntryFlowProvider>
+      </SiteLocaleProvider>
     </BrowserRouter>
     </>
   )

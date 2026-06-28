@@ -6,6 +6,7 @@ import { getOpenCompetitionPeriodForEntry } from './lib/competitionPeriods.mjs'
 import { parseCheckoutCompetition, resolveCheckoutBundle } from './lib/checkoutBundle.mjs'
 import { createCashflowsPaymentIntent, getCashflowsConfig } from './lib/cashflows.mjs'
 import { parseJsonBody, json } from './lib/http.mjs'
+import { requireUkForPaidTickets } from './lib/requireUkForPaidTickets.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -31,6 +32,9 @@ export default async function handler(req, res) {
   if (!getCashflowsConfig().configured) {
     return json(res, 503, { error: 'Cashflows is not configured on the server.' })
   }
+
+  const ukBlock = requireUkForPaidTickets(req)
+  if (ukBlock) return json(res, 403, { error: ukBlock.error, code: ukBlock.code })
 
   const body = parseJsonBody(req)
   const competition = await parseCheckoutCompetition(body)

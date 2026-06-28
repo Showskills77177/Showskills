@@ -24,6 +24,7 @@ import { EntryFlowContext } from './entryContext'
 import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { isCashflowsFrontendEnabled } from '../../shared/paymentFrontendConfig.mjs'
 import { DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
 import {
@@ -55,6 +56,7 @@ function getInitialPaidBundleId(searchParams) {
 export function EntryFlowProvider({ children }) {
   const { layout: homepageLayout } = useHomepageLayout()
   const { shell } = useSiteShell()
+  const { region, t } = useSiteLocale()
   const shirtGiveawaySocialLinks = useMemo(
     () =>
       resolvePublicSocialLinks({
@@ -650,6 +652,11 @@ export function EntryFlowProvider({ children }) {
   }, [])
 
   const openEntry = useCallback((type, options = {}) => {
+    if (type === 'paid' && !region.paidBundlesAvailable) {
+      setPaidError(t('entry.paidUkOnly'))
+      setEntryModalType('paid')
+      return
+    }
     if (options?.competitionSlug) {
       setPaidCompetitionSlug(String(options.competitionSlug).trim())
     }
@@ -741,7 +748,7 @@ export function EntryFlowProvider({ children }) {
       setPaidCashflowsToken('')
       setPaidCashflowsJobRef('')
     }
-  }, [searchParams, restorePaidQuizFromSession])
+  }, [searchParams, restorePaidQuizFromSession, region.paidBundlesAvailable, t])
 
   const closeCardPayment = useCallback(() => {
     setPaidCashflowsToken('')

@@ -24,6 +24,7 @@ import {
 } from '../../shared/iphone17ProCompetition.mjs'
 import { resolveIphone17ProPublicCompetition } from '../../shared/iphone17ProPublic.mjs'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 
 function SectionHeading({ id, children }) {
   return (
@@ -78,6 +79,7 @@ export default function CompetitionsPage({
   const { layout: fetchedLayout, loading: layoutLoading } = usePageLayout(COMPETITIONS_PAGE_ID)
   const layout = mergeCompetitionsPageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
+  const { region, t } = useSiteLocale()
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
   const paidCompetitions = useMemo(() => {
@@ -97,7 +99,7 @@ export default function CompetitionsPage({
   const paidPrimaryCardOffset = offsets.paidPrimaryCard || { x: 0, y: 0, scale: 1 }
   const legacyBundleCard = layout.legacyBundleCard || {}
   const shirtGiveawayCard = layout.shirtGiveawayCard || {}
-  const showPaid = layout.sections.paid?.visible !== false
+  const showPaid = layout.sections.paid?.visible !== false && (editorMode || region.paidBundlesAvailable)
   const showFree = layout.sections.free?.visible !== false
   const visibleSectionCount = (showPaid ? 1 : 0) + (showFree ? 1 : 0)
 
@@ -249,9 +251,11 @@ export default function CompetitionsPage({
   const freeColumn = (
     <div className="min-w-0" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">
-        {layout.sections.free?.title || 'Free giveaways'}
+        {layout.sections.free?.title || t('competitions.freeSection')}
       </SectionHeading>
-      <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">{layout.sections.free?.subtitle}</p>
+      <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">
+        {layout.sections.free?.subtitle || t('region.giveawaysWorldBody')}
+      </p>
       <ul className="mt-4 grid list-none gap-6">
         <li className="ss-competition-free-primary w-full">
           <div
@@ -293,6 +297,11 @@ export default function CompetitionsPage({
     <main className="ss-photo-page relative m-0 overflow-x-clip p-0">
       <PhotoPageBackdrop />
       <div className="relative z-[1] mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+        {!showPaid && !editorMode ? (
+          <p className="mb-4 rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-sm text-stone-300">
+            {t('competitions.paidUkHidden')}
+          </p>
+        ) : null}
         <div data-editor-align-group data-editor-center-root>
           {dragWrap(
             'comp_title',
