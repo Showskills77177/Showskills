@@ -41,6 +41,7 @@ import {
   defaultShirtGiveawayPageLayout,
   mergeShirtGiveawayPageLayout,
 } from '../../../shared/sitePageLayout.mjs'
+import { SITE_DESIGN_THEME_OPTIONS } from '../../../shared/siteDesignThemes.mjs'
 import { DraggableSectionList, EditorField, editorInputClass } from '../../components/admin/DraggableSectionList'
 import { EmailEditorSettings } from '../../components/admin/EmailEditorSettings'
 import { NewsletterEmailPreview } from '../../components/admin/NewsletterEmailPreview'
@@ -934,6 +935,49 @@ function SiteShellEditor({ shell, onChange, setPages }) {
 
   return (
     <div className="space-y-6">
+      <section id="editor-site-design" className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Site design</h2>
+        <p className="mt-1 text-xs leading-relaxed text-stone-500">
+          Choose the public site look. World Cup 2026 uses stadium night tones, trophy gold, and Trionda blues across
+          every page.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {SITE_DESIGN_THEME_OPTIONS.map((theme) => {
+            const active = shell.siteDesignTheme === theme.id
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                onClick={() => onChange({ siteDesignTheme: theme.id })}
+                className={`rounded-xl border p-4 text-left transition ${
+                  active
+                    ? 'border-amber-500/45 bg-amber-950/25 ring-2 ring-amber-500/25'
+                    : 'border-white/10 bg-stone-950/40 hover:border-white/20 hover:bg-stone-900/60'
+                }`}
+              >
+                <div className="flex gap-1.5">
+                  {theme.swatch.map((color) => (
+                    <span
+                      key={color}
+                      className="h-8 flex-1 rounded-md border border-white/10"
+                      style={{ backgroundColor: color }}
+                      aria-hidden
+                    />
+                  ))}
+                </div>
+                <p className="mt-3 font-semibold text-stone-100">{theme.label}</p>
+                <p className="mt-1 text-xs leading-relaxed text-stone-500">{theme.description}</p>
+                {active ? (
+                  <p className="mt-2 text-xs font-medium text-amber-300">Active on live site</p>
+                ) : (
+                  <p className="mt-2 text-xs text-stone-600">Click to apply</p>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
       <section id="editor-site-header" className="rounded-xl border border-white/10 bg-stone-900/40 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500">Header</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">

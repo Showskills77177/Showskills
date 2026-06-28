@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './admin/adminTheme.css';
+@import './siteThemes.css';
 
 :root {
   --ss-bg-deep: #071512;
@@ -8,6 +9,7 @@
   --ss-line: rgba(255, 255, 255, 0.09);
   --ss-emerald-hot: #34d399;
   --ss-teal-hot: #2dd4bf;
+  --ss-gold-accent: #fbbf24;
 }
 
 @theme {
@@ -111,9 +113,9 @@ body {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(45, 212, 191, 0.45) 30%,
-    rgba(52, 211, 153, 0.55) 50%,
-    rgba(45, 212, 191, 0.45) 70%,
+    rgba(45, 212, 191, 0.42) 28%,
+    rgba(251, 191, 36, 0.28) 50%,
+    rgba(45, 212, 191, 0.42) 72%,
     transparent
   );
 }
@@ -123,6 +125,7 @@ body {
 .ss-footer-bg {
   background-color: var(--ss-bg-deep);
   background-image:
+    radial-gradient(ellipse 38% 26% at 50% -6%, rgba(251, 191, 36, 0.06), transparent 56%),
     radial-gradient(ellipse 130% 60% at 50% -12%, rgba(167, 243, 208, 0.24), transparent 54%),
     radial-gradient(ellipse 55% 48% at 88% 18%, rgba(45, 212, 191, 0.14), transparent 52%),
     radial-gradient(ellipse 50% 42% at 8% 32%, rgba(52, 211, 153, 0.12), transparent 50%),

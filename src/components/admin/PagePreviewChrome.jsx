@@ -1,5 +1,6 @@
 import showskillsLogo from '../../assets/showskills-logo.png'
 import { mergeSiteShell } from '../../../shared/sitePageLayout.mjs'
+import { resolveSiteShellClasses } from '../../../shared/siteShellPresentation.mjs'
 import { offsetStyle } from '../../../shared/layoutOffsets.mjs'
 import { FOOTER_NO_PURCHASE_NOTICE, POSTAL_ENTRY_ADDRESS } from '../../competitionData'
 import { UK_AVAILABILITY_NOTICE } from '../../../shared/siteAvailability.mjs'
@@ -80,6 +81,7 @@ export function PagePreviewChrome({
   children,
 }) {
   const shell = mergeSiteShell(rawShell)
+  const { themeRootClass, pageBgClass } = resolveSiteShellClasses(shell)
   const navItems = shell.navOrder.map((id) => shell.navItems[id]).filter(Boolean)
   const footerLinks = (shell.footer?.linkOrder || [])
     .map((id) => shell.footer?.links?.[id])
@@ -106,13 +108,13 @@ export function PagePreviewChrome({
 
   return (
     <div
-      className={`flex min-h-0 flex-col overflow-hidden bg-[#050807] ${
+      className={`${themeRootClass} flex min-h-0 flex-col overflow-hidden ${pageBgClass} ${
         fullscreen ? 'h-full rounded-none border-0' : 'rounded-xl border border-white/10 shadow-inner'
       }`}
     >
       <div
         data-editor-section="site_header"
-        className={`ss-header shrink-0 border-b border-white/[0.06] bg-[#071512]/95 px-4 py-2.5 transition ${
+        className={`ss-header shrink-0 border-b border-white/[0.06] px-4 py-2.5 backdrop-blur-md transition ${
           highlight === 'header' ? 'ring-2 ring-inset ring-teal-400/60' : ''
         }`}
         onClick={() => onHighlight?.('header')}
@@ -175,12 +177,12 @@ export function PagePreviewChrome({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#050807]">{children}</div>
+      <div className={`${pageBgClass} min-h-0 flex-1 overflow-y-auto overscroll-contain`}>{children}</div>
 
       {shell.footer?.visible !== false ? (
         <div
           data-editor-section="site_footer"
-          className={`ss-footer-bg sticky bottom-0 z-10 shrink-0 border-t border-white/[0.06] bg-[#071512] transition ${
+          className={`ss-footer-bg sticky bottom-0 z-10 shrink-0 border-t border-white/[0.06] transition ${
             highlight === 'footer' ? 'ring-2 ring-inset ring-teal-400/60' : ''
           }`}
           onClick={() => onHighlight?.('footer')}

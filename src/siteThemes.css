@@ -1,0 +1,200 @@
+/* Public site design themes — class on Layout root via siteDesignThemes.mjs */
+
+.ss-page-bg-solid {
+  background-color: var(--ss-bg-deep);
+}
+
+/* —— Pitch green (classic, with subtle WC26 gold warmth) —— */
+.ss-site-theme--pitch {
+  --ss-accent-hot: var(--ss-emerald-hot);
+  --ss-accent-glow: rgba(52, 211, 153, 0.45);
+  --ss-header-border: rgba(52, 211, 153, 0.2);
+}
+
+.ss-site-theme--pitch.ss-page-bg,
+.ss-site-theme--pitch .ss-footer-bg {
+  background-image:
+    radial-gradient(ellipse 42% 28% at 50% -4%, rgba(251, 191, 36, 0.07), transparent 58%),
+    radial-gradient(ellipse 130% 60% at 50% -12%, rgba(167, 243, 208, 0.24), transparent 54%),
+    radial-gradient(ellipse 55% 48% at 88% 18%, rgba(45, 212, 191, 0.14), transparent 52%),
+    radial-gradient(ellipse 50% 42% at 8% 32%, rgba(52, 211, 153, 0.12), transparent 50%),
+    radial-gradient(ellipse 75% 55% at 50% 42%, rgba(16, 185, 129, 0.08), transparent 62%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(6, 78, 59, 0.55), transparent 58%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 56px,
+      rgba(255, 255, 255, 0.025) 56px,
+      rgba(255, 255, 255, 0.025) 57px
+    ),
+    repeating-linear-gradient(
+      -22deg,
+      transparent,
+      transparent 120px,
+      rgba(167, 243, 208, 0.025) 120px,
+      rgba(167, 243, 208, 0.025) 121px
+    ),
+    linear-gradient(168deg, #123d32 0%, #0c2820 32%, #0a1f19 58%, #071512 100%);
+}
+
+.ss-site-theme--pitch .ss-header {
+  border-bottom-color: rgba(52, 211, 153, 0.22);
+}
+
+.ss-site-theme--pitch .ss-header::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(45, 212, 191, 0.42) 28%,
+    rgba(251, 191, 36, 0.32) 50%,
+    rgba(45, 212, 191, 0.42) 72%,
+    transparent
+  );
+}
+
+/* —— World Cup 2026 — stadium night, gold trophy, Trionda blues —— */
+.ss-site-theme--world-cup-2026 {
+  --ss-bg-deep: #060a14;
+  --ss-bg-mid: #0a1428;
+  --ss-accent-hot: #fbbf24;
+  --ss-accent-glow: rgba(251, 191, 36, 0.42);
+  --ss-header-border: rgba(251, 191, 36, 0.28);
+  --ss-emerald-hot: #38bdf8;
+  --ss-teal-hot: #fbbf24;
+}
+
+.ss-site-theme--world-cup-2026.ss-page-bg,
+.ss-site-theme--world-cup-2026 .ss-footer-bg {
+  background-color: var(--ss-bg-deep);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -8%, rgba(56, 189, 248, 0.16), transparent 58%),
+    radial-gradient(ellipse 65% 45% at 92% 22%, rgba(251, 191, 36, 0.1), transparent 52%),
+    radial-gradient(ellipse 55% 40% at 8% 78%, rgba(34, 197, 94, 0.08), transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(8, 28, 56, 0.75), transparent 58%),
+    repeating-linear-gradient(
+      120deg,
+      transparent,
+      transparent 48px,
+      rgba(56, 189, 248, 0.025) 48px,
+      rgba(56, 189, 248, 0.025) 49px
+    ),
+    repeating-linear-gradient(
+      60deg,
+      transparent,
+      transparent 84px,
+      rgba(251, 191, 36, 0.018) 84px,
+      rgba(251, 191, 36, 0.018) 85px
+    ),
+    linear-gradient(168deg, #0c1a32 0%, #0a1424 34%, #081018 62%, #060a14 100%);
+}
+
+.ss-site-theme--world-cup-2026.ss-page-bg::after {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(251, 191, 36, 0.1), transparent 62%),
+    radial-gradient(ellipse 50% 35% at 80% 20%, rgba(56, 189, 248, 0.08), transparent 55%);
+}
+
+.ss-site-theme--world-cup-2026 .ss-header {
+  background-color: rgba(6, 10, 20, 0.92);
+  border-bottom-color: var(--ss-header-border);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(251, 191, 36, 0.06);
+}
+
+.ss-site-theme--world-cup-2026 .ss-header::before {
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.12) 0%, rgba(56, 189, 248, 0.06) 40%, transparent 72%);
+}
+
+.ss-site-theme--world-cup-2026 .ss-header::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(56, 189, 248, 0.35) 24%,
+    rgba(251, 191, 36, 0.55) 50%,
+    rgba(56, 189, 248, 0.35) 76%,
+    transparent
+  );
+}
+
+.ss-site-theme--world-cup-2026 .ss-mobile-nav-dock {
+  border-top-color: rgba(251, 191, 36, 0.14);
+  background: linear-gradient(180deg, rgba(8, 16, 32, 0.98) 0%, rgba(4, 8, 16, 1) 100%);
+  box-shadow: inset 0 1px 0 rgba(251, 191, 36, 0.05);
+}
+
+.ss-site-theme--world-cup-2026 .ss-pen-highlight {
+  text-shadow: 0 0 18px rgba(251, 191, 36, 0.16);
+}
+
+.ss-site-theme--world-cup-2026 .ss-pen-highlight::after {
+  background: linear-gradient(
+    92deg,
+    transparent 0%,
+    rgba(251, 191, 36, 0.18) 4%,
+    rgba(245, 158, 11, 0.42) 14%,
+    rgba(253, 230, 138, 0.34) 50%,
+    rgba(245, 158, 11, 0.38) 88%,
+    transparent 100%
+  );
+}
+
+.ss-site-theme--world-cup-2026 .ss-competition-enter-btn--paid {
+  background-image: linear-gradient(to right, #b45309, #d97706);
+  color: #1c1917;
+  box-shadow:
+    0 10px 15px -3px rgba(245, 158, 11, 0.28),
+    0 4px 6px -4px rgba(245, 158, 11, 0.2);
+}
+
+.ss-site-theme--world-cup-2026 .ss-competition-enter-btn--free {
+  background-image: linear-gradient(to right, #ca8a04, #eab308);
+  color: #1c1917;
+  box-shadow:
+    0 10px 15px -3px rgba(234, 179, 8, 0.28),
+    0 4px 6px -4px rgba(234, 179, 8, 0.2);
+}
+
+.ss-site-theme--world-cup-2026 .ss-btn-enter {
+  animation-name: ss-cta-glow-wc26;
+}
+
+@keyframes ss-cta-glow-wc26 {
+  0%,
+  100% {
+    box-shadow:
+      0 4px 20px rgba(245, 158, 11, 0.35),
+      0 0 0 0 rgba(251, 191, 36, 0.22);
+  }
+  50% {
+    box-shadow:
+      0 8px 32px rgba(245, 158, 11, 0.45),
+      0 0 28px rgba(251, 191, 36, 0.14);
+  }
+}
+
+.ss-site-theme--world-cup-2026 .ss-home-wc-ball-panel--embedded {
+  border-top-color: rgba(251, 191, 36, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-site-theme--world-cup-2026 .ss-btn-enter {
+    animation: none;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .ss-site-theme--pitch.ss-page-bg,
+  .ss-site-theme--pitch .ss-footer-bg,
+  .ss-site-theme--world-cup-2026.ss-page-bg,
+  .ss-site-theme--world-cup-2026 .ss-footer-bg {
+    background-attachment: scroll;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  .ss-site-theme--world-cup-2026.ss-page-bg,
+  .ss-site-theme--world-cup-2026 .ss-footer-bg {
+    background-attachment: scroll;
+  }
+}

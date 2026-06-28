@@ -6,6 +6,7 @@ import { DEFAULT_SOCIAL_LINKS, mergeSocialLinks } from './socialLinks.mjs'
 import { EMAIL_LAYOUT_PAGE_ID } from './emailLayout.mjs'
 import { SHIRT_GIVEAWAY_SEASON, refreshShirtGiveawaySeasonInText } from './shirtGiveaway.mjs'
 import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from './worldCupBallGiveaway.mjs'
+import { SITE_DESIGN_THEMES, normalizeSiteDesignTheme } from './siteDesignThemes.mjs'
 
 export { EMAIL_LAYOUT_PAGE_ID }
 
@@ -75,6 +76,7 @@ export function defaultSiteShell() {
     headerTagline: 'Prizes that matter',
     showHeaderTagline: true,
     pageBackground: SITE_PAGE_BACKGROUNDS.default,
+    siteDesignTheme: SITE_DESIGN_THEMES.pitch,
     navOrder: DEFAULT_NAV.map((n) => n.id),
     navItems: Object.fromEntries(DEFAULT_NAV.map((n) => [n.id, { ...n }])),
     headerOffsets: { ...DEFAULT_HEADER_OFFSETS },
@@ -369,6 +371,7 @@ export function mergeSiteShell(input) {
       input.pageBackground === SITE_PAGE_BACKGROUNDS.solid
         ? SITE_PAGE_BACKGROUNDS.solid
         : SITE_PAGE_BACKGROUNDS.default,
+    siteDesignTheme: normalizeSiteDesignTheme(input.siteDesignTheme),
     navItems: nav.navItems,
     navOrder: nav.navOrder,
     headerOffsets: mergeOffsets(base.headerOffsets, input.headerOffsets),

@@ -8,7 +8,7 @@ import { useEntryFlow } from '../entry/entryContext'
 import { useSiteShell } from '../hooks/useSitePages'
 import { SiteFooter } from './SiteFooter'
 import { offsetStyle } from '../../shared/layoutOffsets.mjs'
-import { SITE_PAGE_BACKGROUNDS } from '../../shared/sitePageLayout.mjs'
+import { resolveSiteShellRootClassName } from '../../shared/siteShellPresentation.mjs'
 
 function desktopNavClass({ isActive }) {
   return `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
@@ -60,8 +60,7 @@ export function Layout() {
   const { termsOpen, setTermsOpen, openTerms, paidQuizNavStatus } = useEntryFlow()
   const { shell } = useSiteShell()
   const showQuizPrompt = paidQuizNavStatus !== 'none'
-  const pageBgClass =
-    shell.pageBackground === SITE_PAGE_BACKGROUNDS.solid ? 'bg-[#071512]' : 'ss-page-bg'
+  const rootClassName = resolveSiteShellRootClassName(shell)
   const navItems = shell.navOrder
     .map((id) => shell.navItems[id])
     .filter(Boolean)
@@ -77,11 +76,11 @@ export function Layout() {
   }
 
   return (
-    <div className={`${pageBgClass} min-h-svh font-sans text-stone-300 antialiased`}>
+    <div className={rootClassName}>
       <EntryModal />
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
 
-      <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] bg-[#071512]/90 backdrop-blur-md">
+      <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] backdrop-blur-md">
         <div className="overflow-visible sm:hidden">
           <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-1.5 pt-3.5">
             <Link
