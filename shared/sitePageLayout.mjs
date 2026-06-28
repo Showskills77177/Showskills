@@ -76,7 +76,7 @@ export function defaultSiteShell() {
     headerTagline: 'Prizes that matter',
     showHeaderTagline: true,
     pageBackground: SITE_PAGE_BACKGROUNDS.default,
-    siteDesignTheme: SITE_DESIGN_THEMES.pitch,
+    siteDesignTheme: SITE_DESIGN_THEMES.worldCup2026,
     navOrder: DEFAULT_NAV.map((n) => n.id),
     navItems: Object.fromEntries(DEFAULT_NAV.map((n) => [n.id, { ...n }])),
     headerOffsets: { ...DEFAULT_HEADER_OFFSETS },
@@ -371,7 +371,10 @@ export function mergeSiteShell(input) {
       input.pageBackground === SITE_PAGE_BACKGROUNDS.solid
         ? SITE_PAGE_BACKGROUNDS.solid
         : SITE_PAGE_BACKGROUNDS.default,
-    siteDesignTheme: normalizeSiteDesignTheme(input.siteDesignTheme),
+    siteDesignTheme:
+      typeof input.siteDesignTheme === 'string'
+        ? normalizeSiteDesignTheme(input.siteDesignTheme)
+        : base.siteDesignTheme,
     navItems: nav.navItems,
     navOrder: nav.navOrder,
     headerOffsets: mergeOffsets(base.headerOffsets, input.headerOffsets),
