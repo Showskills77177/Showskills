@@ -5,8 +5,10 @@ import { CONTACT_TOPICS, SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteConta
 import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import { PromoterAddress } from '../components/PromoterAddress'
 import { usePageLayout } from '../hooks/useSitePages'
-import { CONTACT_PAGE_ID } from '../../shared/sitePageLayout.mjs'
+import { CONTACT_PAGE_ID, defaultContactPageLayout } from '../../shared/sitePageLayout.mjs'
 import { apiUrl } from '../lib/api'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { localizedLayoutText } from '../../shared/i18n/localizedLayout.mjs'
 
 const inputClass =
   'mt-2 w-full rounded-xl border border-white/10 bg-[#071512]/80 px-4 py-3 text-base text-stone-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-stone-600 focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/25'
@@ -15,6 +17,8 @@ const labelClass = 'block text-xs font-semibold uppercase tracking-[0.12em] text
 
 export default function ContactPage() {
   const { layout } = usePageLayout(CONTACT_PAGE_ID)
+  const { locale, t } = useSiteLocale()
+  const contactDefaults = defaultContactPageLayout()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [topic, setTopic] = useState('general')
@@ -32,15 +36,15 @@ export default function ContactPage() {
     const trimmedMessage = message.trim()
 
     if (trimmedName.length < 2) {
-      setError('Please enter your name.')
+      setError(t('form.nameRequired'))
       return
     }
     if (!trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      setError('Please enter a valid email address.')
+      setError(t('form.invalidEmail'))
       return
     }
     if (trimmedMessage.length < 10) {
-      setError('Please enter a message (at least 10 characters).')
+      setError(t('form.messageMinLength'))
       return
     }
 
@@ -73,7 +77,7 @@ export default function ContactPage() {
       setMessage('')
       setTopic('general')
     } catch {
-      setError('Network error. Check your connection and try again.')
+      setError(t('form.networkError'))
       setStatus('error')
     }
   }
@@ -81,11 +85,15 @@ export default function ContactPage() {
   return (
     <main className="m-0 p-0">
       <div className="mx-auto max-w-3xl px-4 pb-16 pt-14 sm:px-6 sm:pb-20 sm:pt-20">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400/90">{layout.eyebrow || 'Get in touch'}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-teal-400/90">
+          {localizedLayoutText(locale, t, 'layout.contact.eyebrow', layout.eyebrow, contactDefaults.eyebrow)}
+        </p>
         <h1 className="mt-3 font-display text-4xl uppercase tracking-[0.06em] text-white sm:text-5xl">
-          {layout.title || 'Contact us'}
+          {localizedLayoutText(locale, t, 'layout.contact.title', layout.title, contactDefaults.title)}
         </h1>
-        <p className="mt-5 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">{layout.intro}</p>
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">
+          {localizedLayoutText(locale, t, 'layout.contact.intro', layout.intro, contactDefaults.intro)}
+        </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {layout.showEmailCard !== false ? (
@@ -94,7 +102,7 @@ export default function ContactPage() {
                 <Mail className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </span>
               <p className="min-w-0 flex-1 text-sm leading-relaxed text-stone-400">
-                Prefer email? Write to{' '}
+                {t('contact.preferEmail')}{' '}
                 <a
                   href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`}
                   className="font-medium text-teal-300 underline decoration-teal-600/40 underline-offset-[3px] transition hover:text-teal-200"
@@ -106,12 +114,10 @@ export default function ContactPage() {
           ) : null}
           {layout.showPostalCard !== false ? (
             <div className="rounded-2xl border border-white/[0.08] bg-stone-950/50 px-4 py-3.5 sm:px-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">Free postal entry address</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">{t('contact.postalTitle')}</p>
               <PromoterAddress className="mt-2 text-sm text-stone-300" />
               <p className="mt-2 text-xs leading-relaxed text-stone-500">
-                Same as{' '}
-                <span className="text-stone-400">{POSTAL_ENTRY_ADDRESS}</span> — one entry per person; include competition
-                name and skill answers in your post.
+                {t('contact.postalHint', { address: POSTAL_ENTRY_ADDRESS })}
               </p>
             </div>
           ) : null}
@@ -168,9 +174,9 @@ export default function ContactPage() {
                     required
                     className={`${inputClass} cursor-pointer`}
                   >
-                    {CONTACT_TOPICS.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
+                    {CONTACT_TOPICS.map((topicOption) => (
+                      <option key={topicOption.id} value={topicOption.id}>
+                        {t(`contact.topic.${topicOption.id}`)}
                       </option>
                     ))}
                   </select>

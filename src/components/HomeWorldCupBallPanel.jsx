@@ -5,9 +5,11 @@ import {
   WORLD_CUP_BALL_PRIZE_TITLE,
   WORLD_CUP_BALL_QUESTION_COUNT,
 } from '../../shared/worldCupBallGiveaway.mjs'
-import { WORLD_CUP_BALL_SKILL_NOTICE } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { WorldCupBallPrizeFrame } from './WorldCupBallPrizeFrame'
 import { WorldCupBallTimingCallout } from './WorldCupBallTimingCallout'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { localizedLayoutText } from '../../shared/i18n/localizedLayout.mjs'
+import { defaultHomepageLayout } from '../../shared/homepageLayout.mjs'
 
 /**
  * Homepage panel promoting the World Cup Ball Giveaway.
@@ -20,14 +22,30 @@ export function HomeWorldCupBallPanel({
   preview = false,
   embedded = false,
 }) {
+  const { locale, t } = useSiteLocale()
+  const defaults = defaultHomepageLayout().blocks.world_cup_ball_panel
+
   if (block.visible === false && !editorMode && !preview) return null
 
-  const badgeLabel = block.badgeLabel?.trim() || 'Free skill challenge'
-  const titleText = block.title?.trim() || WORLD_CUP_BALL_GIVEAWAY_LABEL
+  const badgeLabel =
+    localizedLayoutText(locale, t, 'layout.home.world_cup_ball_panel.badgeLabel', block.badgeLabel, defaults.badgeLabel) ||
+    t('layout.home.world_cup_ball_panel.badgeLabel')
+  const titleText =
+    block.title?.trim() ||
+    localizedLayoutText(locale, t, 'layout.wcBall.title', null, WORLD_CUP_BALL_GIVEAWAY_LABEL) ||
+    WORLD_CUP_BALL_GIVEAWAY_LABEL
   const summary =
     block.summary?.trim() ||
-    `${WORLD_CUP_BALL_QUESTION_COUNT} brutal football questions. Answer every one correctly and the ball is yours — no draw, no payment.`
-  const ctaLabel = block.ctaButtonLabel?.trim() || 'Start timed quiz'
+    t('wcBall.pageIntro') ||
+    `${WORLD_CUP_BALL_QUESTION_COUNT} brutal football questions.`
+  const ctaLabel =
+    localizedLayoutText(
+      locale,
+      t,
+      'layout.home.world_cup_ball_panel.ctaButtonLabel',
+      block.ctaButtonLabel,
+      defaults.ctaButtonLabel,
+    ) || t('layout.home.world_cup_ball_panel.ctaButtonLabel')
 
   const card = (
     <article className="ss-home-wc-ball-panel__card overflow-hidden rounded-2xl border border-amber-400/35 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
@@ -49,13 +67,15 @@ export function HomeWorldCupBallPanel({
           </p>
 
           <div className="flex flex-wrap gap-2 pt-1">
-            <span className="ss-home-wc-ball-panel__tag">Free entry</span>
-            <span className="ss-home-wc-ball-panel__tag">{WORLD_CUP_BALL_QUESTION_COUNT} skill questions</span>
-            <span className="ss-home-wc-ball-panel__tag ss-home-wc-ball-panel__tag--hot">Win the ball</span>
+            <span className="ss-home-wc-ball-panel__tag">{t('home.wcBall.tagFree')}</span>
+            <span className="ss-home-wc-ball-panel__tag">
+              {t('home.wcBall.tagQuestions', { count: WORLD_CUP_BALL_QUESTION_COUNT })}
+            </span>
+            <span className="ss-home-wc-ball-panel__tag ss-home-wc-ball-panel__tag--hot">{t('home.wcBall.tagWin')}</span>
           </div>
 
           <p className="text-xs leading-relaxed text-amber-200/70">
-            {WORLD_CUP_BALL_PRIZE_TITLE}. {WORLD_CUP_BALL_SKILL_NOTICE}
+            {WORLD_CUP_BALL_PRIZE_TITLE}. {t('wcBall.eligibility')}
           </p>
 
           {!preview ? (
@@ -69,7 +89,7 @@ export function HomeWorldCupBallPanel({
                 {ctaLabel}
               </button>
               <Link to={WORLD_CUP_BALL_GIVEAWAY_PATH} className="ss-home-wc-ball-panel__rules-link">
-                Full rules &amp; how to win
+                {t('home.wcBall.rulesLink')}
               </Link>
             </div>
           ) : null}

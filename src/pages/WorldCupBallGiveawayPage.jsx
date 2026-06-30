@@ -9,25 +9,27 @@ import {
 import {
   WORLD_CUP_BALL_PUBLIC_STEPS,
   WORLD_CUP_BALL_TERMS_SECTIONS,
-  WORLD_CUP_BALL_PAGE_INTRO,
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
   WORLD_CUP_BALL_GIVEAWAY_PAGE_ID,
   mergeWorldCupBallGiveawayPageLayout,
+  defaultWorldCupBallGiveawayPageLayout,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
 import { usePageLayout } from '../hooks/useSitePages'
 import { WorldCupBallPrizeFrame } from '../components/WorldCupBallPrizeFrame'
 import { WorldCupBallTimingCallout } from '../components/WorldCupBallTimingCallout'
 import { WorldCupBallGiveawayBackdrop } from '../components/WorldCupBallGiveawayBackdrop'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { localizedLayoutText } from '../../shared/i18n/localizedLayout.mjs'
 
-function HostNationsBadge() {
+function HostNationsBadge({ t }) {
   return (
     <p className="ss-wc-ball-giveaway-page__hosts inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-amber-300/35 bg-black/45 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-100 backdrop-blur-sm sm:text-[11px]">
       <span className="ss-wc-ball-giveaway-page__hosts-pulse h-2 w-2 shrink-0 rounded-full bg-amber-400" aria-hidden />
-      <span>FIFA World Cup 2026</span>
+      <span>{t('wcBall.hosts')}</span>
       <span className="text-amber-300/50" aria-hidden>
         ·
       </span>
-      <span className="text-amber-200/90">USA · Canada · Mexico</span>
+      <span className="text-amber-200/90">{t('wcBall.hostNations')}</span>
     </p>
   )
 }
@@ -45,19 +47,32 @@ function StartQuizButton({ onClick, label, editorMode }) {
   )
 }
 
-const AT_A_GLANCE = [
-  WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT,
-  'Free to enter — worldwide, ages 16+',
-  'No VPNs or proxies',
-  'Delivery details only if you win',
-]
-
 /** Rules and entry hub for the World Cup Ball Giveaway. */
 export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, editorMode = false }) {
   const { openEntry, openTerms } = useEntryFlow()
+  const { locale, t } = useSiteLocale()
   const { layout: fetchedLayout } = usePageLayout(WORLD_CUP_BALL_GIVEAWAY_PAGE_ID)
   const layout = mergeWorldCupBallGiveawayPageLayout(layoutProp || fetchedLayout)
-  const ctaLabel = layout.ctaButtonLabel || 'Enter the quiz'
+  const defaults = defaultWorldCupBallGiveawayPageLayout()
+  const ctaLabel =
+    localizedLayoutText(locale, t, 'layout.wcBall.ctaButtonLabel', layout.ctaButtonLabel, defaults.ctaButtonLabel) ||
+    t('wcBall.startQuiz')
+  const localizedSteps = WORLD_CUP_BALL_PUBLIC_STEPS.map((step) => ({
+    ...step,
+    title: t(`wcBall.step.${step.num}.title`) || step.title,
+    detail: t(`wcBall.step.${step.num}.detail`) || step.detail,
+  }))
+  const localizedTerms = WORLD_CUP_BALL_TERMS_SECTIONS.map((section, i) => ({
+    ...section,
+    title: t(`wcBall.terms.${i}.title`) || section.title,
+    body: t(`wcBall.terms.${i}.body`) || section.body,
+  }))
+  const atAGlance = [
+    t('wcBall.oneAttemptShort', { fallback: WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT }),
+    t('wcBall.atAGlance.free'),
+    t('wcBall.atAGlance.noVpn'),
+    t('wcBall.atAGlance.delivery'),
+  ]
 
   const handleStart = () => openEntry('worldCupBall')
 
@@ -74,18 +89,19 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
         <div className="relative mx-auto max-w-6xl px-4 pb-12 pt-10 sm:px-6 sm:pb-16 sm:pt-14 lg:pb-20 lg:pt-16">
           <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(260px,420px)] lg:gap-12">
             <div className="min-w-0 text-left">
-              <HostNationsBadge />
+              <HostNationsBadge t={t} />
 
               <p className="mt-5 font-display text-xs font-bold uppercase tracking-[0.32em] text-amber-300/90 sm:text-sm">
-                {layout.badge || 'Free skill challenge'}
+                {localizedLayoutText(locale, t, 'layout.wcBall.badge', layout.badge, defaults.badge)}
               </p>
 
               <h1 className="ss-wc-ball-giveaway-page__title font-display mt-3 text-[clamp(2.5rem,10vw,4.5rem)] uppercase leading-[0.92] tracking-[0.02em] text-amber-100">
-                {layout.title || WORLD_CUP_BALL_GIVEAWAY_LABEL}
+                {localizedLayoutText(locale, t, 'layout.wcBall.title', layout.title, defaults.title) ||
+                  WORLD_CUP_BALL_GIVEAWAY_LABEL}
               </h1>
 
               <p className="mt-5 max-w-xl text-base font-medium leading-relaxed text-amber-50/88 sm:text-lg">
-                {layout.intro || WORLD_CUP_BALL_PAGE_INTRO}
+                {localizedLayoutText(locale, t, 'layout.wcBall.intro', layout.intro, defaults.intro) || t('wcBall.pageIntro')}
               </p>
 
               <div className="mt-6 max-w-md">
@@ -141,10 +157,11 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
 
               <div id="how-to-enter">
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/85">
-                  {layout.howToTitle || 'How it works'}
+                  {localizedLayoutText(locale, t, 'layout.wcBall.howToTitle', layout.howToTitle, defaults.howToTitle) ||
+                    t('wcBall.howToWin')}
                 </p>
                 <ol className="mt-5 grid list-none gap-3">
-                  {WORLD_CUP_BALL_PUBLIC_STEPS.map((step) => (
+                  {localizedSteps.map((step) => (
                     <li key={step.num} className="ss-wc-ball-giveaway-page__step flex gap-4 rounded-2xl p-4 sm:p-5">
                       <span className="ss-wc-ball-giveaway-page__step-num mt-0.5 shrink-0" aria-hidden>
                         {step.num}
@@ -161,7 +178,7 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
               <div className="ss-wc-ball-giveaway-page__glass rounded-2xl p-5 sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/90">Full rules</p>
                 <div className="mt-5 space-y-5">
-                  {WORLD_CUP_BALL_TERMS_SECTIONS.map((section) => (
+                  {localizedTerms.map((section) => (
                     <div key={section.title} className="border-b border-white/6 pb-5 last:border-0 last:pb-0">
                       <h2 className="text-sm font-semibold text-amber-50">{section.title}</h2>
                       <p className="mt-1.5 text-sm leading-relaxed text-stone-400">{section.body}</p>
@@ -189,7 +206,7 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
             <aside className="ss-wc-ball-giveaway-page__aside mx-auto w-full max-w-[360px] rounded-2xl p-5 lg:sticky lg:top-24 lg:mx-0 lg:max-w-none lg:self-start lg:p-6">
               <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/90">At a glance</p>
               <ul className="mt-4 space-y-2.5 text-sm leading-relaxed text-amber-100/78">
-                {AT_A_GLANCE.map((item) => (
+                {atAGlance.map((item) => (
                   <li key={item} className="flex gap-2.5">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400/80" aria-hidden />
                     <span>{item}</span>

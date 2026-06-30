@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, Gift, HelpCircle, Mail, Search, Sparkles, Ticket } from 'lucide-react'
-import {
-  FAQ_PAGE_SUBTITLE,
-  FAQ_PAGE_TITLE,
-  FAQ_SECTIONS,
-  filterFaqSections,
-  getPopularFaqItems,
-} from '../../shared/faqContent.mjs'
+import { filterFaqSections, getPopularFaqItems } from '../../shared/faqContent.mjs'
 import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
-import { UK_AVAILABILITY_NOTICE } from '../../shared/siteAvailability.mjs'
-import { NO_PURCHASE_ENTRY_NOTICE } from '../../shared/competitionCopy.mjs'
 import { useEntryFlow } from '../entry/entryContext'
 import { PhotoPageBackdrop } from '../components/PhotoPageBackdrop'
 import { usePageLayout } from '../hooks/useSitePages'
-import { FAQ_PAGE_ID } from '../../shared/sitePageLayout.mjs'
+import { FAQ_PAGE_ID, defaultFaqPageLayout } from '../../shared/sitePageLayout.mjs'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import {
+  getLocalizedFaqPageSubtitle,
+  getLocalizedFaqPageTitle,
+  getLocalizedFaqSections,
+} from '../../shared/i18n/localizedFaq.mjs'
 
 function FaqItemCard({ item, open, onToggle }) {
   const panelId = `faq-answer-${item.id}`
@@ -62,20 +60,26 @@ function FaqItemCard({ item, open, onToggle }) {
 export default function FaqPage() {
   const { openTerms } = useEntryFlow()
   const { layout: pageLayout } = usePageLayout(FAQ_PAGE_ID)
+  const { locale, t } = useSiteLocale()
+  const faqDefaults = defaultFaqPageLayout()
+  const localizedSections = useMemo(() => getLocalizedFaqSections(locale, t), [locale, t])
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState(null)
   const [activeSection, setActiveSection] = useState('all')
   const sectionRefs = useRef({})
 
+  const pageTitle = getLocalizedFaqPageTitle(locale, t)
+  const pageSubtitle = getLocalizedFaqPageSubtitle(locale, t)
+
   const filteredSections = useMemo(() => {
-    let sections = filterFaqSections(FAQ_SECTIONS, query)
+    let sections = filterFaqSections(localizedSections, query)
     if (activeSection !== 'all') {
       sections = sections.filter((s) => s.id === activeSection)
     }
     return sections
-  }, [query, activeSection])
+  }, [localizedSections, query, activeSection])
 
-  const popularItems = useMemo(() => getPopularFaqItems(), [])
+  const popularItems = useMemo(() => getPopularFaqItems(localizedSections), [localizedSections])
   const showPopular = pageLayout.showPopular !== false && !query.trim() && activeSection === 'all'
   const totalMatches = filteredSections.reduce((n, s) => n + s.items.length, 0)
 
@@ -116,13 +120,15 @@ export default function FaqPage() {
         <div className="mx-auto max-w-5xl px-4 pb-10 pt-12 sm:px-6 sm:pb-14 sm:pt-16">
           <p className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-200">
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-            Help centre
+            {t('faq.helpCentre')}
           </p>
           <h1 className="mt-4 max-w-3xl font-display text-[clamp(2.25rem,8vw,3.75rem)] uppercase leading-[0.95] tracking-[0.04em] text-white">
-            {pageLayout.title || FAQ_PAGE_TITLE}
+            {pageLayout.title?.trim() && pageLayout.title !== faqDefaults.title ? pageLayout.title : pageTitle}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">
-            {pageLayout.subtitle || FAQ_PAGE_SUBTITLE}
+            {pageLayout.subtitle?.trim() && pageLayout.subtitle !== faqDefaults.subtitle
+              ? pageLayout.subtitle
+              : pageSubtitle}
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2">
@@ -131,7 +137,7 @@ export default function FaqPage() {
               className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl border border-emerald-400/35 bg-emerald-950/30 px-4 py-2 text-sm font-bold text-emerald-100 transition hover:border-emerald-300/50 hover:bg-emerald-950/50"
             >
               <Gift className="h-4 w-4 shrink-0" aria-hidden />
-              View rewards &amp; competitions
+              {t('faq.viewCompetitions')}
             </Link>
             <button
               type="button"
@@ -139,7 +145,7 @@ export default function FaqPage() {
               className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-stone-300 transition hover:bg-white/5"
             >
               <Ticket className="h-4 w-4 shrink-0 text-stone-500" aria-hidden />
-              Full terms &amp; privacy
+              {t('faq.fullTerms')}
             </button>
           </div>
         </div>
@@ -148,17 +154,17 @@ export default function FaqPage() {
       <div className="mx-auto max-w-5xl px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-10">
         {/* UK notice */}
         <p className="rounded-2xl border border-amber-500/20 bg-amber-950/20 px-4 py-3.5 text-sm leading-relaxed text-amber-100/90">
-          {UK_AVAILABILITY_NOTICE}
+          {t('legal.ukAvailability')}
         </p>
 
         <p className="mt-4 rounded-2xl border border-teal-500/25 bg-teal-950/25 px-4 py-3.5 text-sm leading-relaxed text-teal-100/95">
-          {NO_PURCHASE_ENTRY_NOTICE}
+          {t('legal.noPurchase')}
         </p>
 
         {/* Search */}
         {pageLayout.showSearch !== false ? (
         <label className="relative mt-8 block">
-          <span className="sr-only">Search questions</span>
+          <span className="sr-only">{t('faq.searchLabel')}</span>
           <Search
             className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-500"
             aria-hidden
@@ -170,7 +176,7 @@ export default function FaqPage() {
               setQuery(e.target.value)
               setActiveSection('all')
             }}
-            placeholder="Search rewards, tickets, quiz, winners…"
+            placeholder={t('faq.searchPlaceholder')}
             className="w-full rounded-2xl border border-white/10 bg-stone-950/60 py-3.5 pl-12 pr-4 text-base text-stone-100 shadow-inner shadow-black/20 outline-none transition placeholder:text-stone-600 focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20"
             autoComplete="off"
           />
@@ -180,8 +186,10 @@ export default function FaqPage() {
         {pageLayout.showSearch !== false && query.trim() ? (
           <p className="mt-3 text-sm text-stone-500" aria-live="polite">
             {totalMatches === 0
-              ? 'No questions match your search — try different words or browse a topic below.'
-              : `${totalMatches} question${totalMatches === 1 ? '' : 's'} found`}
+              ? t('faq.noResults')
+              : totalMatches === 1
+                ? t('faq.oneResult')
+                : t('faq.manyResults', { count: totalMatches })}
           </p>
         ) : null}
 
@@ -198,9 +206,9 @@ export default function FaqPage() {
                 : 'ss-faq-topic-pill--idle'
             }`}
           >
-            All topics
+            {t('faq.allTopics')}
           </button>
-          {FAQ_SECTIONS.map((section) => (
+          {localizedSections.map((section) => (
             <button
               key={section.id}
               type="button"
@@ -227,7 +235,7 @@ export default function FaqPage() {
             <nav className="sticky top-24 rounded-2xl border border-white/[0.08] bg-stone-950/50 p-3" aria-label="Jump to topic">
               <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-stone-500">On this page</p>
               <ul className="space-y-0.5">
-                {FAQ_SECTIONS.map((section) => (
+                {localizedSections.map((section) => (
                   <li key={section.id}>
                     <button
                       type="button"
@@ -255,9 +263,9 @@ export default function FaqPage() {
                   className="flex items-center gap-2 font-display text-xl uppercase tracking-wide text-stone-100"
                 >
                   <Sparkles className="h-5 w-5 text-emerald-400/90" strokeWidth={1.75} aria-hidden />
-                  Popular questions
+                  {t('faq.popularHeading')}
                 </h2>
-                <p className="mt-1 text-sm text-stone-500">Tap a question to jump straight to the full answer.</p>
+                <p className="mt-1 text-sm text-stone-500">{t('faq.popularHint', { fallback: 'Tap a question to jump straight to the full answer.' })}</p>
                 <ul className="mt-4 flex flex-col gap-2 sm:grid sm:grid-cols-2">
                   {popularItems.map((item) => (
                     <li key={item.id}>
@@ -283,7 +291,7 @@ export default function FaqPage() {
                 <p className="mt-2 text-sm text-stone-500">
                   Clear your search or pick another topic. You can also{' '}
                   <Link to="/contact" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">
-                    contact us
+                    {t('faq.contactUs')}
                   </Link>
                   .
                 </p>
@@ -344,24 +352,13 @@ export default function FaqPage() {
                 <div>
                   <p className="flex items-center gap-2 font-display text-xl uppercase tracking-wide text-stone-100">
                     <Mail className="h-5 w-5 text-emerald-400/90" aria-hidden />
-                    Still need help?
+                    {t('faq.stillNeedHelp')}
                   </p>
                   <p className="mt-2 max-w-md text-sm leading-relaxed text-stone-400">
-                    Our team can help with payments, quiz links, and prize questions. Use the{' '}
-                    <Link
-                      to="/contact"
-                      className="font-medium text-emerald-300 underline decoration-emerald-600/40 underline-offset-2 hover:text-emerald-200"
-                    >
-                      contact form
-                    </Link>{' '}
-                    or email{' '}
-                    <a
-                      href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`}
-                      className="font-medium text-emerald-300 underline decoration-emerald-600/40 underline-offset-2 hover:text-emerald-200"
-                    >
-                      {SHOWSKILLS_CONTACT_EMAIL}
-                    </a>
-                    . Include your order reference for ticket issues.
+                    {t('faq.ctaBody', {
+                      fallback: `Our team can help with payments, quiz links, and prize questions. Use the contact form or email ${SHOWSKILLS_CONTACT_EMAIL}. Include your order reference for ticket issues.`,
+                      email: SHOWSKILLS_CONTACT_EMAIL,
+                    })}
                   </p>
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-56 sm:shrink-0">
@@ -369,13 +366,13 @@ export default function FaqPage() {
                     to="/contact"
                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400"
                   >
-                    Contact us
+                    {t('contact.title')}
                   </Link>
                   <Link
                     to="/competitions"
                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center rounded-xl border border-white/10 px-5 py-2.5 text-sm font-semibold text-stone-300 transition hover:bg-white/5"
                   >
-                    Enter a competition
+                    {t('faq.viewCompetitions')}
                   </Link>
                 </div>
               </div>

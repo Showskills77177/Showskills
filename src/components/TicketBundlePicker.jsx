@@ -2,6 +2,8 @@ import { ChevronDown } from 'lucide-react'
 import { COMPETITION_NAME_POSTAL, POSTAL_ENTRY_ADDRESS, formatBundlePriceGBP } from '../competitionData'
 import { legacyEntryMethods } from '../../shared/competitionEntryMethods.mjs'
 import { TicketBundleIcon } from './TicketBundleIcon'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { localizeTicketBundle } from '../../shared/i18n/localizedBundles.mjs'
 
 /**
  * Mobile: native picker (short). Desktop: full radio list.
@@ -17,19 +19,24 @@ export function TicketBundlePicker({
   postalCompetitionName = COMPETITION_NAME_POSTAL,
   competitionTitle = 'this prize draw',
 }) {
+  const { locale, t } = useSiteLocale()
   const methods = entryMethods || legacyEntryMethods()
   const postalName = postalCompetitionName || COMPETITION_NAME_POSTAL
   const showPaid = methods.allowPaidEntry !== false
   const showFreeOnline = Boolean(methods.allowFreeOnline)
   const showPostal = Boolean(methods.allowPostalEntry)
-  const bundles = showPaid && visibleTicketBundles?.length ? visibleTicketBundles : []
+  const bundles = showPaid && visibleTicketBundles?.length
+    ? visibleTicketBundles.map((b) => localizeTicketBundle(locale, b, t))
+    : []
   const selectValue =
     paidEntryRoute === 'postal' ? 'postal' : paidEntryRoute === 'free_online' ? 'free_online' : paidBundleId
 
-  const routeHeading =
-    [showPaid && 'Pay for tickets', showFreeOnline && 'enter free online', showPostal && 'enter by post']
-      .filter(Boolean)
-      .join(' or ') || 'Choose how to enter'
+  const routeParts = [
+    showPaid && t('bundles.payForTickets'),
+    showFreeOnline && t('bundles.enterFreeOnline'),
+    showPostal && t('bundles.enterByPost'),
+  ].filter(Boolean)
+  const routeHeading = routeParts.join(' or ') || t('bundles.chooseHow')
 
   return (
     <div>
@@ -37,8 +44,8 @@ export function TicketBundlePicker({
 
       <div className="mt-2 max-md:block md:hidden">
         <label htmlFor="ticket-bundle-select" className="mb-1.5 flex items-center justify-between text-sm text-stone-500">
-          <span>Entry route</span>
-          <span className="text-xs uppercase tracking-wide text-teal-400/90">Tap to choose</span>
+          <span>{t('bundles.entryRoute')}</span>
+          <span className="text-xs uppercase tracking-wide text-teal-400/90">{t('bundles.tapToChoose')}</span>
         </label>
         <div className="relative">
           <select

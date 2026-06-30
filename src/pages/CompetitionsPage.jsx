@@ -10,8 +10,10 @@ import { useShirtGiveawayCompetition } from '../hooks/useShirtGiveawayCompetitio
 import { pickCountdownPeriod, DRAW_COMPETITION_SLUG } from '../../shared/competitionPeriods.mjs'
 import {
   COMPETITIONS_PAGE_ID,
+  defaultCompetitionsPageLayout,
   mergeCompetitionsPageLayout,
 } from '../../shared/sitePageLayout.mjs'
+import { localizedLayoutText } from '../../shared/i18n/localizedLayout.mjs'
 import { CompetitionPublicCard } from '../components/CompetitionPublicCard'
 import { GiveawayPublicCard } from '../components/GiveawayPublicCard'
 import { LegacyShirtGiveawayCard } from '../components/LegacyShirtGiveawayCard'
@@ -79,7 +81,8 @@ export default function CompetitionsPage({
   const { layout: fetchedLayout, loading: layoutLoading } = usePageLayout(COMPETITIONS_PAGE_ID)
   const layout = mergeCompetitionsPageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
-  const { region, t } = useSiteLocale()
+  const { region, t, locale } = useSiteLocale()
+  const compDefaults = defaultCompetitionsPageLayout()
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
   const paidCompetitions = useMemo(() => {
@@ -232,9 +235,23 @@ export default function CompetitionsPage({
   const paidColumn = (
     <div className="min-w-0">
       <SectionHeading id="paid-competitions-heading">
-        {layout.sections.paid?.title || 'Prize draw competitions'}
+        {localizedLayoutText(
+          locale,
+          t,
+          'layout.competitions.sections.paid.title',
+          layout.sections.paid?.title,
+          compDefaults.sections.paid.title,
+        )}
       </SectionHeading>
-      <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">{layout.sections.paid?.subtitle}</p>
+      <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">
+        {localizedLayoutText(
+          locale,
+          t,
+          'layout.competitions.sections.paid.subtitle',
+          layout.sections.paid?.subtitle,
+          compDefaults.sections.paid.subtitle,
+        )}
+      </p>
       <ul className="ss-competitions-paid-list mt-4 flex list-none flex-col">
         {paidCompetitions.map((c, index) => (
           <li
@@ -251,10 +268,22 @@ export default function CompetitionsPage({
   const freeColumn = (
     <div className="min-w-0" id="free-giveaways">
       <SectionHeading id="free-giveaways-heading">
-        {layout.sections.free?.title || t('competitions.freeSection')}
+        {localizedLayoutText(
+          locale,
+          t,
+          'layout.competitions.sections.free.title',
+          layout.sections.free?.title,
+          compDefaults.sections.free.title,
+        ) || t('competitions.freeSection')}
       </SectionHeading>
       <p className="mt-2 text-base leading-relaxed text-stone-500 md:text-sm">
-        {layout.sections.free?.subtitle || t('region.giveawaysWorldBody')}
+        {localizedLayoutText(
+          locale,
+          t,
+          'layout.competitions.sections.free.subtitle',
+          layout.sections.free?.subtitle,
+          compDefaults.sections.free.subtitle,
+        ) || t('region.giveawaysWorldBody')}
       </p>
       <ul className="mt-4 grid list-none gap-6">
         <li className="ss-competition-free-primary w-full">
@@ -307,13 +336,17 @@ export default function CompetitionsPage({
             'comp_title',
             'Page title',
             'title',
-            <h1 className="font-display text-[2.125rem] uppercase tracking-[0.08em] text-white sm:text-5xl">{layout.title}</h1>,
+            <h1 className="font-display text-[2.125rem] uppercase tracking-[0.08em] text-white sm:text-5xl">
+              {localizedLayoutText(locale, t, 'layout.competitions.title', layout.title, compDefaults.title)}
+            </h1>,
           )}
           {dragWrap(
             'comp_intro',
             'Intro',
             'intro',
-            <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">{layout.intro}</p>,
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-stone-400 sm:text-lg">
+              {localizedLayoutText(locale, t, 'layout.competitions.intro', layout.intro, compDefaults.intro)}
+            </p>,
           )}
           {dragWrap(
             'comp_links',

@@ -33,6 +33,8 @@ import {
   loadWorldCupBallQuizProgress,
   saveWorldCupBallQuizProgress,
 } from '../lib/worldCupBallQuizProgress.mjs'
+import { localizeQuizQuestion } from '../../shared/i18n/localizedQuiz.mjs'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
 
 function QuizDontKnowButton({ onClick, disabled }) {
@@ -53,6 +55,7 @@ function QuizDontKnowButton({ onClick, disabled }) {
  * @param {{ onResult: (result: object) => void, onError: (msg: string) => void, onPhaseChange?: (phase: string) => void, disabled?: boolean }} props
  */
 export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = false }) {
+  const { locale, t } = useSiteLocale()
   const [phase, setPhase] = useState('idle')
   const [sessionId, setSessionId] = useState('')
   const [questions, setQuestions] = useState([])
@@ -89,15 +92,20 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   }, [])
 
   const q = questions[index]
+  const localizedQ = useMemo(() => (q ? localizeQuizQuestion(locale, q, t) : null), [locale, q, t])
+  const localizedSalvage = useMemo(
+    () => (salvageQuestion ? localizeQuizQuestion(locale, salvageQuestion, t) : null),
+    [locale, salvageQuestion, t],
+  )
   const shuffledChoices = useMemo(() => {
-    if (!q?.choices?.length) return []
-    const list = [...q.choices]
+    if (!localizedQ?.choices?.length) return []
+    const list = [...localizedQ.choices]
     for (let i = list.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[list[i], list[j]] = [list[j], list[i]]
     }
     return list
-  }, [q?.questionKey, q?.choices])
+  }, [localizedQ?.questionKey, localizedQ?.choices])
 
   const persistProgress = useCallback(
     (next) => {
@@ -711,8 +719,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
     )
   }
 
-  if (phase === 'salvage' && salvageQuestion) {
-    const salvageChoices = Array.isArray(salvageQuestion.choices) ? [...salvageQuestion.choices] : []
+  if (phase === 'salvage' && salvageQuestion && localizedSalvage) {
+    const salvageChoices = Array.isArray(localizedSalvage.choices) ? [...localizedSalvage.choices] : []
     for (let i = salvageChoices.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[salvageChoices[i], salvageChoices[j]] = [salvageChoices[j], salvageChoices[i]]
@@ -737,7 +745,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             <p className="mt-1 text-xs leading-relaxed text-amber-100/85">Pick the correct option below.</p>
           </div>
         ) : null}
-        <p className="ss-wc-ball-quiz__prompt text-stone-100">{salvageQuestion.prompt}</p>
+        <p className="ss-wc-ball-quiz__prompt text-stone-100">{localizedSalvage.prompt}</p>
         {hasSalvageChoices ? (
           <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
             {salvageChoices.map((choice) => (
@@ -828,7 +836,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <p className="mt-1 text-xs leading-relaxed text-amber-100/85">{WORLD_CUP_BALL_CASE_INSENSITIVE_NOTICE}</p>
         </div>
       )}
-      <p className="ss-wc-ball-quiz__prompt text-stone-100">{q?.prompt}</p>
+      <p className="ss-wc-ball-quiz__prompt text-stone-100">{localizedQ?.prompt}</p>
       {hasChoices ? (
         <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
           {shuffledChoices.map((choice) => (

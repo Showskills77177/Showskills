@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
-import { POSTAL_ENTRY_ADDRESS, FOOTER_NO_PURCHASE_NOTICE } from '../competitionData'
+import { POSTAL_ENTRY_ADDRESS } from '../competitionData'
 import { FooterSocialLinks } from './FooterSocialLinks'
 import { NewsletterSignupForm } from './NewsletterSignupForm'
 import { TrustpilotReviewCollector } from './TrustpilotFeedback'
 import { NEWSLETTER_SOURCES } from '../../shared/newsletter.mjs'
 import { offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { translateFooterLabel } from '../../shared/i18n/translate.mjs'
+import { localizedLayoutTextOrCms } from '../../shared/i18n/localizedLayout.mjs'
 
 function LogoMark({ className = 'h-7 sm:h-8' }) {
   return (
@@ -28,15 +30,16 @@ function LogoMark({ className = 'h-7 sm:h-8' }) {
   )
 }
 
-function FooterNavLink({ link, openTerms }) {
+function FooterNavLink({ link, openTerms, locale }) {
   if (link.visible === false) return null
+  const label = translateFooterLabel(locale, link)
   const className =
     'text-base font-medium text-stone-400 transition hover:text-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400/50 md:text-sm'
 
   if (link.action === 'terms') {
     return (
       <button type="button" onClick={() => openTerms()} className={className}>
-        {link.label}
+        {label}
       </button>
     )
   }
@@ -52,13 +55,13 @@ function FooterNavLink({ link, openTerms }) {
         }}
         className={className}
       >
-        {link.label}
+        {label}
       </button>
     )
   }
   return (
-    <Link to={link.path || '/'} className={className} title={link.label}>
-      {link.label}
+    <Link to={link.path || '/'} className={className} title={label}>
+      {label}
     </Link>
   )
 }
@@ -78,10 +81,15 @@ function withOffset(offsets, key, node) {
 export function SiteFooter({ shell, footerLinks, openTerms }) {
   if (shell.footer?.visible === false) return null
 
-  const { t, region } = useSiteLocale()
+  const { locale, t, region } = useSiteLocale()
   const footerOffsets = shell.footerOffsets || {}
   const footerSocial = shell.footer?.socialLinks || {}
-  const legalMain = shell.footer?.legalNotice?.trim() || FOOTER_NO_PURCHASE_NOTICE
+  const legalMain =
+    shell.footer?.legalNotice?.trim() ||
+    t('legal.footerNoPurchase')
+  const disclaimer =
+    localizedLayoutTextOrCms(locale, t, 'layout.shell.disclaimer', shell.footer?.disclaimer) ||
+    shell.footer?.disclaimer
 
   return (
     <footer className="ss-footer-bg border-t border-white/[0.06]">
@@ -95,7 +103,7 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
           'links',
           <nav className="mt-2.5 flex max-w-3xl flex-wrap items-center justify-center gap-x-4 gap-y-1.5" aria-label="Footer">
             {footerLinks.map((link) => (
-              <FooterNavLink key={link.label} link={link} openTerms={openTerms} />
+              <FooterNavLink key={link.id || link.label} link={link} openTerms={openTerms} locale={locale} />
             ))}
           </nav>,
         )}
@@ -135,12 +143,12 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
           </div>
         ) : null}
 
-        {shell.footer?.disclaimer
+        {disclaimer
           ? withOffset(
               footerOffsets,
               'disclaimer',
               <p className="mt-3 max-w-2xl border-t border-white/[0.06] pt-3 text-sm leading-relaxed text-stone-500 md:text-xs">
-                {shell.footer.disclaimer}
+                {disclaimer}
               </p>,
             )
           : null}

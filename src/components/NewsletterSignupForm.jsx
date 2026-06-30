@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { apiFetch } from '../lib/api'
 import { NEWSLETTER_SOURCES } from '../../shared/newsletter.mjs'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 
 /** Compact email signup — footer, newsletter page, etc. */
 export function NewsletterSignupForm({
@@ -11,6 +12,7 @@ export function NewsletterSignupForm({
   inputId = 'newsletter-email',
 }) {
   const isFooter = variant === 'footer' || compact
+  const { t } = useSiteLocale()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -22,7 +24,7 @@ export function NewsletterSignupForm({
     setMessage('')
     const em = email.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
-      setError('Enter a valid email address.')
+      setError(t('form.invalidEmail'))
       return
     }
     setLoading(true)
@@ -36,15 +38,13 @@ export function NewsletterSignupForm({
       if (!res.ok) {
         throw new Error(
           data.error ||
-            (res.status === 404
-              ? 'Newsletter signup is not available right now. Please try again in a few minutes.'
-              : 'Could not subscribe'),
+            (res.status === 404 ? t('newsletter.unavailable') : t('newsletter.failed')),
         )
       }
-      setMessage(data.message || 'You are subscribed. Check your inbox for updates.')
+      setMessage(data.message || t('newsletter.subscribed'))
       setEmail('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Subscription failed')
+      setError(err instanceof Error ? err.message : t('newsletter.subscriptionFailed'))
     } finally {
       setLoading(false)
     }
@@ -54,7 +54,7 @@ export function NewsletterSignupForm({
     <form
       onSubmit={onSubmit}
       className={`ss-newsletter-signup w-full ${className}`}
-      aria-label="Newsletter signup"
+      aria-label={t('newsletter.ariaLabel')}
     >
       <p
         className={
@@ -65,17 +65,7 @@ export function NewsletterSignupForm({
               : 'text-base text-stone-400 md:text-sm'
         }
       >
-        {isFooter ? (
-          <>
-            Join <strong className="font-semibold text-stone-200">ShowSkills Rewards</strong> for giveaway and
-            competition news.
-          </>
-        ) : (
-          <>
-            Join <strong className="font-semibold text-stone-300">ShowSkills Rewards</strong> for giveaway and
-            competition news. No account needed.
-          </>
-        )}
+        {isFooter ? t('newsletter.footerLead') : t('newsletter.pageLead')}
       </p>
       <div
         className={
@@ -85,7 +75,7 @@ export function NewsletterSignupForm({
         }
       >
         <label className="sr-only" htmlFor={inputId}>
-          Email
+          {t('common.email')}
         </label>
         <input
           id={inputId}
@@ -93,7 +83,7 @@ export function NewsletterSignupForm({
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder={t('common.emailPlaceholder')}
           className="min-h-[2.75rem] flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40 sm:min-h-[2.75rem]"
           disabled={loading}
         />
@@ -102,7 +92,7 @@ export function NewsletterSignupForm({
           disabled={loading}
           className="min-h-[2.75rem] shrink-0 rounded-lg bg-gradient-to-r from-lime-700 to-emerald-700 px-5 py-2 text-base font-bold text-white transition hover:brightness-110 disabled:opacity-50 sm:min-h-[2.75rem] md:text-sm"
         >
-          {loading ? 'Joining…' : 'Subscribe'}
+          {loading ? t('common.joining') : t('common.subscribe')}
         </button>
       </div>
       {error ? (

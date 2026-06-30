@@ -32,10 +32,12 @@ import { IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetit
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
   HOMEPAGE_BLOCK_IDS,
+  defaultHomepageLayout,
   isHomeBlockVisible,
   mergeHomepageLayout,
 } from '../../shared/homepageLayout.mjs'
 import { HOMEPAGE_BLOCK_LABELS } from '../../shared/sitePageLayout.mjs'
+import { localizedLayoutText } from '../../shared/i18n/localizedLayout.mjs'
 
 const HERO_INNER_BLOCK_IDS = new Set([
   'promo_strip',
@@ -78,23 +80,11 @@ function HomeEditorHiddenSection({ label, hint }) {
   )
 }
 
-const LEGACY_BUNDLE_SPECS = [
-  {
-    label: 'iPhone 17 Pro Max',
-    body: 'Unlocked, 6.9-inch display, 512GB model. Estimated retail value £1,399.',
-  },
-  {
-    label: 'Colour substitution',
-    body: 'If the shown colour is unavailable, an equivalent colour such as black or another available finish may be supplied.',
-  },
-  {
-    label: '24K gold case',
-    body: 'Premium gold-style case for the iPhone 17 Pro Max, included as part of the prize stack.',
-  },
-  {
-    label: 'Museum signed football',
-    body: 'Certified Ronaldo museum-style signed football, presented as a collector item with the bundle.',
-  },
+const LEGACY_BUNDLE_SPEC_KEYS = [
+  { labelKey: 'home.spec.iphone.label', bodyKey: 'home.spec.iphone.body' },
+  { labelKey: 'home.spec.colour.label', bodyKey: 'home.spec.colour.body' },
+  { labelKey: 'home.spec.case.label', bodyKey: 'home.spec.case.body' },
+  { labelKey: 'home.spec.football.label', bodyKey: 'home.spec.football.body' },
 ]
 
 const HERO_BG = {
@@ -207,7 +197,8 @@ export function HomePageContent({
   const { layout: fetchedLayout } = useHomepageLayout()
   const layout = mergeHomepageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
-  const { region, t } = useSiteLocale()
+  const { region, t, locale } = useSiteLocale()
+  const homeDefaults = defaultHomepageLayout().blocks
   const showPaidBundles = editorMode || region.paidBundlesAvailable
   const winners = usePublicWinners()
   const enterPaid = editorMode ? () => {} : (slug) => openEntry('paid', slug ? { competitionSlug: slug } : undefined)
@@ -411,7 +402,13 @@ export function HomePageContent({
     promo,
     <p className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/35 bg-emerald-950/50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200 sm:text-sm">
       <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-      {promo.livePromotionLabel || 'Live promotion'}
+      {localizedLayoutText(
+        locale,
+        t,
+        'layout.home.promo_strip.livePromotionLabel',
+        promo.livePromotionLabel,
+        homeDefaults.promo_strip.livePromotionLabel,
+      ) || t('home.promoLive')}
     </p>,
   )
 
@@ -434,7 +431,13 @@ export function HomePageContent({
         intro,
         <div className="flex flex-wrap items-end gap-3 sm:gap-4">
           <h1 className="ss-hero-brand font-display text-[clamp(2.75rem,10vw,5.25rem)] leading-[0.92] tracking-tight sm:text-[clamp(3.25rem,11vw,5.75rem)]">
-            {intro.brandTitle || 'ShowSkills Rewards'}
+            {localizedLayoutText(
+              locale,
+              t,
+              'layout.home.hero_intro.brandTitle',
+              intro.brandTitle,
+              homeDefaults.hero_intro.brandTitle,
+            )}
           </h1>
           <div className="flex items-end gap-1.5 sm:gap-2">
             <GlowingFootballIcon stagger={0} className="mb-1 shrink-0 sm:mb-1.5" />
@@ -450,11 +453,30 @@ export function HomePageContent({
         'headline',
         intro,
         <p className="max-w-xl text-[clamp(1.35rem,4vw,2.1rem)] font-bold leading-snug tracking-tight text-white">
-          <HeroHeadline text={intro.headline} highlight={intro.highlightPhrase} />
+          <HeroHeadline
+            text={
+              localizedLayoutText(
+                locale,
+                t,
+                'layout.home.hero_intro.headline',
+                intro.headline,
+                homeDefaults.hero_intro.headline,
+              ) || intro.headline
+            }
+            highlight={intro.highlightPhrase}
+          />
         </p>,
       )}
       {intro.consolationCopy ? (
-        <p className="max-w-xl text-base leading-relaxed text-stone-400 md:text-sm lg:text-base">{intro.consolationCopy}</p>
+        <p className="max-w-xl text-base leading-relaxed text-stone-400 md:text-sm lg:text-base">
+          {localizedLayoutText(
+            locale,
+            t,
+            'layout.home.hero_intro.consolationCopy',
+            intro.consolationCopy,
+            homeDefaults.hero_intro.consolationCopy,
+          )}
+        </p>
       ) : null}
       {intro.helperCopy
         ? dragWrap(
@@ -464,7 +486,13 @@ export function HomePageContent({
             'helper',
             intro,
             <p className="ss-hero-helper-copy max-w-xl text-base leading-relaxed text-stone-400 md:text-sm lg:text-base">
-              {intro.helperCopy}
+              {localizedLayoutText(
+                locale,
+                t,
+                'layout.home.hero_intro.helperCopy',
+                intro.helperCopy,
+                homeDefaults.hero_intro.helperCopy,
+              )}
             </p>,
           )
         : null}
@@ -480,14 +508,26 @@ export function HomePageContent({
           className="ss-hero-cta-prize-lineup inline-flex min-h-[3rem] w-full shrink-0 items-center justify-center rounded-xl border-2 border-emerald-400/40 bg-emerald-950/20 px-6 py-2.5 text-base font-bold uppercase tracking-wide text-emerald-100 transition hover:border-emerald-300/60 hover:bg-emerald-950/40 sm:w-auto sm:min-h-[3.25rem] md:text-sm"
           onClick={editorMode ? (e) => e.preventDefault() : undefined}
         >
-          {intro.prizeLineupLabel || 'Prize lineup'}
+          {localizedLayoutText(
+            locale,
+            t,
+            'layout.home.hero_intro.prizeLineupLabel',
+            intro.prizeLineupLabel,
+            homeDefaults.hero_intro.prizeLineupLabel,
+          ) || t('home.prizeLineup')}
         </a>
         <Link
           to={editorMode ? '.' : '/archive/ronaldo-shirt-giveaway'}
           className="ss-hero-cta-shirt-link inline-flex w-full items-center justify-center self-center rounded-lg px-3 py-2 text-sm font-semibold text-stone-500 underline decoration-stone-600 underline-offset-4 hover:text-stone-300 sm:w-auto sm:py-2.5 md:text-xs"
           onClick={editorMode ? (e) => e.preventDefault() : undefined}
         >
-          {intro.shirtLinkLabel || 'Free shirt giveaway'}
+          {localizedLayoutText(
+            locale,
+            t,
+            'layout.home.hero_intro.shirtLinkLabel',
+            intro.shirtLinkLabel,
+            homeDefaults.hero_intro.shirtLinkLabel,
+          ) || t('home.shirtLink')}
         </Link>
         </div>,
       )}
@@ -641,7 +681,15 @@ export function HomePageContent({
               'hero_prizes',
               'ctaBlurb',
               prizes,
-              <p className="ss-hero-bundle-cta-blurb mx-auto max-w-md text-center text-stone-500">{prizes.ctaBlurb}</p>,
+              <p className="ss-hero-bundle-cta-blurb mx-auto max-w-md text-center text-stone-500">
+                {localizedLayoutText(
+                  locale,
+                  t,
+                  'layout.home.hero_prizes.ctaBlurb',
+                  prizes.ctaBlurb,
+                  homeDefaults.hero_prizes.ctaBlurb,
+                )}
+              </p>,
               1,
               { className: 'w-full', transformOrigin: 'top center' },
             )
@@ -660,7 +708,13 @@ export function HomePageContent({
                 className="ss-hero-bundle-draw-btn"
                 tabIndex={editorMode ? -1 : undefined}
               >
-                {prizes.ctaButtonLabel || 'Enter Bundle Draw'}
+                {localizedLayoutText(
+                  locale,
+                  t,
+                  'layout.home.hero_prizes.ctaButtonLabel',
+                  prizes.ctaButtonLabel,
+                  homeDefaults.hero_prizes.ctaButtonLabel,
+                )}
               </button>
             ) : (
               <p className="max-w-md text-center text-sm leading-relaxed text-amber-100/85">
@@ -715,10 +769,10 @@ export function HomePageContent({
               Prize notes
             </h3>
             <dl className="ss-legacy-spec-list">
-              {LEGACY_BUNDLE_SPECS.map(({ label, body }) => (
-                <div key={label} className="ss-legacy-spec-row">
-                  <dt>{label}</dt>
-                  <dd>{body}</dd>
+              {LEGACY_BUNDLE_SPEC_KEYS.map(({ labelKey, bodyKey }) => (
+                <div key={labelKey} className="ss-legacy-spec-row">
+                  <dt>{t(labelKey)}</dt>
+                  <dd>{t(bodyKey)}</dd>
                 </div>
               ))}
             </dl>

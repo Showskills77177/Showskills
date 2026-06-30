@@ -11,6 +11,7 @@ import { offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { resolveSiteShellRootClassName } from '../../shared/siteShellPresentation.mjs'
 import { translateNavLabel } from '../../shared/i18n/translate.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { localizedLayoutTextOrCms } from '../../shared/i18n/localizedLayout.mjs'
 import { LanguagePicker } from './LanguagePicker'
 import { RegionNoticeBanner } from './RegionNoticeBanner'
 
@@ -64,7 +65,8 @@ function DesktopNavLink({ item, openTerms, locale }) {
 export function Layout() {
   const { termsOpen, setTermsOpen, openTerms, paidQuizNavStatus } = useEntryFlow()
   const { shell } = useSiteShell()
-  const { locale } = useSiteLocale()
+  const { locale, t } = useSiteLocale()
+  const headerTagline = localizedLayoutTextOrCms(locale, t, 'layout.shell.tagline', shell.headerTagline)
   const showQuizPrompt = paidQuizNavStatus !== 'none'
   const rootClassName = resolveSiteShellRootClassName(shell)
   const navItems = shell.navOrder
@@ -72,7 +74,10 @@ export function Layout() {
     .filter(Boolean)
     .filter((item) => item.visible !== false)
   const footerLinks = (shell.footer?.linkOrder || [])
-    .map((id) => shell.footer?.links?.[id])
+    .map((id) => {
+      const link = shell.footer?.links?.[id]
+      return link ? { ...link, id } : null
+    })
     .filter(Boolean)
   const headerOffsets = shell.headerOffsets || {}
 
@@ -154,14 +159,14 @@ export function Layout() {
             </Link>,
           )}
 
-          {shell.showHeaderTagline !== false && shell.headerTagline
+          {shell.showHeaderTagline !== false && headerTagline
             ? withOffset(
                 headerOffsets,
                 'tagline',
                 <div className="flex items-center justify-end gap-3 justify-self-end">
                   <LanguagePicker className="hidden md:inline-flex" />
                   <p className="hidden -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95 md:block">
-                    {shell.headerTagline}
+                    {headerTagline}
                   </p>
                 </div>,
               )

@@ -5,6 +5,7 @@ import {
   isUkCountryCode,
   paidTicketBundlesAvailable,
 } from '../../../shared/regionAvailability.mjs'
+import { localeForCountryCode } from '../../../shared/i18n/geoLocale.mjs'
 import { resolveVisitorCountryCode } from '../lib/requireUkForPaidTickets.mjs'
 
 /** GET /api/visitor/region — public geo + product availability for the site shell. */
@@ -15,11 +16,13 @@ export default async function handler(req, res) {
   }
 
   const countryCode = resolveVisitorCountryCode(req)
+  const suggestedLocale = localeForCountryCode(countryCode)
   return json(res, 200, {
     countryCode,
     countryName: countryCode ? countryDisplayName(countryCode) : null,
     isUk: isUkCountryCode(countryCode),
     paidBundlesAvailable: paidTicketBundlesAvailable(countryCode),
     giveawaysInternational: giveawaysAvailableInternationally(),
+    suggestedLocale,
   })
 }

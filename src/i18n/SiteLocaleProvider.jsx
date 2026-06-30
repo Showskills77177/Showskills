@@ -1,11 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { apiUrl } from '../lib/api'
 import {
   DEFAULT_SITE_LOCALE,
+  SITE_LOCALE_MANUAL_KEY,
   SITE_LOCALE_STORAGE_KEY,
   normalizeSiteLocale,
   siteLocaleDirection,
 } from '../../shared/i18n/localeMeta.mjs'
+import { resolveGeoSiteLocale } from '../../shared/i18n/geoLocale.mjs'
 import { t as translate } from '../../shared/i18n/translate.mjs'
 
 const SiteLocaleContext = createContext({
@@ -31,6 +33,15 @@ function readStoredLocale() {
   }
 }
 
+function readLocaleManual() {
+  if (typeof window === 'undefined') return false
+  try {
+    return localStorage.getItem(SITE_LOCALE_MANUAL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 function detectBrowserLocale() {
   if (typeof navigator === 'undefined') return DEFAULT_SITE_LOCALE
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language]
@@ -42,9 +53,10 @@ function detectBrowserLocale() {
 }
 
 export function SiteLocaleProvider({ children }) {
+  const localeManualRef = useRef(readLocaleManual())
   const [locale, setLocaleState] = useState(() => {
-    const stored = readStoredLocale()
-    if (stored !== DEFAULT_SITE_LOCALE || typeof window === 'undefined') return stored
+    if (localeManualRef.current) return readStoredLocale()
+    if (typeof window === 'undefined') return DEFAULT_SITE_LOCALE
     return detectBrowserLocale()
   })
   const [region, setRegion] = useState({
@@ -69,14 +81,28 @@ export function SiteLocaleProvider({ children }) {
         const res = await fetch(apiUrl('/api/visitor/region'), { credentials: 'include' })
         const data = await res.json().catch(() => ({}))
         if (cancelled || !res.ok) return
-        setRegion({
+
+        const nextRegion = {
           countryCode: data.countryCode || null,
           countryName: data.countryName || null,
           isUk: Boolean(data.isUk),
           paidBundlesAvailable: Boolean(data.paidBundlesAvailable),
           giveawaysInternational: data.giveawaysInternational !== false,
           loading: false,
-        })
+        }
+        setRegion(nextRegion)
+
+        if (!localeManualRef.current) {
+          const geoLocale =
+            normalizeSiteLocale(data.suggestedLocale) ||
+            resolveGeoSiteLocale(data.countryCode, detectBrowserLocale())
+          setLocaleState(geoLocale)
+          try {
+            localStorage.setItem(SITE_LOCALE_STORAGE_KEY, geoLocale)
+          } catch {
+            /* ignore */
+          }
+        }
       } catch {
         if (!cancelled) {
           setRegion((prev) => ({ ...prev, loading: false }))
@@ -90,9 +116,11 @@ export function SiteLocaleProvider({ children }) {
 
   const setLocale = useCallback((next) => {
     const code = normalizeSiteLocale(next)
+    localeManualRef.current = true
     setLocaleState(code)
     try {
       localStorage.setItem(SITE_LOCALE_STORAGE_KEY, code)
+      localStorage.setItem(SITE_LOCALE_MANUAL_KEY, '1')
     } catch {
       /* ignore */
     }

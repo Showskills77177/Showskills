@@ -14,22 +14,23 @@ import { LegacyBundleLiveCardCopy } from './LegacyBundleLiveCardCopy'
 import { DRAW_COMPETITION_SLUG, formatPeriodMonthLabel, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import { IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
 import { Iphone17ProPrizeStudio } from './Iphone17ProPrizeStudio'
+import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 
-const DEFAULT_SUMMARY =
-  'Pay for ticket bundles or use free entry routes, then answer three skill questions to qualify for the draw.'
-
-function bundlePriceLine(competition) {
-  if (!competition?.allowPaidEntry) return 'Free entry routes only'
+function bundlePriceLine(competition, t) {
+  if (!competition?.allowPaidEntry) return t('cards.freeEntryOnly')
   if (competition.minBundlePence != null) {
     const max = competition.bundles?.length
       ? Math.max(...competition.bundles.map((b) => b.totalPence))
       : competition.minBundlePence
     if (competition.minBundlePence === max) {
-      return `From ${formatBundlePriceGBP(competition.minBundlePence)}`
+      return t('cards.fromPrice', { price: formatBundlePriceGBP(competition.minBundlePence) })
     }
-    return `From ${formatBundlePriceGBP(competition.minBundlePence)} · bundles to ${formatBundlePriceGBP(max)}`
+    return t('cards.fromToPrice', {
+      min: formatBundlePriceGBP(competition.minBundlePence),
+      max: formatBundlePriceGBP(max),
+    })
   }
-  return 'Paid ticket bundles available'
+  return t('cards.paidBundlesAvailable')
 }
 
 /**
@@ -64,6 +65,9 @@ export function CompetitionPublicCard({
 }) {
   if (!competition) return null
 
+  const { t } = useSiteLocale()
+  const defaultSummary = t('cards.defaultSummary')
+
   const isPageLayout = layout === 'page'
   const isLegacyBundle = competition.slug === DRAW_COMPETITION_SLUG
   const isIphone17Pro = competition.slug === IPHONE_17_PRO_COMPETITION_SLUG
@@ -82,12 +86,12 @@ export function CompetitionPublicCard({
   const gallery = (competition.galleryUrls || []).filter(Boolean)
   const subImages = isLegacyBundle ? [] : gallery.slice(0, 2)
   const summaryOverride = cardLayout?.summary?.trim()
-  const summary = summaryOverride || publicCompetitionSummary(competition, DEFAULT_SUMMARY)
+  const summary = summaryOverride || publicCompetitionSummary(competition, defaultSummary)
   const titleText = cardLayout?.title?.trim() || competition.title
   const metaFeaturedLabel =
     cardLayout?.metaFeaturedLabel?.trim() ||
-    (competition.featuredOnHomepage ? 'Featured · Main prize' : 'Main prize draw')
-  const enterLabel = cardLayout?.enterButtonLabel?.trim() || 'Enter this competition'
+    (competition.featuredOnHomepage ? t('cards.featuredMainPrize') : t('competitions.paidSection'))
+  const enterLabel = cardLayout?.enterButtonLabel?.trim() || t('cards.enterCompetition')
 
   const liveLegacyLayout = isLegacyBundle && !editorMode
 
@@ -205,7 +209,7 @@ export function CompetitionPublicCard({
     'Price badge',
     'price',
     <p className="ss-competition-card-footer__price inline-flex w-fit rounded-lg border border-emerald-400/30 bg-emerald-950/35 px-3 py-1.5 text-sm font-display text-emerald-50 sm:text-base">
-      {bundlePriceLine(competition)}
+      {bundlePriceLine(competition, t)}
     </p>,
     { widthOnly: false },
   )
@@ -373,7 +377,7 @@ export function CompetitionPublicCard({
               onClick={onEnter}
               className="ss-competition-enter-btn ss-competition-enter-btn--paid"
             >
-              Enter this competition
+              {t('cards.enterCompetition')}
             </button>
           </div>
         ) : null}

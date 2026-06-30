@@ -28,6 +28,8 @@ export const SITE_LOCALE_OPTIONS = [
 
 export const DEFAULT_SITE_LOCALE = 'en'
 export const SITE_LOCALE_STORAGE_KEY = 'ss-site-locale'
+/** Set when the visitor explicitly picks a language (geo must not override). */
+export const SITE_LOCALE_MANUAL_KEY = 'ss-site-locale-manual'
 
 /** @param {string | null | undefined} value */
 export function normalizeSiteLocale(value) {
