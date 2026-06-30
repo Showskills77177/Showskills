@@ -31,6 +31,21 @@ describe('geoLocale', () => {
   it('maps UK to English', () => {
     assert.equal(localeForCountryCode('GB'), 'en')
   })
+
+  it('maps France to French', () => {
+    assert.equal(localeForCountryCode('FR'), 'fr')
+    assert.equal(resolveGeoSiteLocale('FR'), 'fr')
+  })
+})
+
+describe('coerceOptionalSiteLocale', async () => {
+  const { coerceOptionalSiteLocale } = await import('./i18n/localeMeta.mjs')
+
+  it('returns null for empty values instead of defaulting to English', () => {
+    assert.equal(coerceOptionalSiteLocale(null), null)
+    assert.equal(coerceOptionalSiteLocale(''), null)
+    assert.equal(coerceOptionalSiteLocale('fr'), 'fr')
+  })
 })
 
 describe('site i18n', () => {

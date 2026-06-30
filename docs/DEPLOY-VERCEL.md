@@ -13,6 +13,7 @@ API routing uses **five** serverless functions (under the Hobby 12-function limi
 | `api/submissions/world-cup-ball/[...slug].js` | `/api/submissions/world-cup-ball/start`, submit, claim, claim-status, send-claim-link |
 | `api/newsletter/[...slug].js` | `/api/newsletter/subscribe`, unsubscribe, preferences |
 | `api/analytics/[...slug].js` | `/api/analytics/page-view` |
+| `api/visitor/[...slug].js` | `/api/visitor/region` (geo + locale for the site shell) |
 
 Do **not** add other `.js` files under `api/` without checking the function count. Handler logic lives in `backend/api/` and the route table in `lib/vercelApiDispatch.mjs`. The `archive/` folder is excluded via `.vercelignore`.
 

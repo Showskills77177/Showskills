@@ -17,6 +17,7 @@ export default async function handler(req, res) {
 
   const countryCode = resolveVisitorCountryCode(req)
   const suggestedLocale = localeForCountryCode(countryCode)
+  res.setHeader('Cache-Control', 'no-store')
   return json(res, 200, {
     countryCode,
     countryName: countryCode ? countryDisplayName(countryCode) : null,

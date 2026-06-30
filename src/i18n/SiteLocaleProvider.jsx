@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { apiUrl } from '../lib/api'
+import { apiFetch } from '../lib/api'
 import {
   DEFAULT_SITE_LOCALE,
   SITE_LOCALE_MANUAL_KEY,
   SITE_LOCALE_STORAGE_KEY,
+  coerceOptionalSiteLocale,
   normalizeSiteLocale,
   siteLocaleDirection,
 } from '../../shared/i18n/localeMeta.mjs'
@@ -78,7 +79,7 @@ export function SiteLocaleProvider({ children }) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(apiUrl('/api/visitor/region'), { credentials: 'include' })
+        const res = await apiFetch('/api/visitor/region')
         const data = await res.json().catch(() => ({}))
         if (cancelled || !res.ok) return
 
@@ -94,7 +95,7 @@ export function SiteLocaleProvider({ children }) {
 
         if (!localeManualRef.current) {
           const geoLocale =
-            normalizeSiteLocale(data.suggestedLocale) ||
+            coerceOptionalSiteLocale(data.suggestedLocale) ||
             resolveGeoSiteLocale(data.countryCode, detectBrowserLocale())
           setLocaleState(geoLocale)
           try {

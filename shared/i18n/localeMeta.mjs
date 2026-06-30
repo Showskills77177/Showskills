@@ -41,6 +41,17 @@ export function normalizeSiteLocale(value) {
   return DEFAULT_SITE_LOCALE
 }
 
+/** Like normalizeSiteLocale but returns null when input is empty or unknown. */
+export function coerceOptionalSiteLocale(value) {
+  if (value == null || value === '') return null
+  const code = String(value)
+    .trim()
+    .toLowerCase()
+    .split('-')[0]
+  if (SITE_LOCALE_OPTIONS.some((l) => l.code === code)) return code
+  return null
+}
+
 /** @param {string | null | undefined} locale */
 export function siteLocaleDirection(locale) {
   const code = normalizeSiteLocale(locale)
