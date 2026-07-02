@@ -6,6 +6,7 @@ import { ensureWorldCupBallSchema } from '../lib/worldCupBallSchema.mjs'
 import { query } from '../lib/db.mjs'
 import { formatWorldCupBallDrawMonthLabel } from '../../../shared/worldCupBallMonthlyDraw.mjs'
 import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from '../../../shared/worldCupBallGiveaway.mjs'
+import { countryDisplayName } from '../../../shared/trafficSource.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -64,6 +65,7 @@ export default async function handler(req, res) {
         s.id AS session_id,
         s.status AS outcome,
         s.ip_address,
+        s.country_code,
         s.submitted_at,
         s.contact_email,
         e.entry_number,
@@ -79,11 +81,14 @@ export default async function handler(req, res) {
 
     const rows = r.rows.map((row) => {
       const email = String(row.contact_email || row.draw_entry_email || '').trim() || null
+      const countryCode = String(row.country_code || '').trim().toUpperCase() || null
       return {
         sessionId: row.session_id,
         outcome: row.outcome,
         email,
         ipAddress: row.ip_address || '',
+        countryCode,
+        countryName: countryCode ? countryDisplayName(countryCode) : null,
         submittedAt: row.submitted_at || null,
         drawEntryNumber: row.entry_number || null,
         drawMonth: row.draw_month || null,

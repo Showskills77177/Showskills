@@ -62,11 +62,17 @@ import {
   WORLD_CUP_BALL_INTERNATIONAL_CASH_USD,
 } from '../../../shared/worldCupBallInternationalPrize.mjs'
 import { countryDisplayName } from '../../../shared/trafficSource.mjs'
+import { getCountryFromRequest } from '../lib/visitorGeo.mjs'
 import { isWorldCupBallQuizBypass } from '../lib/worldCupBallDev.mjs'
 import { verifyCaptchaPayload } from '../lib/captcha.mjs'
 import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
 import { maybeAwardWorldCupBallMonthlyDrawEntry } from '../lib/awardWorldCupBallMonthlyDrawEntry.mjs'
 import { isWorldCupBallStagingResetServerEnabled } from '../../../shared/worldCupBallStagingReset.mjs'
+
+/** @param {import('http').IncomingMessage} req */
+function visitorCountryCode(req) {
+  return getCountryFromRequest(req).countryCode || null
+}
 
 function monthlyDrawApiPayload(award) {
   if (!award?.awarded || !Array.isArray(award.entryNumbers) || !award.entryNumbers.length) {
@@ -187,6 +193,7 @@ export async function startWorldCupBallSession(req, res) {
 
     body = parseJsonBody(req)
     ip = clientIp(req)
+    const countryCode = visitorCountryCode(req)
     const quizBypass = await isWorldCupBallQuizBypass(req)
     const existing = await getInProgressWorldCupBallSessionByIp(ip)
     if (existing) {
@@ -196,6 +203,7 @@ export async function startWorldCupBallSession(req, res) {
           status: 'abandoned',
           timeoutsUsed: existing.timeouts_used ?? 0,
           answers: parseSessionAnswers(existing),
+          countryCode,
         })
       } else if (sessionExpired(existing.started_at)) {
         await finalizeWorldCupBallSession({
@@ -203,6 +211,7 @@ export async function startWorldCupBallSession(req, res) {
           status: 'expired',
           timeoutsUsed: existing.timeouts_used ?? 0,
           answers: existing.answers_json || {},
+          countryCode,
         })
       } else {
         const questionKeys = parseWorldCupBallSessionQuestionKeys(existing)
@@ -226,6 +235,7 @@ export async function startWorldCupBallSession(req, res) {
           status: 'abandoned',
           timeoutsUsed: existing.timeouts_used ?? 0,
           answers: existing.answers_json || {},
+          countryCode,
         })
       }
     }
@@ -247,7 +257,7 @@ export async function startWorldCupBallSession(req, res) {
     }
 
     const { combinationIndex, questionKeys } = pickRandomWorldCupBallCombination()
-    const session = await createWorldCupBallSession(ip, { questionKeys, combinationIndex })
+    const session = await createWorldCupBallSession(ip, { questionKeys, combinationIndex, countryCode })
     try {
       await logEntryAttempt(req, {
         competition: COMPETITION_WORLD_CUP_BALL,
@@ -319,6 +329,7 @@ export async function submitWorldCupBallQuiz(req, res) {
   }
 
   const ip = clientIp(req)
+  const countryCode = visitorCountryCode(req)
   const quizBypass = await isWorldCupBallQuizBypass(req)
   if (!quizBypass && session.ip_address && ip && session.ip_address !== ip) {
     return json(res, 403, { error: FREE_ENTRY_ERRORS.worldCupBallInvalidSession, code: 'ip_mismatch' })
@@ -330,6 +341,7 @@ export async function submitWorldCupBallQuiz(req, res) {
       status: 'expired',
       timeoutsUsed: Number.isFinite(timeoutsUsed) ? timeoutsUsed : session.timeouts_used ?? 0,
       answers: parseSessionAnswers(session),
+      countryCode,
     })
     return json(res, 400, { error: FREE_ENTRY_ERRORS.worldCupBallInvalidSession, code: 'session_expired' })
   }
@@ -358,6 +370,7 @@ export async function submitWorldCupBallQuiz(req, res) {
           status: 'lost',
           timeoutsUsed: effectiveTimeouts,
           answers,
+          countryCode,
         })
 
         await logEntryAttempt(req, {
@@ -439,6 +452,7 @@ export async function submitWorldCupBallQuiz(req, res) {
         timeoutsUsed: effectiveTimeouts,
         answers: mainAnswers,
         claimToken,
+        countryCode,
       })
 
       await logEntryAttempt(req, {
@@ -530,6 +544,7 @@ export async function submitWorldCupBallQuiz(req, res) {
       timeoutsUsed: effectiveTimeouts,
       answers,
       claimToken,
+      countryCode,
     })
 
     await logEntryAttempt(req, {

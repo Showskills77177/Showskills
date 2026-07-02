@@ -101,6 +101,7 @@ export async function ensureWorldCupBallSchema() {
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS combination_index INTEGER`)
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS salvage_question_key TEXT`)
     await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS contact_email TEXT`)
+    await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN IF NOT EXISTS country_code TEXT`)
     await query(`ALTER TABLE world_cup_ball_monthly_draw_entries ADD COLUMN IF NOT EXISTS email TEXT`)
   } else {
     try {
@@ -135,6 +136,11 @@ export async function ensureWorldCupBallSchema() {
     }
     try {
       await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN contact_email TEXT`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_sessions ADD COLUMN country_code TEXT`)
     } catch {
       /* column exists */
     }
@@ -211,15 +217,15 @@ async function ensureWorldCupBallMonthlyDrawSchema() {
   }
 }
 
-export async function createWorldCupBallSession(ipAddress, { questionKeys, combinationIndex } = {}) {
+export async function createWorldCupBallSession(ipAddress, { questionKeys, combinationIndex, countryCode } = {}) {
   await ensureWorldCupBallSchema()
   const id = randomUUID()
   const now = new Date().toISOString()
   const keysJson = JSON.stringify(questionKeys ?? [])
   await query(
-    `INSERT INTO world_cup_ball_sessions (id, ip_address, status, started_at, question_keys_json, combination_index)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, ipAddress, 'in_progress', now, keysJson, combinationIndex ?? null],
+    `INSERT INTO world_cup_ball_sessions (id, ip_address, country_code, status, started_at, question_keys_json, combination_index)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, ipAddress, countryCode || null, 'in_progress', now, keysJson, combinationIndex ?? null],
   )
   return { id, startedAt: now, questionKeys, combinationIndex }
 }
@@ -300,6 +306,7 @@ export async function finalizeWorldCupBallSession({
   answers,
   claimToken,
   submissionId,
+  countryCode,
 }) {
   await ensureWorldCupBallSchema()
   const now = new Date().toISOString()
@@ -311,9 +318,10 @@ export async function finalizeWorldCupBallSession({
       answers_json = $4,
       claim_token = $5,
       submission_id = $6,
-      submitted_at = $7
+      submitted_at = $7,
+      country_code = COALESCE(country_code, $8)
      WHERE id = $1`,
-    [sessionId, status, timeoutsUsed, answersJson, claimToken || null, submissionId || null, now],
+    [sessionId, status, timeoutsUsed, answersJson, claimToken || null, submissionId || null, now, countryCode || null],
   )
 }
 

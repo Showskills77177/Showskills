@@ -83,7 +83,10 @@ async function main() {
 
     const startRes = await fetch(`${base}/api/submissions/world-cup-ball/start`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vercel-ip-country': 'FR',
+      },
     })
     const start = await startRes.json()
     if (!startRes.ok || !start.sessionId) {
@@ -122,7 +125,10 @@ async function main() {
 
     const twoWrongRes = await fetch(`${base}/api/submissions/world-cup-ball/submit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vercel-ip-country': 'FR',
+      },
       body: JSON.stringify({
         sessionId: start.sessionId,
         timeoutsUsed: 0,
@@ -140,6 +146,12 @@ async function main() {
     }
     if (!Array.isArray(twoWrong.wrongReview) || twoWrong.wrongReview.length !== 2) {
       throw new Error(`expected two wrong-review rows, got ${JSON.stringify(twoWrong.wrongReview)}`)
+    }
+
+    const { getWorldCupBallSession } = await import('../backend/api/lib/worldCupBallSchema.mjs')
+    const failedSession = await getWorldCupBallSession(start.sessionId)
+    if (failedSession?.country_code !== 'FR') {
+      throw new Error(`expected failed session country_code FR, got ${failedSession?.country_code}`)
     }
 
     const contactRes = await fetch(`${base}/api/submissions/world-cup-ball/failed-contact`, {
@@ -192,6 +204,8 @@ async function main() {
         addressLine2: '',
         city: 'London',
         postcode: 'SW1A 1AA',
+        countryCode: 'GB',
+        checkPhotoAcknowledged: true,
       }),
     })
     const claim = await claimRes.json()

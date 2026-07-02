@@ -60,8 +60,9 @@ export default function WorldCupBallFailedAttemptsPage() {
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300/90">World Cup Ball</p>
         <h1 className="mt-1 text-xl font-semibold text-stone-100">Failed quiz attempts</h1>
         <p className="mt-2 text-sm text-stone-400">
-          Every finished attempt that did not win the ball — lost or disqualified. Email appears when the entrant
-          saved it on the fail screen.
+          Every finished attempt that did not win the ball — lost or disqualified. Country is inferred from the
+          visitor&apos;s IP at quiz start (Vercel geo headers). Email appears when the entrant saved it on the fail
+          screen.
         </p>
       </div>
 
@@ -108,20 +109,21 @@ export default function WorldCupBallFailedAttemptsPage() {
               <th className="px-3 py-2.5 font-semibold">Email</th>
               <th className="px-3 py-2.5 font-semibold">Outcome</th>
               <th className="px-3 py-2.5 font-semibold">Draw entry</th>
+              <th className="px-3 py-2.5 font-semibold">Country</th>
               <th className="px-3 py-2.5 font-semibold">IP</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {loading && !rows.length ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-stone-500">
+                <td colSpan={6} className="px-3 py-6 text-center text-stone-500">
                   Loading…
                 </td>
               </tr>
             ) : null}
             {!loading && !rows.length ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-stone-500">
+                <td colSpan={6} className="px-3 py-6 text-center text-stone-500">
                   No failed attempts yet.
                 </td>
               </tr>
@@ -145,6 +147,18 @@ export default function WorldCupBallFailedAttemptsPage() {
                       <span className="font-mono text-amber-100/90">{row.drawEntryNumber}</span>
                       {row.drawMonthLabel ? (
                         <span className="mt-0.5 block text-xs text-stone-500">{row.drawMonthLabel}</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="text-stone-500">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5">
+                  {row.countryName ? (
+                    <span>
+                      {row.countryName}
+                      {row.countryCode ? (
+                        <span className="mt-0.5 block font-mono text-xs text-stone-500">{row.countryCode}</span>
                       ) : null}
                     </span>
                   ) : (
