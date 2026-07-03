@@ -7,6 +7,7 @@ import { query } from '../lib/db.mjs'
 import { formatWorldCupBallDrawMonthLabel } from '../../../shared/worldCupBallMonthlyDraw.mjs'
 import { WORLD_CUP_BALL_GIVEAWAY_LABEL } from '../../../shared/worldCupBallGiveaway.mjs'
 import { countryDisplayName } from '../../../shared/trafficSource.mjs'
+import { resolveAndPersistCountriesForIps } from '../lib/ipCountryLookup.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -79,9 +80,36 @@ export default async function handler(req, res) {
       listParams,
     )
 
+    const pageIps = r.rows
+      .filter((row) => !row.country_code && row.ip_address)
+      .map((row) => String(row.ip_address).trim())
+    const extraRes = await query(
+      `SELECT DISTINCT ip_address
+       FROM world_cup_ball_sessions
+       WHERE status IN ('lost', 'disqualified')
+         AND (country_code IS NULL OR TRIM(country_code) = '')
+         AND ip_address IS NOT NULL
+         AND TRIM(ip_address) != ''
+       LIMIT 25`,
+    )
+    const ipsToResolve = [
+      ...new Set([
+        ...pageIps,
+        ...extraRes.rows.map((row) => String(row.ip_address || '').trim()).filter(Boolean),
+      ]),
+    ]
+
+    const ipToCountry =
+      ipsToResolve.length > 0
+        ? await resolveAndPersistCountriesForIps(ipsToResolve, { maxLookups: 25, delayMs: 250 })
+        : new Map()
+
     const rows = r.rows.map((row) => {
       const email = String(row.contact_email || row.draw_entry_email || '').trim() || null
-      const countryCode = String(row.country_code || '').trim().toUpperCase() || null
+      let countryCode = String(row.country_code || '').trim().toUpperCase() || null
+      if (!countryCode && row.ip_address) {
+        countryCode = ipToCountry.get(String(row.ip_address).trim()) || null
+      }
       return {
         sessionId: row.session_id,
         outcome: row.outcome,
