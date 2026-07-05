@@ -1,6 +1,6 @@
-import { json } from '../../lib/http.mjs'
+import { json } from '../lib/http.mjs'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
-import { readYoutubeConfig } from '../../lib/youtubeConfig.mjs'
+import { readYoutubeConfig } from '../lib/youtubeConfig.mjs'
 
 /**
  * GET /api/youtube/oauth/callback — OAuth redirect target (connect flow TBD).
