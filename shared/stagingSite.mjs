@@ -13,10 +13,15 @@ export function isShowSkillsStagingClientEnabled() {
   return isShowSkillsStagingHost(window.location.hostname)
 }
 
-/** API / server: staging deployment only — not production main. */
+/** API / server: staging deployment or local dev — not production live. */
 export function isShowSkillsStagingServerEnabled() {
-  const siteUrl = String(process.env.SITE_URL || process.env.VERCEL_URL || '').toLowerCase()
-  if (isShowSkillsStagingHost(siteUrl)) return true
-  const branch = String(process.env.VERCEL_GIT_COMMIT_REF || '').toLowerCase()
-  return branch === 'staging'
+  const vercelEnv = process.env.VERCEL_ENV
+  if (vercelEnv === 'production') {
+    const siteUrl = String(process.env.SITE_URL || process.env.VERCEL_URL || '').toLowerCase()
+    if (isShowSkillsStagingHost(siteUrl)) return true
+    const branch = String(process.env.VERCEL_GIT_COMMIT_REF || '').toLowerCase()
+    return branch === 'staging'
+  }
+  // Local `npm run dev:api` / `dev:all`, or Vercel preview/staging deployments
+  return true
 }
