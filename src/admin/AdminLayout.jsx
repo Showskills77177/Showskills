@@ -4,6 +4,8 @@ import { AdminThemePicker } from './AdminThemePicker'
 import { useAdminTheme } from './AdminThemeContext'
 import { adminThemeRootClass } from './adminThemes.mjs'
 import { apiFetch } from '../lib/api'
+import { isShowSkillsStagingClientEnabled } from '../../shared/stagingSite.mjs'
+import { EYES_OF_FOOTBALL_ADMIN_PATH } from '../../shared/eyesOfFootball.mjs'
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard' },
@@ -69,6 +71,16 @@ export function AdminLayout() {
                 </span>
               </NavLink>
             ))}
+            {isShowSkillsStagingClientEnabled() ? (
+              <NavLink to={EYES_OF_FOOTBALL_ADMIN_PATH} className={linkClass}>
+                <span className="flex flex-col leading-tight">
+                  <span>Eyes Of Football</span>
+                  <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400/80">
+                    Staging · YouTube
+                  </span>
+                </span>
+              </NavLink>
+            ) : null}
             <button type="button" onClick={logout} className={theme.logoutBtn}>
               Log out
             </button>

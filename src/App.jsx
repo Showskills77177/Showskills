@@ -37,6 +37,8 @@ import PrizeRevealPage from './pages/PrizeRevealPage'
 import ShirtPrizeRevealPage from './pages/ShirtPrizeRevealPage'
 import WorldCupBallGiveawayPage from './pages/WorldCupBallGiveawayPage'
 import AdminSiteVisitsPage from './pages/admin/SiteVisitsPage'
+import EyesOfFootballAdminPage from './pages/admin/EyesOfFootballAdminPage'
+import { isShowSkillsStagingClientEnabled } from '../shared/stagingSite.mjs'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -98,6 +100,9 @@ export default function App() {
                 <Route path="test-email" element={<AdminTestEmailPage />} />
                 <Route path="newsletter" element={<AdminNewsletterPage />} />
                 <Route path="theme" element={<AdminThemeDesignerPage />} />
+                {isShowSkillsStagingClientEnabled() ? (
+                  <Route path="eyes-of-football" element={<EyesOfFootballAdminPage />} />
+                ) : null}
                 <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
               </Route>
             </Route>
