@@ -12,6 +12,7 @@ import {
 } from '../lib/adminResetSecret.mjs'
 import { getResendApiKey, isResendProductionMode, resolveResendFrom } from '../lib/resendConfig.mjs'
 import { json } from '../lib/http.mjs'
+import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 
 /** Safe diagnostics for admin login page (no secrets). */
 export default async function handler(req, res) {
@@ -52,5 +53,11 @@ export default async function handler(req, res) {
     resendProductionMode: isResendProductionMode(),
     fromAddress: resolveResendFrom().replace(/<[^>]+>/, '…'),
     vercelEnv: process.env.VERCEL_ENV || null,
+    stagingDeployment: isShowSkillsStagingServerEnabled(),
+    deployHost: process.env.VERCEL_URL || null,
+    siteUrlEnv: process.env.SITE_URL || null,
+    gitBranch: process.env.VERCEL_GIT_COMMIT_REF || null,
+    adminEmailEnvSet: Boolean(String(process.env.ADMIN_EMAIL || '').trim()),
+    adminOtpEmailEnvSet: Boolean(String(process.env.ADMIN_OTP_EMAIL || '').trim()),
   })
 }

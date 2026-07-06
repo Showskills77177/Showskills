@@ -17,6 +17,7 @@ import {
 import { getResendApiKey } from '../lib/resendConfig.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
+import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -73,6 +74,13 @@ export default async function handler(req, res) {
       const pending = await signAdminSmsPending(sent.codeHash)
       res.setHeader('Set-Cookie', setAdminSmsPendingCookieHeader(pending))
       return json(res, 200, adminOtpVerificationPayload(sent))
+    }
+
+    // Staging: allow password-only when OTP email is not wired (missing ADMIN_EMAIL, etc.)
+    if (isShowSkillsStagingServerEnabled()) {
+      const token = await signAdminSession()
+      res.setHeader('Set-Cookie', setAdminCookieHeader(token))
+      return json(res, 200, { ok: true, verificationRequired: false, stagingPasswordOnly: true })
     }
 
     const missingEmail = []

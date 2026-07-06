@@ -9,6 +9,7 @@ import {
   resolveSiteUrl,
   getResendApiKey,
 } from './resendConfig.mjs'
+import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 
 /**
  * Admin login step 2 — email OTP via Resend (free tier: https://resend.com).
@@ -22,10 +23,14 @@ export function isAdminEmailOtpConfigured() {
 
 /**
  * Password-only admin sign-in (no 6-digit email code).
- * Enabled on local Express (`npm run dev:all`) and E2E; never on Vercel Production.
- * Set ADMIN_REQUIRE_EMAIL_OTP=1 to force codes locally. Set ADMIN_SKIP_EMAIL_OTP=1 on Vercel preview if needed.
+ * Staging hostname: ADMIN_SKIP_EMAIL_OTP=1 works even when VERCEL_ENV=production.
  */
 export function isAdminEmailOtpBypassed() {
+  const skipOtp =
+    process.env.ADMIN_SKIP_EMAIL_OTP === '1' || process.env.ADMIN_SKIP_EMAIL_OTP === 'true'
+
+  if (skipOtp && isShowSkillsStagingServerEnabled()) return true
+
   if (process.env.VERCEL_ENV === 'production') return false
   if (
     process.env.ADMIN_REQUIRE_EMAIL_OTP === '1' ||
@@ -34,9 +39,7 @@ export function isAdminEmailOtpBypassed() {
     return false
   }
   if (process.env.E2E_MODE === '1' || process.env.E2E_MODE === 'true') return true
-  if (process.env.ADMIN_SKIP_EMAIL_OTP === '1' || process.env.ADMIN_SKIP_EMAIL_OTP === 'true') {
-    return true
-  }
+  if (skipOtp) return true
   return !process.env.VERCEL
 }
 
