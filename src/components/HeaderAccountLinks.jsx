@@ -62,41 +62,7 @@ export function HeaderRightAccountLinks() {
 }
 
 export function MobileHeaderAccountLinks() {
-  const { user, status, logout, openAuthModal } = useUserAuth()
-  const { t } = useSiteLocale()
-
-  if (status === 'loading') return null
-
-  if (user) {
-    const name = userDisplayName(user)
-    return (
-      <div className={authGroupClass}>
-        <NavLink to="/account" className={authLinkClass}>
-          {name}
-        </NavLink>
-        <NavDash />
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="rounded-md px-1 py-1 text-sm text-stone-400 transition hover:text-white"
-        >
-          {t('auth.signOut')}
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className={authGroupClass}>
-      <button type="button" onClick={() => openAuthModal('login')} className={authLinkClass}>
-        {t('auth.signIn')}
-      </button>
-      <NavDash />
-      <button type="button" onClick={() => openAuthModal('register')} className={registerClass}>
-        {t('auth.register')}
-      </button>
-    </div>
-  )
+  return null
 }
 
 export function NavProfileSettingsButton() {

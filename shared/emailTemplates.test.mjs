@@ -11,6 +11,11 @@ import { buildCompleteQuizUrl } from './quizLinks.mjs'
 import { buildPrizeRevealUrl } from './prizeReveal.mjs'
 import { buildQuizResultHtml } from './quizResultEmail.mjs'
 import { buildWelcomeEmailHtml, buildCampaignEmailHtml, normalizeCampaignBodyHtml } from './newsletterEmail.mjs'
+import {
+  buildUserPasswordResetEmailHtml,
+  buildUserPasswordResetEmailText,
+  userPasswordResetEmailSubject,
+} from './userAuthEmail.mjs'
 
 describe('email templates', () => {
   it('quiz-pending email includes headline, tickets, and CTA link', () => {
@@ -174,6 +179,42 @@ describe('email templates', () => {
     })
     assert.match(html, /Hello world/)
     assert.match(html, /color:#d6d3d1/)
+  })
+
+  it('password reset email uses branded shell with OTP panel', () => {
+    const html = buildUserPasswordResetEmailHtml({
+      code: '595028',
+      siteUrl: 'https://vercelshowskillstesteasynow.online',
+      fullName: 'Alexander Botev',
+      purpose: 'reset',
+    })
+    assert.match(html, /Reset your password/i)
+    assert.match(html, /595028/)
+    assert.match(html, /showskills-logo\.png/)
+    assert.match(html, /background:#0c1a16/)
+    assert.match(html, /Your verification code/i)
+    assert.match(html, /Enter reset code/i)
+    assert.match(html, /\/forgot-password/)
+
+    const claimHtml = buildUserPasswordResetEmailHtml({
+      code: '123456',
+      siteUrl: 'https://showskills.co.uk',
+      fullName: 'Test User',
+      purpose: 'claim',
+    })
+    assert.match(claimHtml, /Secure your account/i)
+    assert.match(claimHtml, /Verify &amp; set password|Verify & set password/)
+
+    const text = buildUserPasswordResetEmailText({
+      code: '595028',
+      siteUrl: 'https://showskills.co.uk',
+      fullName: 'Alexander Botev',
+    })
+    assert.match(text, /595028/)
+    assert.match(text, /forgot-password/)
+
+    assert.match(userPasswordResetEmailSubject({ purpose: 'reset' }), /password reset code/i)
+    assert.match(userPasswordResetEmailSubject({ purpose: 'claim' }), /Verify your email/i)
   })
 
   it('purchase and quiz emails include Trustpilot review invite', () => {
