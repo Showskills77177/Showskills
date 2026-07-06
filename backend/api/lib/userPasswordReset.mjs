@@ -13,6 +13,11 @@ import {
   resolveCustomerEmailRecipient,
   resendAccountEmail,
 } from './resendConfig.mjs'
+import {
+  buildUserPasswordResetEmailHtml,
+  buildUserPasswordResetEmailText,
+  userPasswordResetEmailSubject,
+} from '../../../shared/userAuthEmail.mjs'
 
 function otpPepper() {
   return (
@@ -69,21 +74,13 @@ export function verifyUserResetOtpCode(code, expectedHash) {
   return diff === 0
 }
 
-function buildUserResetOtpHtml({ code, site, fullName }) {
-  const greeting = fullName ? `Hi ${fullName},` : 'Hi,'
-  return `
-    <p style="font-family:system-ui,sans-serif;color:#e7e5e4;">${greeting}</p>
-    <p style="font-family:system-ui,sans-serif;color:#e7e5e4;">
-      Your ShowSkills Rewards password reset code is:
-    </p>
-    <p style="font-family:ui-monospace,monospace;font-size:28px;font-weight:700;letter-spacing:0.2em;color:#84cc16;">
-      ${code}
-    </p>
-    <p style="font-family:system-ui,sans-serif;font-size:13px;color:#a8a29e;">
-      This code expires in 15 minutes. If you did not request a password reset, you can ignore this email — your password will stay the same.
-    </p>
-    <p style="font-family:system-ui,sans-serif;font-size:12px;color:#78716c;">${site}</p>
-  `.trim()
+function buildUserResetOtpHtml({ code, site, fullName, purpose = 'reset' }) {
+  return buildUserPasswordResetEmailHtml({
+    code,
+    siteUrl: site,
+    fullName,
+    purpose,
+  })
 }
 
 async function postResendEmail(apiKey, payload) {
@@ -101,9 +98,9 @@ async function postResendEmail(apiKey, payload) {
 }
 
 /**
- * @param {{ to: string, fullName?: string }} opts
+ * @param {{ to: string, fullName?: string, purpose?: 'reset' | 'claim' }} opts
  */
-export async function sendUserPasswordResetEmail({ to, fullName }) {
+export async function sendUserPasswordResetEmail({ to, fullName, purpose = 'reset' }) {
   const intended = (to || '').trim().toLowerCase()
   if (!intended.includes('@')) {
     throw new Error('Invalid email address')
@@ -128,17 +125,9 @@ export async function sendUserPasswordResetEmail({ to, fullName }) {
   const code = generateUserResetOtpCode()
   const site = resolveSiteUrl()
   const from = resolveResendFrom()
-  const subject = 'ShowSkills Rewards password reset code'
-  const html = buildUserResetOtpHtml({ code, site, fullName })
-  const text = [
-    fullName ? `Hi ${fullName},` : 'Hi,',
-    '',
-    `Your ShowSkills Rewards password reset code is: ${code}`,
-    '',
-    'This code expires in 15 minutes. If you did not request a password reset, ignore this email.',
-    '',
-    site,
-  ].join('\n')
+  const subject = userPasswordResetEmailSubject({ purpose })
+  const html = buildUserResetOtpHtml({ code, site, fullName, purpose })
+  const text = buildUserPasswordResetEmailText({ code, siteUrl: site, fullName, purpose })
 
   let deliveredTo = deliverTo
   let { ok, data, status } = await postResendEmail(apiKey, {
@@ -218,6 +207,7 @@ export async function requestUserPasswordReset(email) {
   const sent = await sendUserPasswordResetEmail({
     to: row.email,
     fullName: row.full_name,
+    purpose: row.password_hash ? 'reset' : 'claim',
   })
 
   return {
