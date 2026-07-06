@@ -19,7 +19,7 @@ describe('youtubeConfig', () => {
     delete process.env.YOUTUBE_REDIRECT_URI
     assert.equal(
       defaultYoutubeOAuthRedirectUri(),
-      'https://vercelshowskillstesteasynow.online/api/youtube/oauth/callback',
+      'https://vercelshowskillstesteasynow.online/api/youtube-oauth-callback',
     )
     if (prev === undefined) delete process.env.SITE_URL
     else process.env.SITE_URL = prev
