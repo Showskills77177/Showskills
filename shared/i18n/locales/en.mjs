@@ -3,6 +3,7 @@
 /** @type {Record<string, string>} */
 export const EN_MESSAGES = {
   'auth.account': 'My account',
+  'auth.accountClaimRequired': 'This email is already linked to an order. Use Forgot password to verify your email and set a password.',
   'auth.accountExists': 'An account with this email already exists.',
   'auth.accountIntro': 'You are signed in as {email}.',
   'auth.accountTitle': 'My account',

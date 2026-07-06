@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { query, isUniqueViolation } from './db.mjs'
+import { normalizeAccountEmail } from '../../../shared/normalizeAccountEmail.mjs'
 import { ensureUserAuthSchema } from './ensureUserAuthSchema.mjs'
 
 let phoneColumnEnsured = false
@@ -15,7 +16,7 @@ export async function ensureUserPhoneColumn() {
  */
 export async function upsertUserContact({ email, fullName, phone }) {
   await ensureUserPhoneColumn()
-  const e = email.trim().toLowerCase()
+  const e = normalizeAccountEmail(email)
   const n = fullName?.trim() || 'Unknown'
   const p = typeof phone === 'string' ? phone.trim().slice(0, 32) : ''
   const newId = randomUUID()

@@ -3,6 +3,7 @@ import { query } from './db.mjs'
 import { ensureUserAuthSchema } from './ensureUserAuthSchema.mjs'
 import { ensureUserPhoneColumn } from './userContact.mjs'
 import { hashUserPassword, verifyUserPassword } from './password.mjs'
+import { normalizeAccountEmail } from '../../../shared/normalizeAccountEmail.mjs'
 
 function mapUserRow(row) {
   if (!row) return null
@@ -24,9 +25,7 @@ export async function getUserById(id) {
 export async function getUserAuthRowByEmail(email) {
   await ensureUserAuthSchema()
   await ensureUserPhoneColumn()
-  const e = String(email || '')
-    .trim()
-    .toLowerCase()
+  const e = normalizeAccountEmail(email)
   if (!e.includes('@')) return null
   const r = await query(
     `SELECT id, email, full_name, password_hash, created_at, last_login_at FROM users WHERE lower(email) = $1`,
@@ -42,9 +41,7 @@ export async function registerUser({ email, password, fullName }) {
   await ensureUserAuthSchema()
   await ensureUserPhoneColumn()
 
-  const e = String(email || '')
-    .trim()
-    .toLowerCase()
+  const e = normalizeAccountEmail(email)
   const name = String(fullName || '')
     .trim()
     .slice(0, 120)
@@ -68,16 +65,16 @@ export async function registerUser({ email, password, fullName }) {
     return { ok: false, error: 'An account with this email already exists. Sign in instead.' }
   }
 
-  const now = new Date().toISOString()
-
-  if (existing) {
-    await query(
-      `UPDATE users SET full_name = $2, password_hash = $3 WHERE id = $1`,
-      [existing.id, name, passwordHash],
-    )
-    const user = await getUserById(existing.id)
-    return { ok: true, user, isNewAccount: false }
+  if (existing && !existing.password_hash) {
+    return {
+      ok: false,
+      error:
+        'This email is already linked to an order on ShowSkills. Use Forgot password to verify your email and set a password.',
+      code: 'email_claim_required',
+    }
   }
+
+  const now = new Date().toISOString()
 
   const id = randomUUID()
   await query(
@@ -91,9 +88,7 @@ export async function registerUser({ email, password, fullName }) {
 export async function authenticateUser({ email, password }) {
   await ensureUserAuthSchema()
 
-  const e = String(email || '')
-    .trim()
-    .toLowerCase()
+  const e = normalizeAccountEmail(email)
   const row = await getUserAuthRowByEmail(e)
   if (!row?.password_hash) {
     return { ok: false, error: 'Invalid email or password.' }

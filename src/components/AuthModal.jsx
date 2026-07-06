@@ -339,7 +339,7 @@ function ResetPasswordForm({ onSwitchLogin, resetMeta }) {
   )
 }
 
-function RegisterForm({ onSwitchLogin, onSuccess }) {
+function RegisterForm({ onSwitchLogin, onForgotPassword, onSuccess }) {
   const { refresh } = useUserAuth()
   const { t } = useSiteLocale()
   const [fullName, setFullName] = useState('')
@@ -365,7 +365,11 @@ function RegisterForm({ onSwitchLogin, onSuccess }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(parseApiError(data, t('form.networkError'), res.status))
+        if (data.code === 'email_claim_required') {
+          setError(t('auth.accountClaimRequired'))
+        } else {
+          setError(parseApiError(data, t('form.networkError'), res.status))
+        }
         return
       }
       await refresh()
@@ -444,6 +448,10 @@ function RegisterForm({ onSwitchLogin, onSuccess }) {
         {t('auth.hasAccount')}{' '}
         <button type="button" onClick={onSwitchLogin} className="text-lime-300 underline underline-offset-2">
           {t('auth.signIn')}
+        </button>
+        {' · '}
+        <button type="button" onClick={onForgotPassword} className="text-lime-300 underline underline-offset-2">
+          {t('auth.forgotPassword')}
         </button>
       </p>
     </form>
@@ -540,7 +548,11 @@ export function AuthModal() {
           </div>
           <div className="overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
             {view === 'register' ? (
-              <RegisterForm onSwitchLogin={() => openAuthModal('login')} onSuccess={afterAuthSuccess} />
+              <RegisterForm
+                onSwitchLogin={() => openAuthModal('login')}
+                onForgotPassword={() => openAuthModal('forgot')}
+                onSuccess={afterAuthSuccess}
+              />
             ) : view === 'forgot' ? (
               <ForgotPasswordForm onSwitchLogin={goToLogin} onCodeSent={onCodeSent} />
             ) : view === 'reset' ? (

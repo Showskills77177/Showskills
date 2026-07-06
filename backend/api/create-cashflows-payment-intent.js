@@ -7,6 +7,7 @@ import { parseCheckoutCompetition, resolveCheckoutBundle } from './lib/checkoutB
 import { createCashflowsPaymentIntent, getCashflowsConfig } from './lib/cashflows.mjs'
 import { parseJsonBody, json } from './lib/http.mjs'
 import { requireUkForPaidTickets } from './lib/requireUkForPaidTickets.mjs'
+import { normalizeAccountEmail } from '../../shared/normalizeAccountEmail.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -45,8 +46,9 @@ export default async function handler(req, res) {
   }
   const { bundle } = bundleResult
 
-  const customerEmail =
-    typeof body.customerEmail === 'string' ? body.customerEmail.trim().slice(0, 320) : ''
+  const customerEmail = normalizeAccountEmail(
+    typeof body.customerEmail === 'string' ? body.customerEmail : '',
+  ).slice(0, 320)
   const customerFullName =
     typeof body.customerFullName === 'string' ? body.customerFullName.trim().slice(0, 200) : ''
   if (!customerEmail.includes('@')) {

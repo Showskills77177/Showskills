@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { query, isUniqueViolation, isDbConfigured } from './db.mjs'
 import { formatTicketNumber } from '../../../shared/ticketNumber.mjs'
+import { normalizeAccountEmail } from '../../../shared/normalizeAccountEmail.mjs'
 import { ensureTicketSchema } from './ensureTicketSchema.mjs'
 
 function randomSerial() {
@@ -120,7 +121,7 @@ export async function ensureTicketNumbersForPurchase(ticketId, quantity) {
 /** Latest paid purchase for an email (for qualified draw confirmation email). */
 export async function getLatestPaidPurchaseForEmail(email) {
   await ensureTicketSchema()
-  const e = email.trim().toLowerCase()
+  const e = normalizeAccountEmail(email)
   const u = await query(`SELECT id FROM users WHERE lower(email) = $1`, [e])
   if (!u.rows[0]) return null
 
