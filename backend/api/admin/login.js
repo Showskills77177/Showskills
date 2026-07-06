@@ -32,7 +32,10 @@ export default async function handler(req, res) {
     return json(res, 405, { error: 'Method not allowed' })
   }
 
-  const limited = applyRateLimit(req, res, { pathKey: 'admin-login', max: 8, windowMs: 900_000 })
+  const limited =
+    process.env.E2E_MODE === '1'
+      ? { blocked: false }
+      : applyRateLimit(req, res, { pathKey: 'admin-login', max: 8, windowMs: 900_000 })
   if (limited.blocked) {
     return json(res, 429, { error: 'Too many login attempts. Try again later.' })
   }

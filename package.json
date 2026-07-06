@@ -37,6 +37,8 @@
     "test": "playwright test",
     "test:e2e": "playwright test",
     "test:admin": "playwright test tests/e2e/admin.spec.js",
+    "test:eof": "playwright test tests/e2e/eyes-of-football.spec.js",
+    "test:eyes-of-football": "node scripts/test-eyes-of-football-api.mjs && playwright test tests/e2e/eyes-of-football.spec.js",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
     "test:quiz": "node --test shared/paidSkillQuestions.test.mjs shared/competitionSkillQuestions.test.mjs shared/vpnDetection.test.mjs shared/competitionPeriods.test.mjs shared/competitionCopy.test.mjs shared/consolationShirtGiveaway.test.mjs",
     "test:email-templates": "node --test shared/emailTemplates.test.mjs shared/siteContact.test.mjs",

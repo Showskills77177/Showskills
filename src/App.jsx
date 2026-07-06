@@ -9,6 +9,8 @@ import { EofAdminLayout } from './admin/EofAdminLayout'
 import { EditorLayout } from './editor/EditorLayout'
 import { RequireAdmin } from './admin/RequireAdmin'
 import { Layout } from './components/Layout'
+import { UserAuthProvider } from './auth/UserAuthProvider'
+import { RequireUser } from './auth/RequireUser'
 import HomePage from './pages/HomePage'
 import CompetitionsPage from './pages/CompetitionsPage'
 import KickupsArchivePage from './pages/KickupsArchivePage'
@@ -28,6 +30,9 @@ import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import AdminThemeDesignerPage from './pages/admin/ThemeDesignerPage'
 import AdminPageEditorPage from './pages/admin/PageEditorPage'
 import ContactPage from './pages/ContactPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import AccountPage from './pages/AccountPage'
 import FaqPage from './pages/FaqPage'
 import NewsletterPage from './pages/NewsletterPage'
 import NewsletterPreferencesPage from './pages/NewsletterPreferencesPage'
@@ -110,11 +115,23 @@ export default function App() {
               ) : null}
             </Route>
           </Route>
-          <Route path="/" element={<Layout />}>
+          <Route
+            path="/"
+            element={
+              <UserAuthProvider>
+                <Layout />
+              </UserAuthProvider>
+            }
+          >
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="faq" element={<FaqPage />} />
+            <Route path="login" element={<LoginPage />} />
+            <Route path="register" element={<RegisterPage />} />
+            <Route element={<RequireUser />}>
+              <Route path="account" element={<AccountPage />} />
+            </Route>
             <Route path="newsletter" element={<NewsletterPage />} />
             <Route path="newsletter/preferences" element={<NewsletterPreferencesPage />} />
             <Route path="newsletter/unsubscribe" element={<NewsletterUnsubscribePage />} />

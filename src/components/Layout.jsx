@@ -14,6 +14,7 @@ import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { localizedLayoutTextOrCms } from '../../shared/i18n/localizedLayout.mjs'
 import { LanguagePicker } from './LanguagePicker'
 import { RegionNoticeBanner } from './RegionNoticeBanner'
+import { HeaderAccountLinks } from './HeaderAccountLinks'
 
 function desktopNavClass({ isActive }) {
   return `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
@@ -109,7 +110,8 @@ export function Layout() {
               <QuizPromptNav className="w-full max-w-xs" />
             </div>
           ) : (
-            <div className="flex justify-center px-4 pb-2 sm:hidden">
+            <div className="flex flex-col items-center gap-2 px-4 pb-2 sm:hidden">
+              <HeaderAccountLinks />
               <LanguagePicker />
             </div>
           )}
@@ -164,6 +166,7 @@ export function Layout() {
                 headerOffsets,
                 'tagline',
                 <div className="flex items-center justify-end gap-3 justify-self-end">
+                  <HeaderAccountLinks className="hidden sm:flex" />
                   <LanguagePicker className="hidden md:inline-flex" />
                   <p className="hidden -rotate-2 font-display text-lg font-bold tracking-[0.04em] text-white opacity-95 md:block">
                     {headerTagline}
@@ -173,7 +176,8 @@ export function Layout() {
             : withOffset(
                 headerOffsets,
                 'tagline',
-                <div className="hidden justify-self-end md:flex">
+                <div className="hidden items-center justify-end gap-3 justify-self-end md:flex">
+                  <HeaderAccountLinks />
                   <LanguagePicker />
                 </div>,
               )}
