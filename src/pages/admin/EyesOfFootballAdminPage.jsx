@@ -4,6 +4,7 @@ import { apiFetch } from '../../lib/api'
 import { isShowSkillsStagingClientEnabled } from '../../../shared/stagingSite.mjs'
 import { EYES_OF_FOOTBALL_PRODUCT_NAME, YOUTUBE_SETUP_STEPS } from '../../../shared/eyesOfFootball.mjs'
 import EofChannelBar from './eof/EofChannelBar'
+import EofAnalyticsPanel from './eof/EofAnalyticsPanel'
 import EofPublishCalendar from './eof/EofPublishCalendar'
 import EofUploadStudio from './eof/EofUploadStudio'
 import EofProjectList from './eof/EofProjectList'
@@ -72,7 +73,7 @@ export default function EyesOfFootballAdminPage() {
 
       {yt ? (
         <>
-          <EofChannelBar channel={data.channel} youtube={yt} analytics={data.analytics} />
+          <EofChannelBar channel={data.channel} youtube={yt} />
 
           {!ready ? (
             <section className={`mt-6 rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
@@ -93,6 +94,7 @@ export default function EyesOfFootballAdminPage() {
               <nav className="mt-6 flex gap-2 border-b border-[#303030] pb-2">
                 {[
                   ['studio', 'Studio'],
+                  ['analytics', 'Analytics'],
                   ['calendar', 'Calendar'],
                   ['content', 'Content'],
                 ].map(([id, label]) => (
@@ -108,6 +110,10 @@ export default function EyesOfFootballAdminPage() {
                   </button>
                 ))}
               </nav>
+
+              {view === 'analytics' ? (
+                <EofAnalyticsPanel analytics={data.analytics} />
+              ) : null}
 
               {view === 'studio' ? (
                 <div className="mt-6">
