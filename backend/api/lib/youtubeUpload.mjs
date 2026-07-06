@@ -24,23 +24,62 @@ export async function getYoutubeAccessToken() {
 }
 
 /**
- * Start a resumable upload — client PUTs video bytes to returned uploadUrl.
- * @param {{ title: string, description?: string, privacyStatus: 'private' | 'public' | 'unlisted', publishAt?: string | null, contentType?: string }} params
+ * @param {{
+ *   title: string,
+ *   description?: string,
+ *   tags?: string[],
+ *   categoryId?: string,
+ *   privacyStatus: 'private' | 'public' | 'unlisted',
+ *   publishAt?: string | null,
+ *   contentType?: string,
+ *   madeForKids?: boolean,
+ *   containsSyntheticMedia?: boolean,
+ *   paidPromotion?: boolean,
+ *   embeddable?: boolean,
+ *   publicStatsViewable?: boolean,
+ * }} params
  */
 export async function initYoutubeResumableUpload({
   title,
   description = '',
+  tags = [],
+  categoryId = '17',
   privacyStatus,
   publishAt = null,
   contentType = 'video/*',
+  madeForKids = false,
+  containsSyntheticMedia = false,
+  paidPromotion = false,
+  embeddable = true,
+  publicStatsViewable = true,
 }) {
   const accessToken = await getYoutubeAccessToken()
   const status = {
     privacyStatus,
-    selfDeclaredMadeForKids: false,
+    selfDeclaredMadeForKids: Boolean(madeForKids),
+    embeddable,
+    publicStatsViewable,
   }
-  if (publishAt && privacyStatus === 'private') {
+  if (typeof containsSyntheticMedia === 'boolean') {
+    status.containsSyntheticMedia = containsSyntheticMedia
+  }
+  if (typeof paidPromotion === 'boolean') {
+    status.paidProductPlacement = paidPromotion
+  }
+  if (publishAt && (privacyStatus === 'private' || privacyStatus === 'public')) {
     status.publishAt = publishAt
+    if (privacyStatus !== 'private') {
+      status.privacyStatus = 'private'
+    }
+  }
+
+  const snippet = {
+    title: String(title || '').slice(0, 100),
+    description: String(description || '').slice(0, 5000),
+    categoryId: String(categoryId || '17'),
+  }
+  if (tags.length) {
+    snippet.tags = tags.slice(0, 30)
   }
 
   const res = await fetch(
@@ -52,14 +91,7 @@ export async function initYoutubeResumableUpload({
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': contentType,
       },
-      body: JSON.stringify({
-        snippet: {
-          title: String(title || '').slice(0, 100),
-          description: String(description || '').slice(0, 5000),
-          categoryId: '17',
-        },
-        status,
-      }),
+      body: JSON.stringify({ snippet, status }),
     },
   )
 
@@ -79,11 +111,14 @@ export async function initYoutubeResumableUpload({
   return { uploadUrl }
 }
 
+const VIDEO_PARTS =
+  'snippet,status,contentDetails,statistics,processingDetails,fileDetails,player'
+
 /** @param {string} videoId */
 export async function fetchYoutubeVideo(videoId) {
   const accessToken = await getYoutubeAccessToken()
   const url = new URL('https://www.googleapis.com/youtube/v3/videos')
-  url.searchParams.set('part', 'snippet,status')
+  url.searchParams.set('part', VIDEO_PARTS)
   url.searchParams.set('id', videoId)
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -96,26 +131,115 @@ export async function fetchYoutubeVideo(videoId) {
   return data?.items?.[0] || null
 }
 
+/** Normalize upload / copyright / guidelines signals from YouTube processing. */
+export function extractYoutubeUploadChecks(video) {
+  if (!video) {
+    return {
+      processingStatus: 'unknown',
+      copyright: { status: 'unknown', issues: [] },
+      guidelines: { status: 'unknown', issues: [] },
+    }
+  }
+
+  const proc = video.processingDetails || {}
+  const processingStatus = proc.processingStatus || 'unknown'
+  const issues = []
+  if (proc.processingFailureReason) {
+    issues.push(proc.processingFailureReason)
+  }
+  if (Array.isArray(proc.processingIssues)) {
+    for (const item of proc.processingIssues) {
+      if (item?.reason) issues.push(item.reason)
+    }
+  }
+
+  const copyrightIssues = issues.filter((i) =>
+    /copyright|content.?id|claim|blocked/i.test(String(i)),
+  )
+  const guidelineIssues = issues.filter((i) =>
+    /guideline|policy|community|age|restricted/i.test(String(i)),
+  )
+
+  const copyrightStatus =
+    copyrightIssues.length > 0
+      ? 'issues'
+      : processingStatus === 'succeeded'
+        ? 'clear'
+        : processingStatus === 'processing'
+          ? 'checking'
+          : 'unknown'
+
+  const guidelinesStatus =
+    video.status?.uploadStatus === 'rejected' || guidelineIssues.length > 0
+      ? 'issues'
+      : processingStatus === 'succeeded'
+        ? 'clear'
+        : processingStatus === 'processing'
+          ? 'checking'
+          : 'unknown'
+
+  return {
+    processingStatus,
+    copyright: { status: copyrightStatus, issues: copyrightIssues },
+    guidelines: { status: guidelinesStatus, issues: guidelineIssues },
+    rejectionReason: video.status?.rejectionReason || null,
+    failureReason: proc.processingFailureReason || null,
+  }
+}
+
+export function youtubeVideoToSummary(video) {
+  if (!video) return null
+  const checks = extractYoutubeUploadChecks(video)
+  const file = video.fileDetails || {}
+  const content = video.contentDetails || {}
+  const stats = video.statistics || {}
+  const dur = content.duration ? parseIso8601Duration(content.duration) : null
+
+  return {
+    youtubeVideoId: video.id,
+    title: video.snippet?.title,
+    description: video.snippet?.description,
+    tags: video.snippet?.tags || [],
+    channelId: video.snippet?.channelId,
+    channelTitle: video.snippet?.channelTitle,
+    privacyStatus: video.status?.privacyStatus,
+    madeForKids: Boolean(video.status?.selfDeclaredMadeForKids),
+    publishAt: video.status?.publishAt || null,
+    viewCount: stats.viewCount ? Number(stats.viewCount) : 0,
+    likeCount: stats.likeCount ? Number(stats.likeCount) : 0,
+    durationSeconds: dur,
+    fileSizeBytes: file.fileSize ? Number(file.fileSize) : null,
+    definition: file.definition || content.definition || null,
+    dimension: content.dimension || null,
+    thumbnailUrl:
+      video.snippet?.thumbnails?.medium?.url ||
+      video.snippet?.thumbnails?.default?.url ||
+      null,
+    embedHtml: video.player?.embedHtml || null,
+    checks,
+  }
+}
+
+function parseIso8601Duration(iso) {
+  const m = String(iso).match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+  if (!m) return null
+  return Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Number(m[3] || 0)
+}
+
 /**
  * @param {string} videoId
- * @param {{ publishAt?: string | null, privacyStatus?: string }} patch
+ * @param {{ publishAt?: string | null, privacyStatus?: string, madeForKids?: boolean }} patch
  */
 export async function updateYoutubeVideoStatus(videoId, patch) {
   const accessToken = await getYoutubeAccessToken()
-  const res = await fetch(
-    'https://www.googleapis.com/youtube/v3/videos?part=status',
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: JSON.stringify({
-        id: videoId,
-        status: patch,
-      }),
+  const res = await fetch('https://www.googleapis.com/youtube/v3/videos?part=status', {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=UTF-8',
     },
-  )
+    body: JSON.stringify({ id: videoId, status: patch }),
+  })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     const msg = data?.error?.message || `YouTube video update failed (${res.status})`
@@ -124,7 +248,28 @@ export async function updateYoutubeVideoStatus(videoId, patch) {
   return data
 }
 
-/** Publish a private video immediately. */
+/** @param {string} videoId @param {Buffer} imageBytes @param {string} mime */
+export async function uploadYoutubeThumbnail(videoId, imageBytes, mime = 'image/jpeg') {
+  const accessToken = await getYoutubeAccessToken()
+  const url = new URL('https://www.googleapis.com/upload/youtube/v3/thumbnails/set')
+  url.searchParams.set('videoId', videoId)
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': mime,
+      'Content-Length': String(imageBytes.length),
+    },
+    body: imageBytes,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const msg = data?.error?.message || `Thumbnail upload failed (${res.status})`
+    throw new Error(msg)
+  }
+  return data
+}
+
 export async function publishYoutubeVideoNow(videoId) {
   return updateYoutubeVideoStatus(videoId, {
     privacyStatus: 'public',
@@ -132,10 +277,13 @@ export async function publishYoutubeVideoNow(videoId) {
   })
 }
 
-/** Schedule a private video for future publish. */
 export async function scheduleYoutubeVideo(videoId, publishAtIso) {
   return updateYoutubeVideoStatus(videoId, {
     privacyStatus: 'private',
     publishAt: publishAtIso,
   })
+}
+
+export async function setYoutubeVisibility(videoId, privacyStatus) {
+  return updateYoutubeVideoStatus(videoId, { privacyStatus, publishAt: null })
 }

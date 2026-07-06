@@ -3,13 +3,13 @@ import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mj
 import { requireEofSession, requireEofOwner, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
 import { readYoutubeConfig } from '../lib/youtubeConfig.mjs'
 import { initYoutubeResumableUpload } from '../lib/youtubeUpload.mjs'
+import { parseTagsInput } from '../../../shared/eofYoutubeMeta.mjs'
 import {
   createEofProject,
-  completeEofUpload,
   markEofProjectFailed,
-  approveEofProject,
   EOF_UPLOAD_SOURCE,
 } from '../lib/eofYoutubeProjects.mjs'
+import { fetchYoutubeChannelForAdmin } from '../lib/youtubeChannel.mjs'
 
 function parseScheduleAt(value) {
   if (!value || typeof value !== 'string') return null
@@ -23,7 +23,12 @@ function isFuture(iso) {
   return new Date(iso) > new Date()
 }
 
-/** POST /api/admin/eof-upload-init — start resumable YouTube upload + DB project. */
+function parseVisibility(v, fallback = 'private') {
+  if (v === 'public' || v === 'unlisted' || v === 'private') return v
+  return fallback
+}
+
+/** POST /api/admin/eof-upload-init */
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -62,6 +67,18 @@ export default async function handler(req, res) {
       ? body.contentType
       : 'video/mp4'
   const scheduledAt = parseScheduleAt(body.scheduledAt)
+  const videoContentType = body.videoContentType === 'long' ? 'long' : 'short'
+  const tags = Array.isArray(body.tags)
+    ? body.tags.map(String).slice(0, 30)
+    : parseTagsInput(body.tags || '')
+  const categoryId = typeof body.categoryId === 'string' ? body.categoryId : '17'
+  const madeForKids = body.madeForKids === true
+  const containsSyntheticMedia = body.containsSyntheticMedia === true
+  const paidPromotion = body.paidPromotion === true
+  const relatedVideoId =
+    typeof body.relatedVideoId === 'string' ? body.relatedVideoId.trim() : null
+  const fileSizeBytes = Number.isFinite(body.fileSizeBytes) ? body.fileSizeBytes : null
+  const durationSeconds = Number.isFinite(body.durationSeconds) ? body.durationSeconds : null
 
   if (!title || title.length < 3) {
     return json(res, 400, { error: 'Title is required (min 3 characters).' })
@@ -72,24 +89,30 @@ export default async function handler(req, res) {
   if (uploadSource === EOF_UPLOAD_SOURCE.ADMIN) {
     try {
       await requireEofOwner(req)
-    } catch (e) {
+    } catch {
       return json(res, 403, {
         error: 'Admin upload is only available when signed in as the channel owner (ADMIN_USER).',
       })
     }
   }
 
-  const submittedBy = info.username || 'unknown'
-  let privacyStatus = 'private'
+  let visibility = parseVisibility(body.visibility, uploadSource === EOF_UPLOAD_SOURCE.EDITOR ? 'private' : 'public')
   let publishAt = null
 
-  if (uploadSource === EOF_UPLOAD_SOURCE.ADMIN) {
-    if (scheduledAt && isFuture(scheduledAt)) {
-      privacyStatus = 'private'
-      publishAt = scheduledAt
-    } else {
-      privacyStatus = 'public'
-    }
+  if (uploadSource === EOF_UPLOAD_SOURCE.EDITOR) {
+    visibility = 'private'
+  } else if (scheduledAt && isFuture(scheduledAt)) {
+    visibility = 'private'
+    publishAt = scheduledAt
+  } else {
+    visibility = parseVisibility(body.visibility, 'public')
+  }
+
+  let channel = null
+  try {
+    channel = await fetchYoutubeChannelForAdmin()
+  } catch {
+    /* optional */
   }
 
   let project = null
@@ -98,24 +121,41 @@ export default async function handler(req, res) {
       title,
       description,
       uploadSource,
-      submittedBy,
+      submittedBy: info.username || 'unknown',
       scheduledAt: uploadSource === EOF_UPLOAD_SOURCE.ADMIN && isFuture(scheduledAt) ? scheduledAt : null,
+      contentType: videoContentType,
+      tags,
+      visibility,
+      madeForKids,
+      categoryId,
+      channelId: channel?.id || yt.channelId || null,
+      fileSizeBytes,
+      durationSeconds,
+      containsSyntheticMedia,
+      paidPromotion,
+      relatedVideoId,
     })
 
     const { uploadUrl } = await initYoutubeResumableUpload({
       title,
       description,
-      privacyStatus,
+      tags,
+      categoryId,
+      privacyStatus: visibility,
       publishAt,
       contentType,
+      madeForKids,
+      containsSyntheticMedia,
+      paidPromotion,
     })
 
     return json(res, 200, {
       projectId: project.id,
       uploadUrl,
       uploadSource,
-      privacyStatus,
+      privacyStatus: visibility,
       scheduledAt: project.scheduledAt,
+      channelId: project.channelId,
     })
   } catch (e) {
     if (project?.id) {

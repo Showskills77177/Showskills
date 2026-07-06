@@ -5,14 +5,17 @@ import {
   eofSessionInfo,
   isEofEditorLoginConfigured,
 } from '../lib/eofYoutubeAuth.mjs'
-import {
-  EYES_OF_FOOTBALL_PRODUCT_NAME,
-  YOUTUBE_SETUP_STEPS,
-} from '../../../shared/eyesOfFootball.mjs'
+import { EYES_OF_FOOTBALL_PRODUCT_NAME, YOUTUBE_SETUP_STEPS } from '../../../shared/eyesOfFootball.mjs'
 import { youtubeSetupStatusForAdmin } from '../lib/youtubeConfig.mjs'
-import { listEofProjects, syncDueScheduledProjects } from '../lib/eofYoutubeProjects.mjs'
+import {
+  listEofProjects,
+  syncDueScheduledProjects,
+  buildCalendarFromProjects,
+} from '../lib/eofYoutubeProjects.mjs'
+import { fetchYoutubeChannelForAdmin } from '../lib/youtubeChannel.mjs'
+import { fetchChannelAnalyticsSummary } from '../lib/youtubeAnalytics.mjs'
 
-/** GET /api/admin/eyes-of-football — staging-only YouTube hub + project queue. */
+/** GET /api/admin/eyes-of-football */
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -40,6 +43,9 @@ export default async function handler(req, res) {
   const sessionInfo = eofSessionInfo(session)
 
   let projects = []
+  let channel = null
+  let analytics = null
+
   try {
     await syncDueScheduledProjects()
     projects = await listEofProjects()
@@ -47,14 +53,32 @@ export default async function handler(req, res) {
     console.error('[eyes-of-football] projects', e)
   }
 
+  if (youtube.isReadyToPublish) {
+    try {
+      channel = await fetchYoutubeChannelForAdmin()
+    } catch (e) {
+      console.error('[eyes-of-football] channel', e)
+    }
+    try {
+      analytics = await fetchChannelAnalyticsSummary()
+    } catch (e) {
+      analytics = { available: false, reason: e instanceof Error ? e.message : 'Analytics unavailable' }
+    }
+  }
+
+  const calendar = buildCalendarFromProjects(projects)
+
   return json(res, 200, {
     product: EYES_OF_FOOTBALL_PRODUCT_NAME,
     staging: true,
     youtube,
+    channel,
+    analytics,
     setupSteps: YOUTUBE_SETUP_STEPS,
     session: sessionInfo,
     editorLoginConfigured: isEofEditorLoginConfigured(),
     projects,
+    calendar,
     oauthConnectAvailable: youtube.hasOAuthClient && !youtube.hasRefreshToken,
   })
 }

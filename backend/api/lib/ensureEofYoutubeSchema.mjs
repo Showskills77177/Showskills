@@ -2,7 +2,41 @@ import { query, dbIsPostgres } from './db.mjs'
 
 let ensured = false
 
-/** Eyes Of Football — Shorts project queue (staging). */
+const EXTRA_COLUMNS = [
+  ['content_type', "TEXT NOT NULL DEFAULT 'short'"],
+  ['tags_json', "TEXT NOT NULL DEFAULT '[]'"],
+  ['visibility', "TEXT NOT NULL DEFAULT 'private'"],
+  ['made_for_kids', 'INTEGER NOT NULL DEFAULT 0'],
+  ['category_id', "TEXT NOT NULL DEFAULT '17'"],
+  ['channel_id', 'TEXT'],
+  ['file_size_bytes', 'INTEGER'],
+  ['duration_seconds', 'REAL'],
+  ['contains_synthetic_media', 'INTEGER NOT NULL DEFAULT 0'],
+  ['paid_promotion', 'INTEGER NOT NULL DEFAULT 0'],
+  ['related_video_id', 'TEXT'],
+  ['view_count', 'INTEGER NOT NULL DEFAULT 0'],
+  ['processing_status', 'TEXT'],
+  ['checks_json', 'TEXT'],
+  ['thumbnail_uploaded', 'INTEGER NOT NULL DEFAULT 0'],
+]
+
+async function addColumnIfMissing(name, typeSql) {
+  if (dbIsPostgres()) {
+    try {
+      await query(`ALTER TABLE eof_youtube_projects ADD COLUMN IF NOT EXISTS ${name} ${typeSql}`)
+    } catch {
+      /* ignore */
+    }
+  } else {
+    try {
+      await query(`ALTER TABLE eof_youtube_projects ADD COLUMN ${name} ${typeSql}`)
+    } catch {
+      /* column exists */
+    }
+  }
+}
+
+/** Eyes Of Football — Shorts / long-form project queue (staging). */
 export async function ensureEofYoutubeSchema() {
   if (ensured) return
 
@@ -40,6 +74,10 @@ export async function ensureEofYoutubeSchema() {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `)
+  }
+
+  for (const [name, typeSql] of EXTRA_COLUMNS) {
+    await addColumnIfMissing(name, typeSql)
   }
 
   await query(`

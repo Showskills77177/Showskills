@@ -6,6 +6,7 @@ import {
   markEofProjectFailed,
   getEofProject,
   approveEofProject,
+  refreshEofProjectFromYoutube,
 } from '../lib/eofYoutubeProjects.mjs'
 
 function parseScheduleAt(value) {
@@ -15,7 +16,7 @@ function parseScheduleAt(value) {
   return d.toISOString()
 }
 
-/** POST /api/admin/eof-upload-complete — after browser PUT to YouTube upload URL. */
+/** POST /api/admin/eof-upload-complete */
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -43,19 +44,29 @@ export default async function handler(req, res) {
   const youtubeVideoId = typeof body.youtubeVideoId === 'string' ? body.youtubeVideoId.trim() : ''
   const action = typeof body.action === 'string' ? body.action.trim() : 'complete'
 
+  if (action === 'refresh') {
+    if (!projectId) return json(res, 400, { error: 'projectId is required.' })
+    try {
+      const result = await refreshEofProjectFromYoutube(projectId)
+      return json(res, 200, { ok: true, ...result })
+    } catch (e) {
+      return json(res, 400, { error: e instanceof Error ? e.message : 'Refresh failed' })
+    }
+  }
+
   if (action === 'approve') {
     try {
       await requireEofOwner(req)
-    } catch (e) {
+    } catch {
       return json(res, 403, { error: 'Only the channel owner can approve projects.' })
     }
-    if (!projectId) {
-      return json(res, 400, { error: 'projectId is required.' })
-    }
+    if (!projectId) return json(res, 400, { error: 'projectId is required.' })
     const publishNow = body.publishNow === true
     const scheduleAt = parseScheduleAt(body.scheduledAt)
+    const visibility =
+      body.visibility === 'unlisted' || body.visibility === 'private' ? body.visibility : 'public'
     try {
-      const project = await approveEofProject(projectId, { publishNow, scheduleAt })
+      const project = await approveEofProject(projectId, { publishNow, scheduleAt, visibility })
       return json(res, 200, { ok: true, project })
     } catch (e) {
       return json(res, 400, { error: e instanceof Error ? e.message : 'Approve failed' })
@@ -67,9 +78,10 @@ export default async function handler(req, res) {
   }
 
   const project = await getEofProject(projectId)
-  if (!project) {
-    return json(res, 404, { error: 'Project not found.' })
-  }
+  if (!project) return json(res, 404, { error: 'Project not found.' })
+
+  const thumbnailBase64 =
+    typeof body.thumbnailBase64 === 'string' ? body.thumbnailBase64.replace(/^data:[^;]+;base64,/, '') : null
 
   try {
     const updated = await completeEofUpload({
@@ -77,8 +89,11 @@ export default async function handler(req, res) {
       youtubeVideoId,
       uploadSource: project.uploadSource,
       scheduledAt: project.scheduledAt,
+      visibility: project.visibility,
+      thumbnailBase64,
     })
-    return json(res, 200, { ok: true, project: updated })
+    const refreshed = await refreshEofProjectFromYoutube(projectId)
+    return json(res, 200, { ok: true, project: updated, youtube: refreshed.youtube })
   } catch (e) {
     await markEofProjectFailed(projectId, e instanceof Error ? e.message : 'Upload complete failed')
     console.error('[eof-upload-complete]', e)

@@ -49,6 +49,7 @@ export function buildYoutubeOAuthConnectUrl(clientId, redirectUri) {
     scope: [
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/yt-analytics.readonly',
     ].join(' '),
     access_type: 'offline',
     prompt: 'consent',
