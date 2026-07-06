@@ -1,19 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { query, isUniqueViolation, dbIsPostgres } from './db.mjs'
+import { query, isUniqueViolation } from './db.mjs'
+import { ensureUserAuthSchema } from './ensureUserAuthSchema.mjs'
 
 let phoneColumnEnsured = false
 
 export async function ensureUserPhoneColumn() {
   if (phoneColumnEnsured) return
-  if (dbIsPostgres()) {
-    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`)
-  } else {
-    try {
-      await query(`ALTER TABLE users ADD COLUMN phone TEXT`)
-    } catch {
-      /* exists */
-    }
-  }
+  await ensureUserAuthSchema()
   phoneColumnEnsured = true
 }
 

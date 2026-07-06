@@ -1,4 +1,5 @@
 import { query, dbIsPostgres } from './db.mjs'
+import { ensureUserAuthSchema } from './ensureUserAuthSchema.mjs'
 
 let ensured = false
 
@@ -38,6 +39,8 @@ export function normalizeUserAddress(input) {
 /** Idempotent DDL for profile fields on users. */
 export async function ensureUserProfileSchema() {
   if (ensured) return
+
+  await ensureUserAuthSchema()
 
   const cols = ['address_json', 'delivery_address_json']
   if (dbIsPostgres()) {

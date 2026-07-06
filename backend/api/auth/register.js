@@ -43,41 +43,47 @@ export default async function handler(req, res) {
   const password = typeof body.password === 'string' ? body.password : ''
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
 
-  const result = await registerUser({ email, password, fullName })
-  if (!result.ok) {
-    const status = result.error?.includes('already exists') ? 409 : 400
-    return json(res, status, { error: result.error })
-  }
-
-  const newsletter = await subscribeNewsletter(result.user.email, {
-    source: NEWSLETTER_SOURCES.account_registration,
-    resubscribe: true,
-  })
-  if (!newsletter.ok) {
-    console.warn('[auth/register] newsletter subscribe failed:', newsletter.error)
-  }
-
-  if (
-    newsletter.ok &&
-    process.env.NEWSLETTER_SEND_WELCOME !== '0' &&
-    newsletter.subscriber?.unsubscribeToken
-  ) {
-    const welcome = await sendWelcomeEmail({
-      to: newsletter.email,
-      unsubscribeToken: newsletter.subscriber.unsubscribeToken,
-    })
-    if (!welcome.ok && !welcome.skipped) {
-      console.warn('[auth/register] welcome email failed:', welcome.error)
+  try {
+    const result = await registerUser({ email, password, fullName })
+    if (!result.ok) {
+      const status = result.error?.includes('already exists') ? 409 : 400
+      return json(res, status, { error: result.error })
     }
+
+    const newsletter = await subscribeNewsletter(result.user.email, {
+      source: NEWSLETTER_SOURCES.account_registration,
+      resubscribe: true,
+    })
+    if (!newsletter.ok) {
+      console.warn('[auth/register] newsletter subscribe failed:', newsletter.error)
+    }
+
+    if (
+      newsletter.ok &&
+      process.env.NEWSLETTER_SEND_WELCOME !== '0' &&
+      newsletter.subscriber?.unsubscribeToken
+    ) {
+      const welcome = await sendWelcomeEmail({
+        to: newsletter.email,
+        unsubscribeToken: newsletter.subscriber.unsubscribeToken,
+      })
+      if (!welcome.ok && !welcome.skipped) {
+        console.warn('[auth/register] welcome email failed:', welcome.error)
+      }
+    }
+
+    const token = await signUserSession({ sub: result.user.id, email: result.user.email })
+    res.setHeader('Set-Cookie', setUserCookieHeader(token))
+
+    return json(res, 201, {
+      ok: true,
+      user: result.user,
+      newsletterSubscribed: newsletter.ok,
+      message: 'Account created. You are signed in and subscribed to ShowSkills Rewards.',
+    })
+  } catch (e) {
+    console.error('[auth/register]', e)
+    const msg = e instanceof Error ? e.message : 'Registration failed'
+    return json(res, 500, { error: msg })
   }
-
-  const token = await signUserSession({ sub: result.user.id, email: result.user.email })
-  res.setHeader('Set-Cookie', setUserCookieHeader(token))
-
-  return json(res, 201, {
-    ok: true,
-    user: result.user,
-    newsletterSubscribed: newsletter.ok,
-    message: 'Account created. You are signed in and subscribed to ShowSkills Rewards.',
-  })
 }
