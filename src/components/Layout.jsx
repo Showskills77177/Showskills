@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import showskillsLogo from '../assets/showskills-logo.png'
 import { EntryModal } from './EntryModal'
+import { AuthModal } from './AuthModal'
 import { TermsModal } from './TermsModal'
 import { MobileNavDock } from './MobileNavDock'
 import { QuizPromptNav } from './QuizPromptNav'
@@ -13,7 +14,10 @@ import { translateNavLabel } from '../../shared/i18n/translate.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { LanguagePicker } from './LanguagePicker'
 import { RegionNoticeBanner } from './RegionNoticeBanner'
-import { HeaderRightAccountLinks, MobileHeaderAccountLinks } from './HeaderAccountLinks'
+import { HeaderRightAccountLinks, MobileHeaderAccountLinks, NavDash, NavProfileSettingsButton } from './HeaderAccountLinks'
+import { useUserAuth } from '../auth/UserAuthProvider'
+
+const headerNavRowClass = 'flex flex-wrap items-center gap-x-1 text-sm leading-normal'
 
 function desktopNavClass({ isActive }) {
   return `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
@@ -21,7 +25,7 @@ function desktopNavClass({ isActive }) {
   }`
 }
 
-function LogoMark({ className = 'h-10 sm:h-12' }) {
+function LogoMark({ className = 'h-11 sm:h-[3.35rem]' }) {
   return (
     <div
       role="img"
@@ -66,12 +70,18 @@ export function Layout() {
   const { termsOpen, setTermsOpen, openTerms, paidQuizNavStatus } = useEntryFlow()
   const { shell } = useSiteShell()
   const { locale, t } = useSiteLocale()
+  const { status: authStatus } = useUserAuth()
   const showQuizPrompt = paidQuizNavStatus !== 'none'
   const rootClassName = resolveSiteShellRootClassName(shell)
   const navItems = shell.navOrder
     .map((id) => shell.navItems[id])
     .filter(Boolean)
     .filter((item) => item.visible !== false)
+  const isLoggedIn = authStatus === 'ok'
+  const headerNavItems = navItems.filter((item) => {
+    if (!isLoggedIn) return true
+    return item.id !== 'faq' && item.id !== 'terms'
+  })
   const footerLinks = (shell.footer?.linkOrder || [])
     .map((id) => {
       const link = shell.footer?.links?.[id]
@@ -88,45 +98,46 @@ export function Layout() {
   return (
     <div className={rootClassName}>
       <EntryModal />
+      <AuthModal />
       <TermsModal open={termsOpen} onClose={() => setTermsOpen(false)} />
       <RegionNoticeBanner />
 
       <header className="ss-header sticky top-0 z-40 border-b border-white/[0.06] backdrop-blur-md">
         <div className="overflow-visible sm:hidden">
-          <div className="ss-mobile-logo-row mx-auto flex w-full max-w-5xl justify-center px-4 pb-1.5 pt-3.5">
+          <div className="ss-site-container ss-mobile-logo-row flex w-full justify-center px-4 pb-1.5 pt-3.5">
             <Link
               to="/"
               className="outline-none focus-visible:ring-2 focus-visible:ring-lime-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071512]"
               aria-label="ShowSkills Rewards home"
             >
-              <LogoMark className="ss-mobile-header-logo h-12" />
+              <LogoMark className="ss-mobile-header-logo h-[3.2rem]" />
             </Link>
           </div>
           {showQuizPrompt ? (
-            <div className="flex items-center justify-between gap-2 px-4 pb-2 sm:hidden">
+            <div className={`${headerNavRowClass} justify-end px-4 pb-2 sm:hidden`}>
               <LanguagePicker />
-              <QuizPromptNav className="min-w-0 flex-1" />
+              <NavDash />
+              <QuizPromptNav className="min-w-0" />
+              <NavDash />
               <MobileHeaderAccountLinks />
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3 px-4 pb-2 sm:hidden">
+            <div className={`${headerNavRowClass} justify-end px-4 pb-2 sm:hidden`}>
               <LanguagePicker />
+              <NavDash />
               <MobileHeaderAccountLinks />
             </div>
           )}
-          <MobileNavDock navItems={navItems} />
+          <MobileNavDock navItems={headerNavItems} />
         </div>
 
-        <div className="relative z-10 mx-auto hidden max-w-5xl min-h-[4rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-y-0 px-6 py-2.5 sm:grid">
-          <nav
-            className="flex flex-wrap items-center justify-start gap-x-1 text-sm leading-normal"
-            aria-label="Main navigation"
-          >
+        <div className="ss-site-container relative z-10 hidden min-h-[4rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-y-0 px-6 py-2.5 sm:grid">
+          <nav className={`${headerNavRowClass} justify-start`} aria-label="Main navigation">
             {withOffset(
               headerOffsets,
               'nav',
               <>
-                {navItems.map((item, i) => (
+                {headerNavItems.map((item, i) => (
                   <span key={item.id} className="contents">
                     {i > 0 ? (
                       <span className="select-none text-stone-600" aria-hidden>
@@ -136,6 +147,14 @@ export function Layout() {
                     <DesktopNavLink item={item} openTerms={openTerms} locale={locale} />
                   </span>
                 ))}
+                {isLoggedIn ? (
+                  <>
+                    <span className="select-none text-stone-600" aria-hidden>
+                      —
+                    </span>
+                    <NavProfileSettingsButton />
+                  </>
+                ) : null}
                 {showQuizPrompt ? (
                   <>
                     <span className="select-none text-stone-600" aria-hidden>
@@ -163,8 +182,9 @@ export function Layout() {
           {withOffset(
             headerOffsets,
             'tagline',
-            <div className="hidden items-center justify-end gap-3 justify-self-end md:flex">
+            <div className={`${headerNavRowClass} hidden justify-end justify-self-end md:flex`}>
               <HeaderRightAccountLinks />
+              <NavDash />
               <LanguagePicker />
             </div>,
           )}

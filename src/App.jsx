@@ -30,9 +30,8 @@ import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import AdminThemeDesignerPage from './pages/admin/ThemeDesignerPage'
 import AdminPageEditorPage from './pages/admin/PageEditorPage'
 import ContactPage from './pages/ContactPage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
 import AccountPage from './pages/AccountPage'
+import AuthModalRedirect from './pages/AuthModalRedirect'
 import FaqPage from './pages/FaqPage'
 import NewsletterPage from './pages/NewsletterPage'
 import NewsletterPreferencesPage from './pages/NewsletterPreferencesPage'
@@ -127,8 +126,9 @@ export default function App() {
             <Route path="competitions" element={<CompetitionsPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="faq" element={<FaqPage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="register" element={<RegisterPage />} />
+            <Route path="login" element={<AuthModalRedirect view="login" />} />
+            <Route path="register" element={<AuthModalRedirect view="register" />} />
+            <Route path="forgot-password" element={<AuthModalRedirect view="forgot" />} />
             <Route element={<RequireUser />}>
               <Route path="account" element={<AccountPage />} />
             </Route>

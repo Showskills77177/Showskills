@@ -1,32 +1,46 @@
 import { Link, NavLink } from 'react-router-dom'
-import { useUserAuth } from '../auth/UserAuthProvider'
+import { useUserAuth, userDisplayName } from '../auth/UserAuthProvider'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 
-const signInClass = ({ isActive } = {}) =>
-  `rounded-md px-1.5 py-1 text-sm text-white transition ${
+const authLinkClass =
+  'ss-desktop-nav-link rounded-md px-1 py-1 text-sm text-white opacity-90 transition hover:opacity-100'
+
+const registerClass =
+  'ss-desktop-nav-link rounded-md px-1 py-1 text-xs font-semibold uppercase tracking-wide text-lime-300 transition hover:text-lime-200 sm:text-sm'
+
+const authGroupClass = 'flex flex-wrap items-center gap-x-0'
+
+const profileNavClass = ({ isActive }) =>
+  `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
     isActive ? 'opacity-100' : 'opacity-90 hover:opacity-100'
   }`
 
-const registerClass =
-  'rounded-md px-1.5 py-1 text-sm font-bold uppercase tracking-wide text-lime-300 transition hover:text-lime-200'
+export function NavDash() {
+  return (
+    <span className="select-none text-stone-600" aria-hidden>
+      —
+    </span>
+  )
+}
 
-/** Account / sign-in links for the right side of the header (desktop). */
 export function HeaderRightAccountLinks() {
-  const { user, status, logout } = useUserAuth()
+  const { user, status, logout, openAuthModal } = useUserAuth()
   const { t } = useSiteLocale()
 
   if (status === 'loading') return null
 
   if (user) {
+    const name = userDisplayName(user)
     return (
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <NavLink to="/account" className={signInClass}>
-          {t('auth.account')}
+      <div className={authGroupClass}>
+        <NavLink to="/account" className={authLinkClass}>
+          {name}
         </NavLink>
+        <NavDash />
         <button
           type="button"
           onClick={() => logout()}
-          className="rounded-md px-1.5 py-1 text-sm text-stone-400 transition hover:text-white"
+          className="rounded-md px-1 py-1 text-sm text-stone-400 transition hover:text-white"
         >
           {t('auth.signOut')}
         </button>
@@ -35,34 +49,36 @@ export function HeaderRightAccountLinks() {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <NavLink to="/login" className={signInClass}>
+    <div className={authGroupClass}>
+      <button type="button" onClick={() => openAuthModal('login')} className={authLinkClass}>
         {t('auth.signIn')}
-      </NavLink>
-      <Link to="/register" className={registerClass}>
+      </button>
+      <NavDash />
+      <button type="button" onClick={() => openAuthModal('register')} className={registerClass}>
         {t('auth.register')}
-      </Link>
+      </button>
     </div>
   )
 }
 
-/** Compact auth links on the right for mobile header. */
 export function MobileHeaderAccountLinks() {
-  const { user, status, logout } = useUserAuth()
+  const { user, status, logout, openAuthModal } = useUserAuth()
   const { t } = useSiteLocale()
 
   if (status === 'loading') return null
 
   if (user) {
+    const name = userDisplayName(user)
     return (
-      <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-        <NavLink to="/account" className={signInClass}>
-          {t('auth.account')}
+      <div className={authGroupClass}>
+        <NavLink to="/account" className={authLinkClass}>
+          {name}
         </NavLink>
+        <NavDash />
         <button
           type="button"
           onClick={() => logout()}
-          className="rounded-md px-1 py-0.5 text-xs text-stone-400 transition hover:text-white"
+          className="rounded-md px-1 py-1 text-sm text-stone-400 transition hover:text-white"
         >
           {t('auth.signOut')}
         </button>
@@ -71,13 +87,27 @@ export function MobileHeaderAccountLinks() {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-      <NavLink to="/login" className={signInClass}>
+    <div className={authGroupClass}>
+      <button type="button" onClick={() => openAuthModal('login')} className={authLinkClass}>
         {t('auth.signIn')}
-      </NavLink>
-      <Link to="/register" className={`${registerClass} text-xs`}>
+      </button>
+      <NavDash />
+      <button type="button" onClick={() => openAuthModal('register')} className={registerClass}>
         {t('auth.register')}
-      </Link>
+      </button>
     </div>
+  )
+}
+
+export function NavProfileSettingsButton() {
+  const { user, status } = useUserAuth()
+  const { t } = useSiteLocale()
+
+  if (status !== 'ok' || !user) return null
+
+  return (
+    <NavLink to="/account" className={profileNavClass}>
+      {t('auth.profileSettings')}
+    </NavLink>
   )
 }

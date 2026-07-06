@@ -7,6 +7,7 @@ export const NEWSLETTER_SOURCES = {
   paid_competition: 'paid_competition',
   admin_import: 'admin_import',
   account_registration: 'account_registration',
+  account_settings: 'account_settings',
 }
 
 export const DEFAULT_NEWSLETTER_PREFERENCES = {

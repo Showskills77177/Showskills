@@ -828,8 +828,8 @@ export function HomePageContent({
         <div className="ss-hero-photo-scrim absolute inset-0" />
       </div>
 
-      <div className="ss-hero-inner mx-auto max-w-5xl px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
-        <article className="ss-hero-merged-panel relative z-[2] grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 md:grid-cols-2 md:items-stretch md:gap-x-5 md:gap-y-4 md:px-4 md:py-5 lg:gap-x-7 lg:gap-y-3 lg:p-6">
+      <div className="ss-hero-inner ss-site-container px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
+        <article className="ss-hero-merged-panel relative z-[2] grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 md:grid-cols-2 md:items-stretch md:gap-x-5 md:gap-y-4 md:px-4 md:py-5 lg:gap-x-8 lg:gap-y-3 lg:p-6">
           {intro.visible !== false
             ? wrapBlock('hero_intro', HOMEPAGE_BLOCK_LABELS.hero_intro, introBlock)
             : null}
