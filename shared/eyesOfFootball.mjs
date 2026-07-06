@@ -13,8 +13,6 @@ export const YOUTUBE_ENV_KEYS = {
   refreshToken: 'YOUTUBE_REFRESH_TOKEN',
   channelId: 'YOUTUBE_CHANNEL_ID',
   redirectUri: 'YOUTUBE_REDIRECT_URI',
-  editorUser: 'EOF_EDITOR_USER',
-  editorPassword: 'EOF_EDITOR_PASSWORD',
 }
 
 /** Setup steps shown in admin — what the channel owner must provide. */

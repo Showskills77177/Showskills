@@ -15,18 +15,10 @@ function getSecret() {
 
 export { COOKIE as ADMIN_COOKIE_NAME, SMS_PENDING_COOKIE as ADMIN_SMS_PENDING_COOKIE_NAME, RESET_PENDING_COOKIE as ADMIN_RESET_PENDING_COOKIE_NAME }
 
-/**
- * @param {{ sub?: string, role?: 'admin' | 'eof_editor' }} [opts]
- */
-export async function signAdminSession(opts = {}) {
+export async function signAdminSession() {
   const secret = getSecret()
   if (!secret) throw new Error('ADMIN_JWT_SECRET must be set (min 32 characters)')
-  const role = opts.role === 'eof_editor' ? 'eof_editor' : 'admin'
-  const claims = { role }
-  if (typeof opts.sub === 'string' && opts.sub.trim()) {
-    claims.sub = opts.sub.trim()
-  }
-  return new SignJWT(claims)
+  return new SignJWT({ role: 'admin' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE_SEC}s`)
@@ -39,7 +31,7 @@ export async function verifyAdminSession(token) {
   if (!secret) return null
   try {
     const { payload } = await jwtVerify(token, secret)
-    if (payload.role !== 'admin' && payload.role !== 'eof_editor') return null
+    if (payload.role !== 'admin') return null
     return payload
   } catch {
     return null
@@ -68,7 +60,7 @@ export function getAdminTokenFromReq(req) {
 export async function requireAdmin(req) {
   const token = getAdminTokenFromReq(req)
   const payload = await verifyAdminSession(token)
-  if (!payload || payload.role !== 'admin') {
+  if (!payload) {
     const err = new Error('Unauthorized')
     err.statusCode = 401
     throw err
