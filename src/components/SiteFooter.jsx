@@ -93,7 +93,7 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
 
   return (
     <footer className="ss-footer-bg border-t border-white/[0.06]">
-      <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-5 text-center sm:px-6 sm:py-6">
+      <div className="ss-site-container flex flex-col items-center px-4 py-5 text-center sm:px-6 sm:py-6">
         {shell.footer?.showLogo !== false
           ? withOffset(footerOffsets, 'logo', <LogoMark />)
           : null}

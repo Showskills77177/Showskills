@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
 import { translateNavLabel } from '../../shared/i18n/translate.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { useUserAuth } from '../auth/UserAuthProvider'
 
 const NAV_BTN_BASE =
   'ss-mobile-nav-btn flex min-h-[3rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-2 text-center text-sm leading-tight transition'
@@ -14,7 +15,9 @@ function navBtnClass({ isActive }) {
 
 export function MobileNavDock({ navItems = [] }) {
   const { openTerms } = useEntryFlow()
-  const { locale } = useSiteLocale()
+  const { locale, t } = useSiteLocale()
+  const { user, status } = useUserAuth()
+  const isLoggedIn = status === 'ok' && Boolean(user)
   const mobileItems = navItems.filter((item) => item.mobile !== false && item.visible !== false)
 
   return (
@@ -22,22 +25,30 @@ export function MobileNavDock({ navItems = [] }) {
       <nav className="ss-mobile-nav-dock__grid grid gap-1.5 p-2.5 pt-2">
         {mobileItems.map((item) => {
           const label = translateNavLabel(locale, item)
-          return item.action === 'terms' ? (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => openTerms()}
-              className={navBtnClass({ isActive: false })}
-              aria-label={label}
-            >
-              <span className="ss-mobile-nav-label">{label}</span>
-            </button>
-          ) : (
+          if (item.action === 'terms') {
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openTerms()}
+                className={navBtnClass({ isActive: false })}
+                aria-label={label}
+              >
+                <span className="ss-mobile-nav-label">{label}</span>
+              </button>
+            )
+          }
+          return (
             <NavLink key={item.id} to={item.path || '/'} end={item.path === '/'} className={navBtnClass}>
               <span className="ss-mobile-nav-label">{label}</span>
             </NavLink>
           )
         })}
+        {isLoggedIn ? (
+          <NavLink to="/account" className={navBtnClass}>
+            <span className="ss-mobile-nav-label">{t('auth.profileSettings')}</span>
+          </NavLink>
+        ) : null}
       </nav>
     </div>
   )

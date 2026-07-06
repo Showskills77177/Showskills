@@ -100,3 +100,56 @@ export function clearUserCookieHeader() {
   if (userCookieSecure()) parts.push('Secure')
   return parts.join('; ')
 }
+
+const RESET_PENDING_COOKIE = 'user_reset_pending'
+const RESET_PENDING_MAX_AGE_SEC = 60 * 15
+
+function resetCookieParts(name, value, maxAge) {
+  const parts = [`${name}=${value}`, 'Path=/', `Max-Age=${maxAge}`, 'HttpOnly', 'SameSite=Lax']
+  if (userCookieSecure()) parts.push('Secure')
+  return parts.join('; ')
+}
+
+/** @param {{ codeHash: string, email: string }} opts */
+export async function signUserResetPending({ codeHash, email }) {
+  const secret = getSecret()
+  if (!secret) throw new Error('USER_JWT_SECRET or ADMIN_JWT_SECRET must be set (min 32 characters)')
+  const otp = typeof codeHash === 'string' ? codeHash.trim() : ''
+  const em = typeof email === 'string' ? email.trim().toLowerCase() : ''
+  if (!otp || !em.includes('@')) throw new Error('Invalid reset pending payload')
+  return new SignJWT({ role: 'user_reset_pending', otp, email: em })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${RESET_PENDING_MAX_AGE_SEC}s`)
+    .sign(secret)
+}
+
+export async function verifyUserResetPending(token) {
+  if (!token) return null
+  const secret = getSecret()
+  if (!secret) return null
+  try {
+    const { payload } = await jwtVerify(token, secret)
+    if (payload.role !== 'user_reset_pending') return null
+    const otp = typeof payload.otp === 'string' ? payload.otp : ''
+    const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : ''
+    if (!otp || !email.includes('@')) return null
+    return { otp, email }
+  } catch {
+    return null
+  }
+}
+
+export function getUserResetPendingFromReq(req) {
+  const raw = req.headers?.cookie || req.headers?.Cookie
+  const cookies = parseCookies(raw)
+  return cookies[RESET_PENDING_COOKIE] || null
+}
+
+export function setUserResetPendingCookieHeader(token) {
+  return resetCookieParts(RESET_PENDING_COOKIE, token, RESET_PENDING_MAX_AGE_SEC)
+}
+
+export function clearUserResetPendingCookieHeader() {
+  return resetCookieParts(RESET_PENDING_COOKIE, '', 0)
+}

@@ -70,6 +70,13 @@ body {
   clip-path: polygon(0 36%, 8% 24%, 21% 38%, 36% 22%, 54% 35%, 72% 25%, 100% 40%, 100% 86%, 82% 72%, 63% 88%, 43% 73%, 24% 86%, 0 74%);
 }
 
+/* Slightly wider than max-w-5xl (64rem) — header, hero, footer stay aligned */
+.ss-site-container {
+  width: 100%;
+  max-width: 66rem;
+  margin-inline: auto;
+}
+
 /* Header — matchday strip */
 .ss-header {
   position: relative;
@@ -2740,7 +2747,7 @@ body {
   }
 
   .ss-mobile-header-logo {
-    height: 3.025rem !important;
+    height: 3.2rem !important;
   }
 
   .ss-mobile-nav-dock__grid {

@@ -7,13 +7,13 @@ export function LanguagePicker({ className = '' }) {
 
   return (
     <label
-      className={`inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/25 px-1.5 py-0.5 text-[10px] leading-tight text-stone-300 sm:text-[11px] ${className}`}
+      className={`inline-flex items-center gap-0.5 rounded border border-white/10 bg-black/25 px-1 py-px text-[9px] leading-none text-stone-300 sm:text-[10px] ${className}`}
     >
       <span className="sr-only">{t('lang.label')}</span>
       <select
         value={locale}
         onChange={(e) => setLocale(e.target.value)}
-        className="max-w-[5.5rem] cursor-pointer border-0 bg-transparent py-0 pl-0 pr-4 text-[10px] font-medium text-stone-100 focus:outline-none focus:ring-0 sm:max-w-[6.5rem] sm:text-[11px] sm:pr-5"
+        className="max-w-[4.75rem] cursor-pointer border-0 bg-transparent py-0 pl-0 pr-3 text-[9px] font-medium text-stone-100 focus:outline-none focus:ring-0 sm:max-w-[5.5rem] sm:text-[10px] sm:pr-3.5"
         aria-label={t('lang.label')}
       >
         {SITE_LOCALE_OPTIONS.map((option) => (
