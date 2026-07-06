@@ -8,8 +8,11 @@ import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 const inputClass =
   'w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-white outline-none focus:border-lime-500/50'
 
-function parseApiError(data, fallback) {
-  return typeof data?.error === 'string' ? data.error : fallback
+function parseApiError(data, fallback, status) {
+  if (typeof data?.error === 'string') return data.error
+  if (status === 404) return 'Account service is temporarily unavailable. Please try again shortly.'
+  if (status && status >= 500) return 'Server error. Please try again shortly.'
+  return fallback
 }
 
 function LoginForm({ onSwitchRegister, onForgotPassword, onSuccess }) {
@@ -32,7 +35,7 @@ function LoginForm({ onSwitchRegister, onForgotPassword, onSuccess }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(parseApiError(data, t('auth.invalidCredentials')))
+        setError(parseApiError(data, t('auth.invalidCredentials'), res.status))
         return
       }
       await refresh()
@@ -121,7 +124,7 @@ function ForgotPasswordForm({ onSwitchLogin, onCodeSent }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(parseApiError(data, t('form.networkError')))
+        setError(parseApiError(data, t('form.networkError'), res.status))
         return
       }
       const message =
@@ -203,7 +206,7 @@ function ResetPasswordForm({ onSwitchLogin, resetMeta }) {
       const res = await apiFetch('/api/auth/resend-reset-code', { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(parseApiError(data, t('form.networkError')))
+        setError(parseApiError(data, t('form.networkError'), res.status))
         if (res.status === 401) onSwitchLogin()
         return
       }
@@ -233,7 +236,7 @@ function ResetPasswordForm({ onSwitchLogin, resetMeta }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(parseApiError(data, t('form.networkError')))
+        setError(parseApiError(data, t('form.networkError'), res.status))
         if (res.status === 401) onSwitchLogin()
         return
       }
@@ -362,7 +365,7 @@ function RegisterForm({ onSwitchLogin, onSuccess }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(parseApiError(data, t('form.networkError')))
+        setError(parseApiError(data, t('form.networkError'), res.status))
         return
       }
       await refresh()

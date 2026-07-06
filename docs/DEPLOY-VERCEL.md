@@ -9,6 +9,7 @@ API routing uses **five** serverless functions (under the Hobby 12-function limi
 | `api/[[...slug]].js` | Flat routes, e.g. `/api/payment-config`, `/api/record-cashflows-payment` |
 | `api/entries/[...slug].js` | `/api/entries/paid-quiz`, resume quiz, etc. |
 | `api/admin/[...slug].js` | `/api/admin/login`, tickets, draw, … |
+| `api/auth/[...slug].js` | `/api/auth/register`, login, profile, password reset, … |
 | `api/submissions/[...slug].js` | `/api/submissions/kickups` |
 | `api/submissions/world-cup-ball/[...slug].js` | `/api/submissions/world-cup-ball/start`, submit, claim, claim-status, send-claim-link |
 | `api/newsletter/[...slug].js` | `/api/newsletter/subscribe`, unsubscribe, preferences |
