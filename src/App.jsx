@@ -5,6 +5,7 @@ import { SiteLocaleProvider } from './i18n/SiteLocaleProvider.jsx'
 import { EntryFlowProvider } from './entry/EntryFlowProvider'
 import { AdminThemeProvider } from './admin/AdminThemeContext'
 import { AdminLayout } from './admin/AdminLayout'
+import { EofAdminLayout } from './admin/EofAdminLayout'
 import { EditorLayout } from './editor/EditorLayout'
 import { RequireAdmin } from './admin/RequireAdmin'
 import { Layout } from './components/Layout'
@@ -100,11 +101,13 @@ export default function App() {
                 <Route path="test-email" element={<AdminTestEmailPage />} />
                 <Route path="newsletter" element={<AdminNewsletterPage />} />
                 <Route path="theme" element={<AdminThemeDesignerPage />} />
-                {isShowSkillsStagingClientEnabled() ? (
-                  <Route path="eyes-of-football" element={<EyesOfFootballAdminPage />} />
-                ) : null}
                 <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
               </Route>
+              {isShowSkillsStagingClientEnabled() ? (
+                <Route element={<EofAdminLayout />}>
+                  <Route path="eyes-of-football" element={<EyesOfFootballAdminPage />} />
+                </Route>
+              ) : null}
             </Route>
           </Route>
           <Route path="/" element={<Layout />}>

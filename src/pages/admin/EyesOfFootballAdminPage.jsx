@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
 import { isShowSkillsStagingClientEnabled } from '../../../shared/stagingSite.mjs'
 import { EYES_OF_FOOTBALL_PRODUCT_NAME, YOUTUBE_SETUP_STEPS } from '../../../shared/eyesOfFootball.mjs'
@@ -46,27 +46,19 @@ export default function EyesOfFootballAdminPage() {
   const canUpload = ready && (session?.isOwner || session?.isEditor)
 
   return (
-    <div className={`min-h-screen rounded-2xl ${EOF.bg} p-4 text-white md:p-6`}>
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#303030] pb-4">
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff0000]">Eyes Of Football</p>
-          <h1 className="text-2xl font-semibold">{EYES_OF_FOOTBALL_PRODUCT_NAME}</h1>
-          <p className={`mt-1 text-sm ${EOF.muted}`}>YouTube Studio publishing — staging only</p>
+          <h1 className="text-xl font-semibold text-white sm:text-2xl">{EYES_OF_FOOTBALL_PRODUCT_NAME}</h1>
+          <p className={`mt-1 text-sm ${EOF.muted}`}>Publish Shorts and long-form to your YouTube channel</p>
         </div>
-        <div className="flex items-center gap-3">
-          {session?.username ? (
-            <span className={`text-xs ${EOF.muted}`}>
-              {session.username}
-              {session.isOwner ? ' · owner' : ' · editor'}
-            </span>
-          ) : null}
-          {session?.isOwner ? (
-            <Link to="/admin/dashboard" className={`text-xs ${EOF.link} underline`}>
-              Main admin
-            </Link>
-          ) : null}
-        </div>
-      </header>
+        {session?.username ? (
+          <span className={`text-xs ${EOF.muted}`}>
+            {session.username}
+            {session.isOwner ? ' · owner' : session.isEditor ? ' · editor' : ''}
+          </span>
+        ) : null}
+      </div>
 
       {err ? <p className="mb-4 text-sm text-[#ff4e45]">{err}</p> : null}
       {loading && !data ? <p className={EOF.muted}>Loading studio…</p> : null}
