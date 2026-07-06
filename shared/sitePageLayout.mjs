@@ -73,8 +73,7 @@ const DEFAULT_FOOTER_OFFSETS = {
 export function defaultSiteShell() {
   return {
     version: 1,
-    headerTagline: 'Prizes that matter',
-    showHeaderTagline: true,
+    showHeaderTagline: false,
     pageBackground: SITE_PAGE_BACKGROUNDS.default,
     siteDesignTheme: SITE_DESIGN_THEMES.worldCup2026,
     navOrder: DEFAULT_NAV.map((n) => n.id),
