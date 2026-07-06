@@ -34,6 +34,7 @@ export async function ensureUserAuthSchema() {
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`)
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS address_json TEXT`)
     await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS delivery_address_json TEXT`)
+    await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`)
   } else {
     await query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -57,6 +58,7 @@ export async function ensureUserAuthSchema() {
       `ALTER TABLE users ADD COLUMN phone TEXT`,
       `ALTER TABLE users ADD COLUMN address_json TEXT`,
       `ALTER TABLE users ADD COLUMN delivery_address_json TEXT`,
+      `ALTER TABLE users ADD COLUMN deleted_at TEXT`,
     ]) {
       try {
         await query(ddl)

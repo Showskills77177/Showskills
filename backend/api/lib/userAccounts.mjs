@@ -18,7 +18,7 @@ function mapUserRow(row) {
 
 export async function getUserById(id) {
   await ensureUserAuthSchema()
-  const r = await query(`SELECT id, email, full_name, created_at, last_login_at FROM users WHERE id = $1`, [id])
+  const r = await query(`SELECT id, email, full_name, created_at, last_login_at FROM users WHERE id = $1 AND deleted_at IS NULL`, [id])
   return mapUserRow(r.rows[0])
 }
 
@@ -28,10 +28,12 @@ export async function getUserAuthRowByEmail(email) {
   const e = normalizeAccountEmail(email)
   if (!e.includes('@')) return null
   const r = await query(
-    `SELECT id, email, full_name, password_hash, created_at, last_login_at FROM users WHERE lower(email) = $1`,
+    `SELECT id, email, full_name, password_hash, created_at, last_login_at, deleted_at FROM users WHERE lower(email) = $1`,
     [e],
   )
-  return r.rows[0] || null
+  const row = r.rows[0]
+  if (!row || row.deleted_at) return null
+  return row
 }
 
 /**

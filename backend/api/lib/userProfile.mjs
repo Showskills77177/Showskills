@@ -11,8 +11,10 @@ import { getUserAuthRowByEmail } from './userAccounts.mjs'
 import {
   subscribeNewsletter,
   unsubscribeByToken,
+  updateSubscriberPreferences,
+  ensureNewsletterSubscriberToken,
 } from './newsletter.mjs'
-import { NEWSLETTER_SOURCES } from '../../../shared/newsletter.mjs'
+import { NEWSLETTER_SOURCES, normalizeNewsletterPreferences } from '../../../shared/newsletter.mjs'
 
 async function loadUserRow(userId) {
   await ensureUserAuthSchema()
@@ -20,7 +22,7 @@ async function loadUserRow(userId) {
   await ensureUserProfileSchema()
   const r = await query(
     `SELECT id, email, full_name, phone, address_json, delivery_address_json, created_at, last_login_at
-     FROM users WHERE id = $1`,
+     FROM users WHERE id = $1 AND deleted_at IS NULL`,
     [userId],
   )
   return r.rows[0] || null
@@ -142,4 +144,32 @@ export async function setUserNewsletterSubscription(userId, subscribed) {
     if (!result.ok) return { ok: false, error: result.error }
   }
   return { ok: true, subscribed: false }
+}
+
+export async function updateUserNewsletterPreferences(userId, preferences) {
+  const row = await loadUserRow(userId)
+  if (!row) return { ok: false, error: 'Account not found.' }
+
+  const token = await ensureNewsletterSubscriberToken(row.email)
+  if (!token) {
+    const sub = await subscribeNewsletter(row.email, {
+      source: NEWSLETTER_SOURCES.account_settings,
+      preferences,
+      resubscribe: true,
+    })
+    if (!sub.ok) return { ok: false, error: sub.error }
+    return {
+      ok: true,
+      subscribed: true,
+      preferences: normalizeNewsletterPreferences(preferences),
+    }
+  }
+
+  const result = await updateSubscriberPreferences(token, preferences)
+  if (!result.ok) return { ok: false, error: result.error }
+  return {
+    ok: true,
+    subscribed: result.subscriber?.active !== false,
+    preferences: result.subscriber?.preferences || normalizeNewsletterPreferences(preferences),
+  }
 }
