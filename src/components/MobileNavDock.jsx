@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
 import { translateNavLabel } from '../../shared/i18n/translate.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
-import { MobileNavAccountLinks } from './HeaderAccountLinks'
 
 const NAV_BTN_BASE =
   'ss-mobile-nav-btn flex min-h-[3rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-2 text-center text-sm leading-tight transition'
@@ -39,7 +38,6 @@ export function MobileNavDock({ navItems = [] }) {
             </NavLink>
           )
         })}
-        <MobileNavAccountLinks />
       </nav>
     </div>
   )

@@ -13,7 +13,7 @@ import { translateNavLabel } from '../../shared/i18n/translate.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { LanguagePicker } from './LanguagePicker'
 import { RegionNoticeBanner } from './RegionNoticeBanner'
-import { DesktopNavAccountLinks } from './HeaderAccountLinks'
+import { HeaderRightAccountLinks, MobileHeaderAccountLinks } from './HeaderAccountLinks'
 
 function desktopNavClass({ isActive }) {
   return `ss-desktop-nav-link rounded-md px-1.5 py-1 text-sm text-white transition ${
@@ -103,13 +103,15 @@ export function Layout() {
             </Link>
           </div>
           {showQuizPrompt ? (
-            <div className="flex justify-center gap-2 px-4 pb-2 sm:hidden">
+            <div className="flex items-center justify-between gap-2 px-4 pb-2 sm:hidden">
               <LanguagePicker />
-              <QuizPromptNav className="w-full max-w-xs" />
+              <QuizPromptNav className="min-w-0 flex-1" />
+              <MobileHeaderAccountLinks />
             </div>
           ) : (
-            <div className="flex justify-center px-4 pb-2 sm:hidden">
+            <div className="flex items-center justify-between gap-3 px-4 pb-2 sm:hidden">
               <LanguagePicker />
+              <MobileHeaderAccountLinks />
             </div>
           )}
           <MobileNavDock navItems={navItems} />
@@ -142,7 +144,6 @@ export function Layout() {
                     <QuizPromptNav />
                   </>
                 ) : null}
-                <DesktopNavAccountLinks />
               </>,
             )}
           </nav>
@@ -162,7 +163,8 @@ export function Layout() {
           {withOffset(
             headerOffsets,
             'tagline',
-            <div className="hidden items-center justify-end justify-self-end md:flex">
+            <div className="hidden items-center justify-end gap-3 justify-self-end md:flex">
+              <HeaderRightAccountLinks />
               <LanguagePicker />
             </div>,
           )}
