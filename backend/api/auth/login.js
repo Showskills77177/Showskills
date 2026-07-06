@@ -40,13 +40,19 @@ export default async function handler(req, res) {
   const email = typeof body.email === 'string' ? body.email.trim() : ''
   const password = typeof body.password === 'string' ? body.password : ''
 
-  const result = await authenticateUser({ email, password })
-  if (!result.ok) {
-    return json(res, 401, { error: result.error })
+  try {
+    const result = await authenticateUser({ email, password })
+    if (!result.ok) {
+      return json(res, 401, { error: result.error })
+    }
+
+    const token = await signUserSession({ sub: result.user.id, email: result.user.email })
+    res.setHeader('Set-Cookie', setUserCookieHeader(token))
+
+    return json(res, 200, { ok: true, user: result.user })
+  } catch (e) {
+    console.error('[auth/login]', e)
+    const msg = e instanceof Error ? e.message : 'Sign-in failed'
+    return json(res, 500, { error: msg })
   }
-
-  const token = await signUserSession({ sub: result.user.id, email: result.user.email })
-  res.setHeader('Set-Cookie', setUserCookieHeader(token))
-
-  return json(res, 200, { ok: true, user: result.user })
 }
