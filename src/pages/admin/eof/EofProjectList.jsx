@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { apiFetch } from '../../../lib/api'
-import { formatBytes, formatDuration } from '../../../../shared/eofYoutubeMeta.mjs'
+import { formatBytes, formatDuration, formatAspectRatio } from '../../../../shared/eofYoutubeMeta.mjs'
 import { EOF } from './eofStudioTheme'
 
 function statusColor(status) {
@@ -71,7 +71,12 @@ function ProjectCard({ project, isOwner, onRefresh, onSelect }) {
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-white">{project.title}</p>
           <p className={`mt-1 text-xs ${EOF.muted}`}>
-            {project.contentType} · {project.visibility} · {project.uploadSource}
+            {project.isVerticalShort || project.contentType === 'short' ? (
+              <span className="mr-2 rounded bg-[#ff0000] px-1.5 py-0.5 text-[10px] font-bold text-white">SHORT</span>
+            ) : (
+              <span className="mr-2 rounded bg-[#3ea6ff] px-1.5 py-0.5 text-[10px] font-bold text-white">LONG</span>
+            )}
+            {project.visibility} · {project.uploadSource} · {project.viewCount?.toLocaleString?.() ?? 0} views
           </p>
         </div>
         <span className={`text-xs font-semibold capitalize ${statusColor(project.status)}`}>{project.status}</span>
@@ -92,8 +97,18 @@ function ProjectCard({ project, isOwner, onRefresh, onSelect }) {
 
           <dl className="grid gap-2 text-xs sm:grid-cols-2">
             <Row label="Views" value={project.viewCount?.toLocaleString?.() ?? '0'} />
+            <Row label="Format" value={project.isVerticalShort ? 'Vertical Short' : 'Long form'} />
+            <Row
+              label="Resolution"
+              value={
+                project.widthPixels && project.heightPixels
+                  ? `${project.widthPixels}×${project.heightPixels} (${formatAspectRatio(project.widthPixels, project.heightPixels)})`
+                  : '—'
+              }
+            />
             <Row label="Duration" value={formatDuration(project.durationSeconds)} />
             <Row label="File size" value={formatBytes(project.fileSizeBytes)} />
+            <Row label="Quality" value={project.definition || '—'} />
             <Row label="Made for kids" value={project.madeForKids ? 'Yes' : 'No'} />
             <Row label="AI disclosure" value={project.containsSyntheticMedia ? 'Yes' : 'No'} />
             <Row label="Paid promo" value={project.paidPromotion ? 'Yes' : 'No'} />

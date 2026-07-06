@@ -37,6 +37,9 @@ export async function getYoutubeAccessToken() {
  *   paidPromotion?: boolean,
  *   embeddable?: boolean,
  *   publicStatsViewable?: boolean,
+ *   license?: 'youtube' | 'creativeCommon',
+ *   defaultLanguage?: string | null,
+ *   recordingDate?: string | null,
  * }} params
  */
 export async function initYoutubeResumableUpload({
@@ -52,6 +55,9 @@ export async function initYoutubeResumableUpload({
   paidPromotion = false,
   embeddable = true,
   publicStatsViewable = true,
+  license = 'youtube',
+  defaultLanguage = null,
+  recordingDate = null,
 }) {
   const accessToken = await getYoutubeAccessToken()
   const status = {
@@ -59,14 +65,12 @@ export async function initYoutubeResumableUpload({
     selfDeclaredMadeForKids: Boolean(madeForKids),
     embeddable,
     publicStatsViewable,
+    license: license === 'creativeCommon' ? 'creativeCommon' : 'youtube',
   }
   if (typeof containsSyntheticMedia === 'boolean') {
     status.containsSyntheticMedia = containsSyntheticMedia
   }
-  if (typeof paidPromotion === 'boolean') {
-    status.paidProductPlacement = paidPromotion
-  }
-  if (publishAt && (privacyStatus === 'private' || privacyStatus === 'public')) {
+  if (publishAt && (privacyStatus === 'private' || privacyStatus === 'public' || privacyStatus === 'unlisted')) {
     status.publishAt = publishAt
     if (privacyStatus !== 'private') {
       status.privacyStatus = 'private'
@@ -78,12 +82,22 @@ export async function initYoutubeResumableUpload({
     description: String(description || '').slice(0, 5000),
     categoryId: String(categoryId || '17'),
   }
-  if (tags.length) {
-    snippet.tags = tags.slice(0, 30)
+  if (tags.length) snippet.tags = tags.slice(0, 30)
+  if (defaultLanguage) snippet.defaultLanguage = defaultLanguage
+
+  const body = {
+    snippet,
+    status,
+    paidProductPlacementDetails: {
+      hasPaidProductPlacement: Boolean(paidPromotion),
+    },
+  }
+  if (recordingDate) {
+    body.recordingDetails = { recordingDate }
   }
 
   const res = await fetch(
-    'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+    'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status,paidProductPlacementDetails,recordingDetails',
     {
       method: 'POST',
       headers: {
@@ -91,7 +105,7 @@ export async function initYoutubeResumableUpload({
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': contentType,
       },
-      body: JSON.stringify({ snippet, status }),
+      body: JSON.stringify(body),
     },
   )
 
@@ -112,7 +126,7 @@ export async function initYoutubeResumableUpload({
 }
 
 const VIDEO_PARTS =
-  'snippet,status,contentDetails,statistics,processingDetails,fileDetails,player'
+  'snippet,status,contentDetails,statistics,processingDetails,fileDetails,player,paidProductPlacementDetails,suggestions'
 
 /** @param {string} videoId */
 export async function fetchYoutubeVideo(videoId) {
@@ -194,6 +208,11 @@ export function youtubeVideoToSummary(video) {
   const content = video.contentDetails || {}
   const stats = video.statistics || {}
   const dur = content.duration ? parseIso8601Duration(content.duration) : null
+  const stream = file.videoStreams?.[0]
+  const w = stream?.widthPixels ? Number(stream.widthPixels) : null
+  const h = stream?.heightPixels ? Number(stream.heightPixels) : null
+  const isVertical =
+    content.dimension === '2d' && w && h ? h > w : content.dimension ? false : null
 
   return {
     youtubeVideoId: video.id,
@@ -204,13 +223,22 @@ export function youtubeVideoToSummary(video) {
     channelTitle: video.snippet?.channelTitle,
     privacyStatus: video.status?.privacyStatus,
     madeForKids: Boolean(video.status?.selfDeclaredMadeForKids),
+    paidPromotion: Boolean(video.paidProductPlacementDetails?.hasPaidProductPlacement),
+    containsSyntheticMedia: Boolean(video.status?.containsSyntheticMedia),
+    license: video.status?.license || 'youtube',
     publishAt: video.status?.publishAt || null,
     viewCount: stats.viewCount ? Number(stats.viewCount) : 0,
     likeCount: stats.likeCount ? Number(stats.likeCount) : 0,
+    commentCount: stats.commentCount ? Number(stats.commentCount) : 0,
     durationSeconds: dur,
     fileSizeBytes: file.fileSize ? Number(file.fileSize) : null,
     definition: file.definition || content.definition || null,
     dimension: content.dimension || null,
+    widthPixels: w,
+    heightPixels: h,
+    isVerticalShort: isVertical === true || (w && h ? h >= w : false),
+    tagSuggestions: video.suggestions?.tagSuggestions || [],
+    processingProgress: video.processingDetails?.processingProgress || null,
     thumbnailUrl:
       video.snippet?.thumbnails?.medium?.url ||
       video.snippet?.thumbnails?.default?.url ||

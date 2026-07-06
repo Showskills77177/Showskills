@@ -75,6 +75,15 @@ function rowToProject(row) {
     processingStatus: row.processing_status || null,
     checks: parseChecksJson(row.checks_json),
     thumbnailUploaded: Boolean(row.thumbnail_uploaded),
+    widthPixels: row.width_pixels ?? null,
+    heightPixels: row.height_pixels ?? null,
+    aspectRatio: row.aspect_ratio ?? null,
+    isVerticalShort: Boolean(row.is_vertical_short),
+    license: row.license || 'youtube',
+    defaultLanguage: row.default_language || null,
+    recordingDate: row.recording_date || null,
+    embeddable: row.embeddable !== 0,
+    publicStatsViewable: row.public_stats_viewable !== 0,
   }
 }
 
@@ -109,6 +118,15 @@ export async function createEofProject({
   containsSyntheticMedia = false,
   paidPromotion = false,
   relatedVideoId = null,
+  widthPixels = null,
+  heightPixels = null,
+  aspectRatio = null,
+  isVerticalShort = false,
+  license = 'youtube',
+  defaultLanguage = null,
+  recordingDate = null,
+  embeddable = true,
+  publicStatsViewable = true,
 }) {
   await ensureEofYoutubeSchema()
   const id = randomUUID()
@@ -117,8 +135,10 @@ export async function createEofProject({
     `INSERT INTO eof_youtube_projects
       (id, title, description, upload_source, status, submitted_by, scheduled_at,
        content_type, tags_json, visibility, made_for_kids, category_id, channel_id,
-       file_size_bytes, duration_seconds, contains_synthetic_media, paid_promotion, related_video_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+       file_size_bytes, duration_seconds, contains_synthetic_media, paid_promotion, related_video_id,
+       width_pixels, height_pixels, aspect_ratio, is_vertical_short, license, default_language,
+       recording_date, embeddable, public_stats_viewable)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
     [
       id,
       title,
@@ -138,6 +158,15 @@ export async function createEofProject({
       containsSyntheticMedia ? 1 : 0,
       paidPromotion ? 1 : 0,
       relatedVideoId,
+      widthPixels,
+      heightPixels,
+      aspectRatio,
+      isVerticalShort ? 1 : 0,
+      license,
+      defaultLanguage,
+      recordingDate,
+      embeddable ? 1 : 0,
+      publicStatsViewable ? 1 : 0,
     ],
   )
   return getEofProject(id)
@@ -164,6 +193,9 @@ async function syncProjectFromYoutube(projectId, video) {
          duration_seconds = COALESCE($5, duration_seconds),
          file_size_bytes = COALESCE($6, file_size_bytes),
          channel_id = COALESCE($7, channel_id),
+         width_pixels = COALESCE($8, width_pixels),
+         height_pixels = COALESCE($9, height_pixels),
+         is_vertical_short = CASE WHEN $10 IS NOT NULL THEN $10 ELSE is_vertical_short END,
          updated_at = now()
      WHERE id = $1`,
     [
@@ -174,6 +206,9 @@ async function syncProjectFromYoutube(projectId, video) {
       summary.durationSeconds,
       summary.fileSizeBytes,
       summary.channelId,
+      summary.widthPixels,
+      summary.heightPixels,
+      summary.isVerticalShort ? 1 : 0,
     ],
   )
 }

@@ -38,5 +38,6 @@ function channelPayload(ch) {
       ? Number(ch.statistics.subscriberCount)
       : null,
     videoCount: ch.statistics?.videoCount ? Number(ch.statistics.videoCount) : null,
+    viewCount: ch.statistics?.viewCount ? Number(ch.statistics.viewCount) : null,
   }
 }

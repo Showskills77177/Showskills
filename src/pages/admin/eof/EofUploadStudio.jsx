@@ -4,8 +4,13 @@ import {
   EOF_CONTENT_TYPES,
   EOF_VISIBILITY_OPTIONS,
   EOF_YOUTUBE_CATEGORIES,
+  EOF_LICENSE_OPTIONS,
+  EOF_LANGUAGE_OPTIONS,
   formatBytes,
   formatDuration,
+  detectVideoFormat,
+  applyShortsDescription,
+  formatAspectRatio,
 } from '../../../../shared/eofYoutubeMeta.mjs'
 import { EOF } from './eofStudioTheme'
 
@@ -54,8 +59,15 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
   const [videoContentType, setVideoContentType] = useState('short')
+  const [formatManual, setFormatManual] = useState(false)
+  const [addShortsHashtag, setAddShortsHashtag] = useState(true)
   const [visibility, setVisibility] = useState('private')
   const [categoryId, setCategoryId] = useState('17')
+  const [license, setLicense] = useState('youtube')
+  const [defaultLanguage, setDefaultLanguage] = useState('')
+  const [recordingDate, setRecordingDate] = useState('')
+  const [embeddable, setEmbeddable] = useState(true)
+  const [publicStatsViewable, setPublicStatsViewable] = useState(true)
   const [madeForKids, setMadeForKids] = useState(false)
   const [containsSyntheticMedia, setContainsSyntheticMedia] = useState(false)
   const [paidPromotion, setPaidPromotion] = useState(false)
@@ -64,7 +76,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
   const [file, setFile] = useState(null)
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
-  const [meta, setMeta] = useState({ size: 0, duration: 0 })
+  const [meta, setMeta] = useState({ size: 0, duration: 0, width: 0, height: 0, aspectLabel: '', isShort: false })
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
   const [formErr, setFormErr] = useState('')
@@ -74,7 +86,8 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
   useEffect(() => {
     if (!file) {
       setPreviewUrl(null)
-      setMeta({ size: 0, duration: 0 })
+      setMeta({ size: 0, duration: 0, width: 0, height: 0, aspectLabel: '', isShort: false })
+      setFormatManual(false)
       return undefined
     }
     const url = URL.createObjectURL(file)
@@ -85,8 +98,19 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
 
   function onVideoMeta() {
     const v = videoRef.current
-    if (v && Number.isFinite(v.duration)) {
-      setMeta((m) => ({ ...m, duration: v.duration }))
+    if (!v) return
+    const detected = detectVideoFormat({ width: v.videoWidth, height: v.videoHeight })
+    setMeta((m) => ({
+      ...m,
+      duration: Number.isFinite(v.duration) ? v.duration : m.duration,
+      width: detected.width,
+      height: detected.height,
+      aspectLabel: detected.aspectLabel,
+      isShort: detected.isShort,
+    }))
+    if (!formatManual) {
+      setVideoContentType(detected.formatId)
+      setAddShortsHashtag(detected.isShort)
     }
   }
 
@@ -114,15 +138,26 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
         scheduleIso = d.toISOString()
       }
 
+      const detected = detectVideoFormat({ width: meta.width, height: meta.height })
+      const finalDescription = applyShortsDescription(description.trim(), {
+        isShort: detected.isShort || videoContentType === 'short',
+        addShortsHashtag,
+      })
+
       const result = await uploadVideoToYoutube(
         {
           title: title.trim(),
-          description: description.trim(),
+          description: finalDescription,
           tags,
           uploadSource: isOwner ? 'admin' : 'editor',
           videoContentType,
           visibility: isOwner ? visibility : 'private',
           categoryId,
+          license,
+          defaultLanguage: defaultLanguage || null,
+          recordingDate: recordingDate || null,
+          embeddable,
+          publicStatsViewable,
           madeForKids,
           containsSyntheticMedia,
           paidPromotion,
@@ -131,12 +166,19 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
           contentType: file.type || 'video/mp4',
           fileSizeBytes: file.size,
           durationSeconds: meta.duration || null,
+          widthPixels: meta.width || null,
+          heightPixels: meta.height || null,
+          aspectRatio: meta.width && meta.height ? meta.width / meta.height : null,
+          isVerticalShort: detected.isShort,
           thumbnailBase64: await readThumbnailBase64(),
           file,
         },
         setProgress,
       )
       setLastChecks(result.youtube?.checks || result.project?.checks)
+      if (result.youtube?.checks?.processingStatus === 'processing') {
+        pollUploadChecks(result.project?.id)
+      }
       setTitle('')
       setDescription('')
       setTags('')
@@ -152,6 +194,34 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
       setBusy(false)
     }
   }
+
+  async function pollUploadChecks(projectId) {
+    if (!projectId) return
+    for (let i = 0; i < 12; i += 1) {
+      await new Promise((r) => setTimeout(r, 5000))
+      try {
+        const res = await apiFetch('/api/admin/eof-upload-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'refresh', projectId }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (j.youtube?.checks) {
+          setLastChecks(j.youtube.checks)
+          if (j.youtube.checks.processingStatus === 'succeeded' || j.youtube.checks.processingStatus === 'failed') {
+            onDone?.()
+            break
+          }
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
+  }
+
+  const detectedFormat = detectVideoFormat({ width: meta.width, height: meta.height })
+  const formatMismatch =
+    formatManual && meta.width > 0 && detectedFormat.formatId !== videoContentType
 
   if (!canUse) {
     return <p className={`text-sm ${EOF.muted}`}>Sign in and connect YouTube to upload.</p>
@@ -191,12 +261,30 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
           {tab === 'details' ? (
             <div className="space-y-4">
               <Field label="Format">
+                {meta.width > 0 ? (
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                        detectedFormat.isShort ? 'bg-[#ff0000] text-white' : 'bg-[#3ea6ff] text-white'
+                      }`}
+                    >
+                      {detectedFormat.isShort ? 'Short (vertical)' : 'Long (landscape)'}
+                    </span>
+                    <span className="text-xs text-[#3ea6ff]">
+                      {meta.width}×{meta.height} · {formatAspectRatio(meta.width, meta.height)} ·{' '}
+                      {formatDuration(meta.duration)}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="flex gap-2">
                   {EOF_CONTENT_TYPES.map((t) => (
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => setVideoContentType(t.id)}
+                      onClick={() => {
+                        setFormatManual(true)
+                        setVideoContentType(t.id)
+                      }}
                       className={`flex-1 rounded-lg border px-3 py-2 text-left text-sm ${
                         videoContentType === t.id
                           ? 'border-[#3ea6ff] bg-[#1a2a3a] text-white'
@@ -208,6 +296,22 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                     </button>
                   ))}
                 </div>
+                {formatMismatch ? (
+                  <p className="mt-2 text-xs text-[#f9a825]">
+                    Selected format differs from detected {detectedFormat.aspectLabel}. YouTube classifies Shorts by
+                    vertical/square shape, not length.
+                  </p>
+                ) : null}
+                {detectedFormat.isShort ? (
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-[#aaa]">
+                    <input
+                      type="checkbox"
+                      checked={addShortsHashtag}
+                      onChange={(e) => setAddShortsHashtag(e.target.checked)}
+                    />
+                    Add #Shorts to description (recommended for vertical videos)
+                  </label>
+                ) : null}
               </Field>
               <Field label="Title (required)">
                 <input
@@ -240,6 +344,32 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                   ))}
                 </select>
               </Field>
+              <Field label="Language">
+                <select value={defaultLanguage} onChange={(e) => setDefaultLanguage(e.target.value)} className={inputCls}>
+                  {EOF_LANGUAGE_OPTIONS.map((l) => (
+                    <option key={l.id || 'default'} value={l.id}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="License">
+                <select value={license} onChange={(e) => setLicense(e.target.value)} className={inputCls}>
+                  {EOF_LICENSE_OPTIONS.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Recording date (optional)">
+                <input
+                  type="date"
+                  value={recordingDate}
+                  onChange={(e) => setRecordingDate(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
               <Field label="Video file">
                 <input
                   type="file"
@@ -250,7 +380,8 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                 />
                 {file ? (
                   <p className="mt-1 text-xs text-[#3ea6ff]">
-                    {formatBytes(meta.size)} · {formatDuration(meta.duration)} · {file.type || 'video'}
+                    {formatBytes(meta.size)} · {formatDuration(meta.duration)} ·{' '}
+                    {meta.width ? `${meta.width}×${meta.height}` : '—'} · {file.type || 'video'}
                   </p>
                 ) : null}
               </Field>
@@ -315,6 +446,18 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
 
           {tab === 'advanced' ? (
             <div className="space-y-4">
+              <Toggle
+                label="Allow embedding"
+                hint="Let others embed this video on websites"
+                checked={embeddable}
+                onChange={setEmbeddable}
+              />
+              <Toggle
+                label="Show public view count"
+                hint="Display view count on watch page"
+                checked={publicStatsViewable}
+                onChange={setPublicStatsViewable}
+              />
               <Toggle
                 label="Made for kids"
                 hint="Default: No — required for COPPA compliance"
@@ -383,7 +526,11 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
 
         <div className="bg-[#0f0f0f] p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#717171]">Preview</p>
-          <div className="aspect-video overflow-hidden rounded-lg bg-black">
+          <div
+            className={`overflow-hidden rounded-lg bg-black ${
+              detectedFormat.isShort || videoContentType === 'short' ? 'mx-auto aspect-[9/16] max-w-[200px]' : 'aspect-video'
+            }`}
+          >
             {previewUrl ? (
               <video
                 ref={videoRef}

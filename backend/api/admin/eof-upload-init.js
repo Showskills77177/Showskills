@@ -79,6 +79,18 @@ export default async function handler(req, res) {
     typeof body.relatedVideoId === 'string' ? body.relatedVideoId.trim() : null
   const fileSizeBytes = Number.isFinite(body.fileSizeBytes) ? body.fileSizeBytes : null
   const durationSeconds = Number.isFinite(body.durationSeconds) ? body.durationSeconds : null
+  const widthPixels = Number.isFinite(body.widthPixels) ? body.widthPixels : null
+  const heightPixels = Number.isFinite(body.heightPixels) ? body.heightPixels : null
+  const aspectRatio = Number.isFinite(body.aspectRatio) ? body.aspectRatio : null
+  const isVerticalShort = body.isVerticalShort === true
+  const license = body.license === 'creativeCommon' ? 'creativeCommon' : 'youtube'
+  const defaultLanguage = typeof body.defaultLanguage === 'string' ? body.defaultLanguage.trim() : null
+  const recordingDateRaw = typeof body.recordingDate === 'string' ? body.recordingDate.trim() : ''
+  const recordingDate = recordingDateRaw
+    ? new Date(`${recordingDateRaw}T12:00:00Z`).toISOString()
+    : null
+  const embeddable = body.embeddable !== false
+  const publicStatsViewable = body.publicStatsViewable !== false
 
   if (!title || title.length < 3) {
     return json(res, 400, { error: 'Title is required (min 3 characters).' })
@@ -134,11 +146,25 @@ export default async function handler(req, res) {
       containsSyntheticMedia,
       paidPromotion,
       relatedVideoId,
+      widthPixels,
+      heightPixels,
+      aspectRatio,
+      isVerticalShort,
+      license,
+      defaultLanguage: defaultLanguage || null,
+      recordingDate: recordingDate || null,
+      embeddable,
+      publicStatsViewable,
     })
+
+    let finalDescription = description
+    if (relatedVideoId) {
+      finalDescription = `${finalDescription}\n\nRelated: https://www.youtube.com/watch?v=${relatedVideoId}`.trim()
+    }
 
     const { uploadUrl } = await initYoutubeResumableUpload({
       title,
-      description,
+      description: finalDescription,
       tags,
       categoryId,
       privacyStatus: visibility,
@@ -147,6 +173,11 @@ export default async function handler(req, res) {
       madeForKids,
       containsSyntheticMedia,
       paidPromotion,
+      embeddable,
+      publicStatsViewable,
+      license,
+      defaultLanguage: defaultLanguage || null,
+      recordingDate: recordingDate || null,
     })
 
     return json(res, 200, {

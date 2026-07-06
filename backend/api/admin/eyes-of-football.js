@@ -13,7 +13,7 @@ import {
   buildCalendarFromProjects,
 } from '../lib/eofYoutubeProjects.mjs'
 import { fetchYoutubeChannelForAdmin } from '../lib/youtubeChannel.mjs'
-import { fetchChannelAnalyticsSummary } from '../lib/youtubeAnalytics.mjs'
+import { fetchChannelAnalyticsSummary, fetchVideoViewCounts } from '../lib/youtubeAnalytics.mjs'
 
 /** GET /api/admin/eyes-of-football */
 export default async function handler(req, res) {
@@ -49,6 +49,15 @@ export default async function handler(req, res) {
   try {
     await syncDueScheduledProjects()
     projects = await listEofProjects()
+    const videoIds = projects.map((p) => p.youtubeVideoId).filter(Boolean)
+    if (videoIds.length && youtube.isReadyToPublish) {
+      const views = await fetchVideoViewCounts(videoIds)
+      projects = projects.map((p) =>
+        p.youtubeVideoId && views[p.youtubeVideoId]
+          ? { ...p, viewCount: views[p.youtubeVideoId].viewCount }
+          : p,
+      )
+    }
   } catch (e) {
     console.error('[eyes-of-football] projects', e)
   }

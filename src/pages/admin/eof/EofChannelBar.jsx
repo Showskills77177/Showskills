@@ -31,28 +31,50 @@ export default function EofChannelBar({ channel, youtube, analytics }) {
           <h2 className="truncate text-lg font-semibold text-white">{name}</h2>
           <p className={`text-xs ${EOF.muted}`}>
             Channel ID: <code className="text-[#3ea6ff]">{id}</code>
-            {channel?.customUrl ? (
-              <>
-                {' '}
-                · youtube.com/{channel.customUrl}
-              </>
-            ) : null}
+            {channel?.customUrl ? <> · youtube.com/{channel.customUrl}</> : null}
           </p>
         </div>
-        {analytics?.available ? (
-          <div className="flex flex-wrap gap-4 text-center">
-            <Stat label="Views (28d)" value={analytics.totalViews?.toLocaleString()} />
-            <Stat label="Watch time (min)" value={analytics.totalMinutesWatched?.toLocaleString()} />
-            <Stat label="Subs gained" value={analytics.subscribersGained?.toLocaleString()} />
-          </div>
-        ) : analytics ? (
-          <p className={`max-w-xs text-xs ${EOF.muted}`}>
-            Analytics: {analytics.hint || analytics.reason || 'Unavailable — reconnect YouTube for analytics scope.'}
-          </p>
-        ) : null}
+        <AnalyticsBlock analytics={analytics} channel={channel} />
       </div>
     </div>
   )
+}
+
+function AnalyticsBlock({ analytics, channel }) {
+  if (analytics?.available) {
+    return (
+      <div className="flex flex-wrap gap-4 text-center">
+        <Stat label={`Views (${analytics.periodDays}d)`} value={analytics.totalViews?.toLocaleString()} />
+        <Stat label="Watch time (min)" value={analytics.totalMinutesWatched?.toLocaleString()} />
+        <Stat label="Subs gained" value={analytics.subscribersGained?.toLocaleString()} />
+        {analytics.channelLifetimeViews != null ? (
+          <Stat label="Lifetime views" value={analytics.channelLifetimeViews?.toLocaleString()} />
+        ) : null}
+      </div>
+    )
+  }
+
+  if (channel?.viewCount != null || analytics?.channelLifetimeViews != null) {
+    return (
+      <div className="max-w-sm text-right">
+        <Stat
+          label="Channel views (lifetime)"
+          value={(analytics?.channelLifetimeViews ?? channel?.viewCount)?.toLocaleString()}
+        />
+        {analytics?.hint ? <p className={`mt-1 text-[10px] ${EOF.muted}`}>{analytics.hint}</p> : null}
+      </div>
+    )
+  }
+
+  if (analytics) {
+    return (
+      <p className={`max-w-xs text-xs ${EOF.muted}`}>
+        Analytics: {analytics.hint || analytics.reason || 'Unavailable — reconnect YouTube for analytics scope.'}
+      </p>
+    )
+  }
+
+  return null
 }
 
 function Stat({ label, value }) {

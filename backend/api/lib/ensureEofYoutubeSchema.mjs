@@ -18,6 +18,15 @@ const EXTRA_COLUMNS = [
   ['processing_status', 'TEXT'],
   ['checks_json', 'TEXT'],
   ['thumbnail_uploaded', 'INTEGER NOT NULL DEFAULT 0'],
+  ['width_pixels', 'INTEGER'],
+  ['height_pixels', 'INTEGER'],
+  ['aspect_ratio', 'REAL'],
+  ['is_vertical_short', 'INTEGER NOT NULL DEFAULT 0'],
+  ['license', "TEXT NOT NULL DEFAULT 'youtube'"],
+  ['default_language', 'TEXT'],
+  ['recording_date', 'TEXT'],
+  ['embeddable', 'INTEGER NOT NULL DEFAULT 1'],
+  ['public_stats_viewable', 'INTEGER NOT NULL DEFAULT 1'],
 ]
 
 async function addColumnIfMissing(name, typeSql) {
