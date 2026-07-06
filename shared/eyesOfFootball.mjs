@@ -3,9 +3,6 @@ export const EYES_OF_FOOTBALL_PRODUCT_NAME = 'Eyes Of Football'
 export const EYES_OF_FOOTBALL_ADMIN_TITLE = `${EYES_OF_FOOTBALL_PRODUCT_NAME} admin`
 export const EYES_OF_FOOTBALL_ADMIN_PATH = '/admin/eyes-of-football'
 
-/** Single-segment path — Vercel root catch-all only matches one segment after /api/. */
-export const YOUTUBE_OAUTH_CALLBACK_PATH = '/api/youtube-oauth-callback'
-
 /** Vercel / local env keys for YouTube Data API v3 OAuth. */
 export const YOUTUBE_ENV_KEYS = {
   clientId: 'YOUTUBE_CLIENT_ID',

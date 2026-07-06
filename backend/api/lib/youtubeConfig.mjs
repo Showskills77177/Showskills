@@ -1,4 +1,4 @@
-import { YOUTUBE_ENV_KEYS, YOUTUBE_OAUTH_CALLBACK_PATH } from '../../../shared/eyesOfFootball.mjs'
+import { YOUTUBE_ENV_KEYS } from '../../../shared/eyesOfFootball.mjs'
 import { resolveSiteUrl } from './resendConfig.mjs'
 
 function env(name) {
@@ -18,7 +18,7 @@ export function defaultYoutubeOAuthRedirectUri() {
   if (configured) return configured
   const site = resolveSiteUrl()?.replace(/\/$/, '')
   if (!site) return null
-  return `${site}${YOUTUBE_OAUTH_CALLBACK_PATH}`
+  return `${site}/api/youtube/oauth/callback`
 }
 
 export function readYoutubeConfig() {

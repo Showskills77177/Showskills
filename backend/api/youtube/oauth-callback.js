@@ -11,7 +11,7 @@ function escapeHtml(value) {
 }
 
 /**
- * GET /api/youtube-oauth-callback — exchange code, show refresh token for Vercel (staging).
+ * GET /api/youtube/oauth/callback — exchange code, show refresh token for Vercel (staging).
  */
 export default async function handler(req, res) {
   if (!isShowSkillsStagingServerEnabled()) {
