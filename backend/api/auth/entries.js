@@ -32,6 +32,6 @@ export default async function handler(req, res) {
     return json(res, 401, { error: 'Not signed in' })
   }
 
-  const entries = await listUserEntryHistory(user.id)
+  const entries = await listUserEntryHistory(user.id, user.email)
   return json(res, 200, { ok: true, entries })
 }

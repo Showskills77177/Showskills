@@ -337,6 +337,22 @@ export async function getSubscriberByToken(token) {
   return mapSubscriberRow(r.rows[0])
 }
 
+/** Return unsubscribe/preferences token for an email, creating a subscriber row if needed. */
+export async function ensureNewsletterSubscriberToken(email) {
+  await ensureNewsletterSchema()
+  const em = String(email || '')
+    .trim()
+    .toLowerCase()
+  if (!em.includes('@')) return null
+  const existing = await query(`SELECT unsubscribe_token FROM newsletter_subscribers WHERE email = $1`, [em])
+  let token = existing.rows[0]?.unsubscribe_token
+  if (token) return token
+  const sub = await subscribeNewsletter(em, { source: NEWSLETTER_SOURCES.account_settings, resubscribe: true })
+  if (!sub.ok) return null
+  const again = await query(`SELECT unsubscribe_token FROM newsletter_subscribers WHERE email = $1`, [em])
+  return again.rows[0]?.unsubscribe_token || null
+}
+
 export async function unsubscribeByToken(token) {
   const sub = await getSubscriberByToken(token)
   if (!sub) return { ok: false, error: 'Invalid or expired link.' }
