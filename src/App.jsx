@@ -44,6 +44,7 @@ import WorldCupBallGiveawayPage from './pages/WorldCupBallGiveawayPage'
 import AdminSiteVisitsPage from './pages/admin/SiteVisitsPage'
 import EyesOfFootballAdminPage from './pages/admin/EyesOfFootballAdminPage'
 import { isShowSkillsStagingClientEnabled } from '../shared/stagingSite.mjs'
+import { StagingSeoBlock } from './components/StagingSeoBlock.jsx'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -52,6 +53,7 @@ const routerBasename =
 export default function App() {
   return (
     <>
+      <StagingSeoBlock />
       <Analytics />
       <BrowserRouter basename={routerBasename}>
       <SiteLocaleProvider>

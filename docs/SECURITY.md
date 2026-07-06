@@ -70,6 +70,17 @@ No website can be guaranteed “unhackable.” This project uses **defense in de
 5. Enable **Vercel Firewall** — see [VERCEL_FIREWALL.md](./VERCEL_FIREWALL.md).
 6. For scale, replace in-memory rate limits with **Redis** or edge rate limiting.
 
+## Staging test site (unlisted)
+
+The staging hostname is **not** marketed or linked from production. Deployments on the `staging` branch (or `SITE_URL` pointing at the test host) get:
+
+- `robots.txt` → `Disallow: /`
+- Empty `sitemap.xml`
+- `noindex, nofollow` in built `index.html` and at runtime on the staging host
+- Outbound email logos/assets use `showskills.co.uk`, not the test hostname
+
+Do not submit the staging URL to Google Search Console or publish it in public docs.
+
 ## Archived Stripe integration
 
 Previous Stripe Checkout / Payment Element code lives in `archive/stripe/` for reference and seed scripts only. It is **not** mounted in production routes.

@@ -129,6 +129,10 @@ describe('email templates', () => {
   it('email logo uses public site URL even when siteUrl is localhost', () => {
     assert.equal(emailLogoUrl('http://localhost:5173'), 'https://showskills.co.uk/email/showskills-logo.png')
     assert.equal(resolvePublicSiteUrlForEmail('http://127.0.0.1:3000'), 'https://showskills.co.uk')
+    assert.equal(
+      resolvePublicSiteUrlForEmail('https://vercelshowskillstesteasynow.online'),
+      'https://showskills.co.uk',
+    )
   })
 
   it('newsletter welcome and campaign use branded shell like ticket emails', () => {
@@ -195,6 +199,8 @@ describe('email templates', () => {
     assert.match(html, /Your verification code/i)
     assert.match(html, /Enter reset code/i)
     assert.match(html, /\/forgot-password/)
+    assert.match(html, /showskills-logo\.png/)
+    assert.doesNotMatch(html, />https:\/\/vercelshowskillstesteasynow/)
 
     const claimHtml = buildUserPasswordResetEmailHtml({
       code: '123456',

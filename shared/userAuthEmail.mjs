@@ -41,7 +41,8 @@ export function userPasswordResetEmailSubject({ purpose = 'reset' } = {}) {
  */
 export function buildUserPasswordResetEmailHtml(props) {
   const { code, fullName, purpose = 'reset' } = props
-  const siteUrl = resolvePublicSiteUrlForEmail(props.siteUrl)
+  const actionSiteUrl = String(props.siteUrl || '').replace(/\/$/, '')
+  const brandSiteUrl = resolvePublicSiteUrlForEmail(props.siteUrl)
   const name = String(fullName || '').trim() || 'there'
   const isClaim = purpose === 'claim'
 
@@ -51,7 +52,7 @@ export function buildUserPasswordResetEmailHtml(props) {
     ? 'You asked to set a password for an email already linked to a ShowSkills order. Enter this code on the site to verify your email and choose a password.'
     : 'You asked to reset your ShowSkills Rewards password. Enter this code on the site to choose a new password.'
 
-  const forgotUrl = `${siteUrl}/forgot-password`
+  const forgotUrl = `${actionSiteUrl}/forgot-password`
 
   const inner = `
     <p style="margin:0 0 14px;font-size:16px;color:#e7e5e4">Hi ${escapeHtml(name)},</p>
@@ -63,12 +64,12 @@ export function buildUserPasswordResetEmailHtml(props) {
     </p>
     ${ctaButtonHtml(forgotUrl, isClaim ? 'Verify & set password' : 'Enter reset code')}
     <p style="margin:12px 0 0;font-size:13px;line-height:1.5;color:#78716c">
-      Or open <a href="${escapeHtml(siteUrl)}" style="color:#6ee7b7;text-decoration:underline">${escapeHtml(siteUrl)}</a> and use Forgot password.
+      On the same site where you requested this, open <strong style="color:#d6d3d1">Forgot password</strong> and enter the code above.
     </p>
   `
 
   return wrapNewsletterEmailDocument({
-    siteUrl,
+    siteUrl: brandSiteUrl,
     title: headline,
     headline,
     subtitle,
@@ -89,7 +90,7 @@ export function buildUserPasswordResetEmailHtml(props) {
  */
 export function buildUserPasswordResetEmailText(props) {
   const { code, fullName, purpose = 'reset' } = props
-  const siteUrl = resolvePublicSiteUrlForEmail(props.siteUrl)
+  const actionSiteUrl = String(props.siteUrl || '').replace(/\/$/, '')
   const name = String(fullName || '').trim() || 'there'
   const isClaim = purpose === 'claim'
 
@@ -105,9 +106,7 @@ export function buildUserPasswordResetEmailText(props) {
     `This code expires in ${CODE_EXPIRY_MINUTES} minutes.`,
     'If you did not request this, ignore this email — your password will stay the same.',
     '',
-    `Open ${siteUrl}/forgot-password to enter the code.`,
-    '',
-    siteUrl,
+    `Open ${actionSiteUrl}/forgot-password to enter the code.`,
   ]
   return lines.join('\n')
 }

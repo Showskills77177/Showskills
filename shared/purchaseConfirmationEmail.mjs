@@ -6,6 +6,8 @@ import {
   buildPrizeRevealEmailTextLines,
 } from './prizeRevealEmailBlock.mjs'
 
+import { isShowSkillsStagingHost } from './stagingSite.mjs'
+
 export function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -26,7 +28,8 @@ export function isLocalOrPrivateSiteUrl(url) {
       h === '127.0.0.1' ||
       h === '0.0.0.0' ||
       h === '[::1]' ||
-      h.endsWith('.local')
+      h.endsWith('.local') ||
+      isShowSkillsStagingHost(h)
     )
   } catch {
     return true
