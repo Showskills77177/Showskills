@@ -5,6 +5,10 @@ import { registerUser } from '../lib/userAccounts.mjs'
 import { subscribeNewsletter, sendWelcomeEmail } from '../lib/newsletter.mjs'
 import { NEWSLETTER_SOURCES } from '../../../shared/newsletter.mjs'
 import {
+  checkAccountRegistrationAllowed,
+  logAccountRegistrationSuccess,
+} from '../lib/accountAbuse.mjs'
+import {
   isUserAuthConfigured,
   signUserSession,
   setUserCookieHeader,
@@ -26,7 +30,7 @@ export default async function handler(req, res) {
   const limited =
     process.env.E2E_MODE === '1'
       ? { blocked: false }
-      : applyRateLimit(req, res, { pathKey: 'auth-register', max: 6, windowMs: 900_000 })
+      : applyRateLimit(req, res, { pathKey: 'auth-register', max: 3, windowMs: 900_000 })
   if (limited.blocked) {
     return json(res, 429, { error: 'Too many registration attempts. Try again later.' })
   }
@@ -44,10 +48,24 @@ export default async function handler(req, res) {
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim() : ''
 
   try {
-    const result = await registerUser({ email, password, fullName })
+    const abuse = await checkAccountRegistrationAllowed(req, email)
+    if (!abuse.ok) {
+      const status = abuse.code === 'ip_account_limit' ? 429 : 400
+      return json(res, status, { error: abuse.error, code: abuse.code })
+    }
+
+    const result = await registerUser({ email: abuse.email, password, fullName })
     if (!result.ok) {
-      const status = result.error?.includes('already exists') ? 409 : 400
-      return json(res, status, { error: result.error })
+      const status = result.error?.includes('already exists')
+        ? 409
+        : result.code === 'email_claim_required'
+          ? 409
+          : 400
+      return json(res, status, { error: result.error, code: result.code })
+    }
+
+    if (result.isNewAccount) {
+      await logAccountRegistrationSuccess(req, { email: abuse.email, userId: result.user?.id })
     }
 
     const newsletter = await subscribeNewsletter(result.user.email, {

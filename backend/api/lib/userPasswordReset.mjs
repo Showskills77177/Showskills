@@ -2,6 +2,7 @@ import { createHash, randomInt } from 'node:crypto'
 import { query } from './db.mjs'
 import { getUserAuthRowByEmail } from './userAccounts.mjs'
 import { hashUserPassword } from './password.mjs'
+import { normalizeAccountEmail } from '../../../shared/normalizeAccountEmail.mjs'
 import {
   getResendApiKey,
   resolveResendFrom,
@@ -204,15 +205,13 @@ export function userResetVerificationPayload(sent, { email }) {
  * @param {string} email
  */
 export async function requestUserPasswordReset(email) {
-  const e = String(email || '')
-    .trim()
-    .toLowerCase()
+  const e = normalizeAccountEmail(email)
   if (!e.includes('@') || !e.includes('.')) {
     return { ok: false, error: 'Enter a valid email address.' }
   }
 
   const row = await getUserAuthRowByEmail(e)
-  if (!row?.password_hash) {
+  if (!row) {
     return { ok: true, sent: false, message: GENERIC_RESET_MESSAGE }
   }
 
@@ -228,6 +227,7 @@ export async function requestUserPasswordReset(email) {
     userId: row.id,
     sentResult: sent,
     message: GENERIC_RESET_MESSAGE,
+    purpose: row.password_hash ? 'reset' : 'claim',
   }
 }
 
@@ -255,7 +255,7 @@ export async function completeUserPasswordReset({
   }
 
   const row = await getUserAuthRowByEmail(email)
-  if (!row?.password_hash) {
+  if (!row) {
     return { ok: false, error: 'Invalid or expired code. Request a new reset code.' }
   }
 
@@ -270,6 +270,8 @@ export async function completeUserPasswordReset({
 
   return {
     ok: true,
-    message: 'Password updated. Sign in with your new password.',
+    message: row.password_hash
+      ? 'Password updated. Sign in with your new password.'
+      : 'Account secured. Sign in with your new password.',
   }
 }

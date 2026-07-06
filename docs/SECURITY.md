@@ -24,6 +24,13 @@ No website can be guaranteed “unhackable.” This project uses **defense in de
 - **Login rate limit** (slows brute force).
 - **Email 2FA** (optional, free via Resend): when `RESEND_API_KEY` + `ADMIN_EMAIL` are set, login is password → 6-digit email code → session. See `.env.example`.
 
+### Public accounts
+
+- **One password-backed account per canonical email** (Gmail dot/plus aliases normalised).
+- **Checkout-only emails** cannot be hijacked via register — use **Forgot password** email verification to claim the account.
+- **Registration rate limits** per IP; disposable email domains blocked.
+- **Paid skill quiz** cannot be submitted twice for the same order.
+
 ### General API
 
 - Bundle **prices and ticket counts** come only from `shared/ticketBundles.mjs` (never from the browser).

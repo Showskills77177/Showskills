@@ -210,6 +210,8 @@ function buildCoreUi() {
     'auth.resendResetCooldown': 'Resend in {seconds}s',
     'auth.resetCodeSent': 'If an account exists for that email, we sent a reset code.',
     'auth.passwordResetSuccess': 'Password updated. Sign in with your new password.',
+    'auth.accountClaimRequired':
+      'This email is already linked to an order. Use Forgot password to verify your email and set a password.',
     'auth.backToSignIn': 'Back to sign in',
     'contact.eyebrow': 'Get in touch',
     'contact.title': 'Contact us',

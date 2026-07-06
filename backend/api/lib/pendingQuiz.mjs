@@ -9,14 +9,16 @@ import { sendPurchaseConfirmationEmail } from './sendPurchaseEmail.mjs'
 
 const COMPETITION = 'ronaldo_legacy_bundle'
 
-export async function hasPaidQuizEntryForTicket(userId, ticketId) {
+export async function hasPaidQuizEntryForTicket(userId, ticketId, competition = COMPETITION) {
   if (!userId || !ticketId) return false
   await ensureTicketSchema()
   const t = await query(
-    `SELECT COALESCE(purchased_at, created_at) AS since_at FROM tickets WHERE id = $1 AND user_id = $2`,
+    `SELECT COALESCE(purchased_at, created_at) AS since_at, competition FROM tickets WHERE id = $1 AND user_id = $2`,
     [ticketId, userId],
   )
   const since = t.rows[0]?.since_at
+  const ticketCompetition =
+    (typeof t.rows[0]?.competition === 'string' && t.rows[0].competition.trim()) || competition
   if (!since) return false
 
   const e = await query(
@@ -24,25 +26,27 @@ export async function hasPaidQuizEntryForTicket(userId, ticketId) {
      WHERE user_id = $1 AND entry_type = 'paid' AND competition = $2
        AND created_at >= $3
      LIMIT 1`,
-    [userId, COMPETITION, since],
+    [userId, ticketCompetition, since],
   )
   return Boolean(e.rows[0])
 }
 
-async function getLatestPaidQuizOutcomeForTicket(userId, ticketId) {
+async function getLatestPaidQuizOutcomeForTicket(userId, ticketId, competition = COMPETITION) {
   if (!userId || !ticketId) return null
   const t = await query(
-    `SELECT COALESCE(purchased_at, created_at) AS since_at FROM tickets WHERE id = $1 AND user_id = $2`,
+    `SELECT COALESCE(purchased_at, created_at) AS since_at, competition FROM tickets WHERE id = $1 AND user_id = $2`,
     [ticketId, userId],
   )
   const since = t.rows[0]?.since_at
+  const ticketCompetition =
+    (typeof t.rows[0]?.competition === 'string' && t.rows[0].competition.trim()) || competition
   if (!since) return null
 
   const e = await query(
     `SELECT all_correct FROM competition_entries
      WHERE user_id = $1 AND entry_type = 'paid' AND competition = $2 AND created_at >= $3
      ORDER BY created_at DESC LIMIT 1`,
-    [userId, COMPETITION, since],
+    [userId, ticketCompetition, since],
   )
   const row = e.rows[0]
   if (!row) return null

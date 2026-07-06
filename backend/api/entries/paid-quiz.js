@@ -9,6 +9,8 @@ import { resolveTicketBundle } from '../lib/competitionCatalog.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 import { awardConsolationShirtEntries } from '../lib/awardConsolationShirtEntries.mjs'
 import { prizeRevealUrlForTicket } from '../lib/prizeRevealEmailContext.mjs'
+import { hasPaidQuizEntryForTicket } from '../lib/pendingQuiz.mjs'
+import { normalizeAccountEmail } from '../../../shared/normalizeAccountEmail.mjs'
 
 /**
  * Public endpoint: persist Signed Legacy Bundle quiz answers (paid or free entry_type).
@@ -37,7 +39,7 @@ export default async function handler(req, res) {
 
   const body = parseJsonBody(req)
   const fullName = typeof body.fullName === 'string' ? body.fullName.trim().slice(0, 200) : ''
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 320) : ''
+  const email = normalizeAccountEmail(body.email)
   const bodyCompetition =
     typeof body.competition === 'string' ? body.competition.trim().slice(0, 120) : ''
   const entryType = body.entryType === 'free' ? 'free' : 'paid'
@@ -53,6 +55,16 @@ export default async function handler(req, res) {
       purchase = await getLatestPaidPurchaseForEmail(email)
       if (!purchase) {
         return json(res, 400, { error: 'No paid ticket found for this email. Complete checkout first.' })
+      }
+
+      const owner = await query(`SELECT user_id FROM tickets WHERE id = $1`, [purchase.ticketId])
+      const userId = owner.rows[0]?.user_id
+      const ticketCompetition = purchase.competition || bodyCompetition || DRAW_COMPETITION_SLUG
+      if (userId && (await hasPaidQuizEntryForTicket(userId, purchase.ticketId, ticketCompetition))) {
+        return json(res, 409, {
+          error: 'Skill quiz already submitted for this order.',
+          code: 'quiz_already_submitted',
+        })
       }
     }
 

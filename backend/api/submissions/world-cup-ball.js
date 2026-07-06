@@ -876,6 +876,11 @@ export async function resetWorldCupBallStagingAttempt(req, res) {
     return json(res, 404, { error: 'Not found' })
   }
 
+  const limited = applyRateLimit(req, res, { pathKey: 'wc-ball-reset-attempt', max: 2, windowMs: 3_600_000 })
+  if (limited.blocked) {
+    return json(res, 429, { error: 'Too many reset requests. Try again later.' })
+  }
+
   if (!isDbConfigured()) return json(res, 503, { error: 'Database not configured' })
 
   try {
