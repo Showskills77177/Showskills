@@ -51,7 +51,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const token = await signAdminSession()
+    const adminUser = (process.env.ADMIN_USER || '').trim()
+    const token = await signAdminSession({ sub: adminUser, role: 'admin' })
     res.setHeader('Set-Cookie', setAdminCookieHeader(token))
     if (typeof res.appendHeader === 'function') {
       res.appendHeader('Set-Cookie', clearAdminSmsPendingCookieHeader())

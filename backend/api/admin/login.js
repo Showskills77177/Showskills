@@ -18,6 +18,7 @@ import { getResendApiKey } from '../lib/resendConfig.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
+import { verifyEofEditorPassword } from '../lib/eofYoutubeAuth.mjs'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -50,9 +51,19 @@ export default async function handler(req, res) {
   const password = typeof body.password === 'string' ? body.password : ''
 
   const adminUser = (process.env.ADMIN_USER || '').trim()
-  if (!adminUser || username !== adminUser) {
+  const isAdminLogin = Boolean(adminUser && username === adminUser)
+  const isEditorLogin = !isAdminLogin && verifyEofEditorPassword(username, password)
+
+  if (!isAdminLogin && !isEditorLogin) {
     return json(res, 401, { error: 'Invalid credentials' })
   }
+
+  if (isEditorLogin) {
+    const token = await signAdminSession({ sub: username, role: 'eof_editor' })
+    res.setHeader('Set-Cookie', setAdminCookieHeader(token))
+    return json(res, 200, { ok: true, verificationRequired: false, role: 'eof_editor' })
+  }
+
   const ok = await verifyAdminPassword(password)
   if (!ok) {
     return json(res, 401, { error: 'Invalid credentials' })
@@ -60,7 +71,7 @@ export default async function handler(req, res) {
 
   try {
     if (isAdminEmailOtpBypassed()) {
-      const token = await signAdminSession()
+      const token = await signAdminSession({ sub: adminUser, role: 'admin' })
       res.setHeader('Set-Cookie', setAdminCookieHeader(token))
       return json(res, 200, { ok: true, verificationRequired: false })
     }
@@ -78,7 +89,7 @@ export default async function handler(req, res) {
 
     // Staging: allow password-only when OTP email is not wired (missing ADMIN_EMAIL, etc.)
     if (isShowSkillsStagingServerEnabled()) {
-      const token = await signAdminSession()
+      const token = await signAdminSession({ sub: adminUser, role: 'admin' })
       res.setHeader('Set-Cookie', setAdminCookieHeader(token))
       return json(res, 200, { ok: true, verificationRequired: false, stagingPasswordOnly: true })
     }
