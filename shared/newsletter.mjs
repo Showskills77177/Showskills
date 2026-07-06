@@ -6,6 +6,7 @@ export const NEWSLETTER_SOURCES = {
   shirt_giveaway: 'shirt_giveaway',
   paid_competition: 'paid_competition',
   admin_import: 'admin_import',
+  account_registration: 'account_registration',
 }
 
 export const DEFAULT_NEWSLETTER_PREFERENCES = {
