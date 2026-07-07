@@ -10,6 +10,7 @@ import {
   youtubeVideoToSummary,
 } from './youtubeUpload.mjs'
 import { readYoutubeConfig } from './youtubeConfig.mjs'
+import { projectCalendarDate } from '../../../shared/eofYoutubeMeta.mjs'
 
 export const EOF_STATUS = {
   UPLOADING: 'uploading',
@@ -45,6 +46,14 @@ function parseChecksJson(raw) {
   }
 }
 
+function normalizeTimestamp(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === 'string') return value
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString()
+}
+
 function rowToProject(row) {
   if (!row) return null
   return {
@@ -54,12 +63,12 @@ function rowToProject(row) {
     uploadSource: row.upload_source,
     status: row.status,
     submittedBy: row.submitted_by,
-    scheduledAt: row.scheduled_at || null,
-    publishedAt: row.published_at || null,
+    scheduledAt: normalizeTimestamp(row.scheduled_at),
+    publishedAt: normalizeTimestamp(row.published_at),
     youtubeVideoId: row.youtube_video_id || null,
     errorMessage: row.error_message || null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: normalizeTimestamp(row.created_at),
+    updatedAt: normalizeTimestamp(row.updated_at),
     contentType: row.content_type || 'short',
     tags: parseTagsJson(row.tags_json),
     visibility: row.visibility || 'private',
@@ -356,10 +365,7 @@ export function buildCalendarFromProjects(projects) {
   /** @type {Record<string, typeof projects>} */
   const byDay = {}
   for (const p of projects) {
-    const key =
-      (p.scheduledAt && p.scheduledAt.slice(0, 10)) ||
-      (p.publishedAt && p.publishedAt.slice(0, 10)) ||
-      (p.createdAt && String(p.createdAt).slice(0, 10))
+    const key = projectCalendarDate(p)
     if (!key) continue
     if (!byDay[key]) byDay[key] = []
     byDay[key].push(p)

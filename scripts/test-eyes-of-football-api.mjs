@@ -89,6 +89,12 @@ async function main() {
     const cal = buildCalendarFromProjects(list)
     if (typeof cal !== 'object') throw new Error('calendar not object')
     ok('buildCalendarFromProjects')
+
+    const calWithDates = buildCalendarFromProjects([
+      { scheduledAt: new Date('2026-07-15T12:00:00.000Z'), createdAt: new Date('2026-07-01T09:00:00.000Z') },
+    ])
+    if (!calWithDates['2026-07-15']) throw new Error('calendar should accept Date timestamps from Postgres')
+    ok('buildCalendarFromProjects with Date values')
   } catch (e) {
     fail('eofYoutubeProjects DB', e)
   }
