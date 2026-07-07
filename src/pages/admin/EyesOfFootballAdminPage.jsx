@@ -7,6 +7,8 @@ import EofChannelBar from './eof/EofChannelBar'
 import EofAnalyticsPanel from './eof/EofAnalyticsPanel'
 import EofPublishCalendar from './eof/EofPublishCalendar'
 import EofUploadStudio from './eof/EofUploadStudio'
+import EofProductionPanel from './eof/EofProductionPanel'
+import EofMusicLibrary from './eof/EofMusicLibrary'
 import EofProjectList from './eof/EofProjectList'
 import { EOF } from './eof/eofStudioTheme'
 
@@ -44,6 +46,7 @@ export default function EyesOfFootballAdminPage() {
   const session = data?.session
   const ready = Boolean(yt?.isReadyToPublish)
   const canUpload = ready && (session?.isOwner || session?.isEditor)
+  const isOwner = Boolean(session?.isOwner)
 
   return (
     <div>
@@ -86,6 +89,8 @@ export default function EyesOfFootballAdminPage() {
               <nav className="mt-6 flex gap-2 border-b border-[#303030] pb-2">
                 {[
                   ['studio', 'Studio'],
+                  ['production', 'Production'],
+                  ['music', 'Music'],
                   ['analytics', 'Analytics'],
                   ['calendar', 'Calendar'],
                   ['content', 'Content'],
@@ -105,6 +110,18 @@ export default function EyesOfFootballAdminPage() {
 
               {view === 'analytics' ? (
                 <EofAnalyticsPanel analytics={data.analytics} />
+              ) : null}
+
+              {view === 'production' ? (
+                <div className="mt-6">
+                  <EofProductionPanel isOwner={isOwner} />
+                </div>
+              ) : null}
+
+              {view === 'music' ? (
+                <div className="mt-6">
+                  <EofMusicLibrary />
+                </div>
               ) : null}
 
               {view === 'studio' ? (

@@ -13,6 +13,7 @@ db/*.sqlite
 db/*.sqlite-shm
 db/*.sqlite-wal
 uploads/
+storage/eof/
 db/e2e.sqlite
 db/e2e.sqlite-shm
 db/e2e.sqlite-wal

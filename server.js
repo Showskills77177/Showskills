@@ -79,6 +79,10 @@ const competitionImageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
 })
+const eofMusicUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 24 * 1024 * 1024 },
+})
 
 app.post('/api/login', (req, res) => {
   const username = typeof req.body?.username === 'string' ? req.body.username.trim() : ''
@@ -109,12 +113,20 @@ app.post(
   adapt(competitionUploadHandler),
 )
 
+const eofMusicUploadHandler = (await import('./backend/api/admin/eof-music-upload.mjs')).default
+app.post(
+  '/api/admin/eof-music-upload',
+  eofMusicUpload.single('audio'),
+  adapt(eofMusicUploadHandler),
+)
+
 /** Same handlers as Vercel production (`lib/vercelApiDispatch.mjs`) — avoids missing local routes. */
 const { routes } = await import('./lib/vercelApiDispatch.mjs')
 const SKIP_ROUTE_MOUNT = new Set([
   '/api/cashflows-webhook',
   '/api/submissions/kickups/upload',
   '/api/admin/competition-upload',
+  '/api/admin/eof-music-upload',
 ])
 
 for (const [routePath, handler] of Object.entries(routes)) {
