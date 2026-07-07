@@ -271,8 +271,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       selected?.status !== 'rendering' &&
       selected?.status !== 'rendering_video' &&
       renderPhase !== 'rendering' &&
-      renderPhase !== 'rendering-video' &&
-      !busy
+      renderPhase !== 'rendering-video'
     ) {
       return undefined
     }
@@ -379,9 +378,9 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       if (job.renderProgress) setRenderProgress(job.renderProgress)
       if (job.status === 'video_rendered') return job
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Build failed')
-      if (!['rendering', 'rendering_video', 'rendered'].includes(job.status)) return job
+      // Keep waiting — job may still be ready_script for a moment before server marks rendering.
     }
-    throw new Error('Build timed out — click Reset & retry.')
+    throw new Error('Build timed out — click Reset & retry, then Build Short again.')
   }
 
   async function buildShort() {
@@ -395,7 +394,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
 
     try {
       const saved = await saveJob({ silent: true })
-      if (!saved) return
+      if (!saved) {
+        setErr((prev) => prev || 'Could not save script — fix errors and try again.')
+        return
+      }
 
       const rebuild = selected?.status === 'video_rendered'
       const estSec =
@@ -418,8 +420,13 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         body: JSON.stringify({ action: 'build-short', jobId: selectedId, rebuild }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok && res.status !== 202) throw new Error(j.error || 'Build failed')
-      if (j.job) upsertJob(j.job)
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Build failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
 
       const finishedJob = await waitForFullBuildComplete(selectedId)
       if (finishedJob.status !== 'video_rendered') {
@@ -951,13 +958,14 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 <h3 className="font-semibold text-white">{draftScript.title}</h3>
                 <p className={`text-xs ${EOF.muted}`}>
                   {selected.topic}
+                  <span className="ml-2 text-[#9ecbff]">· {productionJobStatusLabel(selected.status)}</span>
                   {draftDirty ? <span className="ml-2 text-amber-400">· unsaved changes</span> : null}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || isRendering}
+                  disabled={busy || (isRendering && !isRenderStuck)}
                   onClick={buildShort}
                   className={`rounded-full px-5 py-2 text-sm font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
                 >
