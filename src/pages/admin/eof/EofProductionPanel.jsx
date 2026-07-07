@@ -313,6 +313,39 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     }
   }
 
+  async function deleteJob(jobId) {
+    const job = jobs.find((row) => row.id === jobId)
+    const label = job?.title || job?.topic || 'this script'
+    if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return
+
+    setBusy(true)
+    setErr('')
+    setSuccess('')
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not delete script')
+
+      setJobs((prev) => prev.filter((row) => row.id !== jobId))
+      if (selectedId === jobId) {
+        hydratedJobIdRef.current = null
+        setSelectedId(null)
+        setDraftScript(null)
+        setDraftDirty(false)
+        setAudioPreviewUrl('')
+      }
+      setSuccess(`Deleted “${label}”.`)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function updateScene(index, field, value) {
     markDraftDirty()
     setDraftScript((prev) => {
@@ -421,16 +454,26 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               <li className={`text-sm ${EOF.muted}`}>No jobs yet</li>
             ) : (
               jobs.map((j) => (
-                <li key={j.id}>
+                <li key={j.id} className="flex items-stretch gap-1">
                   <button
                     type="button"
                     onClick={() => selectJob(j.id)}
-                    className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                    className={`min-w-0 flex-1 rounded-lg px-3 py-2 text-left text-sm ${
                       selectedId === j.id ? 'bg-[#272727] text-white' : 'text-[#aaa] hover:bg-[#1a1a1a]'
                     }`}
                   >
                     <div className="font-medium truncate">{j.title || j.topic}</div>
                     <div className="text-[10px] text-[#717171]">{productionJobStatusLabel(j.status)}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteJob(j.id)}
+                    disabled={busy}
+                    title={`Delete ${j.title || j.topic}`}
+                    aria-label={`Delete ${j.title || j.topic}`}
+                    className="rounded-lg px-2 text-sm text-[#717171] hover:bg-[#2a1515] hover:text-[#ff9b95] disabled:opacity-50"
+                  >
+                    ×
                   </button>
                 </li>
               ))
@@ -468,6 +511,14 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                     : selected.status === 'rendering'
                       ? 'Rendering…'
                       : 'Render audio + music'}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => deleteJob(selected.id)}
+                  className="rounded-full border border-[#ff4e45]/40 px-4 py-1.5 text-xs text-[#ff9b95] disabled:opacity-50"
+                >
+                  Delete script
                 </button>
               </div>
             </div>

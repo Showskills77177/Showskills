@@ -1,6 +1,6 @@
 import { json, readJsonBody } from '../lib/http.mjs'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
-import { requireEofSession, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
+import { requireEofSession, requireEofOwner, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
 import { ensureEofMusicCatalogSeeded, listEofMusicTracks } from '../lib/eofMusicTracks.mjs'
 import {
   listEofProductionJobs,
@@ -8,6 +8,7 @@ import {
   getEofProductionJob,
   updateEofProductionJob,
   regenerateEofProductionScript,
+  deleteEofProductionJob,
 } from '../lib/eofProductionJobs.mjs'
 import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
@@ -17,7 +18,7 @@ import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
     return res.status(204).end()
   }
@@ -132,7 +133,23 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, job })
     }
 
-    res.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
+    if (req.method === 'DELETE') {
+      try {
+        await requireEofOwner(req)
+      } catch (e) {
+        return json(res, e.statusCode || 403, { error: 'Only the channel owner can delete production jobs.' })
+      }
+
+      const body = await readJsonBody(req)
+      const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+      if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+
+      const deleted = await deleteEofProductionJob(jobId)
+      if (!deleted) return json(res, 404, { error: 'Job not found.' })
+      return json(res, 200, { ok: true, deletedId: jobId })
+    }
+
+    res.setHeader('Allow', 'GET, POST, PATCH, DELETE, OPTIONS')
     return json(res, 405, { error: 'Method not allowed' })
   } catch (e) {
     console.error('[eof-production] handler', e)

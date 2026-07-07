@@ -13,8 +13,12 @@ function eofProductionStorageRoot() {
   return join(root, 'storage', 'eof')
 }
 
+export function eofProductionJobDirPath(jobId) {
+  return join(eofProductionStorageRoot(), 'jobs', jobId)
+}
+
 export function eofProductionWorkDir(jobId) {
-  const dir = join(eofProductionStorageRoot(), 'jobs', jobId)
+  const dir = eofProductionJobDirPath(jobId)
   mkdirSync(dir, { recursive: true })
   return dir
 }

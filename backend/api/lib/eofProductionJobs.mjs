@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync, rmSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { query, dbIsPostgres } from './db.mjs'
 import { ensureEofProductionSchema } from './ensureEofProductionSchema.mjs'
 import {
@@ -8,6 +11,9 @@ import {
 } from '../../../shared/eofProduction.mjs'
 import { buildFactsShortScript } from '../../../shared/eofScriptTemplates.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
+import { eofProductionJobDirPath } from './eofSceneTts.mjs'
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 function normalizeTimestamp(value) {
   if (value == null || value === '') return null
@@ -166,4 +172,29 @@ export async function regenerateEofProductionScript(id) {
     status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
     errorMessage: null,
   })
+}
+
+function removeEofProductionJobFiles(jobId) {
+  const dirs = [
+    eofProductionJobDirPath(jobId),
+    join(root, 'storage', 'eof', 'jobs', jobId),
+  ]
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue
+    try {
+      rmSync(dir, { recursive: true, force: true })
+    } catch (e) {
+      console.warn('[eof-production] could not remove job files', jobId, e)
+    }
+  }
+}
+
+export async function deleteEofProductionJob(id) {
+  await ensureEofProductionSchema()
+  const job = await getEofProductionJob(id)
+  if (!job) return false
+
+  await query(`DELETE FROM eof_production_jobs WHERE id = $1`, [id])
+  removeEofProductionJobFiles(id)
+  return true
 }
