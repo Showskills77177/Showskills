@@ -1,19 +1,30 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../../lib/api'
 import { productionJobStatusLabel } from '../../../../shared/eofProduction.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
+const SELECTED_JOB_KEY = 'eof_production_selected_job'
 
-export default function EofProductionPanel({ isOwner }) {
+function readStoredSelectedId() {
+  try {
+    return sessionStorage.getItem(SELECTED_JOB_KEY) || null
+  } catch {
+    return null
+  }
+}
+
+export default function EofProductionPanel({ isOwner, active = true }) {
   const [jobs, setJobs] = useState([])
   const [tracks, setTracks] = useState([])
   const [voicePresets, setVoicePresets] = useState([])
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
   const [voicePreset, setVoicePreset] = useState('british')
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId] = useState(readStoredSelectedId)
   const [draftScript, setDraftScript] = useState(null)
+  const [draftDirty, setDraftDirty] = useState(false)
+  const hydratedJobIdRef = useRef(null)
   const [musicTrackId, setMusicTrackId] = useState('')
   const [musicVolume, setMusicVolume] = useState(0.22)
   const [err, setErr] = useState('')
@@ -24,27 +35,32 @@ export default function EofProductionPanel({ isOwner }) {
   const [audioPreviewUrl, setAudioPreviewUrl] = useState('')
   const [renderPhase, setRenderPhase] = useState('')
 
+  const fetchProduction = useCallback(async () => {
+    const res = await apiFetch('/api/admin/eof-production')
+    const text = await res.text()
+    let j = {}
+    try {
+      j = text ? JSON.parse(text) : {}
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) {
+      const detail =
+        typeof j.error === 'string'
+          ? j.error
+          : text.trim()
+            ? `${res.status}: ${text.trim().slice(0, 160)}`
+            : `Request failed (HTTP ${res.status})`
+      throw new Error(detail)
+    }
+    return j
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     setErr('')
     try {
-      const res = await apiFetch('/api/admin/eof-production')
-      const text = await res.text()
-      let j = {}
-      try {
-        j = text ? JSON.parse(text) : {}
-      } catch {
-        /* non-JSON */
-      }
-      if (!res.ok) {
-        const detail =
-          typeof j.error === 'string'
-            ? j.error
-            : text.trim()
-              ? `${res.status}: ${text.trim().slice(0, 160)}`
-              : `Request failed (HTTP ${res.status})`
-        throw new Error(detail)
-      }
+      const j = await fetchProduction()
       setJobs(j.jobs || [])
       setTracks(j.tracks || [])
       setVoicePresets(j.voicePresets || [])
@@ -55,34 +71,80 @@ export default function EofProductionPanel({ isOwner }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchProduction])
+
+  const refreshJobsQuiet = useCallback(async () => {
+    try {
+      const j = await fetchProduction()
+      setJobs(j.jobs || [])
+      setTracks(j.tracks || [])
+    } catch {
+      /* background refresh */
+    }
+  }, [fetchProduction])
 
   useEffect(() => {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!selectedId) {
+      try {
+        sessionStorage.removeItem(SELECTED_JOB_KEY)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+    try {
+      sessionStorage.setItem(SELECTED_JOB_KEY, selectedId)
+    } catch {
+      /* ignore */
+    }
+  }, [selectedId])
+
   const selected = jobs.find((j) => j.id === selectedId) || null
 
-  useEffect(() => {
-    if (selected) {
-      setDraftScript(selected.script ? JSON.parse(JSON.stringify(selected.script)) : null)
-      setMusicTrackId(selected.musicTrackId || '')
-      setMusicVolume(selected.musicVolume ?? 0.22)
-      setVoicePreset(selected.voicePreset || 'british')
-      if (selected.status !== 'rendered') setAudioPreviewUrl('')
-    } else {
-      setDraftScript(null)
-      setAudioPreviewUrl('')
-    }
-  }, [selected])
+  function hydrateDraftFromJob(job) {
+    setDraftScript(job.script ? JSON.parse(JSON.stringify(job.script)) : null)
+    setMusicTrackId(job.musicTrackId || '')
+    setMusicVolume(job.musicVolume ?? 0.22)
+    setVoicePreset(job.voicePreset || 'british')
+    if (job.status !== 'rendered') setAudioPreviewUrl('')
+    setDraftDirty(false)
+  }
+
+  function selectJob(jobId) {
+    hydratedJobIdRef.current = null
+    setSelectedId(jobId)
+  }
 
   useEffect(() => {
-    if (selected?.status !== 'rendering' || busy) return undefined
+    if (!selectedId) {
+      setDraftScript(null)
+      setDraftDirty(false)
+      hydratedJobIdRef.current = null
+      setAudioPreviewUrl('')
+      return
+    }
+    if (hydratedJobIdRef.current === selectedId) return
+    const job = jobs.find((j) => j.id === selectedId)
+    if (!job) return
+    hydratedJobIdRef.current = selectedId
+    hydrateDraftFromJob(job)
+  }, [selectedId, jobs])
+
+  useEffect(() => {
+    if (!active || selected?.status !== 'rendering' || busy) return undefined
     const timer = setInterval(() => {
-      load()
+      refreshJobsQuiet()
     }, 5000)
     return () => clearInterval(timer)
-  }, [selected?.status, busy, load])
+  }, [active, selected?.status, busy, refreshJobsQuiet])
+
+  function markDraftDirty() {
+    setDraftDirty(true)
+  }
 
   function workflowStepState(step) {
     if (!selected) return step === 1 ? 'current' : 'upcoming'
@@ -103,6 +165,17 @@ export default function EofProductionPanel({ isOwner }) {
     return 'upcoming'
   }
 
+  function upsertJob(job) {
+    if (!job?.id) return
+    setJobs((prev) => {
+      const i = prev.findIndex((row) => row.id === job.id)
+      if (i === -1) return [job, ...prev]
+      const next = [...prev]
+      next[i] = job
+      return next
+    })
+  }
+
   async function createJob(e) {
     e.preventDefault()
     setBusy(true)
@@ -117,8 +190,11 @@ export default function EofProductionPanel({ isOwner }) {
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not create job')
       setTopic('')
-      setSelectedId(j.job.id)
+      selectJob(j.job.id)
+      if (j.job?.script) hydrateDraftFromJob(j.job)
+      hydratedJobIdRef.current = j.job.id
       setSuccess(`Script drafted for “${j.job.topic}”. Review scenes, then render audio.`)
+      upsertJob(j.job)
       await load()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
@@ -151,7 +227,11 @@ export default function EofProductionPanel({ isOwner }) {
       if (!silent) {
         setSuccess('Script and music settings saved. Next: click “Render audio + music”.')
       }
-      await load()
+      if (j.job) {
+        upsertJob(j.job)
+        hydratedJobIdRef.current = selectedId
+        hydrateDraftFromJob(j.job)
+      }
       return true
     } catch (e) {
       if (!silent) setErr(e instanceof Error ? e.message : 'Error')
@@ -202,11 +282,17 @@ export default function EofProductionPanel({ isOwner }) {
           ? 'Audio rendered. Preview below, then video assembly is next.'
           : 'Audio rendered.',
       )
-      await load()
+      if (j.job) {
+        upsertJob(j.job)
+        hydratedJobIdRef.current = selectedId
+        hydrateDraftFromJob(j.job)
+      } else {
+        await refreshJobsQuiet()
+      }
     } catch (e) {
       setRenderPhase('failed')
       setErr(e instanceof Error ? e.message : 'Error')
-      await load()
+      await refreshJobsQuiet()
     } finally {
       setBusy(false)
       setRenderPhase('')
@@ -228,6 +314,7 @@ export default function EofProductionPanel({ isOwner }) {
   }
 
   function updateScene(index, field, value) {
+    markDraftDirty()
     setDraftScript((prev) => {
       if (!prev?.scenes) return prev
       const scenes = [...prev.scenes]
@@ -337,7 +424,7 @@ export default function EofProductionPanel({ isOwner }) {
                 <li key={j.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(j.id)}
+                    onClick={() => selectJob(j.id)}
                     className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
                       selectedId === j.id ? 'bg-[#272727] text-white' : 'text-[#aaa] hover:bg-[#1a1a1a]'
                     }`}
@@ -356,7 +443,10 @@ export default function EofProductionPanel({ isOwner }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-white">{draftScript.title}</h3>
-                <p className={`text-xs ${EOF.muted}`}>{selected.topic}</p>
+                <p className={`text-xs ${EOF.muted}`}>
+                  {selected.topic}
+                  {draftDirty ? <span className="ml-2 text-amber-400">· unsaved changes</span> : null}
+                </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -387,7 +477,10 @@ export default function EofProductionPanel({ isOwner }) {
                 Music bed
                 <select
                   value={musicTrackId}
-                  onChange={(e) => setMusicTrackId(e.target.value)}
+                  onChange={(e) => {
+                    markDraftDirty()
+                    setMusicTrackId(e.target.value)
+                  }}
                   className={inputCls}
                 >
                   <option value="">Auto (default / mood)</option>
@@ -406,7 +499,10 @@ export default function EofProductionPanel({ isOwner }) {
                   max={0.5}
                   step={0.01}
                   value={musicVolume}
-                  onChange={(e) => setMusicVolume(Number(e.target.value))}
+                  onChange={(e) => {
+                    markDraftDirty()
+                    setMusicVolume(Number(e.target.value))
+                  }}
                   className="mt-2 w-full"
                 />
               </label>
@@ -417,7 +513,10 @@ export default function EofProductionPanel({ isOwner }) {
               <textarea
                 rows={2}
                 value={draftScript.description || ''}
-                onChange={(e) => setDraftScript((s) => ({ ...s, description: e.target.value }))}
+                onChange={(e) => {
+                  markDraftDirty()
+                  setDraftScript((s) => ({ ...s, description: e.target.value }))
+                }}
                 className={inputCls}
               />
             </label>

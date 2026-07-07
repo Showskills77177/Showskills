@@ -12,12 +12,42 @@ import EofMusicLibrary from './eof/EofMusicLibrary'
 import EofProjectList from './eof/EofProjectList'
 import { EOF } from './eof/eofStudioTheme'
 
+const EOF_VIEW_KEY = 'eof_admin_view'
+
+function readStoredView() {
+  try {
+    const stored = sessionStorage.getItem(EOF_VIEW_KEY)
+    if (
+      stored === 'studio' ||
+      stored === 'production' ||
+      stored === 'music' ||
+      stored === 'analytics' ||
+      stored === 'calendar' ||
+      stored === 'content'
+    ) {
+      return stored
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'studio'
+}
+
 export default function EyesOfFootballAdminPage() {
   const [data, setData] = useState(null)
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(null)
-  const [view, setView] = useState('studio')
+  const [view, setView] = useState(readStoredView)
+
+  const selectView = useCallback((id) => {
+    setView(id)
+    try {
+      sessionStorage.setItem(EOF_VIEW_KEY, id)
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -112,7 +142,7 @@ export default function EyesOfFootballAdminPage() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setView(id)}
+                    onClick={() => selectView(id)}
                     className={`rounded-full px-4 py-1.5 text-sm font-medium ${
                       view === id ? 'bg-white text-black' : 'text-[#aaa] hover:bg-[#272727]'
                     }`}
@@ -122,61 +152,35 @@ export default function EyesOfFootballAdminPage() {
                 ))}
               </nav>
 
-              {view === 'analytics' ? (
+              <div hidden={view !== 'analytics'} className="mt-6">
                 <EofAnalyticsPanel analytics={data.analytics} />
-              ) : null}
+              </div>
 
-              {view === 'production' ? (
-                <div className="mt-6">
-                  <EofProductionPanel isOwner={isOwner} />
-                </div>
-              ) : null}
+              <div hidden={view !== 'production'} className="mt-6">
+                <EofProductionPanel isOwner={isOwner} active={view === 'production'} />
+              </div>
 
-              {view === 'music' ? (
-                <div className="mt-6">
-                  <EofMusicLibrary />
-                </div>
-              ) : null}
+              <div hidden={view !== 'music'} className="mt-6">
+                <EofMusicLibrary />
+              </div>
 
-              {view === 'studio' ? (
-                <div className="mt-6">
-                  <EofUploadStudio canUse={canUpload} isOwner={session?.isOwner} onDone={() => load()} />
-                </div>
-              ) : null}
+              <div hidden={view !== 'studio'} className="mt-6">
+                <EofUploadStudio canUse={canUpload} isOwner={session?.isOwner} onDone={() => load()} />
+              </div>
 
-              {view === 'calendar' ? (
-                <div className="mt-6 grid gap-6 lg:grid-cols-2">
-                  <EofPublishCalendar
-                    calendar={data.calendar}
-                    selectedDay={selectedDay}
-                    onSelectDay={(day) => {
-                      setSelectedDay(day)
-                      setView('content')
-                    }}
-                  />
-                  <div>
-                    <h3 className="mb-3 text-sm font-semibold text-[#3ea6ff]">
-                      {selectedDay ? `Videos on ${selectedDay}` : 'Select a day'}
-                    </h3>
-                    <EofProjectList
-                      projects={data.projects}
-                      calendar={data.calendar}
-                      selectedDay={selectedDay}
-                      isOwner={session?.canApprove}
-                      onRefresh={load}
-                    />
-                  </div>
-                </div>
-              ) : null}
-
-              {view === 'content' ? (
-                <div className="mt-6">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">Channel content</h2>
-                    <button type="button" onClick={load} className={`text-xs ${EOF.link}`}>
-                      Refresh
-                    </button>
-                  </div>
+              <div hidden={view !== 'calendar'} className="mt-6 grid gap-6 lg:grid-cols-2">
+                <EofPublishCalendar
+                  calendar={data.calendar}
+                  selectedDay={selectedDay}
+                  onSelectDay={(day) => {
+                    setSelectedDay(day)
+                    selectView('content')
+                  }}
+                />
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold text-[#3ea6ff]">
+                    {selectedDay ? `Videos on ${selectedDay}` : 'Select a day'}
+                  </h3>
                   <EofProjectList
                     projects={data.projects}
                     calendar={data.calendar}
@@ -185,7 +189,23 @@ export default function EyesOfFootballAdminPage() {
                     onRefresh={load}
                   />
                 </div>
-              ) : null}
+              </div>
+
+              <div hidden={view !== 'content'} className="mt-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Channel content</h2>
+                  <button type="button" onClick={load} className={`text-xs ${EOF.link}`}>
+                    Refresh
+                  </button>
+                </div>
+                <EofProjectList
+                  projects={data.projects}
+                  calendar={data.calendar}
+                  selectedDay={selectedDay}
+                  isOwner={session?.canApprove}
+                  onRefresh={load}
+                />
+              </div>
             </>
           )}
         </>
