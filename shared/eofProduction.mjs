@@ -110,14 +110,38 @@ export const EOF_RENDER_STACK = {
 /** Rough pre-render estimate from narration length + scene count. */
 export function estimateEofRenderDurationSec(script) {
   const scenes = script?.scenes || []
-  if (!scenes.length) return 30
+  if (!scenes.length) return 45
   let ttsSec = 0
   for (const scene of scenes) {
     const chars = String(scene.narration || '').trim().length
-    ttsSec += Math.max(6, chars * 0.055)
+    // Edge TTS on serverless: ~10–18s per scene including network latency.
+    ttsSec += Math.max(10, Math.min(20, 8 + chars * 0.035))
   }
-  const mixSec = 10 + scenes.length * 1.5
-  return Math.ceil(ttsSec + mixSec)
+  const mixSec = 8 + scenes.length
+  return Math.ceil(Math.min(150, ttsSec + mixSec))
+}
+
+/** Video assembly estimate (images + ffmpeg clips + mux). */
+export function estimateEofVideoRenderDurationSec(sceneCount = 5) {
+  const n = Math.max(1, sceneCount || 1)
+  return Math.min(90, Math.max(20, Math.ceil(n * 5)))
+}
+
+function computeRenderEtaSeconds({ percent, elapsedSeconds, estimatedTotalSec }) {
+  if (percent >= 100) return 0
+  const budget = Math.max(20, estimatedTotalSec)
+  const remainingByBudget = Math.max(0, budget - elapsedSeconds)
+  // Early on, pace extrapolation blows up (4% + 60s elapsed → 24m). Stick to budget.
+  if (percent < 18 || elapsedSeconds < 10) return remainingByBudget
+  const remainingByPace = Math.round((elapsedSeconds / Math.max(percent, 18)) * (100 - percent))
+  return Math.min(remainingByBudget, remainingByPace)
+}
+
+function formatEtaLabel(etaSeconds) {
+  if (etaSeconds <= 0) return '0:00 left'
+  const etaMinutes = Math.floor(etaSeconds / 60)
+  const etaRemSec = etaSeconds % 60
+  return etaMinutes > 0 ? `~${etaMinutes}m ${etaRemSec}s left` : `~${etaRemSec}s left`
 }
 
 /**
@@ -166,18 +190,13 @@ export function buildEofRenderProgress(input) {
     message = 'Render complete'
   }
 
-  const estimatedTotalSec = Math.max(
-    elapsedSeconds + 1,
-    input.estimatedTotalSec || estimateEofRenderDurationSec({ scenes: Array.from({ length: sceneCount }) }),
-  )
-  const pacePercent = Math.max(percent, 1)
-  const etaSeconds =
-    percent >= 100
-      ? 0
-      : Math.max(0, Math.round((elapsedSeconds / pacePercent) * (100 - percent)))
+  const estimatedTotalSec =
+    pipeline === 'video'
+      ? estimateEofVideoRenderDurationSec(sceneCount)
+      : input.estimatedTotalSec ||
+        estimateEofRenderDurationSec({ scenes: Array.from({ length: sceneCount }) })
 
-  const etaMinutes = Math.floor(etaSeconds / 60)
-  const etaRemSec = etaSeconds % 60
+  const etaSeconds = computeRenderEtaSeconds({ percent, elapsedSeconds, estimatedTotalSec })
 
   return {
     percent,
@@ -190,12 +209,7 @@ export function buildEofRenderProgress(input) {
     elapsedSeconds,
     estimatedTotalSec,
     etaSeconds,
-    etaLabel:
-      percent >= 100
-        ? '0:00 left'
-        : etaMinutes > 0
-          ? `~${etaMinutes}m ${etaRemSec}s left`
-          : `~${etaRemSec}s left`,
+    etaLabel: formatEtaLabel(etaSeconds),
   }
 }
 
@@ -226,16 +240,18 @@ export function refreshEofRenderProgress(progress) {
 /** Client estimate when the server has not written progress yet (or render is orphaned). */
 export function buildFallbackRenderProgress(job, script, pipeline = 'audio') {
   const sceneCount = script?.scenes?.length || job?.renderProgress?.sceneCount || 5
-  const startedAt = job?.renderProgress?.startedAt || job?.updatedAt || new Date().toISOString()
+  const startedAt = job?.renderProgress?.startedAt || null
   const estimatedTotalSec =
     pipeline === 'video'
-      ? Math.max(20, sceneCount * 4)
+      ? estimateEofVideoRenderDurationSec(sceneCount)
       : estimateEofRenderDurationSec(script || { scenes: Array.from({ length: sceneCount }) })
-  const elapsedSeconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000))
-  const percent = Math.min(92, Math.max(4, Math.round((elapsedSeconds / Math.max(estimatedTotalSec, 1)) * 100)))
-  const etaSeconds = Math.max(0, estimatedTotalSec - elapsedSeconds)
-  const etaMinutes = Math.floor(etaSeconds / 60)
-  const etaRemSec = etaSeconds % 60
+  const elapsedSeconds = startedAt
+    ? Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000))
+    : 0
+  const percent = startedAt
+    ? Math.min(88, Math.max(4, Math.round((elapsedSeconds / Math.max(estimatedTotalSec, 1)) * 100)))
+    : 4
+  const etaSeconds = computeRenderEtaSeconds({ percent, elapsedSeconds, estimatedTotalSec })
 
   const message =
     pipeline === 'video'
@@ -251,16 +267,11 @@ export function buildFallbackRenderProgress(job, script, pipeline = 'audio') {
     sceneCount,
     message,
     pipeline,
-    startedAt,
+    startedAt: startedAt || new Date().toISOString(),
     elapsedSeconds,
     estimatedTotalSec,
     etaSeconds,
-    etaLabel:
-      etaSeconds > 0
-        ? etaMinutes > 0
-          ? `~${etaMinutes}m ${etaRemSec}s left`
-          : `~${etaRemSec}s left`
-        : 'finishing…',
+    etaLabel: formatEtaLabel(etaSeconds),
     fallback: !job?.renderProgress,
   }
 }

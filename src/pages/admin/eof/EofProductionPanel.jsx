@@ -3,6 +3,7 @@ import { apiFetch } from '../../../lib/api'
 import {
   productionJobStatusLabel,
   estimateEofRenderDurationSec,
+  estimateEofVideoRenderDurationSec,
   refreshEofRenderProgress,
   buildFallbackRenderProgress,
 } from '../../../../shared/eofProduction.mjs'
@@ -481,7 +482,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     setRenderPhase('rendering-video')
     setVideoPreviewUrl('')
     try {
-      const estSec = Math.max(20, (draftScript?.scenes?.length || 5) * 4)
+      const estSec = estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5)
       setRenderProgress({
         percent: 3,
         message: 'Starting video render…',

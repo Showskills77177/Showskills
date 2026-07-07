@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import {
   EOF_PRODUCTION_JOB_STATUS,
   buildEofRenderProgress,
-  estimateEofRenderDurationSec,
+  estimateEofVideoRenderDurationSec,
 } from '../../../shared/eofProduction.mjs'
 import {
   getEofProductionJob,
@@ -40,7 +40,7 @@ export async function renderEofProductionVideoJob(jobId) {
 
   const sceneCount = Math.max(manifest.length, scriptScenes.length)
   const renderStartedAt = new Date().toISOString()
-  const estimatedTotalSec = Math.max(20, Math.ceil(sceneCount * 4))
+  const estimatedTotalSec = estimateEofVideoRenderDurationSec(sceneCount)
 
   await updateEofProductionJob(jobId, {
     status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
