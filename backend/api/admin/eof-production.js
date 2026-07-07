@@ -69,7 +69,7 @@ export default async function handler(req, res) {
         ffmpegAvailable: ffmpeg,
         renderNote: ffmpeg
           ? null
-          : 'Audio render needs ffmpeg on a worker or local API — script editing still works on staging.',
+          : 'Audio render needs ffmpeg (bundled ffmpeg-static on deploy, or FFMPEG_PATH locally).',
         session: info,
       })
     }

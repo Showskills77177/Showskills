@@ -6,7 +6,12 @@ import {
   markEofProductionJobFailed,
 } from './eofProductionJobs.mjs'
 import { getEofMusicTrack, resolveEofMusicTrackFilePath } from './eofMusicTracks.mjs'
-import { eofProductionWorkDir, synthesizeEofSceneNarration, probeAudioDurationSec } from './eofSceneTts.mjs'
+import {
+  eofProductionWorkDir,
+  eofProductionMixedAudioRelPath,
+  synthesizeEofSceneNarration,
+  probeAudioDurationSec,
+} from './eofSceneTts.mjs'
 import { mixEofNarrationWithMusic, isFfmpegAvailable } from './eofAudioMix.mjs'
 
 /**
@@ -20,7 +25,9 @@ export async function renderEofProductionAudio(jobId) {
 
   const ffmpegOk = await isFfmpegAvailable()
   if (!ffmpegOk) {
-    throw new Error('ffmpeg is not installed on this server. Install ffmpeg to render audio.')
+    throw new Error(
+      'ffmpeg is not available for audio render. Ensure ffmpeg-static is installed or set FFMPEG_PATH.',
+    )
   }
 
   await updateEofProductionJob(jobId, {
@@ -66,7 +73,7 @@ export async function renderEofProductionAudio(jobId) {
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
       narrationManifest: sceneManifest,
-      mixedAudioPath: `storage/eof/jobs/${jobId}/mixed.mp3`,
+      mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
       renderOutputPath: null,
       errorMessage: null,
       script: {

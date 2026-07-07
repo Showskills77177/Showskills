@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/[[...slug]].js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "headers": [

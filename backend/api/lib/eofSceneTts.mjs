@@ -1,17 +1,28 @@
-import { execFile } from 'node:child_process'
 import { mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+import { EdgeTTS } from 'node-edge-tts'
 import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
+import { runFfprobe } from './eofFfmpeg.mjs'
 
-const execFileAsync = promisify(execFile)
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
+function eofProductionStorageRoot() {
+  if (process.env.EOF_PRODUCTION_WORK_ROOT) return process.env.EOF_PRODUCTION_WORK_ROOT
+  if (process.env.VERCEL) return join('/tmp', 'showskills-eof')
+  return join(root, 'storage', 'eof')
+}
+
 export function eofProductionWorkDir(jobId) {
-  const dir = join(root, 'storage', 'eof', 'jobs', jobId)
+  const dir = join(eofProductionStorageRoot(), 'jobs', jobId)
   mkdirSync(dir, { recursive: true })
   return dir
+}
+
+/** Logical path stored on the job record (display / local dev). */
+export function eofProductionMixedAudioRelPath(jobId) {
+  if (process.env.VERCEL) return `tmp/showskills-eof/jobs/${jobId}/mixed.mp3`
+  return `storage/eof/jobs/${jobId}/mixed.mp3`
 }
 
 /**
@@ -24,22 +35,15 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }
 
   mkdirSync(dirname(outPath), { recursive: true })
 
-  const args = [
-    '--yes',
-    'node-edge-tts',
-    '-t',
-    line,
-    '-v',
-    preset.voice,
-    '-l',
-    preset.voice.startsWith('en-GB') ? 'en-GB' : 'en-US',
-    '-r',
-    preset.rate,
-    '-f',
-    outPath,
-  ]
+  const lang = preset.voice.startsWith('en-GB') ? 'en-GB' : 'en-US'
+  const tts = new EdgeTTS({
+    voice: preset.voice,
+    lang,
+    rate: preset.rate,
+    timeout: 45000,
+  })
 
-  await execFileAsync('npx', args, { cwd: root, maxBuffer: 8 * 1024 * 1024 })
+  await tts.ttsPromise(line, outPath)
   if (!existsSync(outPath)) throw new Error('TTS output file missing.')
   return outPath
 }
@@ -48,8 +52,7 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }
  * @param {string} audioPath
  */
 export async function probeAudioDurationSec(audioPath) {
-  const { stdout } = await execFileAsync(
-    'ffprobe',
+  const { stdout } = await runFfprobe(
     ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', audioPath],
     { maxBuffer: 1024 * 1024 },
   )

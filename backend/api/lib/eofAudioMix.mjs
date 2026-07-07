@@ -1,11 +1,10 @@
-import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { mkdirSync } from 'node:fs'
-import { promisify } from 'node:util'
 import { probeAudioDurationSec } from './eofSceneTts.mjs'
+import { isFfmpegAvailable, runFfmpeg } from './eofFfmpeg.mjs'
 
-const execFileAsync = promisify(execFile)
+export { isFfmpegAvailable }
 
 function musicVolumeToDb(volume) {
   const v = Math.max(0.05, Math.min(1, Number(volume) || 0.22))
@@ -38,14 +37,12 @@ export async function mixEofNarrationWithMusic({
   const listBody = paths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n')
   await import('node:fs/promises').then((fs) => fs.writeFile(listFile, listBody, 'utf8'))
 
-  await execFileAsync(
-    'ffmpeg',
-    ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', narrationOnly],
-    { maxBuffer: 8 * 1024 * 1024 },
-  )
+  await runFfmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', narrationOnly], {
+    maxBuffer: 8 * 1024 * 1024,
+  })
 
   if (!musicFilePath || !existsSync(musicFilePath)) {
-    await execFileAsync('ffmpeg', ['-y', '-i', narrationOnly, '-c:a', 'libmp3lame', '-q:a', '4', outputPath], {
+    await runFfmpeg(['-y', '-i', narrationOnly, '-c:a', 'libmp3lame', '-q:a', '4', outputPath], {
       maxBuffer: 8 * 1024 * 1024,
     })
     return { outputPath, durationSec: await probeAudioDurationSec(outputPath), hasMusicBed: false }
@@ -55,8 +52,7 @@ export async function mixEofNarrationWithMusic({
   const fadeOutStart = Math.max(0, narrDur - 2)
   const musicDb = musicVolumeToDb(musicVolume)
 
-  await execFileAsync(
-    'ffmpeg',
+  await runFfmpeg(
     [
       '-y',
       '-i',
@@ -83,20 +79,4 @@ export async function mixEofNarrationWithMusic({
     durationSec: await probeAudioDurationSec(outputPath),
     hasMusicBed: true,
   }
-}
-
-export async function isFfmpegAvailable({ timeoutMs = 2000 } = {}) {
-  return Promise.race([
-    (async () => {
-      try {
-        await execFileAsync('ffmpeg', ['-version'], { maxBuffer: 1024 * 1024 })
-        return true
-      } catch {
-        return false
-      }
-    })(),
-    new Promise((resolve) => {
-      setTimeout(() => resolve(false), timeoutMs)
-    }),
-  ])
 }

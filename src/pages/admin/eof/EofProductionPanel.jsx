@@ -173,7 +173,7 @@ export default function EofProductionPanel({ isOwner }) {
         {!loading && !ffmpegAvailable ? (
           <p className="mt-2 text-xs text-amber-400">
             {renderNote ||
-              'ffmpeg is not available on this API host — you can still draft scripts here; audio render needs a local worker with ffmpeg.'}
+              'ffmpeg is not detected — redeploy staging with ffmpeg-static, or set FFMPEG_PATH on the API host.'}
           </p>
         ) : null}
         {!loading && tracks.length === 0 ? (
