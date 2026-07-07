@@ -40,7 +40,7 @@ function PrivacyPolicySection() {
         <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
           Privacy Policy
         </h2>
-        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 18 June 2026</p>
+        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 21 May 2026</p>
         <p className="mt-4 text-zinc-300">
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
@@ -98,14 +98,66 @@ function PrivacyPolicySection() {
           after the relevant competition period ends unless a longer period is required by law or to resolve a dispute.
         </li>
         <li>IP address and basic technical data (for security and anonymous analytics)</li>
+        <li>
+          <strong>Optional user account (My account):</strong> if you create a free ShowSkills Rewards login, we
+          store your email, full name, and a <strong>secure password hash</strong> (we never store your plain-text
+          password). You may optionally add a phone number, billing address, and delivery address in your profile.
+          We also store account creation and last sign-in times, newsletter preferences, and competition entry
+          history linked to your account (paid tickets, giveaways, and skill-quiz status). A secure{' '}
+          <strong>session cookie</strong> keeps you signed in on your device until you log out or the session
+          expires.
+        </li>
       </ul>
       <p className="mb-2">We do not collect:</p>
       <ul className="mb-3 list-inside list-disc space-y-1">
-        <li>Passwords or account logins (entries do not require a user account)</li>
+        <li>
+          Your plain-text password — only a one-way hash is stored for account logins; payment card numbers and CVV
+          are handled only by our payment providers
+        </li>
         <li>Government ID numbers through the website (we may ask winners to verify identity separately)</li>
         <li>Date of birth on the entry form (eligibility is based on you confirming you meet the age requirement)</li>
         <li>Any special category / sensitive personal data</li>
       </ul>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200" id="ss-privacy-user-accounts">
+        P.1a Optional user accounts — what we store and deletion
+      </h3>
+      <p className="mb-2">
+        Creating a <strong>ShowSkills Rewards account</strong> is <strong>optional</strong>. You can still enter many
+        promotions as a guest using your email at checkout. If you register, we collect and store only what is needed
+        to run your account:
+      </p>
+      <ul className="mb-3 list-inside list-disc space-y-1">
+        <li>
+          <strong>Account details:</strong> email address, full name, password (stored as a secure hash only)
+        </li>
+        <li>
+          <strong>Profile (optional):</strong> phone number, billing address, and delivery address — only if you choose
+          to add them
+        </li>
+        <li>
+          <strong>Newsletter preferences:</strong> whether you receive competition and giveaway emails (account
+          registration subscribes you by default; you can change this in My account or via links in our emails)
+        </li>
+        <li>
+          <strong>Entry history:</strong> paid tickets, free giveaway entries, and skill-quiz completion status linked
+          to your account so you can view them in <strong>My account</strong>
+        </li>
+        <li>
+          <strong>Security &amp; access:</strong> account creation date, last sign-in time, a secure{' '}
+          <strong>user session cookie</strong> while you are logged in, and short-lived hashed codes if you use{' '}
+          <strong>Forgot password</strong> (sent to your email)
+        </li>
+      </ul>
+      <p className="mb-3 rounded-lg border border-teal-800/40 bg-teal-950/30 px-3 py-2.5 text-zinc-200">
+        <strong>Delete your account:</strong> you can permanently delete your login at any time from{' '}
+        <strong>My account → Delete account</strong>, entering your password to confirm. Deletion removes your profile
+        details (name, phone, addresses) and invalidates your password. Your account email is{' '}
+        <strong>anonymised</strong> on our systems. Records needed for legal, tax, fraud prevention, or completed
+        transactions (for example ticket purchases already made) may be kept in anonymised or minimal form where the law
+        requires — account deletion does not erase every historical order audit record. After deletion you cannot sign
+        in with the same credentials; you may register again with the same email unless our abuse rules prevent it.
+      </p>
 
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.2 How we use your information</h3>
       <p className="mb-2">We use your personal data only for:</p>
@@ -119,6 +171,17 @@ function PrivacyPolicySection() {
         <li>Verifying skill answers and qualifying entries</li>
         <li>Responding to enquiries via our contact form or email</li>
         <li>Improving our website (anonymous analytics, e.g. Vercel Analytics)</li>
+        <li>
+          Running your <strong>optional user account</strong> — sign-in, profile settings, entry history, password
+          reset, newsletter preferences, and account deletion (see{' '}
+          <a
+            href="#ss-privacy-user-accounts"
+            className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+          >
+            user accounts
+          </a>{' '}
+          above)
+        </li>
         <li>
           <strong>Winner announcements:</strong> if you win, we may photograph or film you with the prize and use
           those images or videos on our website, social media, and promotional materials — see{' '}
@@ -199,6 +262,18 @@ function PrivacyPolicySection() {
           <strong>Free online verification references:</strong> we may retain a Cashflows payment or verification
           reference (not card numbers) for a limited time to enforce entry limits and resolve disputes
         </li>
+        <li>
+          <strong>User account data:</strong> kept while your account is active. If you delete your account, profile
+          and login data are removed or anonymised promptly; minimal purchase or entry audit records may be retained
+          where required by law (see{' '}
+          <a
+            href="#ss-privacy-user-accounts"
+            className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+          >
+            account deletion
+          </a>
+          )
+        </li>
       </ul>
 
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.6 Your rights</h3>
@@ -209,6 +284,10 @@ function PrivacyPolicySection() {
         <li>Object to or restrict certain processing</li>
         <li>Withdraw consent where processing is based on consent</li>
         <li>Lodge a complaint with the ICO (Information Commissioner&apos;s Office)</li>
+        <li>
+          <strong>Delete your account</strong> yourself from My account (password confirmation required), or contact us
+          if you need help
+        </li>
       </ul>
       <p className="mb-3">
         To exercise any of these rights, email{' '}
@@ -225,8 +304,9 @@ function PrivacyPolicySection() {
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.7 Cookies</h3>
       <p className="mb-3">
         We use <strong>essential</strong> cookies and similar technologies so the site works (e.g. admin sessions where
-        applicable, and payment checkout). We use <strong>anonymous analytics</strong> to understand how the site is
-        used. We do <strong>not</strong> use advertising or cross-site tracking cookies.
+        applicable, <strong>user session cookies</strong> when you are signed in to My account, and payment checkout).
+        We use <strong>anonymous analytics</strong> to understand how the site is used. We do <strong>not</strong> use
+        advertising or cross-site tracking cookies.
       </p>
 
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.8 International transfers</h3>
@@ -296,7 +376,9 @@ export function TermsModal({ open, onClose }) {
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
             promotions in the United Kingdom, including the paid <strong>Signed Legacy Bundle</strong> skill competition
-            and the separate <strong>free Ronaldo shirt giveaway</strong>. By entering, you agree to these terms.
+            and the separate <strong>free Ronaldo shirt giveaway</strong>. You may also create an optional{' '}
+            <strong>user account</strong> to view entry history and manage your profile. By entering or registering, you
+            agree to these terms.
           </p>
 
           <p className="mb-4 rounded-lg border border-emerald-900/35 bg-emerald-950/25 px-3 py-2.5 text-zinc-200">
@@ -533,6 +615,44 @@ export function TermsModal({ open, onClose }) {
               Privacy Policy below
             </a>
             .
+          </p>
+
+          <h3 className="mb-2 mt-6 font-semibold text-stone-200" id="ss-terms-user-accounts">
+            11a. Optional user account (My account)
+          </h3>
+          <p className="mb-3">
+            You may create a <strong>free ShowSkills Rewards account</strong> to sign in, view linked competition
+            entries, and update optional profile details. An account is <strong>not required</strong> to enter every
+            promotion — guest checkout and free routes remain available where offered.
+          </p>
+          <p className="mb-3">
+            By registering, you confirm that the email and details you provide are accurate, that you will keep your
+            password confidential, and that you are at least <strong>18</strong>. Registration subscribes you to our
+            newsletter by default (you can change email preferences in My account or via unsubscribe links).
+          </p>
+          <p className="mb-3">
+            We store account data as described in the{' '}
+            <a
+              href="#ss-privacy-user-accounts"
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              Privacy Policy — user accounts
+            </a>
+            . You may <strong>delete your account at any time</strong> from <strong>My account → Delete account</strong>,
+            entering your password to confirm. Deletion removes your login and profile information and anonymises your
+            account email. Historical purchase or entry records needed for legal, tax, or dispute purposes may be
+            retained in anonymised or minimal form, as explained in the Privacy Policy.
+          </p>
+          <p className="mb-3">
+            We may suspend or refuse accounts that breach these terms, abuse entry limits, or attempt fraud. Contact us
+            at{' '}
+            <a
+              href={`mailto:${SHOWSKILLS_CONTACT_EMAIL}`}
+              className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+            >
+              {SHOWSKILLS_CONTACT_EMAIL}
+            </a>{' '}
+            for account help.
           </p>
 
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">12. Limitation of liability</h3>
