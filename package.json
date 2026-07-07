@@ -61,6 +61,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "^3.7.5",
     "altcha": "^3.1.0",
     "altcha-lib": "^2.2.0",
     "bcryptjs": "^2.4.3",

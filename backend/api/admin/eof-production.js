@@ -12,6 +12,7 @@ import {
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
 import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
+import { startEofProductionRenderBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
 
@@ -84,6 +85,23 @@ export default async function handler(req, res) {
       if (action === 'render') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (existing.status === 'rendering') {
+          return json(res, 202, { ok: true, accepted: true, job: existing })
+        }
+
+        const asyncRender = body.wait !== true
+        if (asyncRender) {
+          try {
+            await startEofProductionRenderBackground(jobId)
+            const job = await getEofProductionJob(jobId)
+            return json(res, 202, { ok: true, accepted: true, job })
+          } catch (e) {
+            return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
+          }
+        }
+
         try {
           const job = await renderEofProductionAudio(jobId)
           const audioDataUrl = await readEofMixedAudioInline(jobId)
@@ -91,6 +109,19 @@ export default async function handler(req, res) {
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
         }
+      }
+
+      if (action === 'delete') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, { error: 'Only the channel owner can delete production jobs.' })
+        }
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const deleted = await deleteEofProductionJob(jobId)
+        if (!deleted) return json(res, 404, { error: 'Job not found.' })
+        return json(res, 200, { ok: true, deletedId: jobId })
       }
 
       if (action === 'regenerate-script') {
@@ -155,7 +186,16 @@ export default async function handler(req, res) {
       }
 
       const body = await readJsonBody(req)
-      const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+      let jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+      if (!jobId) {
+        try {
+          const raw = typeof req.url === 'string' ? req.url : '/'
+          const url = new URL(raw, 'http://localhost')
+          jobId = (url.searchParams.get('jobId') || '').trim()
+        } catch {
+          jobId = ''
+        }
+      }
       if (!jobId) return json(res, 400, { error: 'jobId is required.' })
 
       const deleted = await deleteEofProductionJob(jobId)

@@ -67,10 +67,10 @@ async function main() {
     voicePreset: 'british',
   })
   const delReq = {
-    method: 'DELETE',
+    method: 'POST',
     headers: { cookie: `admin_session=${token}` },
     url: '/api/admin/eof-production',
-    body: { jobId: job2.id },
+    body: { action: 'delete', jobId: job2.id },
   }
   const delRes = { statusCode: 200, headers: {}, setHeader() {}, end(body) { this.body = body } }
   await handler(delReq, delRes)

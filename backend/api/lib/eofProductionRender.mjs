@@ -81,29 +81,33 @@ export async function renderEofProductionAudio(jobId) {
 
   try {
     const workDir = eofProductionWorkDir(jobId)
-    const sceneManifest = []
 
     await reportProgress('tts', 0)
 
-    for (let i = 0; i < job.script.scenes.length; i += 1) {
-      const scene = job.script.scenes[i]
-      const outPath = join(workDir, `scene-${i + 1}.mp3`)
-      await synthesizeEofSceneNarration({
-        text: scene.narration,
-        voicePreset: job.voicePreset,
-        outPath,
-      })
-      const durationSec = await probeAudioDurationSec(outPath)
-      sceneManifest.push({
-        sceneId: scene.id,
-        index: i,
-        audioPath: outPath,
-        durationSec,
-        caption: scene.caption,
-        imageQuery: scene.imageQuery,
-      })
-      await reportProgress('tts', i + 1)
-    }
+    let scenesDone = 0
+    const sceneManifest = await Promise.all(
+      job.script.scenes.map(async (scene, i) => {
+        const outPath = join(workDir, `scene-${i + 1}.mp3`)
+        await synthesizeEofSceneNarration({
+          text: scene.narration,
+          voicePreset: job.voicePreset,
+          outPath,
+        })
+        const durationSec = await probeAudioDurationSec(outPath)
+        scenesDone += 1
+        await reportProgress('tts', scenesDone)
+        return {
+          sceneId: scene.id,
+          index: i,
+          audioPath: outPath,
+          durationSec,
+          caption: scene.caption,
+          imageQuery: scene.imageQuery,
+        }
+      }),
+    )
+
+    sceneManifest.sort((a, b) => a.index - b.index)
 
     await reportProgress('mix', sceneCount)
 

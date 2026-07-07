@@ -94,7 +94,12 @@ export const EOF_RENDER_STACK = {
   host: {
     id: 'vercel',
     label: 'ShowSkills staging API (Vercel serverless)',
-    detail: 'Render runs in one API request (up to ~5 min). Video assembly is not wired yet.',
+    detail: 'Audio render runs in the background with progress polling. Video clips need a provider like Luma Dream Machine API.',
+  },
+  video: {
+    id: 'luma',
+    label: 'Luma Dream Machine API (planned for B-roll)',
+    detail: 'Official API at docs.lumalabs.ai — text/image to video. Not an autonomous agent; we orchestrate script → TTS → clips → ffmpeg.',
   },
 }
 

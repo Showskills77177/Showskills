@@ -217,6 +217,7 @@ export async function deleteEofProductionJob(id) {
   const job = await getEofProductionJob(id)
   if (!job) return false
 
+  await updateEofProductionRenderProgress(id, null)
   await query(`DELETE FROM eof_production_jobs WHERE id = $1`, [id])
   removeEofProductionJobFiles(id)
   return true

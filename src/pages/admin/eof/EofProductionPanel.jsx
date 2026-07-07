@@ -89,6 +89,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [renderProgress, setRenderProgress] = useState(null)
   const [renderStack, setRenderStack] = useState(null)
   const [progressTick, setProgressTick] = useState(0)
+  const [deletingId, setDeletingId] = useState(null)
   const renderPollRef = useRef(null)
 
   const fetchProduction = useCallback(async () => {
@@ -383,6 +384,22 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     }
   }
 
+  async function waitForRenderComplete(jobId) {
+    const deadline = Date.now() + 6 * 60 * 1000
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const j = await fetchProduction()
+      const job = (j.jobs || []).find((row) => row.id === jobId)
+      if (!job) throw new Error('Job disappeared during render.')
+      upsertJob(job)
+      if (job.renderProgress) setRenderProgress(job.renderProgress)
+      if (job.status === 'rendered') return job
+      if (job.status === 'failed') throw new Error(job.errorMessage || 'Render failed')
+      if (job.status !== 'rendering') return job
+    }
+    throw new Error('Render timed out — click Reset & retry, then render again.')
+  }
+
   async function renderAudio() {
     if (!selectedId) return
     setBusy(true)
@@ -415,11 +432,25 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         body: JSON.stringify({ action: 'render', jobId: selectedId }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error || 'Render failed')
 
-      if (typeof j.audioDataUrl === 'string' && j.audioDataUrl.startsWith('data:audio/')) {
-        setAudioPreviewUrl(j.audioDataUrl)
+      let finishedJob = null
+      if (res.status === 202 || j.accepted) {
+        if (j.job) upsertJob(j.job)
+        finishedJob = await waitForRenderComplete(selectedId)
+      } else if (res.ok) {
+        finishedJob = j.job || null
+        if (typeof j.audioDataUrl === 'string' && j.audioDataUrl.startsWith('data:audio/')) {
+          setAudioPreviewUrl(j.audioDataUrl)
+        }
       } else {
+        throw new Error(j.error || 'Render failed')
+      }
+
+      if (!finishedJob || finishedJob.status !== 'rendered') {
+        throw new Error(finishedJob?.errorMessage || 'Render did not complete')
+      }
+
+      if (!audioPreviewUrl) {
         const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
         if (audioRes.ok) {
           const blob = await audioRes.blob()
@@ -430,17 +461,13 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setRenderPhase('done')
       setRenderProgress({ percent: 100, message: 'Render complete', etaLabel: '0:00 left' })
       setSuccess(
-        j.job?.mixedAudioPath
+        finishedJob.mixedAudioPath
           ? 'Audio rendered. Preview below, then video assembly is next.'
           : 'Audio rendered.',
       )
-      if (j.job) {
-        upsertJob(j.job)
-        hydratedJobIdRef.current = selectedId
-        hydrateDraftFromJob(j.job)
-      } else {
-        await refreshJobsQuiet()
-      }
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
       setRenderPhase('failed')
       setRenderProgress(null)
@@ -472,17 +499,25 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     const label = job?.title || job?.topic || 'this script'
     if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return
 
-    setBusy(true)
+    setDeletingId(jobId)
     setErr('')
     setSuccess('')
     try {
       const res = await apiFetch('/api/admin/eof-production', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId }),
+        body: JSON.stringify({ action: 'delete', jobId }),
       })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error || 'Could not delete script')
+      const text = await res.text()
+      let j = {}
+      try {
+        j = text ? JSON.parse(text) : {}
+      } catch {
+        /* non-JSON */
+      }
+      if (!res.ok) {
+        throw new Error(j.error || text.trim() || `Could not delete script (HTTP ${res.status})`)
+      }
 
       setJobs((prev) => prev.filter((row) => row.id !== jobId))
       if (selectedId === jobId) {
@@ -491,12 +526,13 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         setDraftScript(null)
         setDraftDirty(false)
         setAudioPreviewUrl('')
+        setRenderProgress(null)
       }
       setSuccess(`Deleted “${label}”.`)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
-      setBusy(false)
+      setDeletingId(null)
     }
   }
 
@@ -570,6 +606,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               <li>
                 <span className="text-[#aaa]">{renderStack.host.label}</span> — {renderStack.host.detail}
               </li>
+              {renderStack.video ? (
+                <li>
+                  <span className="text-[#aaa]">{renderStack.video.label}</span> — {renderStack.video.detail}
+                </li>
+              ) : null}
             </ul>
           </details>
         ) : null}
@@ -652,7 +693,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                   <button
                     type="button"
                     onClick={() => deleteJob(j.id)}
-                    disabled={busy}
+                    disabled={deletingId === j.id}
                     title={`Delete ${j.title || j.topic}`}
                     aria-label={`Delete ${j.title || j.topic}`}
                     className="rounded-lg px-2 text-sm text-[#717171] hover:bg-[#2a1515] hover:text-[#ff9b95] disabled:opacity-50"
@@ -703,11 +744,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 ) : null}
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={deletingId === selected.id}
                   onClick={() => deleteJob(selected.id)}
                   className="rounded-full border border-[#ff4e45]/40 px-4 py-1.5 text-xs text-[#ff9b95] disabled:opacity-50"
                 >
-                  Delete script
+                  {deletingId === selected.id ? 'Deleting…' : 'Delete script'}
                 </button>
               </div>
             </div>
