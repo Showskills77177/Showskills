@@ -40,6 +40,7 @@
     "test:eof": "playwright test tests/e2e/eyes-of-football.spec.js",
     "test:eyes-of-football": "node scripts/test-eyes-of-football-api.mjs && playwright test tests/e2e/eyes-of-football.spec.js",
     "test:eof-production": "node --test shared/eofScriptTemplates.test.mjs && node scripts/test-eof-production-api.mjs",
+    "render:eof": "node scripts/render-eof-production.mjs",
     "seed:eof-music": "node scripts/seed-eof-music-catalog.mjs",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
     "test:quiz": "node --test shared/paidSkillQuestions.test.mjs shared/competitionSkillQuestions.test.mjs shared/vpnDetection.test.mjs shared/competitionPeriods.test.mjs shared/competitionCopy.test.mjs shared/consolationShirtGiveaway.test.mjs",

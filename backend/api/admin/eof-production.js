@@ -12,7 +12,7 @@ import {
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
 import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
-import { startEofProductionRenderBackground } from '../lib/eofProductionRenderRunner.mjs'
+import { startEofProductionRenderBackground, startEofProductionVideoRenderBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
 
@@ -108,6 +108,27 @@ export default async function handler(req, res) {
           return json(res, 200, { ok: true, job, audioDataUrl })
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
+        }
+      }
+
+      if (action === 'render-video') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (existing.status === 'rendering_video') {
+          return json(res, 202, { ok: true, accepted: true, job: existing })
+        }
+        if (!existing.mixedAudioPath && existing.status !== 'rendered' && existing.status !== 'video_rendered') {
+          return json(res, 400, { error: 'Render audio first before building the video.' })
+        }
+
+        try {
+          await startEofProductionVideoRenderBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : 'Video render failed' })
         }
       }
 

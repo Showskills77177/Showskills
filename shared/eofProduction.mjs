@@ -6,6 +6,8 @@ export const EOF_PRODUCTION_JOB_STATUS = {
   READY_SCRIPT: 'ready_script',
   RENDERING: 'rendering',
   RENDERED: 'rendered',
+  RENDERING_VIDEO: 'rendering_video',
+  VIDEO_RENDERED: 'video_rendered',
   FAILED: 'failed',
   PUBLISHED: 'published',
 }
@@ -72,8 +74,10 @@ export function productionJobStatusLabel(status) {
     draft: 'Draft',
     scripting: 'Writing script…',
     ready_script: 'Script ready',
-    rendering: 'Rendering…',
+    rendering: 'Rendering audio…',
     rendered: 'Audio rendered',
+    rendering_video: 'Rendering video…',
+    video_rendered: 'Video ready',
     failed: 'Failed',
     published: 'Published',
   }
@@ -94,12 +98,12 @@ export const EOF_RENDER_STACK = {
   host: {
     id: 'vercel',
     label: 'ShowSkills staging API (Vercel serverless)',
-    detail: 'Audio render runs in the background with progress polling. Video clips need a provider like Luma Dream Machine API.',
+    detail: 'Audio and video renders run in the background with progress polling on Vercel (waitUntil).',
   },
   video: {
-    id: 'luma',
-    label: 'Luma Dream Machine API (planned for B-roll)',
-    detail: 'Official API at docs.lumalabs.ai — text/image to video. Not an autonomous agent; we orchestrate script → TTS → clips → ffmpeg.',
+    id: 'ffmpeg-images',
+    label: 'Pexels stock photos + ffmpeg (9:16 Short)',
+    detail: 'Fetches portrait images from Pexels when PEXELS_API_KEY is set, else placeholder slides. Set key at pexels.com/api.',
   },
 }
 
@@ -118,11 +122,12 @@ export function estimateEofRenderDurationSec(script) {
 
 /**
  * @param {{
- *   stage: 'tts' | 'mix' | 'done',
+ *   stage: 'tts' | 'mix' | 'images' | 'video' | 'mux' | 'done',
  *   sceneIndex?: number,
  *   sceneCount: number,
  *   startedAt: string,
  *   estimatedTotalSec?: number,
+ *   pipeline?: 'audio' | 'video',
  * }} input
  */
 export function buildEofRenderProgress(input) {
@@ -130,11 +135,26 @@ export function buildEofRenderProgress(input) {
   const sceneIndex = Math.max(0, input.sceneIndex ?? 0)
   const startedMs = new Date(input.startedAt).getTime()
   const elapsedSeconds = Math.max(0, Math.round((Date.now() - startedMs) / 1000))
+  const pipeline = input.pipeline || 'audio'
 
   let percent = 0
   let message = 'Starting render…'
 
-  if (input.stage === 'tts') {
+  if (pipeline === 'video') {
+    if (input.stage === 'images') {
+      percent = Math.min(38, Math.round(((sceneIndex + 0.35) / sceneCount) * 38))
+      message = `Fetching image ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount}…`
+    } else if (input.stage === 'video') {
+      percent = 38 + Math.min(52, Math.round(((sceneIndex + 0.35) / sceneCount) * 52))
+      message = `Building scene clip ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount}…`
+    } else if (input.stage === 'mux') {
+      percent = 96
+      message = 'Muxing final Short MP4…'
+    } else if (input.stage === 'done') {
+      percent = 100
+      message = 'Video render complete'
+    }
+  } else if (input.stage === 'tts') {
     const ttsWeight = 0.86
     percent = Math.min(86, Math.round(((sceneIndex + 0.35) / sceneCount) * 100 * ttsWeight))
     message = `Narrating scene ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount} (Edge TTS)…`
@@ -165,6 +185,7 @@ export function buildEofRenderProgress(input) {
     sceneIndex,
     sceneCount,
     message,
+    pipeline,
     startedAt: input.startedAt,
     elapsedSeconds,
     estimatedTotalSec,
@@ -198,29 +219,38 @@ export function refreshEofRenderProgress(progress) {
     sceneCount: progress.sceneCount || 1,
     startedAt: progress.startedAt,
     estimatedTotalSec: progress.estimatedTotalSec,
+    pipeline: progress.pipeline || 'audio',
   })
 }
 
 /** Client estimate when the server has not written progress yet (or render is orphaned). */
-export function buildFallbackRenderProgress(job, script) {
+export function buildFallbackRenderProgress(job, script, pipeline = 'audio') {
   const sceneCount = script?.scenes?.length || job?.renderProgress?.sceneCount || 5
   const startedAt = job?.renderProgress?.startedAt || job?.updatedAt || new Date().toISOString()
-  const estimatedTotalSec = estimateEofRenderDurationSec(script || { scenes: Array.from({ length: sceneCount }) })
+  const estimatedTotalSec =
+    pipeline === 'video'
+      ? Math.max(45, sceneCount * 12)
+      : estimateEofRenderDurationSec(script || { scenes: Array.from({ length: sceneCount }) })
   const elapsedSeconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000))
   const percent = Math.min(92, Math.max(4, Math.round((elapsedSeconds / Math.max(estimatedTotalSec, 1)) * 100)))
   const etaSeconds = Math.max(0, estimatedTotalSec - elapsedSeconds)
   const etaMinutes = Math.floor(etaSeconds / 60)
   const etaRemSec = etaSeconds % 60
 
+  const message =
+    pipeline === 'video'
+      ? job?.renderProgress?.message || `Building Short video (${sceneCount} scenes)…`
+      : job?.renderProgress?.stage === 'mix'
+        ? 'Mixing narration with music bed (ffmpeg)…'
+        : `Rendering… narrating up to ${sceneCount} scenes (Edge TTS)`
+
   return {
     percent,
-    stage: job?.renderProgress?.stage || 'tts',
+    stage: job?.renderProgress?.stage || (pipeline === 'video' ? 'images' : 'tts'),
     sceneIndex: job?.renderProgress?.sceneIndex ?? 0,
     sceneCount,
-    message:
-      job?.renderProgress?.stage === 'mix'
-        ? 'Mixing narration with music bed (ffmpeg)…'
-        : `Rendering… narrating up to ${sceneCount} scenes (Edge TTS)`,
+    message,
+    pipeline,
     startedAt,
     elapsedSeconds,
     estimatedTotalSec,

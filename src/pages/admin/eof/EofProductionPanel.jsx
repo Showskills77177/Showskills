@@ -85,6 +85,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [loading, setLoading] = useState(true)
   const [renderNote, setRenderNote] = useState('')
   const [audioPreviewUrl, setAudioPreviewUrl] = useState('')
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState('')
   const [renderPhase, setRenderPhase] = useState('')
   const [renderProgress, setRenderProgress] = useState(null)
   const [renderStack, setRenderStack] = useState(null)
@@ -169,6 +170,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     setMusicVolume(job.musicVolume ?? 0.22)
     setVoicePreset(job.voicePreset || 'british')
     if (job.status !== 'rendered') setAudioPreviewUrl('')
+    if (job.status !== 'video_rendered') setVideoPreviewUrl('')
     setDraftDirty(false)
   }
 
@@ -193,13 +195,29 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   }, [selectedId, jobs])
 
   useEffect(() => {
+    if (!selectedId || !selected || busy) return undefined
+    if (selected.status === 'rendered' && selected.mixedAudioPath && !audioPreviewUrl) {
+      void loadAudioPreview()
+    }
+    if (selected.status === 'video_rendered' && !videoPreviewUrl) {
+      void loadVideoPreview()
+    }
+    return undefined
+  }, [selectedId, selected?.status, selected?.mixedAudioPath, busy])
+
+  useEffect(() => {
     return () => {
       if (renderPollRef.current) clearInterval(renderPollRef.current)
     }
   }, [])
 
   const isRendering =
-    selected?.status === 'rendering' || busy || renderPhase === 'rendering' || renderPhase === 'saving'
+    selected?.status === 'rendering' ||
+    selected?.status === 'rendering_video' ||
+    busy ||
+    renderPhase === 'rendering' ||
+    renderPhase === 'rendering-video' ||
+    renderPhase === 'saving'
 
   useEffect(() => {
     if (!isRendering) return undefined
@@ -212,7 +230,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (renderProgress) return refreshEofRenderProgress(renderProgress)
     if (selected?.renderProgress) return refreshEofRenderProgress(selected.renderProgress)
     if (selected?.status === 'rendering' && draftScript) {
-      return buildFallbackRenderProgress(selected, draftScript)
+      return buildFallbackRenderProgress(selected, draftScript, 'audio')
+    }
+    if (selected?.status === 'rendering_video' && draftScript) {
+      return buildFallbackRenderProgress(selected, draftScript, 'video')
     }
     return null
   }, [
@@ -225,13 +246,20 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   ])
 
   const isRenderStuck =
-    selected?.status === 'rendering' &&
+    (selected?.status === 'rendering' || selected?.status === 'rendering_video') &&
     displayProgress &&
     displayProgress.elapsedSeconds > Math.max(360, (displayProgress.estimatedTotalSec || 120) * 2)
 
   useEffect(() => {
     if (!active || !selectedId) return undefined
-    if (selected?.status !== 'rendering' && renderPhase !== 'rendering') return undefined
+    if (
+      selected?.status !== 'rendering' &&
+      selected?.status !== 'rendering_video' &&
+      renderPhase !== 'rendering' &&
+      renderPhase !== 'rendering-video'
+    ) {
+      return undefined
+    }
 
     const poll = async () => {
       try {
@@ -276,7 +304,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       if (!res.ok) throw new Error(j.error || 'Could not reset render')
       setRenderProgress(null)
       if (j.job) upsertJob(j.job)
-      setSuccess('Render reset — you can click “Render audio + music” again.')
+      setSuccess(
+        selected?.status === 'rendering_video'
+          ? 'Video render reset — you can click “Render video” again.'
+          : 'Render reset — you can click “Render audio + music” again.',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -294,16 +326,25 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (step === 1) return status === 'draft' || status === 'scripting' ? 'current' : 'done'
     if (step === 2) {
       if (status === 'ready_script' || status === 'draft') return 'current'
-      if (status === 'rendering' || status === 'rendered' || status === 'failed') return 'done'
-      return 'upcoming'
+      return 'done'
     }
     if (step === 3) {
       if (status === 'rendering') return 'current'
-      if (status === 'rendered') return 'done'
-      if (status === 'failed') return 'failed'
+      if (['rendered', 'rendering_video', 'video_rendered', 'failed'].includes(status)) return 'done'
       return 'current'
     }
-    if (step === 4) return status === 'rendered' ? 'current' : 'upcoming'
+    if (step === 4) {
+      if (status === 'rendered' || status === 'rendering_video') return 'current'
+      if (status === 'video_rendered') return 'done'
+      return 'upcoming'
+    }
+    if (step === 5) {
+      if (status === 'rendering_video') return 'current'
+      if (status === 'video_rendered') return 'done'
+      if (status === 'failed') return 'failed'
+      return status === 'rendered' ? 'current' : 'upcoming'
+    }
+    if (step === 6) return status === 'video_rendered' ? 'current' : 'upcoming'
     return 'upcoming'
   }
 
@@ -398,6 +439,89 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       if (job.status !== 'rendering') return job
     }
     throw new Error('Render timed out — click Reset & retry, then render again.')
+  }
+
+  async function waitForVideoComplete(jobId) {
+    const deadline = Date.now() + 8 * 60 * 1000
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const j = await fetchProduction()
+      const job = (j.jobs || []).find((row) => row.id === jobId)
+      if (!job) throw new Error('Job disappeared during video render.')
+      upsertJob(job)
+      if (job.renderProgress) setRenderProgress(job.renderProgress)
+      if (job.status === 'video_rendered') return job
+      if (job.status === 'failed') throw new Error(job.errorMessage || 'Video render failed')
+      if (job.status !== 'rendering_video') return job
+    }
+    throw new Error('Video render timed out — click Reset & retry.')
+  }
+
+  async function loadVideoPreview() {
+    if (!selectedId) return
+    setErr('')
+    try {
+      const videoRes = await apiFetch(`/api/admin/eof-production-video?jobId=${encodeURIComponent(selectedId)}`)
+      if (!videoRes.ok) {
+        const j = await videoRes.json().catch(() => ({}))
+        throw new Error(j.error || 'Could not load video preview')
+      }
+      const blob = await videoRes.blob()
+      setVideoPreviewUrl(URL.createObjectURL(blob))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not load video preview')
+    }
+  }
+
+  async function renderVideo() {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    setSuccess('')
+    setRenderPhase('rendering-video')
+    setVideoPreviewUrl('')
+    try {
+      const estSec = Math.max(45, (draftScript?.scenes?.length || 5) * 12)
+      setRenderProgress({
+        percent: 3,
+        message: 'Starting video render…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'images',
+        pipeline: 'video',
+      })
+      setSuccess('Building 9:16 Short with images + captions…')
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'render-video', jobId: selectedId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) throw new Error(j.error || 'Video render failed')
+
+      const finishedJob = await waitForVideoComplete(selectedId)
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Video render did not complete')
+      }
+
+      await loadVideoPreview()
+      setRenderProgress({ percent: 100, message: 'Video render complete', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('Short video ready — preview below. Upload from Studio when ready.')
+      upsertJob(finishedJob)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
   }
 
   async function renderAudio() {
@@ -556,7 +680,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Auto production</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          Topic → script → narration + music mix. Video assembly (images + captions) comes next.
+          Topic → script → narration + music → 9:16 Short with stock images and captions.
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
@@ -564,6 +688,8 @@ export default function EofProductionPanel({ isOwner, active = true }) {
             ['2', 'Review & save'],
             ['3', 'Render audio'],
             ['4', 'Preview audio'],
+            ['5', 'Render video'],
+            ['6', 'Preview video'],
           ].map(([n, label]) => {
             const state = workflowStepState(Number(n))
             const cls =
@@ -685,7 +811,8 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                   >
                     <div className="font-medium truncate">{j.title || j.topic}</div>
                     <div className="text-[10px] text-[#717171]">
-                      {j.status === 'rendering' && j.renderProgress?.percent != null
+                      {(j.status === 'rendering' || j.status === 'rendering_video') &&
+                      j.renderProgress?.percent != null
                         ? `Rendering… ${Math.round(j.renderProgress.percent)}%`
                         : productionJobStatusLabel(j.status)}
                     </div>
@@ -727,7 +854,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 </button>
                 <button
                   type="button"
-                  disabled={busy || selected.status === 'rendering'}
+                  disabled={busy || selected.status === 'rendering' || selected.status === 'rendering_video'}
                   onClick={renderAudio}
                   className={`rounded-full px-4 py-1.5 text-xs ${EOF.btnPrimary} disabled:opacity-50`}
                 >
@@ -737,9 +864,26 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                       ? 'Rendering…'
                       : 'Render audio + music'}
                 </button>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    selected.status === 'rendering' ||
+                    selected.status === 'rendering_video' ||
+                    !['rendered', 'video_rendered', 'failed'].includes(selected.status)
+                  }
+                  onClick={renderVideo}
+                  className="rounded-full border border-[#3ea6ff]/50 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
+                >
+                  {busy && renderPhase === 'rendering-video'
+                    ? 'Rendering video…'
+                    : selected.status === 'rendering_video'
+                      ? 'Rendering video…'
+                      : 'Render video'}
+                </button>
                 {!busy && selected.status !== 'rendering' && draftScript ? (
                   <span className="self-center text-[10px] text-[#717171]">
-                    ~{formatDuration(estimateEofRenderDurationSec(draftScript))} est.
+                    ~{formatDuration(estimateEofRenderDurationSec(draftScript))} audio est.
                   </span>
                 ) : null}
                 <button
@@ -753,7 +897,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               </div>
             </div>
 
-            {displayProgress && (selected.status === 'rendering' || busy) ? (
+            {displayProgress &&
+            (selected.status === 'rendering' ||
+              selected.status === 'rendering_video' ||
+              renderPhase === 'rendering' ||
+              renderPhase === 'rendering-video') ? (
               <div className="mt-4">
                 <EofRenderProgressBar
                   progress={displayProgress}
@@ -876,9 +1024,51 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                     Load preview
                   </button>
                 )}
-                <p className={`mt-2 text-[10px] ${EOF.muted}`}>
-                  Video assembly (images + captions) is the next pipeline step.
+              </div>
+            ) : null}
+
+            {['rendered', 'rendering_video', 'video_rendered', 'failed'].includes(selected.status) ? (
+              <div className="mt-4 rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#9ecbff]">
+                  Step 5 — Short video (9:16)
                 </p>
+                <p className={`mt-1 text-[10px] ${EOF.muted}`}>
+                  Pexels portrait images + Ken Burns motion + on-screen captions, muxed with your mixed audio.
+                </p>
+                {selected.status === 'rendered' || selected.status === 'failed' ? (
+                  <button
+                    type="button"
+                    disabled={busy || selected.status === 'rendering_video'}
+                    onClick={renderVideo}
+                    className={`mt-3 rounded-full px-4 py-1.5 text-xs ${EOF.btnPrimary} disabled:opacity-50`}
+                  >
+                    Render video
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {selected.status === 'video_rendered' || videoPreviewUrl ? (
+              <div className="mt-4 rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#9ecbff]">
+                  Step 6 — Video preview
+                </p>
+                {selected.renderOutputPath ? (
+                  <p className="mt-1 text-[10px] text-[#717171]">{selected.renderOutputPath}</p>
+                ) : null}
+                {videoPreviewUrl ? (
+                  <video controls playsInline className="mt-3 max-h-[480px] w-full rounded-lg bg-black" src={videoPreviewUrl}>
+                    Your browser does not support video playback.
+                  </video>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={loadVideoPreview}
+                    className="mt-3 rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white"
+                  >
+                    Load video preview
+                  </button>
+                )}
               </div>
             ) : null}
           </div>

@@ -77,6 +77,23 @@ async function main() {
   const delPayload = JSON.parse(delRes.body)
   if (delRes.statusCode !== 200 || !delPayload.ok) throw new Error('production DELETE failed')
 
+  const job3 = await createEofProductionJob({
+    topic: 'Video without audio',
+    createdBy: 'test',
+    voicePreset: 'british',
+  })
+  const videoReq = {
+    method: 'POST',
+    headers: { cookie: `admin_session=${token}` },
+    url: '/api/admin/eof-production',
+    body: { action: 'render-video', jobId: job3.id },
+  }
+  const videoRes = { statusCode: 200, headers: {}, setHeader() {}, end(body) { this.body = body } }
+  await handler(videoReq, videoRes)
+  const videoPayload = JSON.parse(videoRes.body)
+  if (videoRes.statusCode !== 400) throw new Error('render-video should require audio first')
+  if (!String(videoPayload.error || '').includes('audio')) throw new Error('unexpected render-video error')
+
   console.log('EOF production lib smoke tests passed')
 }
 

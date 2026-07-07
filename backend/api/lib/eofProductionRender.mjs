@@ -64,6 +64,7 @@ export async function renderEofProductionAudio(jobId) {
       sceneCount,
       startedAt: renderStartedAt,
       estimatedTotalSec,
+      pipeline: 'audio',
     }),
   )
 
@@ -74,6 +75,7 @@ export async function renderEofProductionAudio(jobId) {
       sceneCount,
       startedAt: renderStartedAt,
       estimatedTotalSec,
+      pipeline: 'audio',
     })
     await updateEofProductionRenderProgress(jobId, progress)
     return progress

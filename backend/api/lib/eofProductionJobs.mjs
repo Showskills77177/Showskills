@@ -203,11 +203,14 @@ function removeEofProductionJobFiles(jobId) {
 export async function cancelEofProductionRender(id) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
-  if (job.status !== EOF_PRODUCTION_JOB_STATUS.RENDERING) return job
+  if (job?.status !== 'rendering' && job?.status !== 'rendering_video') return job
 
   await updateEofProductionRenderProgress(id, null)
+  const backStatus = job.mixedAudioPath
+    ? EOF_PRODUCTION_JOB_STATUS.RENDERED
+    : EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT
   return updateEofProductionJob(id, {
-    status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+    status: backStatus,
     errorMessage: null,
   })
 }
