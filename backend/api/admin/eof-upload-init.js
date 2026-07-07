@@ -86,9 +86,7 @@ export default async function handler(req, res) {
   const license = body.license === 'creativeCommon' ? 'creativeCommon' : 'youtube'
   const defaultLanguage = typeof body.defaultLanguage === 'string' ? body.defaultLanguage.trim() : null
   const recordingDateRaw = typeof body.recordingDate === 'string' ? body.recordingDate.trim() : ''
-  const recordingDate = recordingDateRaw
-    ? new Date(`${recordingDateRaw}T12:00:00Z`).toISOString()
-    : null
+  const recordingDate = /^\d{4}-\d{2}-\d{2}$/.test(recordingDateRaw) ? recordingDateRaw : null
   const embeddable = body.embeddable !== false
   const publicStatsViewable = body.publicStatsViewable !== false
 
@@ -170,6 +168,7 @@ export default async function handler(req, res) {
       privacyStatus: visibility,
       publishAt,
       contentType,
+      contentLength: fileSizeBytes,
       madeForKids,
       containsSyntheticMedia,
       paidPromotion,

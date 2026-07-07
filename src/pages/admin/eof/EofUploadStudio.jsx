@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../../lib/api'
+import { putVideoToYoutubeUploadUrl } from '../../../lib/youtubeResumableUpload'
 import {
   EOF_CONTENT_TYPES,
   EOF_VISIBILITY_OPTIONS,
@@ -23,18 +24,14 @@ async function uploadVideoToYoutube(payload, onProgress) {
   const init = await initRes.json().catch(() => ({}))
   if (!initRes.ok) throw new Error(init.error || 'Could not start upload')
 
-  onProgress?.('Uploading to YouTube…')
-  const putRes = await fetch(init.uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': payload.contentType || 'video/mp4' },
-    body: payload.file,
+  onProgress?.('Uploading to YouTube… 0%')
+  const ytVideo = await putVideoToYoutubeUploadUrl(init.uploadUrl, payload.file, {
+    contentType: payload.contentType || 'video/mp4',
+    onProgress: (loaded, total) => {
+      const pct = total > 0 ? Math.round((loaded / total) * 100) : 0
+      onProgress?.(`Uploading to YouTube… ${pct}%`)
+    },
   })
-  if (!putRes.ok) {
-    const detail = await putRes.text().catch(() => '')
-    throw new Error(`YouTube upload failed (${putRes.status}). ${detail.slice(0, 120)}`)
-  }
-
-  const ytVideo = await putRes.json().catch(() => ({}))
   const youtubeVideoId = ytVideo?.id
   if (!youtubeVideoId) throw new Error('YouTube did not return a video ID.')
 
@@ -80,6 +77,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState('')
   const [formErr, setFormErr] = useState('')
+  const [previewWarn, setPreviewWarn] = useState('')
   const [lastChecks, setLastChecks] = useState(null)
   const videoRef = useRef(null)
 
@@ -87,11 +85,13 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
     if (!file) {
       setPreviewUrl(null)
       setMeta({ size: 0, duration: 0, width: 0, height: 0, aspectLabel: '', isShort: false })
+      setPreviewWarn('')
       setFormatManual(false)
       return undefined
     }
     const url = URL.createObjectURL(file)
     setPreviewUrl(url)
+    setPreviewWarn('')
     setMeta({ size: file.size, duration: 0 })
     return () => URL.revokeObjectURL(url)
   }, [file])
@@ -128,6 +128,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
     if (!canUse || !file || title.trim().length < 3) return
     setBusy(true)
     setFormErr('')
+    setPreviewWarn('')
     setLastChecks(null)
     try {
       let scheduleIso = null
@@ -188,7 +189,8 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
       setProgress('')
       onDone?.(result)
     } catch (err) {
-      setFormErr(err instanceof Error ? err.message : 'Upload failed')
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      setFormErr(message)
       setProgress('')
     } finally {
       setBusy(false)
@@ -512,6 +514,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
             </div>
           ) : null}
 
+          {previewWarn ? <p className="mt-2 text-xs text-amber-400">{previewWarn}</p> : null}
           {formErr ? <p className="mt-4 text-sm text-[#ff4e45]">{formErr}</p> : null}
           {progress ? <p className="mt-2 text-sm text-[#3ea6ff]">{progress}</p> : null}
 
@@ -536,8 +539,16 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                 ref={videoRef}
                 src={previewUrl}
                 controls
+                playsInline
                 className="h-full w-full object-contain"
                 onLoadedMetadata={onVideoMeta}
+                onError={() => {
+                  if (file) {
+                    setPreviewWarn(
+                      'Preview could not load this file (codec). Upload may still work — MP4 (H.264) is most reliable.',
+                    )
+                  }
+                }}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-[#555]">Select a video</div>

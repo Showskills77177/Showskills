@@ -40,6 +40,7 @@ export async function getYoutubeAccessToken() {
  *   license?: 'youtube' | 'creativeCommon',
  *   defaultLanguage?: string | null,
  *   recordingDate?: string | null,
+ *   contentLength?: number | null,
  * }} params
  */
 export async function initYoutubeResumableUpload({
@@ -50,6 +51,7 @@ export async function initYoutubeResumableUpload({
   privacyStatus,
   publishAt = null,
   contentType = 'video/*',
+  contentLength = null,
   madeForKids = false,
   containsSyntheticMedia = false,
   paidPromotion = false,
@@ -96,15 +98,20 @@ export async function initYoutubeResumableUpload({
     body.recordingDetails = { recordingDate }
   }
 
+  const uploadHeaders = {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json; charset=UTF-8',
+    'X-Upload-Content-Type': contentType,
+  }
+  if (Number.isFinite(contentLength) && contentLength > 0) {
+    uploadHeaders['X-Upload-Content-Length'] = String(Math.floor(contentLength))
+  }
+
   const res = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status,paidProductPlacementDetails,recordingDetails',
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Type': contentType,
-      },
+      headers: uploadHeaders,
       body: JSON.stringify(body),
     },
   )
