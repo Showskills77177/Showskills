@@ -16,6 +16,11 @@ function parseLoginResponse(res, text) {
   return { data, apiMsg: typeof data.error === 'string' ? data.error : '' }
 }
 
+function adminLoginDestination(from, data) {
+  if (data?.role === 'eof_editor') return '/admin/eyes-of-football'
+  return from.startsWith('/admin') ? from : '/admin/dashboard'
+}
+
 export default function AdminLoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -261,7 +266,7 @@ export default function AdminLoginPage() {
         setResendCooldown(60)
         return
       }
-      navigate(from.startsWith('/admin') ? from : '/admin/dashboard', { replace: true })
+      navigate(adminLoginDestination(from, data), { replace: true })
     } catch (err) {
       const aborted = err instanceof Error && err.name === 'AbortError'
       setError(
@@ -302,7 +307,7 @@ export default function AdminLoginPage() {
         }
         return
       }
-      navigate(from.startsWith('/admin') ? from : '/admin/dashboard', { replace: true })
+      navigate(adminLoginDestination(from, data), { replace: true })
     } catch (err) {
       setError(`Network error (${err instanceof Error ? err.message : String(err)}).`)
     } finally {

@@ -24,8 +24,22 @@ export default function EyesOfFootballAdminPage() {
     setErr('')
     try {
       const res = await apiFetch('/api/admin/eyes-of-football')
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error || 'Failed to load')
+      const text = await res.text()
+      let j = {}
+      try {
+        j = text ? JSON.parse(text) : {}
+      } catch {
+        /* non-JSON (gateway timeout, etc.) */
+      }
+      if (!res.ok) {
+        const detail =
+          typeof j.error === 'string'
+            ? j.error
+            : text.trim()
+              ? `${res.status}: ${text.trim().slice(0, 160)}`
+              : `Request failed (HTTP ${res.status})`
+        throw new Error(detail)
+      }
       setData(j)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
