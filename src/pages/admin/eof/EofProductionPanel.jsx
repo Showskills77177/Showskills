@@ -481,7 +481,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     setRenderPhase('rendering-video')
     setVideoPreviewUrl('')
     try {
-      const estSec = Math.max(45, (draftScript?.scenes?.length || 5) * 12)
+      const estSec = Math.max(20, (draftScript?.scenes?.length || 5) * 4)
       setRenderProgress({
         percent: 3,
         message: 'Starting video render…',
@@ -1033,7 +1033,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                   Step 5 — Short video (9:16)
                 </p>
                 <p className={`mt-1 text-[10px] ${EOF.muted}`}>
-                  Pexels portrait images + Ken Burns motion + on-screen captions, muxed with your mixed audio.
+                  Pexels portrait images + captions, muxed with your mixed audio. Fast static slides (Ken Burns optional via EOF_VIDEO_KEN_BURNS=1).
                 </p>
                 {selected.status === 'rendered' || selected.status === 'failed' ? (
                   <button

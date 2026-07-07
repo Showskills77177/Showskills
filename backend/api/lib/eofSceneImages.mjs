@@ -29,7 +29,7 @@ export async function fetchEofSceneImage({ imageQuery, outPath, index = 0 }) {
       if (res.ok) {
         const data = await res.json()
         const photo = data.photos?.[0]
-        const imgUrl = photo?.src?.large2x || photo?.src?.large || photo?.src?.original
+        const imgUrl = photo?.src?.portrait || photo?.src?.large || photo?.src?.medium
         if (imgUrl) {
           const imgRes = await fetch(imgUrl)
           if (imgRes.ok) {

@@ -44,7 +44,7 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }
     voice: preset.voice,
     lang,
     rate: preset.rate,
-    timeout: 22000,
+    timeout: 16000,
   })
 
   await tts.ttsPromise(line, outPath)

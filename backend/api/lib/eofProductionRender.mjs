@@ -16,6 +16,9 @@ import {
 } from './eofSceneTts.mjs'
 import { mixEofNarrationWithMusic, isFfmpegAvailable } from './eofAudioMix.mjs'
 import { hasBundledFfmpeg } from './eofFfmpeg.mjs'
+import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
+
+const TTS_CONCURRENCY = Number(process.env.EOF_TTS_CONCURRENCY) || 3
 
 const MAX_INLINE_AUDIO_BYTES = 3_500_000
 
@@ -68,7 +71,7 @@ export async function renderEofProductionAudio(jobId) {
     }),
   )
 
-  async function reportProgress(stage, sceneIndex = 0) {
+  async function reportProgress(stage, sceneIndex = 0, { force = false } = {}) {
     const progress = buildEofRenderProgress({
       stage,
       sceneIndex,
@@ -77,60 +80,69 @@ export async function renderEofProductionAudio(jobId) {
       estimatedTotalSec,
       pipeline: 'audio',
     })
-    await updateEofProductionRenderProgress(jobId, progress)
+    await throttledProgress(progress, { force })
     return progress
   }
+
+  const throttledProgress = createThrottledWriter(
+    (progress) => updateEofProductionRenderProgress(jobId, progress),
+    700,
+  )
 
   try {
     const workDir = eofProductionWorkDir(jobId)
 
-    await reportProgress('tts', 0)
+    await reportProgress('tts', 0, { force: true })
 
     let scenesDone = 0
-    const sceneManifest = await Promise.all(
-      job.script.scenes.map(async (scene, i) => {
-        const outPath = join(workDir, `scene-${i + 1}.mp3`)
-        await synthesizeEofSceneNarration({
-          text: scene.narration,
-          voicePreset: job.voicePreset,
-          outPath,
-        })
-        const durationSec = await probeAudioDurationSec(outPath)
-        scenesDone += 1
-        await reportProgress('tts', scenesDone)
-        return {
-          sceneId: scene.id,
-          index: i,
-          audioPath: outPath,
-          durationSec,
-          caption: scene.caption,
-          imageQuery: scene.imageQuery,
-        }
-      }),
+    const sceneManifest = await mapWithConcurrency(job.script.scenes, TTS_CONCURRENCY, async (scene, i) => {
+      const outPath = join(workDir, `scene-${i + 1}.mp3`)
+      await synthesizeEofSceneNarration({
+        text: scene.narration,
+        voicePreset: job.voicePreset,
+        outPath,
+      })
+      scenesDone += 1
+      await reportProgress('tts', scenesDone)
+      return {
+        sceneId: scene.id,
+        index: i,
+        audioPath: outPath,
+        caption: scene.caption,
+        imageQuery: scene.imageQuery,
+      }
+    })
+
+    const durations = await Promise.all(
+      sceneManifest.map((entry) => probeAudioDurationSec(entry.audioPath)),
     )
+    const sceneManifestWithDur = sceneManifest.map((entry, i) => ({
+      ...entry,
+      durationSec: durations[i],
+    }))
 
-    sceneManifest.sort((a, b) => a.index - b.index)
+    sceneManifestWithDur.sort((a, b) => a.index - b.index)
 
-    await reportProgress('mix', sceneCount)
+    await reportProgress('mix', sceneCount, { force: true })
 
     const track = job.musicTrackId ? await getEofMusicTrack(job.musicTrackId) : null
     const musicPath = resolveEofMusicTrackFilePath(track)
     const mixedPath = join(workDir, 'mixed.mp3')
 
     const mix = await mixEofNarrationWithMusic({
-      sceneAudioPaths: sceneManifest.map((s) => s.audioPath),
+      sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
       musicFilePath: musicPath,
       musicVolume: job.musicVolume,
       outputPath: mixedPath,
     })
     void mix
 
-    await reportProgress('done', sceneCount)
+    await reportProgress('done', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)
 
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
-      narrationManifest: sceneManifest,
+      narrationManifest: sceneManifestWithDur,
       mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
       renderOutputPath: null,
       errorMessage: null,
@@ -138,7 +150,7 @@ export async function renderEofProductionAudio(jobId) {
         ...job.script,
         scenes: job.script.scenes.map((scene, i) => ({
           ...scene,
-          durationSec: sceneManifest[i]?.durationSec ?? scene.durationSec,
+          durationSec: sceneManifestWithDur[i]?.durationSec ?? scene.durationSec,
         })),
       },
     })

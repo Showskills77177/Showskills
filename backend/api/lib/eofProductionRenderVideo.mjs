@@ -14,6 +14,9 @@ import {
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage } from './eofSceneImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath } from './eofProductionVideo.mjs'
+import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
+
+const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 
 /**
  * Build 9:16 Short MP4 from rendered audio + scene images/captions.
@@ -37,16 +40,20 @@ export async function renderEofProductionVideoJob(jobId) {
 
   const sceneCount = Math.max(manifest.length, scriptScenes.length)
   const renderStartedAt = new Date().toISOString()
-  const estimatedTotalSec = Math.max(45, Math.ceil(sceneCount * 12))
+  const estimatedTotalSec = Math.max(20, Math.ceil(sceneCount * 4))
 
   await updateEofProductionJob(jobId, {
     status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
     errorMessage: null,
   })
 
-  async function report(stage, sceneIndex = 0) {
-    await updateEofProductionRenderProgress(
-      jobId,
+  const throttledProgress = createThrottledWriter(
+    (progress) => updateEofProductionRenderProgress(jobId, progress),
+    700,
+  )
+
+  async function report(stage, sceneIndex = 0, { force = false } = {}) {
+    await throttledProgress(
       buildEofRenderProgress({
         stage,
         sceneIndex,
@@ -55,14 +62,12 @@ export async function renderEofProductionVideoJob(jobId) {
         estimatedTotalSec,
         pipeline: 'video',
       }),
+      { force },
     )
   }
 
   try {
-    await report('images', 0)
-
-    const scenesForVideo = []
-    let imagesDone = 0
+    await report('images', 0, { force: true })
 
     const rows = manifest.length
       ? manifest.map((m, i) => ({
@@ -78,27 +83,26 @@ export async function renderEofProductionVideoJob(jobId) {
           imageQuery: s.imageQuery,
         }))
 
-    await Promise.all(
-      rows.map(async (row) => {
-        const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
-        await fetchEofSceneImage({
-          imageQuery: row.imageQuery,
-          outPath: imagePath,
-          index: row.index,
-        })
-        imagesDone += 1
-        await report('images', imagesDone)
-        scenesForVideo.push({
-          index: row.index,
-          durationSec: row.durationSec,
-          caption: row.caption,
-          imagePath,
-        })
-      }),
-    )
+    let imagesDone = 0
+    const scenesForVideo = await mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
+      const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
+      await fetchEofSceneImage({
+        imageQuery: row.imageQuery,
+        outPath: imagePath,
+        index: row.index,
+      })
+      imagesDone += 1
+      await report('images', imagesDone)
+      return {
+        index: row.index,
+        durationSec: row.durationSec,
+        caption: row.caption,
+        imagePath,
+      }
+    })
 
     scenesForVideo.sort((a, b) => a.index - b.index)
-    await report('video', 0)
+    await report('video', 0, { force: true })
 
     const { relPath } = await renderEofProductionVideo({
       jobId,
@@ -107,7 +111,7 @@ export async function renderEofProductionVideoJob(jobId) {
       onSceneProgress: async (done) => report('video', done),
     })
 
-    await report('mux', sceneCount)
+    await report('mux', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)
 
     return updateEofProductionJob(jobId, {

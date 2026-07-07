@@ -103,7 +103,7 @@ export const EOF_RENDER_STACK = {
   video: {
     id: 'ffmpeg-images',
     label: 'Pexels stock photos + ffmpeg (9:16 Short)',
-    detail: 'Fetches portrait images from Pexels when PEXELS_API_KEY is set, else placeholder slides. Set key at pexels.com/api.',
+    detail: 'Fetches portrait images from Pexels when PEXELS_API_KEY is set, else placeholder slides. Uses fast static slides by default (set EOF_VIDEO_KEN_BURNS=1 for slow Ken Burns).',
   },
 }
 
@@ -229,7 +229,7 @@ export function buildFallbackRenderProgress(job, script, pipeline = 'audio') {
   const startedAt = job?.renderProgress?.startedAt || job?.updatedAt || new Date().toISOString()
   const estimatedTotalSec =
     pipeline === 'video'
-      ? Math.max(45, sceneCount * 12)
+      ? Math.max(20, sceneCount * 4)
       : estimateEofRenderDurationSec(script || { scenes: Array.from({ length: sceneCount }) })
   const elapsedSeconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000))
   const percent = Math.min(92, Math.max(4, Math.round((elapsedSeconds / Math.max(estimatedTotalSec, 1)) * 100)))
