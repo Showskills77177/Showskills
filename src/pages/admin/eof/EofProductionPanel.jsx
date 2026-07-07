@@ -90,9 +90,12 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [renderPhase, setRenderPhase] = useState('')
   const [renderProgress, setRenderProgress] = useState(null)
   const [renderStack, setRenderStack] = useState(null)
+  const [pexelsConfigured, setPexelsConfigured] = useState(false)
+  const [imagesNote, setImagesNote] = useState('')
   const [progressTick, setProgressTick] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
   const renderPollRef = useRef(null)
+  const resultPanelRef = useRef(null)
 
   const fetchProduction = useCallback(async () => {
     const res = await apiFetch('/api/admin/eof-production')
@@ -125,6 +128,8 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setVoicePresets(j.voicePresets || [])
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
+      setPexelsConfigured(Boolean(j.pexelsConfigured))
+      setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
       setRenderStack(j.renderStack || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
@@ -324,29 +329,66 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   function workflowStepState(step) {
     if (!selected) return step === 1 ? 'current' : 'upcoming'
     const status = selected.status
-    if (step === 1) return status === 'draft' || status === 'scripting' ? 'current' : 'done'
+    if (step === 1) {
+      return ['draft', 'scripting', 'ready_script'].includes(status) ? 'current' : 'done'
+    }
     if (step === 2) {
-      if (status === 'ready_script' || status === 'draft') return 'current'
-      return 'done'
-    }
-    if (step === 3) {
-      if (status === 'rendering') return 'current'
-      if (['rendered', 'rendering_video', 'video_rendered', 'failed'].includes(status)) return 'done'
-      return 'current'
-    }
-    if (step === 4) {
-      if (status === 'rendered' || status === 'rendering_video') return 'current'
-      if (status === 'video_rendered') return 'done'
-      return 'upcoming'
-    }
-    if (step === 5) {
-      if (status === 'rendering_video') return 'current'
+      if (['rendering', 'rendering_video', 'rendered'].includes(status)) return 'current'
       if (status === 'video_rendered') return 'done'
       if (status === 'failed') return 'failed'
-      return status === 'rendered' ? 'current' : 'upcoming'
+      return ['draft', 'ready_script'].includes(status) ? 'upcoming' : 'current'
     }
-    if (step === 6) return status === 'video_rendered' ? 'current' : 'upcoming'
+    if (step === 3) return status === 'video_rendered' ? 'current' : 'upcoming'
     return 'upcoming'
+  }
+
+  function sceneImageSourceLabel(source) {
+    if (source === 'pexels') return 'Stock photo'
+    if (source === 'cache') return 'Cached photo'
+    if (source === 'placeholder-no-pexels-key') return 'Placeholder — add PEXELS_API_KEY'
+    if (source === 'placeholder') return 'Placeholder — search missed'
+    return 'Image'
+  }
+
+  function sceneStillUrl(sceneNumber) {
+    if (!selectedId) return ''
+    return `/api/admin/eof-production-scene-image?jobId=${encodeURIComponent(selectedId)}&scene=${sceneNumber}`
+  }
+
+  async function buildShort() {
+    if (!selectedId || !draftScript) return
+    setErr('')
+    setSuccess('Building your Short — images, narration, and music…')
+
+    const saved = await saveJob({ silent: true })
+    if (!saved) return
+
+    let payload = await fetchProduction()
+    let job = (payload.jobs || []).find((row) => row.id === selectedId)
+    if (!job) return
+
+    const rebuild = job.status === 'video_rendered'
+    const needsAudio =
+      rebuild ||
+      !job.mixedAudioPath ||
+      ['ready_script', 'draft', 'failed'].includes(job.status)
+
+    if (needsAudio && job.status !== 'rendering') {
+      await renderAudio()
+      payload = await fetchProduction()
+      job = (payload.jobs || []).find((row) => row.id === selectedId)
+      if (!job || job.status === 'failed') return
+    }
+
+    if (rebuild || job.status !== 'video_rendered') {
+      if (job.status !== 'rendering_video') {
+        await renderVideo()
+      }
+    }
+
+    setTimeout(() => {
+      resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 300)
   }
 
   function upsertJob(job) {
@@ -511,8 +553,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
 
       await loadVideoPreview()
       setRenderProgress({ percent: 100, message: 'Video render complete', etaLabel: '0:00 left', pipeline: 'video' })
-      setSuccess('Short video ready — preview below. Upload from Studio when ready.')
+      setSuccess('Your Short is ready — watch it below.')
       upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
       setRenderPhase('failed')
       setRenderProgress(null)
@@ -681,16 +725,13 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Auto production</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          Topic → script → narration + music → 9:16 Short with stock images and captions.
+          Write a script, build a 9:16 Short (stock images + narration + music), then watch the result.
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
-            ['1', 'Create script'],
-            ['2', 'Review & save'],
-            ['3', 'Render audio'],
-            ['4', 'Preview audio'],
-            ['5', 'Render video'],
-            ['6', 'Preview video'],
+            ['1', 'Write script'],
+            ['2', 'Build Short'],
+            ['3', 'Watch result'],
           ].map(([n, label]) => {
             const state = workflowStepState(Number(n))
             const cls =
@@ -712,6 +753,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
           <p className="mt-2 text-xs text-amber-400">
             {renderNote ||
               'ffmpeg is not detected — redeploy staging with ffmpeg-static, or set FFMPEG_PATH on the API host.'}
+          </p>
+        ) : null}
+        {!loading && !pexelsConfigured ? (
+          <p className="mt-2 text-xs text-amber-400">
+            {imagesNote || 'Add PEXELS_API_KEY on Vercel for real football photos in each scene.'}
           </p>
         ) : null}
         {!loading && tracks.length === 0 ? (
@@ -847,23 +893,34 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  disabled={busy || isRendering}
+                  onClick={buildShort}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
+                >
+                  {busy || isRendering
+                    ? 'Building…'
+                    : selected.status === 'video_rendered'
+                      ? 'Rebuild Short'
+                      : 'Build Short'}
+                </button>
+                <button
+                  type="button"
                   disabled={busy}
                   onClick={() => saveJob()}
                   className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white disabled:opacity-50"
                 >
                   Save script
                 </button>
+                <details className="self-center text-xs text-[#717171]">
+                  <summary className="cursor-pointer text-[#aaa]">Manual steps</summary>
+                  <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={busy || selected.status === 'rendering' || selected.status === 'rendering_video'}
                   onClick={renderAudio}
-                  className={`rounded-full px-4 py-1.5 text-xs ${EOF.btnPrimary} disabled:opacity-50`}
+                  className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white disabled:opacity-50"
                 >
-                  {busy && renderPhase === 'rendering'
-                    ? 'Rendering…'
-                    : selected.status === 'rendering'
-                      ? 'Rendering…'
-                      : 'Render audio + music'}
+                  {selected.status === 'rendering' ? 'Rendering audio…' : 'Audio only'}
                 </button>
                 <button
                   type="button"
@@ -876,17 +933,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                   onClick={renderVideo}
                   className="rounded-full border border-[#3ea6ff]/50 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
                 >
-                  {busy && renderPhase === 'rendering-video'
-                    ? 'Rendering video…'
-                    : selected.status === 'rendering_video'
-                      ? 'Rendering video…'
-                      : 'Render video'}
+                  {selected.status === 'rendering_video' ? 'Rendering video…' : 'Video only'}
                 </button>
-                {!busy && selected.status !== 'rendering' && draftScript ? (
-                  <span className="self-center text-[10px] text-[#717171]">
-                    ~{formatDuration(estimateEofRenderDurationSec(draftScript))} audio est.
-                  </span>
-                ) : null}
+                  </div>
+                </details>
                 <button
                   type="button"
                   disabled={deletingId === selected.id}
@@ -910,6 +960,73 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                   onCancel={cancelStuckRender}
                   cancelBusy={busy}
                 />
+              </div>
+            ) : null}
+
+            {selected.status === 'video_rendered' || videoPreviewUrl ? (
+              <div
+                ref={resultPanelRef}
+                className="mt-4 rounded-xl border-2 border-[#2ba640]/50 bg-[#101a14] p-5"
+              >
+                <p className="text-sm font-semibold text-[#6ee07d]">Your Short is ready</p>
+                <p className={`mt-1 text-xs ${EOF.muted}`}>
+                  Stock images per scene, mixed with narration and music — preview below.
+                </p>
+                {videoPreviewUrl ? (
+                  <video
+                    controls
+                    playsInline
+                    className="mt-4 max-h-[min(70vh,640px)] w-full rounded-xl bg-black shadow-lg"
+                    src={videoPreviewUrl}
+                  >
+                    Your browser does not support video playback.
+                  </video>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={loadVideoPreview}
+                    className={`mt-4 rounded-full px-5 py-2 text-sm ${EOF.btnPrimary}`}
+                  >
+                    Load finished Short
+                  </button>
+                )}
+
+                {selected.narrationManifest?.length ? (
+                  <div className="mt-5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
+                      What went into this Short
+                    </p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {selected.narrationManifest.map((scene, i) => (
+                        <div key={scene.sceneId || i} className="overflow-hidden rounded-lg border border-[#303030] bg-[#0d0d0d]">
+                          <img
+                            alt=""
+                            className="h-36 w-full object-cover"
+                            src={sceneStillUrl((scene.index ?? i) + 1)}
+                            loading="lazy"
+                          />
+                          <div className="p-2">
+                            <p className="text-[10px] font-semibold text-[#9ecbff]">Scene {(scene.index ?? i) + 1}</p>
+                            <p className="mt-1 line-clamp-2 text-[10px] text-[#aaa]">{scene.caption || draftScript.scenes?.[i]?.caption}</p>
+                            <p className="mt-1 text-[10px] text-[#717171]">
+                              {scene.durationSec ? `${scene.durationSec.toFixed(1)}s` : '—'}
+                              {scene.imageSource ? ` · ${sceneImageSourceLabel(scene.imageSource)}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {audioPreviewUrl ? (
+                  <details className="mt-4 text-xs text-[#aaa]">
+                    <summary className="cursor-pointer">Mixed audio track</summary>
+                    <audio controls className="mt-2 w-full" src={audioPreviewUrl}>
+                      Your browser does not support audio playback.
+                    </audio>
+                  </details>
+                ) : null}
               </div>
             ) : null}
 
@@ -1002,75 +1119,6 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               <p className="mt-4 rounded-lg border border-[#ff4e45]/40 bg-[#2a1515] px-3 py-2 text-sm text-[#ff9b95]">
                 Render failed: {selected.errorMessage}
               </p>
-            ) : null}
-
-            {selected.mixedAudioPath || audioPreviewUrl ? (
-              <div className="mt-4 rounded-lg border border-[#2ba640]/30 bg-[#141f17] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#6ee07d]">
-                  Step 4 — Mixed audio preview
-                </p>
-                {selected.mixedAudioPath ? (
-                  <p className="mt-1 text-[10px] text-[#717171]">{selected.mixedAudioPath}</p>
-                ) : null}
-                {audioPreviewUrl ? (
-                  <audio controls className="mt-3 w-full" src={audioPreviewUrl}>
-                    Your browser does not support audio playback.
-                  </audio>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={loadAudioPreview}
-                    className="mt-3 rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white"
-                  >
-                    Load preview
-                  </button>
-                )}
-              </div>
-            ) : null}
-
-            {['rendered', 'rendering_video', 'video_rendered', 'failed'].includes(selected.status) ? (
-              <div className="mt-4 rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#9ecbff]">
-                  Step 5 — Short video (9:16)
-                </p>
-                <p className={`mt-1 text-[10px] ${EOF.muted}`}>
-                  Pexels portrait images + captions, muxed with your mixed audio. Fast static slides (Ken Burns optional via EOF_VIDEO_KEN_BURNS=1).
-                </p>
-                {selected.status === 'rendered' || selected.status === 'failed' ? (
-                  <button
-                    type="button"
-                    disabled={busy || selected.status === 'rendering_video'}
-                    onClick={renderVideo}
-                    className={`mt-3 rounded-full px-4 py-1.5 text-xs ${EOF.btnPrimary} disabled:opacity-50`}
-                  >
-                    Render video
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-
-            {selected.status === 'video_rendered' || videoPreviewUrl ? (
-              <div className="mt-4 rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#9ecbff]">
-                  Step 6 — Video preview
-                </p>
-                {selected.renderOutputPath ? (
-                  <p className="mt-1 text-[10px] text-[#717171]">{selected.renderOutputPath}</p>
-                ) : null}
-                {videoPreviewUrl ? (
-                  <video controls playsInline className="mt-3 max-h-[480px] w-full rounded-lg bg-black" src={videoPreviewUrl}>
-                    Your browser does not support video playback.
-                  </video>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={loadVideoPreview}
-                    className="mt-3 rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white"
-                  >
-                    Load video preview
-                  </button>
-                )}
-              </div>
             ) : null}
           </div>
         ) : (

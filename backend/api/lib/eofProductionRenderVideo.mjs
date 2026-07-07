@@ -12,7 +12,7 @@ import {
   updateEofProductionRenderProgress,
 } from './eofProductionJobs.mjs'
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
-import { fetchEofSceneImage } from './eofSceneImages.mjs'
+import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 
@@ -68,6 +68,7 @@ export async function renderEofProductionVideoJob(jobId) {
 
   try {
     await report('images', 0, { force: true })
+    clearEofSceneImageCache(workDir)
 
     const rows = manifest.length
       ? manifest.map((m, i) => ({
@@ -86,10 +87,12 @@ export async function renderEofProductionVideoJob(jobId) {
     let imagesDone = 0
     const scenesForVideo = await mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
       const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
-      await fetchEofSceneImage({
+      const imageMeta = await fetchEofSceneImage({
+        topic: job.topic,
         imageQuery: row.imageQuery,
         outPath: imagePath,
         index: row.index,
+        refresh: true,
       })
       imagesDone += 1
       await report('images', imagesDone)
@@ -98,6 +101,8 @@ export async function renderEofProductionVideoJob(jobId) {
         durationSec: row.durationSec,
         caption: row.caption,
         imagePath,
+        imageSource: imageMeta.source,
+        imageQueryUsed: imageMeta.imageQuery || row.imageQuery,
       }
     })
 
@@ -114,9 +119,23 @@ export async function renderEofProductionVideoJob(jobId) {
     await report('mux', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)
 
+    const updatedManifest = (manifest.length ? manifest : rows).map((entry, i) => {
+      const videoScene = scenesForVideo.find((s) => s.index === (entry.index ?? i)) || scenesForVideo[i]
+      return {
+        ...(typeof entry === 'object' ? entry : {}),
+        index: entry.index ?? i,
+        durationSec: videoScene?.durationSec ?? entry.durationSec,
+        caption: videoScene?.caption ?? entry.caption,
+        imageQuery: entry.imageQuery,
+        imageSource: videoScene?.imageSource || null,
+        imageQueryUsed: videoScene?.imageQueryUsed || entry.imageQuery,
+      }
+    })
+
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED,
       renderOutputPath: relPath,
+      narrationManifest: updatedManifest,
       errorMessage: null,
     })
   } catch (e) {

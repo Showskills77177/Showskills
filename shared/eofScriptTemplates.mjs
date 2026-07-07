@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
+import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
+
 const FACT_TEMPLATES = [
   (name) => `${name} is one of the most discussed names in modern football.`,
   (name) => `Fans still debate ${name}'s greatest seasons and what made them special.`,
@@ -22,7 +24,7 @@ export function buildFactsShortScript(topic) {
       id: randomUUID(),
       narration,
       caption: caption || `Fact ${i + 1}`,
-      imageQuery: `${name} football`,
+      imageQuery: defaultSceneImageQuery(name, i),
       durationSec: null,
     }
   })
