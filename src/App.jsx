@@ -30,6 +30,7 @@ import AdminEntryAttemptsPage from './pages/admin/EntryAttemptsPage'
 import AdminThemeDesignerPage from './pages/admin/ThemeDesignerPage'
 import AdminPageEditorPage from './pages/admin/PageEditorPage'
 import ContactPage from './pages/ContactPage'
+import PrivacyPage from './pages/PrivacyPage'
 import AccountPage from './pages/AccountPage'
 import AuthModalRedirect from './pages/AuthModalRedirect'
 import FaqPage from './pages/FaqPage'
@@ -127,6 +128,7 @@ export default function App() {
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
             <Route path="contact" element={<ContactPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="login" element={<AuthModalRedirect view="login" />} />
             <Route path="register" element={<AuthModalRedirect view="register" />} />

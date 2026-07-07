@@ -28,7 +28,7 @@ function PaidTicketNonRefundCallout() {
   )
 }
 
-function PrivacyPolicySection() {
+export function PrivacyPolicySection() {
   const mail = SHOWSKILLS_CONTACT_EMAIL
   return (
     <>
@@ -40,7 +40,7 @@ function PrivacyPolicySection() {
         <h2 id="privacy-policy-title" className="text-base font-semibold text-stone-100">
           Privacy Policy
         </h2>
-        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 21 May 2026</p>
+        <p className="mt-2 text-sm text-zinc-500 md:text-xs">Last updated: 7 July 2026</p>
         <p className="mt-4 text-zinc-300">
           At <strong>ShowSkills Rewards</strong>, we respect your privacy and are committed to protecting your personal
           data. This Privacy Policy explains how we collect, use, and protect your information when you use our
@@ -321,7 +321,68 @@ function PrivacyPolicySection() {
       <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.10 Intellectual property &amp; illustrative content</h3>
       <LegalDisclaimerNotice headingLevel="h4" id="ss-privacy-legal-disclaimer" />
 
-      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.11 Changes to this policy</h3>
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200" id="ss-privacy-third-party-apis">
+        P.11 Third-party services &amp; APIs (including Pinterest)
+      </h3>
+      <p className="mb-3">
+        To operate our website and internal content tools, we use trusted third-party services. These providers process
+        data only as needed to deliver their service to us, under their own terms and privacy policies.
+      </p>
+      <ul className="mb-3 list-inside list-disc space-y-2">
+        <li>
+          <strong>Payment processing</strong> (e.g. Cashflows, PayPal) — card and payment details are handled by the
+          payment provider; we do not store full card numbers on our servers.
+        </li>
+        <li>
+          <strong>Email &amp; hosting</strong> — transactional email and site hosting infrastructure.
+        </li>
+        <li>
+          <strong>Stock imagery &amp; creative APIs</strong> — our internal &quot;Eyes of Football&quot; production tools
+          (staging/admin only, not a public consumer Pinterest login) may use the{' '}
+          <strong>Pinterest API</strong> and <strong>Pexels API</strong> to search for or retrieve images used when
+          assembling YouTube Shorts. This is server-to-server: we do <strong>not</strong> collect Pinterest account
+          data from website visitors through this integration. API credentials are stored securely on our servers and
+          are not published in the public site. Images are used for editorial/video production in line with each
+          provider&apos;s terms.
+        </li>
+        <li>
+          <strong>Text-to-speech</strong> — narration for internal video drafts may use Microsoft Edge neural TTS via a
+          server library; no voice biometric data is collected from users for this purpose.
+        </li>
+      </ul>
+      <p className="mb-3">
+        For more information about how Pinterest handles data, see{' '}
+        <a
+          href="https://policy.pinterest.com/en/privacy-policy"
+          className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Pinterest&apos;s Privacy Policy
+        </a>
+        . For Pexels, see{' '}
+        <a
+          href="https://www.pexels.com/privacy-policy/"
+          className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Pexels Privacy Policy
+        </a>
+        .
+      </p>
+      <p className="mb-3">
+        Questions about our use of third-party APIs:{' '}
+        <a
+          href={`mailto:${mail}`}
+          className="font-medium text-teal-400 underline decoration-teal-600/50 underline-offset-2 hover:text-teal-300"
+        >
+          {mail}
+        </a>
+        .
+      </p>
+
+      <h3 className="mb-2 mt-6 font-semibold text-stone-200">P.12 Changes to this policy</h3>
       <p className="mb-3">
         We may update this Privacy Policy from time to time. The &quot;Last updated&quot; date above will change when we
         do. Significant changes may also be noted on the website where appropriate.
