@@ -9,7 +9,7 @@ import {
   updateEofProductionJob,
   regenerateEofProductionScript,
 } from '../lib/eofProductionJobs.mjs'
-import { renderEofProductionAudio } from '../lib/eofProductionRender.mjs'
+import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
 
@@ -83,7 +83,8 @@ export default async function handler(req, res) {
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         try {
           const job = await renderEofProductionAudio(jobId)
-          return json(res, 200, { ok: true, job })
+          const audioDataUrl = await readEofMixedAudioInline(jobId)
+          return json(res, 200, { ok: true, job, audioDataUrl })
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
         }

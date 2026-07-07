@@ -73,7 +73,22 @@ export async function runFfprobe(args, opts) {
   return execFileAsync(bin, args, opts)
 }
 
-export async function isFfmpegAvailable({ timeoutMs = 5000 } = {}) {
+export async function hasBundledFfmpeg() {
+  try {
+    const mod = await import('ffmpeg-static')
+    const bundled = mod.default || mod
+    return Boolean(bundled && existsSync(bundled))
+  } catch {
+    return false
+  }
+}
+
+export async function isFfmpegAvailable({ timeoutMs = 15000 } = {}) {
+  if (await hasBundledFfmpeg()) return true
+
+  const envPath = process.env.FFMPEG_PATH || process.env.EOF_FFMPEG_PATH
+  if (envPath && existsSync(envPath)) return true
+
   return Promise.race([
     (async () => {
       try {

@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { readFile, stat } from 'node:fs/promises'
 import { EOF_PRODUCTION_JOB_STATUS } from '../../../shared/eofProduction.mjs'
 import {
   getEofProductionJob,
@@ -13,6 +14,21 @@ import {
   probeAudioDurationSec,
 } from './eofSceneTts.mjs'
 import { mixEofNarrationWithMusic, isFfmpegAvailable } from './eofAudioMix.mjs'
+import { hasBundledFfmpeg } from './eofFfmpeg.mjs'
+
+const MAX_INLINE_AUDIO_BYTES = 3_500_000
+
+export async function readEofMixedAudioInline(jobId) {
+  const mixedPath = join(eofProductionWorkDir(jobId), 'mixed.mp3')
+  try {
+    const info = await stat(mixedPath)
+    if (!info.isFile() || info.size > MAX_INLINE_AUDIO_BYTES) return null
+    const buf = await readFile(mixedPath)
+    return `data:audio/mpeg;base64,${buf.toString('base64')}`
+  } catch {
+    return null
+  }
+}
 
 /**
  * Generate per-scene TTS and mix with catalog music bed.
@@ -23,7 +39,7 @@ export async function renderEofProductionAudio(jobId) {
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
-  const ffmpegOk = await isFfmpegAvailable()
+  const ffmpegOk = (await hasBundledFfmpeg()) || (await isFfmpegAvailable())
   if (!ffmpegOk) {
     throw new Error(
       'ffmpeg is not available for audio render. Ensure ffmpeg-static is installed or set FFMPEG_PATH.',

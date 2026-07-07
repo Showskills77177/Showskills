@@ -21,6 +21,8 @@ export default function EofProductionPanel({ isOwner }) {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [renderNote, setRenderNote] = useState('')
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState('')
+  const [renderPhase, setRenderPhase] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -66,10 +68,40 @@ export default function EofProductionPanel({ isOwner }) {
       setDraftScript(selected.script ? JSON.parse(JSON.stringify(selected.script)) : null)
       setMusicTrackId(selected.musicTrackId || '')
       setMusicVolume(selected.musicVolume ?? 0.22)
+      setVoicePreset(selected.voicePreset || 'british')
+      if (selected.status !== 'rendered') setAudioPreviewUrl('')
     } else {
       setDraftScript(null)
+      setAudioPreviewUrl('')
     }
   }, [selected])
+
+  useEffect(() => {
+    if (selected?.status !== 'rendering' || busy) return undefined
+    const timer = setInterval(() => {
+      load()
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [selected?.status, busy, load])
+
+  function workflowStepState(step) {
+    if (!selected) return step === 1 ? 'current' : 'upcoming'
+    const status = selected.status
+    if (step === 1) return status === 'draft' || status === 'scripting' ? 'current' : 'done'
+    if (step === 2) {
+      if (status === 'ready_script' || status === 'draft') return 'current'
+      if (status === 'rendering' || status === 'rendered' || status === 'failed') return 'done'
+      return 'upcoming'
+    }
+    if (step === 3) {
+      if (status === 'rendering') return 'current'
+      if (status === 'rendered') return 'done'
+      if (status === 'failed') return 'failed'
+      return 'current'
+    }
+    if (step === 4) return status === 'rendered' ? 'current' : 'upcoming'
+    return 'upcoming'
+  }
 
   async function createJob(e) {
     e.preventDefault()
@@ -95,10 +127,13 @@ export default function EofProductionPanel({ isOwner }) {
     }
   }
 
-  async function saveJob() {
-    if (!selectedId || !draftScript) return
-    setBusy(true)
-    setErr('')
+  async function saveJob({ silent = false } = {}) {
+    if (!selectedId || !draftScript) return false
+    if (!silent) {
+      setBusy(true)
+      setErr('')
+      setSuccess('')
+    }
     try {
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'PATCH',
@@ -113,12 +148,17 @@ export default function EofProductionPanel({ isOwner }) {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Save failed')
-      setSuccess('Script and music settings saved.')
+      if (!silent) {
+        setSuccess('Script and music settings saved. Next: click “Render audio + music”.')
+      }
       await load()
+      return true
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Error')
+      if (!silent) setErr(e instanceof Error ? e.message : 'Error')
+      if (silent) setErr(e instanceof Error ? e.message : 'Error')
+      return false
     } finally {
-      setBusy(false)
+      if (!silent) setBusy(false)
     }
   }
 
@@ -127,8 +167,17 @@ export default function EofProductionPanel({ isOwner }) {
     setBusy(true)
     setErr('')
     setSuccess('')
+    setRenderPhase('saving')
+    setAudioPreviewUrl('')
     try {
-      await saveJob()
+      const saved = await saveJob({ silent: true })
+      if (!saved) return
+
+      setRenderPhase('rendering')
+      setSuccess(
+        'Rendering narration and mixing music… This usually takes 1–2 minutes. Keep this tab open.',
+      )
+
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,16 +185,45 @@ export default function EofProductionPanel({ isOwner }) {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Render failed')
+
+      if (typeof j.audioDataUrl === 'string' && j.audioDataUrl.startsWith('data:audio/')) {
+        setAudioPreviewUrl(j.audioDataUrl)
+      } else {
+        const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
+        if (audioRes.ok) {
+          const blob = await audioRes.blob()
+          setAudioPreviewUrl(URL.createObjectURL(blob))
+        }
+      }
+
+      setRenderPhase('done')
       setSuccess(
         j.job?.mixedAudioPath
-          ? `Audio rendered with music bed. File: ${j.job.mixedAudioPath}`
+          ? 'Audio rendered. Preview below, then video assembly is next.'
           : 'Audio rendered.',
       )
       await load()
     } catch (e) {
+      setRenderPhase('failed')
       setErr(e instanceof Error ? e.message : 'Error')
+      await load()
     } finally {
       setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
+  async function loadAudioPreview() {
+    if (!selectedId || !selected?.mixedAudioPath) return
+    setErr('')
+    try {
+      const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
+      const j = await audioRes.json().catch(() => ({}))
+      if (!audioRes.ok) throw new Error(j.error || 'Could not load audio preview')
+      const blob = await audioRes.blob()
+      setAudioPreviewUrl(URL.createObjectURL(blob))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not load audio preview')
     }
   }
 
@@ -170,6 +248,29 @@ export default function EofProductionPanel({ isOwner }) {
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           Topic → script → narration + music mix. Video assembly (images + captions) comes next.
         </p>
+        <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
+          {[
+            ['1', 'Create script'],
+            ['2', 'Review & save'],
+            ['3', 'Render audio'],
+            ['4', 'Preview audio'],
+          ].map(([n, label]) => {
+            const state = workflowStepState(Number(n))
+            const cls =
+              state === 'done'
+                ? 'border-[#2ba640]/50 bg-[#1a2e1f] text-[#6ee07d]'
+                : state === 'current'
+                  ? 'border-[#3ea6ff]/50 bg-[#172033] text-[#9ecbff]'
+                  : state === 'failed'
+                    ? 'border-[#ff4e45]/50 bg-[#2a1515] text-[#ff9b95]'
+                    : 'border-[#303030] text-[#717171]'
+            return (
+              <li key={n} className={`rounded-full border px-3 py-1 ${cls}`}>
+                {n}. {label}
+              </li>
+            )
+          })}
+        </ol>
         {!loading && !ffmpegAvailable ? (
           <p className="mt-2 text-xs text-amber-400">
             {renderNote ||
@@ -261,18 +362,22 @@ export default function EofProductionPanel({ isOwner }) {
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={saveJob}
-                  className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white"
+                  onClick={() => saveJob()}
+                  className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white disabled:opacity-50"
                 >
-                  Save
+                  Save script
                 </button>
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || selected.status === 'rendering'}
                   onClick={renderAudio}
-                  className={`rounded-full px-4 py-1.5 text-xs ${EOF.btnPrimary}`}
+                  className={`rounded-full px-4 py-1.5 text-xs ${EOF.btnPrimary} disabled:opacity-50`}
                 >
-                  Render audio + music
+                  {busy && renderPhase === 'rendering'
+                    ? 'Rendering…'
+                    : selected.status === 'rendering'
+                      ? 'Rendering…'
+                      : 'Render audio + music'}
                 </button>
               </div>
             </div>
@@ -353,8 +458,43 @@ export default function EofProductionPanel({ isOwner }) {
               ))}
             </div>
 
-            {selected.mixedAudioPath ? (
-              <p className="mt-4 text-xs text-[#6ee07d]">Mixed audio: {selected.mixedAudioPath}</p>
+            {selected.status === 'failed' && selected.errorMessage ? (
+              <p className="mt-4 rounded-lg border border-[#ff4e45]/40 bg-[#2a1515] px-3 py-2 text-sm text-[#ff9b95]">
+                Render failed: {selected.errorMessage}
+              </p>
+            ) : null}
+
+            {selected.status === 'rendering' && !busy ? (
+              <p className="mt-4 text-sm text-[#9ecbff]">
+                Render in progress… refreshing every few seconds.
+              </p>
+            ) : null}
+
+            {selected.mixedAudioPath || audioPreviewUrl ? (
+              <div className="mt-4 rounded-lg border border-[#2ba640]/30 bg-[#141f17] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#6ee07d]">
+                  Step 4 — Mixed audio preview
+                </p>
+                {selected.mixedAudioPath ? (
+                  <p className="mt-1 text-[10px] text-[#717171]">{selected.mixedAudioPath}</p>
+                ) : null}
+                {audioPreviewUrl ? (
+                  <audio controls className="mt-3 w-full" src={audioPreviewUrl}>
+                    Your browser does not support audio playback.
+                  </audio>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={loadAudioPreview}
+                    className="mt-3 rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white"
+                  >
+                    Load preview
+                  </button>
+                )}
+                <p className={`mt-2 text-[10px] ${EOF.muted}`}>
+                  Video assembly (images + captions) is the next pipeline step.
+                </p>
+              </div>
             ) : null}
           </div>
         ) : (
