@@ -51,6 +51,7 @@
     "test:purchase-email": "node scripts/test-purchase-email.mjs",
     "test:consolation-shirt": "node scripts/test-consolation-shirt.mjs",
     "test:competition-catalog": "node scripts/test-competition-catalog.mjs",
+    "test:user-account": "node scripts/test-user-account-api.mjs",
     "test:world-cup-ball": "node scripts/test-world-cup-ball-api.mjs",
     "test:world-cup-ball-monthly-draw": "node scripts/test-world-cup-ball-monthly-draw.mjs",
     "reset:world-cup-ball": "node scripts/reset-world-cup-ball-local.mjs",
