@@ -12,7 +12,7 @@ import {
 } from '../lib/eofProductionJobs.mjs'
 import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
-import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
+import { EOF_VOICE_PRESETS, EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -71,6 +71,7 @@ export default async function handler(req, res) {
         renderNote: ffmpeg
           ? null
           : 'Audio render needs ffmpeg (bundled ffmpeg-static on deploy, or FFMPEG_PATH locally).',
+        renderStack: EOF_RENDER_STACK,
         session: info,
       })
     }

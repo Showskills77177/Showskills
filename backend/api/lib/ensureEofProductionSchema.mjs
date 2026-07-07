@@ -85,5 +85,20 @@ export async function ensureEofProductionSchema() {
     await query(`CREATE INDEX IF NOT EXISTS idx_eof_music_tracks_mood ON eof_music_tracks (mood, active)`)
   }
 
+  await addEofProductionJobColumns()
   ensured = true
+}
+
+async function addEofProductionJobColumns() {
+  if (dbIsPostgres()) {
+    await query(
+      `ALTER TABLE eof_production_jobs ADD COLUMN IF NOT EXISTS render_progress_json TEXT`,
+    )
+    return
+  }
+  try {
+    await query(`ALTER TABLE eof_production_jobs ADD COLUMN render_progress_json TEXT`)
+  } catch {
+    /* column exists */
+  }
 }

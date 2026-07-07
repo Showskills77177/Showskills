@@ -8,6 +8,7 @@ import {
   EOF_PRODUCTION_JOB_STATUS,
   EOF_DEFAULT_MUSIC_VOLUME,
   parseProductionScript,
+  parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
 import { buildFactsShortScript } from '../../../shared/eofScriptTemplates.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
@@ -50,6 +51,7 @@ function rowToJob(row) {
     renderOutputPath: row.render_output_path || null,
     youtubeProjectId: row.youtube_project_id || null,
     errorMessage: row.error_message || null,
+    renderProgress: parseRenderProgress(row.render_progress_json),
     createdBy: row.created_by || null,
     createdAt: normalizeTimestamp(row.created_at),
     updatedAt: normalizeTimestamp(row.updated_at),
@@ -154,10 +156,19 @@ export async function updateEofProductionJob(id, patch) {
 }
 
 export async function markEofProductionJobFailed(id, message) {
+  await updateEofProductionRenderProgress(id, null)
   return updateEofProductionJob(id, {
     status: EOF_PRODUCTION_JOB_STATUS.FAILED,
     errorMessage: String(message || 'Failed').slice(0, 500),
   })
+}
+
+export async function updateEofProductionRenderProgress(id, progress) {
+  await ensureEofProductionSchema()
+  await query(
+    `UPDATE eof_production_jobs SET render_progress_json = $2, updated_at = ${nowSql()} WHERE id = $1`,
+    [id, progress ? JSON.stringify(progress) : null],
+  )
 }
 
 export async function regenerateEofProductionScript(id) {

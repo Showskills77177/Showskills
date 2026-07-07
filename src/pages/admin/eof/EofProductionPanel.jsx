@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../../../lib/api'
-import { productionJobStatusLabel } from '../../../../shared/eofProduction.mjs'
+import { productionJobStatusLabel, estimateEofRenderDurationSec } from '../../../../shared/eofProduction.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
@@ -34,6 +34,9 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [renderNote, setRenderNote] = useState('')
   const [audioPreviewUrl, setAudioPreviewUrl] = useState('')
   const [renderPhase, setRenderPhase] = useState('')
+  const [renderProgress, setRenderProgress] = useState(null)
+  const [renderStack, setRenderStack] = useState(null)
+  const renderPollRef = useRef(null)
 
   const fetchProduction = useCallback(async () => {
     const res = await apiFetch('/api/admin/eof-production')
@@ -66,6 +69,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setVoicePresets(j.voicePresets || [])
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
+      setRenderStack(j.renderStack || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -135,12 +139,52 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   }, [selectedId, jobs])
 
   useEffect(() => {
+    return () => {
+      if (renderPollRef.current) clearInterval(renderPollRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!active || selected?.status !== 'rendering' || busy) return undefined
     const timer = setInterval(() => {
       refreshJobsQuiet()
     }, 5000)
     return () => clearInterval(timer)
   }, [active, selected?.status, busy, refreshJobsQuiet])
+
+  useEffect(() => {
+    if (selected?.renderProgress) setRenderProgress(selected.renderProgress)
+  }, [selected?.renderProgress])
+
+  function stopRenderPolling() {
+    if (renderPollRef.current) {
+      clearInterval(renderPollRef.current)
+      renderPollRef.current = null
+    }
+  }
+
+  function startRenderPolling() {
+    stopRenderPolling()
+    renderPollRef.current = setInterval(async () => {
+      try {
+        const j = await fetchProduction()
+        const job = (j.jobs || []).find((row) => row.id === selectedId)
+        if (job?.renderProgress) {
+          setRenderProgress(job.renderProgress)
+          upsertJob(job)
+        }
+      } catch {
+        /* polling */
+      }
+    }, 1200)
+  }
+
+  function formatDuration(sec) {
+    const total = Math.max(0, Math.round(Number(sec) || 0))
+    const m = Math.floor(total / 60)
+    const s = total % 60
+    return m > 0 ? `${m}m ${s}s` : `${s}s`
+  }
 
   function markDraftDirty() {
     setDraftDirty(true)
@@ -254,9 +298,16 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       if (!saved) return
 
       setRenderPhase('rendering')
-      setSuccess(
-        'Rendering narration and mixing music… This usually takes 1–2 minutes. Keep this tab open.',
-      )
+      const estSec = estimateEofRenderDurationSec(draftScript)
+      setRenderProgress({
+        percent: 2,
+        message: 'Starting narration render…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+      })
+      startRenderPolling()
+      setSuccess('Rendering narration and mixing music… Keep this tab open.')
 
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
@@ -277,6 +328,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       }
 
       setRenderPhase('done')
+      setRenderProgress({ percent: 100, message: 'Render complete', etaLabel: '0:00 left' })
       setSuccess(
         j.job?.mixedAudioPath
           ? 'Audio rendered. Preview below, then video assembly is next.'
@@ -291,9 +343,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       }
     } catch (e) {
       setRenderPhase('failed')
+      setRenderProgress(null)
       setErr(e instanceof Error ? e.message : 'Error')
       await refreshJobsQuiet()
     } finally {
+      stopRenderPolling()
       setBusy(false)
       setRenderPhase('')
     }
@@ -401,6 +455,45 @@ export default function EofProductionPanel({ isOwner, active = true }) {
           <p className="mt-2 text-xs text-amber-400">
             Add at least one music track in the Music tab, or refresh after the default catalog is seeded.
           </p>
+        ) : null}
+
+        {renderStack ? (
+          <details className={`mt-3 text-xs ${EOF.muted}`}>
+            <summary className="cursor-pointer text-[#aaa]">What API / platform renders the audio?</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-[#717171]">
+              <li>
+                <span className="text-[#aaa]">{renderStack.tts.label}</span> — {renderStack.tts.detail}
+              </li>
+              <li>
+                <span className="text-[#aaa]">{renderStack.audio.label}</span> — {renderStack.audio.detail}
+              </li>
+              <li>
+                <span className="text-[#aaa]">{renderStack.host.label}</span> — {renderStack.host.detail}
+              </li>
+            </ul>
+          </details>
+        ) : null}
+
+        {renderProgress ? (
+          <div className="mt-4 rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4" role="status" aria-live="polite">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9ecbff]">
+              <span>{renderProgress.message || 'Rendering…'}</span>
+              <span className="font-semibold tabular-nums">{Math.round(renderProgress.percent || 0)}%</span>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#0d1520]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#2563eb] to-[#3ea6ff] transition-[width] duration-500 ease-out"
+                style={{ width: `${Math.min(100, Math.max(0, renderProgress.percent || 0))}%` }}
+              />
+            </div>
+            <p className="mt-2 text-[10px] text-[#717171]">
+              Elapsed {formatDuration(renderProgress.elapsedSeconds)}
+              {renderProgress.etaLabel ? ` · ${renderProgress.etaLabel}` : ''}
+              {renderProgress.estimatedTotalSec
+                ? ` · ~${formatDuration(renderProgress.estimatedTotalSec)} total est.`
+                : ''}
+            </p>
+          </div>
         ) : null}
 
         <form onSubmit={createJob} className="mt-4 flex flex-wrap items-end gap-3">
@@ -512,6 +605,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                       ? 'Rendering…'
                       : 'Render audio + music'}
                 </button>
+                {!busy && selected.status !== 'rendering' && draftScript ? (
+                  <span className="self-center text-[10px] text-[#717171]">
+                    ~{formatDuration(estimateEofRenderDurationSec(draftScript))} est.
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   disabled={busy}

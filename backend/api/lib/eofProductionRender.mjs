@@ -1,10 +1,11 @@
 import { join } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
-import { EOF_PRODUCTION_JOB_STATUS } from '../../../shared/eofProduction.mjs'
+import { EOF_PRODUCTION_JOB_STATUS, buildEofRenderProgress, estimateEofRenderDurationSec } from '../../../shared/eofProduction.mjs'
 import {
   getEofProductionJob,
   updateEofProductionJob,
   markEofProductionJobFailed,
+  updateEofProductionRenderProgress,
 } from './eofProductionJobs.mjs'
 import { getEofMusicTrack, resolveEofMusicTrackFilePath } from './eofMusicTracks.mjs'
 import {
@@ -51,9 +52,27 @@ export async function renderEofProductionAudio(jobId) {
     errorMessage: null,
   })
 
+  const sceneCount = job.script.scenes.length
+  const renderStartedAt = new Date().toISOString()
+  const estimatedTotalSec = estimateEofRenderDurationSec(job.script)
+
+  async function reportProgress(stage, sceneIndex = 0) {
+    const progress = buildEofRenderProgress({
+      stage,
+      sceneIndex,
+      sceneCount,
+      startedAt: renderStartedAt,
+      estimatedTotalSec,
+    })
+    await updateEofProductionRenderProgress(jobId, progress)
+    return progress
+  }
+
   try {
     const workDir = eofProductionWorkDir(jobId)
     const sceneManifest = []
+
+    await reportProgress('tts', 0)
 
     for (let i = 0; i < job.script.scenes.length; i += 1) {
       const scene = job.script.scenes[i]
@@ -72,7 +91,10 @@ export async function renderEofProductionAudio(jobId) {
         caption: scene.caption,
         imageQuery: scene.imageQuery,
       })
+      await reportProgress('tts', i + 1)
     }
+
+    await reportProgress('mix', sceneCount)
 
     const track = job.musicTrackId ? await getEofMusicTrack(job.musicTrackId) : null
     const musicPath = resolveEofMusicTrackFilePath(track)
@@ -85,6 +107,9 @@ export async function renderEofProductionAudio(jobId) {
       outputPath: mixedPath,
     })
     void mix
+
+    await reportProgress('done', sceneCount)
+    await updateEofProductionRenderProgress(jobId, null)
 
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
