@@ -271,7 +271,8 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       selected?.status !== 'rendering' &&
       selected?.status !== 'rendering_video' &&
       renderPhase !== 'rendering' &&
-      renderPhase !== 'rendering-video'
+      renderPhase !== 'rendering-video' &&
+      !busy
     ) {
       return undefined
     }
@@ -357,7 +358,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (source === 'pinterest') return 'Pinterest search'
     if (source === 'pinterest-pin') return 'Pinterest pin'
     if (source === 'cache') return 'Cached photo'
-    if (source === 'placeholder-no-image-keys') return 'Placeholder — add Pexels or Pinterest API key'
+    if (source === 'placeholder-no-image-keys') return 'Placeholder — add Google, Pexels, or Pinterest keys'
     if (source === 'placeholder') return 'Placeholder — search missed'
     return 'Image'
   }
@@ -367,40 +368,90 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     return `/api/admin/eof-production-scene-image?jobId=${encodeURIComponent(selectedId)}&scene=${sceneNumber}`
   }
 
+  async function waitForFullBuildComplete(jobId) {
+    const deadline = Date.now() + 10 * 60 * 1000
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const j = await fetchProduction()
+      const job = (j.jobs || []).find((row) => row.id === jobId)
+      if (!job) throw new Error('Job disappeared during build.')
+      upsertJob(job)
+      if (job.renderProgress) setRenderProgress(job.renderProgress)
+      if (job.status === 'video_rendered') return job
+      if (job.status === 'failed') throw new Error(job.errorMessage || 'Build failed')
+      if (!['rendering', 'rendering_video', 'rendered'].includes(job.status)) return job
+    }
+    throw new Error('Build timed out — click Reset & retry.')
+  }
+
   async function buildShort() {
     if (!selectedId || !draftScript) return
+    setBusy(true)
     setErr('')
-    setSuccess('Building your Short — images, narration, and music…')
+    setSuccess('Building your Short — narration, images, and video on the server…')
+    setRenderPhase('rendering')
+    setVideoPreviewUrl('')
+    setAudioPreviewUrl('')
 
-    const saved = await saveJob({ silent: true })
-    if (!saved) return
+    try {
+      const saved = await saveJob({ silent: true })
+      if (!saved) return
 
-    let payload = await fetchProduction()
-    let job = (payload.jobs || []).find((row) => row.id === selectedId)
-    if (!job) return
+      const rebuild = selected?.status === 'video_rendered'
+      const estSec =
+        estimateEofRenderDurationSec(draftScript) + estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5)
+      setRenderProgress({
+        percent: 2,
+        message: 'Starting full build…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'tts',
+        pipeline: 'audio',
+      })
 
-    const rebuild = job.status === 'video_rendered'
-    const needsAudio =
-      rebuild ||
-      !job.mixedAudioPath ||
-      ['ready_script', 'draft', 'failed'].includes(job.status)
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'build-short', jobId: selectedId, rebuild }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) throw new Error(j.error || 'Build failed')
+      if (j.job) upsertJob(j.job)
 
-    if (needsAudio && job.status !== 'rendering') {
-      await renderAudio()
-      payload = await fetchProduction()
-      job = (payload.jobs || []).find((row) => row.id === selectedId)
-      if (!job || job.status === 'failed') return
-    }
-
-    if (rebuild || job.status !== 'video_rendered') {
-      if (job.status !== 'rendering_video') {
-        await renderVideo()
+      const finishedJob = await waitForFullBuildComplete(selectedId)
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Build did not finish with a video')
       }
-    }
 
-    setTimeout(() => {
-      resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 300)
+      await loadVideoPreview()
+      const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
+      if (audioRes.ok) {
+        const blob = await audioRes.blob()
+        setAudioPreviewUrl(URL.createObjectURL(blob))
+      }
+
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('Your Short is ready — watch it below.')
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
+
+      setTimeout(() => {
+        resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
   }
 
   function upsertJob(job) {

@@ -39,7 +39,7 @@
     "test:admin": "playwright test tests/e2e/admin.spec.js",
     "test:eof": "playwright test tests/e2e/eyes-of-football.spec.js",
     "test:eyes-of-football": "node scripts/test-eyes-of-football-api.mjs && playwright test tests/e2e/eyes-of-football.spec.js",
-    "test:eof-production": "node --test shared/eofScriptTemplates.test.mjs shared/eofProduction.test.mjs shared/eofPinterestImages.test.mjs shared/eofGoogleImages.test.mjs && node scripts/test-eof-production-api.mjs",
+    "test:eof-production": "node --test shared/eofScriptTemplates.test.mjs shared/eofProduction.test.mjs shared/eofPinterestImages.test.mjs shared/eofGoogleImages.test.mjs && node scripts/test-eof-production-api.mjs && node scripts/test-eof-video-pipeline.mjs",
     "render:eof": "node scripts/render-eof-production.mjs",
     "seed:eof-music": "node scripts/seed-eof-music-catalog.mjs",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
