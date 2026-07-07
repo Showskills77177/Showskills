@@ -3,7 +3,7 @@ import { query } from './db.mjs'
 import { ensureUserAuthSchema } from './ensureUserAuthSchema.mjs'
 import { verifyUserPassword } from './password.mjs'
 import { getUserAuthRowByEmail } from './userAccounts.mjs'
-import { clearUserSessionCookieHeader } from './userAuth.mjs'
+import { clearUserCookieHeader } from './userAuth.mjs'
 
 const DELETED_EMAIL_DOMAIN = 'deleted.showskills.invalid'
 
@@ -47,7 +47,7 @@ export async function deleteUserAccount({ userId, password }) {
     [userId, anonEmail, now],
   )
 
-  return { ok: true, clearSessionCookie: clearUserSessionCookieHeader() }
+  return { ok: true, clearSessionCookie: clearUserCookieHeader() }
 }
 
 /** Reject deleted accounts at login. */
