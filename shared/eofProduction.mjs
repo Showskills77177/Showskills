@@ -182,3 +182,50 @@ export function parseRenderProgress(raw) {
     return null
   }
 }
+
+/** Recompute elapsed time + ETA from a stored progress snapshot. */
+export function refreshEofRenderProgress(progress) {
+  if (!progress) return null
+  if (!progress.startedAt) return progress
+  return buildEofRenderProgress({
+    stage: progress.stage || 'tts',
+    sceneIndex: progress.sceneIndex ?? 0,
+    sceneCount: progress.sceneCount || 1,
+    startedAt: progress.startedAt,
+    estimatedTotalSec: progress.estimatedTotalSec,
+  })
+}
+
+/** Client estimate when the server has not written progress yet (or render is orphaned). */
+export function buildFallbackRenderProgress(job, script) {
+  const sceneCount = script?.scenes?.length || job?.renderProgress?.sceneCount || 5
+  const startedAt = job?.renderProgress?.startedAt || job?.updatedAt || new Date().toISOString()
+  const estimatedTotalSec = estimateEofRenderDurationSec(script || { scenes: Array.from({ length: sceneCount }) })
+  const elapsedSeconds = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000))
+  const percent = Math.min(92, Math.max(4, Math.round((elapsedSeconds / Math.max(estimatedTotalSec, 1)) * 100)))
+  const etaSeconds = Math.max(0, estimatedTotalSec - elapsedSeconds)
+  const etaMinutes = Math.floor(etaSeconds / 60)
+  const etaRemSec = etaSeconds % 60
+
+  return {
+    percent,
+    stage: job?.renderProgress?.stage || 'tts',
+    sceneIndex: job?.renderProgress?.sceneIndex ?? 0,
+    sceneCount,
+    message:
+      job?.renderProgress?.stage === 'mix'
+        ? 'Mixing narration with music bed (ffmpeg)…'
+        : `Rendering… narrating up to ${sceneCount} scenes (Edge TTS)`,
+    startedAt,
+    elapsedSeconds,
+    estimatedTotalSec,
+    etaSeconds,
+    etaLabel:
+      etaSeconds > 0
+        ? etaMinutes > 0
+          ? `~${etaMinutes}m ${etaRemSec}s left`
+          : `~${etaRemSec}s left`
+        : 'finishing…',
+    fallback: !job?.renderProgress,
+  }
+}

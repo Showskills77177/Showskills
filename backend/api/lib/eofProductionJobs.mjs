@@ -200,6 +200,18 @@ function removeEofProductionJobFiles(jobId) {
   }
 }
 
+export async function cancelEofProductionRender(id) {
+  const job = await getEofProductionJob(id)
+  if (!job) throw new Error('Production job not found.')
+  if (job.status !== EOF_PRODUCTION_JOB_STATUS.RENDERING) return job
+
+  await updateEofProductionRenderProgress(id, null)
+  return updateEofProductionJob(id, {
+    status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+    errorMessage: null,
+  })
+}
+
 export async function deleteEofProductionJob(id) {
   await ensureEofProductionSchema()
   const job = await getEofProductionJob(id)

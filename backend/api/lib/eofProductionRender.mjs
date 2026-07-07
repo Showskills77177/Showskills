@@ -56,6 +56,17 @@ export async function renderEofProductionAudio(jobId) {
   const renderStartedAt = new Date().toISOString()
   const estimatedTotalSec = estimateEofRenderDurationSec(job.script)
 
+  await updateEofProductionRenderProgress(
+    jobId,
+    buildEofRenderProgress({
+      stage: 'tts',
+      sceneIndex: 0,
+      sceneCount,
+      startedAt: renderStartedAt,
+      estimatedTotalSec,
+    }),
+  )
+
   async function reportProgress(stage, sceneIndex = 0) {
     const progress = buildEofRenderProgress({
       stage,

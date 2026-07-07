@@ -9,6 +9,7 @@ import {
   updateEofProductionJob,
   regenerateEofProductionScript,
   deleteEofProductionJob,
+  cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
 import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
@@ -96,6 +97,18 @@ export default async function handler(req, res) {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const job = await regenerateEofProductionScript(jobId)
+        return json(res, 200, { ok: true, job })
+      }
+
+      if (action === 'cancel-render') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, { error: 'Only the channel owner can cancel renders.' })
+        }
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const job = await cancelEofProductionRender(jobId)
         return json(res, 200, { ok: true, job })
       }
 

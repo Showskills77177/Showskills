@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '../../../lib/api'
-import { productionJobStatusLabel, estimateEofRenderDurationSec } from '../../../../shared/eofProduction.mjs'
+import {
+  productionJobStatusLabel,
+  estimateEofRenderDurationSec,
+  refreshEofRenderProgress,
+  buildFallbackRenderProgress,
+} from '../../../../shared/eofProduction.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
@@ -12,6 +17,53 @@ function readStoredSelectedId() {
   } catch {
     return null
   }
+}
+
+function formatDuration(sec) {
+  const total = Math.max(0, Math.round(Number(sec) || 0))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+
+function EofRenderProgressBar({ progress, stuck, onCancel, cancelBusy }) {
+  if (!progress) return null
+  const percent = Math.min(100, Math.max(0, Math.round(progress.percent || 0)))
+
+  return (
+    <div className="rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4" role="status" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9ecbff]">
+        <span>{progress.message || 'Rendering…'}</span>
+        <span className="font-semibold tabular-nums">{percent}%</span>
+      </div>
+      <div className="mt-2 h-3 overflow-hidden rounded-full bg-[#0d1520]">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#2563eb] to-[#3ea6ff] transition-[width] duration-700 ease-out"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <p className="mt-2 text-[10px] text-[#717171]">
+        Elapsed {formatDuration(progress.elapsedSeconds)}
+        {progress.etaLabel ? ` · ${progress.etaLabel}` : ''}
+        {progress.estimatedTotalSec ? ` · ~${formatDuration(progress.estimatedTotalSec)} total est.` : ''}
+      </p>
+      {stuck ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="text-xs text-amber-400">
+            This render may have timed out on the server (Vercel limit). Reset it, then try again.
+          </p>
+          <button
+            type="button"
+            disabled={cancelBusy}
+            onClick={onCancel}
+            className="rounded-full border border-amber-500/50 px-3 py-1 text-xs text-amber-200 disabled:opacity-50"
+          >
+            Reset & retry
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export default function EofProductionPanel({ isOwner, active = true }) {
@@ -36,6 +88,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [renderPhase, setRenderPhase] = useState('')
   const [renderProgress, setRenderProgress] = useState(null)
   const [renderStack, setRenderStack] = useState(null)
+  const [progressTick, setProgressTick] = useState(0)
   const renderPollRef = useRef(null)
 
   const fetchProduction = useCallback(async () => {
@@ -144,17 +197,62 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     }
   }, [])
 
-  useEffect(() => {
-    if (!active || selected?.status !== 'rendering' || busy) return undefined
-    const timer = setInterval(() => {
-      refreshJobsQuiet()
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [active, selected?.status, busy, refreshJobsQuiet])
+  const isRendering =
+    selected?.status === 'rendering' || busy || renderPhase === 'rendering' || renderPhase === 'saving'
 
   useEffect(() => {
-    if (selected?.renderProgress) setRenderProgress(selected.renderProgress)
-  }, [selected?.renderProgress])
+    if (!isRendering) return undefined
+    const timer = setInterval(() => setProgressTick((n) => n + 1), 1000)
+    return () => clearInterval(timer)
+  }, [isRendering])
+
+  const displayProgress = useMemo(() => {
+    void progressTick
+    if (renderProgress) return refreshEofRenderProgress(renderProgress)
+    if (selected?.renderProgress) return refreshEofRenderProgress(selected.renderProgress)
+    if (selected?.status === 'rendering' && draftScript) {
+      return buildFallbackRenderProgress(selected, draftScript)
+    }
+    return null
+  }, [
+    progressTick,
+    renderProgress,
+    selected?.renderProgress,
+    selected?.status,
+    selected?.updatedAt,
+    draftScript,
+  ])
+
+  const isRenderStuck =
+    selected?.status === 'rendering' &&
+    displayProgress &&
+    displayProgress.elapsedSeconds > Math.max(360, (displayProgress.estimatedTotalSec || 120) * 2)
+
+  useEffect(() => {
+    if (!active || !selectedId) return undefined
+    if (selected?.status !== 'rendering' && renderPhase !== 'rendering') return undefined
+
+    const poll = async () => {
+      try {
+        const j = await fetchProduction()
+        const fresh = (j.jobs || []).find((row) => row.id === selectedId)
+        if (!fresh) return
+        upsertJob(fresh)
+        if (fresh.renderProgress) setRenderProgress(fresh.renderProgress)
+      } catch {
+        /* polling */
+      }
+    }
+
+    poll()
+    renderPollRef.current = setInterval(poll, 1200)
+    return () => {
+      if (renderPollRef.current) {
+        clearInterval(renderPollRef.current)
+        renderPollRef.current = null
+      }
+    }
+  }, [active, selectedId, selected?.status, renderPhase, fetchProduction])
 
   function stopRenderPolling() {
     if (renderPollRef.current) {
@@ -163,27 +261,26 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     }
   }
 
-  function startRenderPolling() {
-    stopRenderPolling()
-    renderPollRef.current = setInterval(async () => {
-      try {
-        const j = await fetchProduction()
-        const job = (j.jobs || []).find((row) => row.id === selectedId)
-        if (job?.renderProgress) {
-          setRenderProgress(job.renderProgress)
-          upsertJob(job)
-        }
-      } catch {
-        /* polling */
-      }
-    }, 1200)
-  }
-
-  function formatDuration(sec) {
-    const total = Math.max(0, Math.round(Number(sec) || 0))
-    const m = Math.floor(total / 60)
-    const s = total % 60
-    return m > 0 ? `${m}m ${s}s` : `${s}s`
+  async function cancelStuckRender() {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel-render', jobId: selectedId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not reset render')
+      setRenderProgress(null)
+      if (j.job) upsertJob(j.job)
+      setSuccess('Render reset — you can click “Render audio + music” again.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
+    }
   }
 
   function markDraftDirty() {
@@ -305,8 +402,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         etaLabel: `~${formatDuration(estSec)} est.`,
         elapsedSeconds: 0,
         estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 1,
+        stage: 'tts',
+        sceneIndex: 0,
       })
-      startRenderPolling()
       setSuccess('Rendering narration and mixing music… Keep this tab open.')
 
       const res = await apiFetch('/api/admin/eof-production', {
@@ -474,26 +574,13 @@ export default function EofProductionPanel({ isOwner, active = true }) {
           </details>
         ) : null}
 
-        {renderProgress ? (
-          <div className="mt-4 rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4" role="status" aria-live="polite">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9ecbff]">
-              <span>{renderProgress.message || 'Rendering…'}</span>
-              <span className="font-semibold tabular-nums">{Math.round(renderProgress.percent || 0)}%</span>
-            </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#0d1520]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#2563eb] to-[#3ea6ff] transition-[width] duration-500 ease-out"
-                style={{ width: `${Math.min(100, Math.max(0, renderProgress.percent || 0))}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[10px] text-[#717171]">
-              Elapsed {formatDuration(renderProgress.elapsedSeconds)}
-              {renderProgress.etaLabel ? ` · ${renderProgress.etaLabel}` : ''}
-              {renderProgress.estimatedTotalSec
-                ? ` · ~${formatDuration(renderProgress.estimatedTotalSec)} total est.`
-                : ''}
-            </p>
-          </div>
+        {displayProgress ? (
+          <EofRenderProgressBar
+            progress={displayProgress}
+            stuck={isRenderStuck}
+            onCancel={cancelStuckRender}
+            cancelBusy={busy}
+          />
         ) : null}
 
         <form onSubmit={createJob} className="mt-4 flex flex-wrap items-end gap-3">
@@ -556,7 +643,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                     }`}
                   >
                     <div className="font-medium truncate">{j.title || j.topic}</div>
-                    <div className="text-[10px] text-[#717171]">{productionJobStatusLabel(j.status)}</div>
+                    <div className="text-[10px] text-[#717171]">
+                      {j.status === 'rendering' && j.renderProgress?.percent != null
+                        ? `Rendering… ${Math.round(j.renderProgress.percent)}%`
+                        : productionJobStatusLabel(j.status)}
+                    </div>
                   </button>
                   <button
                     type="button"
@@ -620,6 +711,17 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 </button>
               </div>
             </div>
+
+            {displayProgress && (selected.status === 'rendering' || busy) ? (
+              <div className="mt-4">
+                <EofRenderProgressBar
+                  progress={displayProgress}
+                  stuck={isRenderStuck}
+                  onCancel={cancelStuckRender}
+                  cancelBusy={busy}
+                />
+              </div>
+            ) : null}
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-xs text-[#aaa]">
@@ -709,12 +811,6 @@ export default function EofProductionPanel({ isOwner, active = true }) {
             {selected.status === 'failed' && selected.errorMessage ? (
               <p className="mt-4 rounded-lg border border-[#ff4e45]/40 bg-[#2a1515] px-3 py-2 text-sm text-[#ff9b95]">
                 Render failed: {selected.errorMessage}
-              </p>
-            ) : null}
-
-            {selected.status === 'rendering' && !busy ? (
-              <p className="mt-4 text-sm text-[#9ecbff]">
-                Render in progress… refreshing every few seconds.
               </p>
             ) : null}
 
