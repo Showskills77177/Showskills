@@ -15,6 +15,33 @@ import {
 } from '../../../../shared/eofYoutubeMeta.mjs'
 import { EOF } from './eofStudioTheme'
 
+function buildUploadSuccessMessage({ result, isOwner, scheduledAtIso, visibility }) {
+  const project = result?.project
+  const label = project?.title?.trim() || 'Your video'
+  const formatWhen = (iso) =>
+    iso
+      ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      : null
+
+  if (!isOwner) {
+    return `"${label}" was uploaded privately and is waiting for channel owner approval.`
+  }
+
+  const scheduledIso = scheduledAtIso || project?.scheduledAt
+  if (project?.status === 'scheduled' || (scheduledIso && new Date(scheduledIso) > new Date())) {
+    const when = formatWhen(scheduledIso) || 'the scheduled time'
+    return `Scheduled! "${label}" will publish on ${when}.`
+  }
+
+  if (visibility === 'public') {
+    return `Published! "${label}" is live on your YouTube channel.`
+  }
+  if (visibility === 'unlisted') {
+    return `Uploaded! "${label}" is on YouTube as unlisted.`
+  }
+  return `Uploaded! "${label}" is on YouTube as private.`
+}
+
 async function uploadVideoToYoutube(payload, onProgress) {
   const initRes = await apiFetch('/api/admin/eof-upload-init', {
     method: 'POST',
@@ -78,6 +105,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
   const [progress, setProgress] = useState('')
   const [formErr, setFormErr] = useState('')
   const [previewWarn, setPreviewWarn] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [lastChecks, setLastChecks] = useState(null)
   const videoRef = useRef(null)
 
@@ -129,6 +157,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
     setBusy(true)
     setFormErr('')
     setPreviewWarn('')
+    setSuccessMessage('')
     setLastChecks(null)
     try {
       let scheduleIso = null
@@ -180,6 +209,15 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
       if (result.youtube?.checks?.processingStatus === 'processing') {
         pollUploadChecks(result.project?.id)
       }
+      setSuccessMessage(
+        buildUploadSuccessMessage({
+          result,
+          isOwner,
+          scheduledAtIso: scheduleIso,
+          visibility: isOwner ? visibility : 'private',
+        }),
+      )
+      setTab('checks')
       setTitle('')
       setDescription('')
       setTags('')
@@ -241,6 +279,14 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
       <div className="border-b border-[#303030] px-4 py-3">
         <h2 className="text-base font-semibold text-white">Create</h2>
         <p className={`text-xs ${EOF.muted}`}>Upload Short or long-form — full YouTube metadata</p>
+        {successMessage ? (
+          <p
+            className="mt-3 rounded-lg border border-[#2ba640]/40 bg-[#1a2e1f] px-3 py-2 text-sm text-[#6ee07d]"
+            role="status"
+          >
+            {successMessage}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-0 lg:grid-cols-[1fr_280px]">
@@ -260,8 +306,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
             ))}
           </div>
 
-          {tab === 'details' ? (
-            <div className="space-y-4">
+          <div hidden={tab !== 'details'} className="space-y-4">
               <Field label="Format">
                 {meta.width > 0 ? (
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -321,7 +366,10 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                   minLength={3}
                   maxLength={100}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setSuccessMessage('')
+                    setTitle(e.target.value)
+                  }}
                   className={inputCls}
                 />
               </Field>
@@ -377,7 +425,10 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                   type="file"
                   accept="video/*"
                   required
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setSuccessMessage('')
+                    setFile(e.target.files?.[0] || null)
+                  }}
                   className="text-sm text-[#aaa] file:mr-2 file:rounded file:border-0 file:bg-[#ff0000] file:px-3 file:py-1.5 file:text-white"
                 />
                 {file ? (
@@ -397,11 +448,9 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                   />
                 </Field>
               ) : null}
-            </div>
-          ) : null}
+          </div>
 
-          {tab === 'visibility' ? (
-            <div className="space-y-4">
+          <div hidden={tab !== 'visibility'} className="space-y-4">
               {isOwner ? (
                 <>
                   <Field label="Visibility">
@@ -443,11 +492,9 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                   approves.
                 </p>
               )}
-            </div>
-          ) : null}
+          </div>
 
-          {tab === 'advanced' ? (
-            <div className="space-y-4">
+          <div hidden={tab !== 'advanced'} className="space-y-4">
               <Toggle
                 label="Allow embedding"
                 hint="Let others embed this video on websites"
@@ -489,11 +536,9 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
                   Appended to description as a link. End screens/cards are set in YouTube Studio.
                 </p>
               </Field>
-            </div>
-          ) : null}
+          </div>
 
-          {tab === 'checks' ? (
-            <div className="space-y-3 text-sm">
+          <div hidden={tab !== 'checks'} className="space-y-3 text-sm">
               <p className={EOF.muted}>
                 After upload, YouTube runs copyright and community guidelines checks. Results appear here and on each
                 video in the queue.
@@ -511,8 +556,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
               ) : (
                 <p className="text-xs text-[#717171]">Upload a video to run checks.</p>
               )}
-            </div>
-          ) : null}
+          </div>
 
           {previewWarn ? <p className="mt-2 text-xs text-amber-400">{previewWarn}</p> : null}
           {formErr ? <p className="mt-4 text-sm text-[#ff4e45]">{formErr}</p> : null}
