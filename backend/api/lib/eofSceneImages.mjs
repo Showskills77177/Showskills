@@ -9,6 +9,7 @@ import {
   searchPinterestPartnerPins,
   isEofPinterestApiConfigured,
 } from './eofPinterestImages.mjs'
+import { isEofGoogleCseConfigured, searchGoogleCseImages } from './eofGoogleImages.mjs'
 
 const PALETTES = ['0x16162e', '0x1a2e1f', '0x172033', '0x2a1515', '0x1f1a2e']
 
@@ -18,6 +19,7 @@ export function isEofPexelsConfigured() {
 
 export function eofImageSourceStatus() {
   return {
+    google: isEofGoogleCseConfigured(),
     pexels: isEofPexelsConfigured(),
     pinterestApi: isEofPinterestApiConfigured(),
     pinterestPinUrl: true,
@@ -25,9 +27,9 @@ export function eofImageSourceStatus() {
 }
 
 export function eofImagesConfigurationNote() {
-  const { pexels, pinterestApi } = eofImageSourceStatus()
-  if (pexels || pinterestApi) return null
-  return 'Add PEXELS_API_KEY and/or PINTEREST_ACCESS_TOKEN on Vercel for auto image search. You can also paste a Pinterest pin link in Image search per scene.'
+  const { google, pexels, pinterestApi } = eofImageSourceStatus()
+  if (google || pexels || pinterestApi) return null
+  return 'Add GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID, PEXELS_API_KEY, and/or PINTEREST_ACCESS_TOKEN on Vercel — or paste a Pinterest pin link per scene.'
 }
 
 function paletteForQuery(query, index) {
@@ -125,6 +127,23 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
       }
     }
 
+    if (isEofGoogleCseConfigured()) {
+      try {
+        const hit = await searchGoogleCseImages(query, index)
+        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
+          return {
+            path: outPath,
+            source: 'google',
+            imageQuery: query,
+            imageTitle: hit.title,
+            sourcePage: hit.sourcePage,
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] Google image search failed', query, e)
+      }
+    }
+
     if (pinterestToken) {
       try {
         const hit = await searchPinterestPartnerPins(query, index, pinterestToken)
@@ -151,7 +170,7 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
   )
   if (!existsSync(outPath)) throw new Error(`Could not create image for “${fallbackQuery}”.`)
 
-  const hasAnyKey = pexelsKey || pinterestToken
+  const hasAnyKey = pexelsKey || pinterestToken || isEofGoogleCseConfigured()
   return {
     path: outPath,
     source: hasAnyKey ? 'placeholder' : 'placeholder-no-image-keys',

@@ -90,7 +90,12 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [renderPhase, setRenderPhase] = useState('')
   const [renderProgress, setRenderProgress] = useState(null)
   const [renderStack, setRenderStack] = useState(null)
-  const [imageSources, setImageSources] = useState({ pexels: false, pinterestApi: false, pinterestPinUrl: true })
+  const [imageSources, setImageSources] = useState({
+    google: false,
+    pexels: false,
+    pinterestApi: false,
+    pinterestPinUrl: true,
+  })
   const [imagesNote, setImagesNote] = useState('')
   const [progressTick, setProgressTick] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
@@ -131,7 +136,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setImageSources(
         j.imageSources && typeof j.imageSources === 'object'
           ? j.imageSources
-          : { pexels: Boolean(j.pexelsConfigured), pinterestApi: false, pinterestPinUrl: true },
+          : { google: false, pexels: Boolean(j.pexelsConfigured), pinterestApi: false, pinterestPinUrl: true },
       )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
       setRenderStack(j.renderStack || null)
@@ -348,6 +353,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
 
   function sceneImageSourceLabel(source) {
     if (source === 'pexels') return 'Pexels'
+    if (source === 'google') return 'Google Images'
     if (source === 'pinterest') return 'Pinterest search'
     if (source === 'pinterest-pin') return 'Pinterest pin'
     if (source === 'cache') return 'Cached photo'
@@ -761,10 +767,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               'ffmpeg is not detected — redeploy staging with ffmpeg-static, or set FFMPEG_PATH on the API host.'}
           </p>
         ) : null}
-        {!loading && !imageSources.pexels && !imageSources.pinterestApi ? (
+        {!loading && !imageSources.google && !imageSources.pexels && !imageSources.pinterestApi ? (
           <p className="mt-2 text-xs text-amber-400">
             {imagesNote ||
-              'Add PEXELS_API_KEY and/or PINTEREST_ACCESS_TOKEN on Vercel — or paste a Pinterest pin URL in each scene Image search.'}
+              'Add GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID (Google Images), PEXELS_API_KEY, and/or PINTEREST_ACCESS_TOKEN — or paste Pinterest pin URLs per scene.'}
           </p>
         ) : null}
         {!loading && tracks.length === 0 ? (

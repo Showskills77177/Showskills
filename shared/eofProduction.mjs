@@ -103,7 +103,7 @@ export const EOF_RENDER_STACK = {
   video: {
     id: 'ffmpeg-images',
     label: 'Pexels stock photos + ffmpeg (9:16 Short)',
-    detail: 'Pexels and Pinterest (API or pin URL per scene) for stock photos, else placeholder slides. Set PEXELS_API_KEY and/or PINTEREST_ACCESS_TOKEN.',
+    detail: 'Google Image Search (Custom Search API), Pexels, Pinterest (API or pin URL), else placeholders. Set GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID and/or PEXELS_API_KEY.',
   },
 }
 
