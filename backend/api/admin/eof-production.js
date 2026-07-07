@@ -1,7 +1,7 @@
 import { json, readJsonBody } from '../lib/http.mjs'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 import { requireEofSession, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
-import { listEofMusicTracks } from '../lib/eofMusicTracks.mjs'
+import { ensureEofMusicCatalogSeeded, listEofMusicTracks } from '../lib/eofMusicTracks.mjs'
 import {
   listEofProductionJobs,
   createEofProductionJob,
@@ -35,79 +35,107 @@ export default async function handler(req, res) {
 
   const info = eofSessionInfo(session)
 
-  if (req.method === 'GET') {
-    const [jobs, tracks, ffmpeg] = await Promise.all([
-      listEofProductionJobs(),
-      listEofMusicTracks(),
-      isFfmpegAvailable(),
-    ])
-    return json(res, 200, {
-      ok: true,
-      jobs,
-      tracks,
-      voicePresets: Object.values(EOF_VOICE_PRESETS),
-      ffmpegAvailable: ffmpeg,
-      session: info,
-    })
-  }
+  try {
+    if (req.method === 'GET') {
+      await ensureEofMusicCatalogSeeded()
 
-  if (req.method === 'POST') {
-    const body = await readJsonBody(req)
-    const action = typeof body.action === 'string' ? body.action : 'create'
+      let jobs = []
+      let tracks = []
+      let ffmpeg = false
 
-    if (action === 'render') {
-      const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
-      if (!jobId) return json(res, 400, { error: 'jobId is required.' })
       try {
-        const job = await renderEofProductionAudio(jobId)
-        return json(res, 200, { ok: true, job })
+        jobs = await listEofProductionJobs()
       } catch (e) {
-        return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
+        console.error('[eof-production] jobs', e)
+      }
+
+      try {
+        tracks = await listEofMusicTracks()
+      } catch (e) {
+        console.error('[eof-production] tracks', e)
+      }
+
+      try {
+        ffmpeg = await isFfmpegAvailable()
+      } catch {
+        ffmpeg = false
+      }
+
+      return json(res, 200, {
+        ok: true,
+        jobs,
+        tracks,
+        voicePresets: Object.values(EOF_VOICE_PRESETS),
+        ffmpegAvailable: ffmpeg,
+        renderNote: ffmpeg
+          ? null
+          : 'Audio render needs ffmpeg on a worker or local API — script editing still works on staging.',
+        session: info,
+      })
+    }
+
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req)
+      const action = typeof body.action === 'string' ? body.action : 'create'
+
+      if (action === 'render') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        try {
+          const job = await renderEofProductionAudio(jobId)
+          return json(res, 200, { ok: true, job })
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
+        }
+      }
+
+      if (action === 'regenerate-script') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const job = await regenerateEofProductionScript(jobId)
+        return json(res, 200, { ok: true, job })
+      }
+
+      const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
+      const voicePreset = typeof body.voicePreset === 'string' ? body.voicePreset : 'british'
+      const musicTrackId = typeof body.musicTrackId === 'string' ? body.musicTrackId.trim() : null
+      try {
+        const job = await createEofProductionJob({
+          topic,
+          createdBy: info.username,
+          voicePreset,
+          musicTrackId,
+        })
+        return json(res, 201, { ok: true, job })
+      } catch (e) {
+        return json(res, 400, { error: e instanceof Error ? e.message : 'Could not create job' })
       }
     }
 
-    if (action === 'regenerate-script') {
+    if (req.method === 'PATCH') {
+      const body = await readJsonBody(req)
       const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
       if (!jobId) return json(res, 400, { error: 'jobId is required.' })
-      const job = await regenerateEofProductionScript(jobId)
+
+      const existing = await getEofProductionJob(jobId)
+      if (!existing) return json(res, 404, { error: 'Job not found.' })
+
+      const job = await updateEofProductionJob(jobId, {
+        script: body.script,
+        title: body.title,
+        topic: body.topic,
+        musicTrackId: body.musicTrackId,
+        musicVolume: body.musicVolume,
+        voicePreset: body.voicePreset,
+      })
       return json(res, 200, { ok: true, job })
     }
 
-    const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
-    const voicePreset = typeof body.voicePreset === 'string' ? body.voicePreset : 'british'
-    const musicTrackId = typeof body.musicTrackId === 'string' ? body.musicTrackId.trim() : null
-    try {
-      const job = await createEofProductionJob({
-        topic,
-        createdBy: info.username,
-        voicePreset,
-        musicTrackId,
-      })
-      return json(res, 201, { ok: true, job })
-    } catch (e) {
-      return json(res, 400, { error: e instanceof Error ? e.message : 'Could not create job' })
-    }
+    res.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
+    return json(res, 405, { error: 'Method not allowed' })
+  } catch (e) {
+    console.error('[eof-production] handler', e)
+    const msg = e instanceof Error ? e.message : 'Could not load production'
+    return json(res, 500, { error: msg })
   }
-
-  if (req.method === 'PATCH') {
-    const body = await readJsonBody(req)
-    const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
-    if (!jobId) return json(res, 400, { error: 'jobId is required.' })
-
-    const existing = await getEofProductionJob(jobId)
-    if (!existing) return json(res, 404, { error: 'Job not found.' })
-
-    const job = await updateEofProductionJob(jobId, {
-      script: body.script,
-      title: body.title,
-      topic: body.topic,
-      musicTrackId: body.musicTrackId,
-      musicVolume: body.musicVolume,
-      voicePreset: body.voicePreset,
-    })
-    return json(res, 200, { ok: true, job })
-  }
-
-  res.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
-  return json(res, 405, { error: 'Method not allowed' })
 }

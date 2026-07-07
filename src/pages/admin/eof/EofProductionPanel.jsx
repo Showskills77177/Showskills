@@ -19,19 +19,39 @@ export default function EofProductionPanel({ isOwner }) {
   const [err, setErr] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [renderNote, setRenderNote] = useState('')
 
   const load = useCallback(async () => {
+    setLoading(true)
     setErr('')
     try {
       const res = await apiFetch('/api/admin/eof-production')
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error || 'Failed to load production')
+      const text = await res.text()
+      let j = {}
+      try {
+        j = text ? JSON.parse(text) : {}
+      } catch {
+        /* non-JSON */
+      }
+      if (!res.ok) {
+        const detail =
+          typeof j.error === 'string'
+            ? j.error
+            : text.trim()
+              ? `${res.status}: ${text.trim().slice(0, 160)}`
+              : `Request failed (HTTP ${res.status})`
+        throw new Error(detail)
+      }
       setJobs(j.jobs || [])
       setTracks(j.tracks || [])
       setVoicePresets(j.voicePresets || [])
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
+      setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -144,18 +164,22 @@ export default function EofProductionPanel({ isOwner }) {
 
   return (
     <div className="space-y-6">
+      {loading ? <p className={`text-sm ${EOF.muted}`}>Loading production…</p> : null}
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Auto production</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           Topic → script → narration + music mix. Video assembly (images + captions) comes next.
         </p>
-        {!ffmpegAvailable ? (
+        {!loading && !ffmpegAvailable ? (
           <p className="mt-2 text-xs text-amber-400">
-            ffmpeg not detected on API server — audio render will fail until ffmpeg is installed (local dev / worker).
+            {renderNote ||
+              'ffmpeg is not available on this API host — you can still draft scripts here; audio render needs a local worker with ffmpeg.'}
           </p>
         ) : null}
-        {tracks.length === 0 ? (
-          <p className="mt-2 text-xs text-amber-400">Add at least one music track in the Music tab first.</p>
+        {!loading && tracks.length === 0 ? (
+          <p className="mt-2 text-xs text-amber-400">
+            Add at least one music track in the Music tab, or refresh after the default catalog is seeded.
+          </p>
         ) : null}
 
         <form onSubmit={createJob} className="mt-4 flex flex-wrap items-end gap-3">
@@ -186,7 +210,7 @@ export default function EofProductionPanel({ isOwner }) {
           </label>
           <button
             type="submit"
-            disabled={busy || tracks.length === 0}
+            disabled={busy || loading || tracks.length === 0}
             className={`rounded-full px-5 py-2 text-sm ${EOF.btnPrimary} disabled:opacity-50`}
           >
             Create script

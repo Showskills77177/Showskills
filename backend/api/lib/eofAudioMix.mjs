@@ -85,11 +85,18 @@ export async function mixEofNarrationWithMusic({
   }
 }
 
-export async function isFfmpegAvailable() {
-  try {
-    await execFileAsync('ffmpeg', ['-version'], { maxBuffer: 1024 * 1024 })
-    return true
-  } catch {
-    return false
-  }
+export async function isFfmpegAvailable({ timeoutMs = 2000 } = {}) {
+  return Promise.race([
+    (async () => {
+      try {
+        await execFileAsync('ffmpeg', ['-version'], { maxBuffer: 1024 * 1024 })
+        return true
+      } catch {
+        return false
+      }
+    })(),
+    new Promise((resolve) => {
+      setTimeout(() => resolve(false), timeoutMs)
+    }),
+  ])
 }

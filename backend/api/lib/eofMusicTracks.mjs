@@ -7,6 +7,31 @@ import { EOF_MUSIC_SOURCE_YOUTUBE_LIBRARY } from '../../../shared/eofProduction.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
+const DEFAULT_EOF_MUSIC_CATALOG = [
+  {
+    title: 'Neutral bed',
+    mood: 'neutral',
+    publicUrl: '/eof/music/default-neutral.mp3',
+    isDefault: true,
+    licenseNote: 'YouTube Audio Library — upload the MP3 under public/eof/music/ before rendering.',
+  },
+  {
+    title: 'Dramatic bed',
+    mood: 'dramatic',
+    publicUrl: '/eof/music/default-dramatic.mp3',
+    isDefault: false,
+    licenseNote: 'YouTube Audio Library — upload the MP3 under public/eof/music/ before rendering.',
+  },
+]
+
+function normalizeTimestamp(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === 'string') return value
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString()
+}
+
 function rowToTrack(row) {
   if (!row) return null
   return {
@@ -19,16 +44,32 @@ function rowToTrack(row) {
     durationSeconds: row.duration_seconds ?? null,
     isDefault: Boolean(row.is_default),
     licenseNote: row.license_note || null,
-    active: row.active !== 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    active: row.active !== 0 && row.active !== false,
+    createdAt: normalizeTimestamp(row.created_at),
+    updatedAt: normalizeTimestamp(row.updated_at),
   }
+}
+
+/** Register placeholder catalog rows when the Music tab has never been set up. */
+export async function ensureEofMusicCatalogSeeded() {
+  await ensureEofProductionSchema()
+  const existing = await listEofMusicTracks({ activeOnly: false })
+  if (existing.length) return existing
+
+  for (const item of DEFAULT_EOF_MUSIC_CATALOG) {
+    await createEofMusicTrack({
+      ...item,
+      source: EOF_MUSIC_SOURCE_YOUTUBE_LIBRARY,
+    }).catch(() => {})
+  }
+
+  return listEofMusicTracks({ activeOnly: false })
 }
 
 export async function listEofMusicTracks({ activeOnly = true } = {}) {
   await ensureEofProductionSchema()
   const sql = activeOnly
-    ? `SELECT * FROM eof_music_tracks WHERE active = 1 ORDER BY is_default DESC, title ASC`
+    ? `SELECT * FROM eof_music_tracks WHERE active != 0 ORDER BY is_default DESC, title ASC`
     : `SELECT * FROM eof_music_tracks ORDER BY is_default DESC, title ASC`
   const { rows } = await query(sql)
   return rows.map(rowToTrack)

@@ -9,6 +9,14 @@ import {
 import { buildFactsShortScript } from '../../../shared/eofScriptTemplates.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 
+function normalizeTimestamp(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === 'string') return value
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString()
+}
+
 function nowSql() {
   return dbIsPostgres() ? 'now()' : `datetime('now')`
 }
@@ -37,8 +45,8 @@ function rowToJob(row) {
     youtubeProjectId: row.youtube_project_id || null,
     errorMessage: row.error_message || null,
     createdBy: row.created_by || null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: normalizeTimestamp(row.created_at),
+    updatedAt: normalizeTimestamp(row.updated_at),
   }
 }
 

@@ -13,14 +13,18 @@ const failures = []
 
 async function main() {
   const { ensureEofProductionSchema } = await import('../backend/api/lib/ensureEofProductionSchema.mjs')
-  const { createEofMusicTrack, listEofMusicTracks, pickEofMusicTrackForTopic } = await import(
-    '../backend/api/lib/eofMusicTracks.mjs'
-  )
-  const { createEofProductionJob, getEofProductionJob } = await import(
+  const { createEofMusicTrack, listEofMusicTracks, pickEofMusicTrackForTopic, ensureEofMusicCatalogSeeded } =
+    await import('../backend/api/lib/eofMusicTracks.mjs')
+  const { createEofProductionJob, getEofProductionJob, listEofProductionJobs } = await import(
     '../backend/api/lib/eofProductionJobs.mjs'
   )
+  const handler = (await import('../backend/api/admin/eof-production.js')).default
+  const { signAdminSession } = await import('../backend/api/lib/adminAuth.mjs')
 
   await ensureEofProductionSchema()
+
+  const seeded = await ensureEofMusicCatalogSeeded()
+  if (seeded.length < 1) throw new Error('music catalog seed failed')
 
   await createEofMusicTrack({
     title: 'Test neutral',
@@ -43,6 +47,14 @@ async function main() {
 
   const tracks = await listEofMusicTracks()
   if (tracks.length < 1) throw new Error('no tracks')
+
+  const token = await signAdminSession({ sub: process.env.ADMIN_USER, role: 'admin' })
+  const req = { method: 'GET', headers: { cookie: `admin_session=${token}` }, url: '/api/admin/eof-production' }
+  const res = { statusCode: 200, headers: {}, setHeader() {}, end(body) { this.body = body } }
+  await handler(req, res)
+  const payload = JSON.parse(res.body)
+  if (res.statusCode !== 200 || !payload.ok) throw new Error('production GET failed')
+  if (!payload.tracks.length) throw new Error('production GET returned no tracks')
 
   console.log('EOF production lib smoke tests passed')
 }

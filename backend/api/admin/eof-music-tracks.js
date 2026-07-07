@@ -1,7 +1,8 @@
 import { json, readJsonBody } from '../lib/http.mjs'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
-import { requireEofOwner } from '../lib/eofYoutubeAuth.mjs'
+import { requireEofSession, requireEofOwner } from '../lib/eofYoutubeAuth.mjs'
 import {
+  ensureEofMusicCatalogSeeded,
   listEofMusicTracks,
   createEofMusicTrack,
   updateEofMusicTrack,
@@ -22,15 +23,26 @@ export default async function handler(req, res) {
   }
 
   try {
-    await requireEofOwner(req)
+    if (req.method === 'GET') {
+      await requireEofSession(req)
+    } else {
+      await requireEofOwner(req)
+    }
   } catch (e) {
-    return json(res, e.statusCode || 403, { error: 'Only the channel owner can manage music.' })
+    const code = e.statusCode || (req.method === 'GET' ? 401 : 403)
+    const msg =
+      req.method === 'GET'
+        ? 'Unauthorized'
+        : 'Only the channel owner can manage music.'
+    return json(res, code, { error: msg })
   }
 
-  if (req.method === 'GET') {
-    const tracks = await listEofMusicTracks({ activeOnly: false })
-    return json(res, 200, { ok: true, tracks, moods: EOF_MUSIC_MOODS })
-  }
+  try {
+    if (req.method === 'GET') {
+      await ensureEofMusicCatalogSeeded()
+      const tracks = await listEofMusicTracks({ activeOnly: false })
+      return json(res, 200, { ok: true, tracks, moods: EOF_MUSIC_MOODS })
+    }
 
   if (req.method === 'POST') {
     const body = await readJsonBody(req)
@@ -71,4 +83,9 @@ export default async function handler(req, res) {
 
   res.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
   return json(res, 405, { error: 'Method not allowed' })
+  } catch (e) {
+    console.error('[eof-music-tracks] handler', e)
+    const msg = e instanceof Error ? e.message : 'Could not load music tracks'
+    return json(res, 500, { error: msg })
+  }
 }
