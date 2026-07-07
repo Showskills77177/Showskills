@@ -11,7 +11,7 @@ import {
   paidTicketNumbersForEmail,
 } from '../support/db.mjs'
 import { e2eSecret } from '../support/env.mjs'
-import { IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
+import { IPHONE_17_PRO_COMPETITION_ACTIVE, IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
 
 const IPHONE_QUIZ = {
   q1: '1099',
@@ -20,6 +20,7 @@ const IPHONE_QUIZ = {
 }
 
 test.describe('iPhone 17 Pro or Cash bundle', () => {
+  test.skip(!IPHONE_17_PRO_COMPETITION_ACTIVE, 'iPhone draw is currently inactive')
   test('homepage panel → 29p checkout → iPhone skill quiz → qualified entry', async ({ page }) => {
     const assertClean = installPageErrorAsserter(page)
     const email = `e2e-iphone-home-${Date.now()}@example.test`

@@ -2,11 +2,13 @@ import { query, dbIsPostgres } from './db.mjs'
 import { DRAW_COMPETITION_SLUG, DRAW_COMPETITION_LABEL } from '../../../shared/competitionPeriods.mjs'
 import {
   IPHONE_17_PRO_BUNDLES,
+  IPHONE_17_PRO_COMPETITION_ACTIVE,
   IPHONE_17_PRO_COMPETITION_LABEL,
   IPHONE_17_PRO_COMPETITION_SLUG,
   IPHONE_17_PRO_COMPETITION_SUMMARY,
   IPHONE_17_PRO_RULES_MARKDOWN,
   defaultPostalNameForIphone17ProCompetition,
+  iphone17ProCompetitionCatalogStatus,
   getIphone17ProBundleById,
 } from '../../../shared/iphone17ProCompetition.mjs'
 import {
@@ -210,7 +212,7 @@ const BUILTIN_MAIN_DRAWS = [
     title: IPHONE_17_PRO_COMPETITION_LABEL,
     summary: IPHONE_17_PRO_COMPETITION_SUMMARY,
     rulesMarkdown: IPHONE_17_PRO_RULES_MARKDOWN,
-    status: COMPETITION_STATUS.published,
+    status: iphone17ProCompetitionCatalogStatus(),
     kind: COMPETITION_KIND.mainDraw,
     sortOrder: 2,
     seedBundles: true,
@@ -282,6 +284,7 @@ async function backfillIphone17ProCompetition() {
   const freeVal = dbIsPostgres() ? true : 1
   const postalVal = dbIsPostgres() ? true : 1
   const now = new Date().toISOString()
+  const catalogStatus = iphone17ProCompetitionCatalogStatus()
   const existing = await query(`SELECT slug, status FROM competitions WHERE slug = $1`, [
     IPHONE_17_PRO_COMPETITION_SLUG,
   ])
@@ -297,7 +300,7 @@ async function backfillIphone17ProCompetition() {
         IPHONE_17_PRO_COMPETITION_LABEL,
         IPHONE_17_PRO_COMPETITION_SUMMARY,
         IPHONE_17_PRO_RULES_MARKDOWN,
-        COMPETITION_STATUS.published,
+        catalogStatus,
         COMPETITION_KIND.mainDraw,
         2,
         paidVal,
@@ -307,15 +310,23 @@ async function backfillIphone17ProCompetition() {
         now,
       ],
     ).catch(() => {})
-  } else if (
-    existing.rows[0].status !== COMPETITION_STATUS.archived &&
-    existing.rows[0].status !== COMPETITION_STATUS.published
-  ) {
-    await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
-      IPHONE_17_PRO_COMPETITION_SLUG,
-      COMPETITION_STATUS.published,
-      now,
-    ]).catch(() => {})
+  } else if (existing.rows[0].status !== COMPETITION_STATUS.archived) {
+    if (!IPHONE_17_PRO_COMPETITION_ACTIVE && existing.rows[0].status === COMPETITION_STATUS.published) {
+      await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+        IPHONE_17_PRO_COMPETITION_SLUG,
+        COMPETITION_STATUS.draft,
+        now,
+      ]).catch(() => {})
+    } else if (
+      IPHONE_17_PRO_COMPETITION_ACTIVE &&
+      existing.rows[0].status !== COMPETITION_STATUS.published
+    ) {
+      await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+        IPHONE_17_PRO_COMPETITION_SLUG,
+        COMPETITION_STATUS.published,
+        now,
+      ]).catch(() => {})
+    }
   }
 
   await query(
@@ -451,7 +462,7 @@ async function ensureBuiltinCompetitions() {
         [c.slug, c.title, c.summary, c.rulesMarkdown, c.status, c.kind, c.sortOrder, now],
       )
     } else if (
-      (c.slug === DRAW_COMPETITION_SLUG || c.slug === IPHONE_17_PRO_COMPETITION_SLUG) &&
+      c.slug === DRAW_COMPETITION_SLUG &&
       existing.rows[0].status !== COMPETITION_STATUS.archived &&
       existing.rows[0].status !== COMPETITION_STATUS.published
     ) {
@@ -460,6 +471,18 @@ async function ensureBuiltinCompetitions() {
         COMPETITION_STATUS.published,
         now,
       ])
+    } else if (
+      c.slug === IPHONE_17_PRO_COMPETITION_SLUG &&
+      existing.rows[0].status !== COMPETITION_STATUS.archived
+    ) {
+      const targetStatus = iphone17ProCompetitionCatalogStatus()
+      if (existing.rows[0].status !== targetStatus) {
+        await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+          c.slug,
+          targetStatus,
+          now,
+        ])
+      }
     }
 
     await ensureDefaultCompetitionPeriod(c.slug, { title: c.title })

@@ -3,9 +3,11 @@ import { describe, it } from 'node:test'
 import {
   IPHONE_17_PRO_BUNDLES,
   IPHONE_17_PRO_CASH_ALTERNATIVE_PENCE,
+  IPHONE_17_PRO_COMPETITION_ACTIVE,
   IPHONE_17_PRO_COMPETITION_SLUG,
   IPHONE_17_PRO_RETAIL_PENCE,
   getIphone17ProBundleById,
+  iphone17ProCompetitionCatalogStatus,
 } from './iphone17ProCompetition.mjs'
 
 describe('iphone17ProCompetition', () => {
@@ -24,5 +26,10 @@ describe('iphone17ProCompetition', () => {
   it('defines bundles for the catalog slug', () => {
     assert.ok(IPHONE_17_PRO_BUNDLES.length >= 5)
     assert.equal(IPHONE_17_PRO_COMPETITION_SLUG, 'iphone_17_pro')
+  })
+
+  it('maps the public feature flag to catalog status', () => {
+    assert.equal(IPHONE_17_PRO_COMPETITION_ACTIVE, false)
+    assert.equal(iphone17ProCompetitionCatalogStatus(), 'draft')
   })
 })

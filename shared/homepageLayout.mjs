@@ -94,8 +94,8 @@ export function defaultHomepageLayout() {
         offsets: { ...DEFAULT_BUNDLES_OFFSETS },
       },
       iphone_17_pro_panel: {
-        visible: true,
-        badgeLabel: 'Also live now',
+        visible: false,
+        badgeLabel: 'Coming soon',
         title: '',
         summary: '',
         ctaButtonLabel: 'Enter iPhone draw',

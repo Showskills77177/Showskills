@@ -18,7 +18,9 @@ const {
   createCompetition,
 } = await import('../backend/api/lib/competitionCatalog.mjs')
 const { DRAW_COMPETITION_SLUG } = await import('../shared/competitionPeriods.mjs')
-const { IPHONE_17_PRO_COMPETITION_SLUG } = await import('../shared/iphone17ProCompetition.mjs')
+const { IPHONE_17_PRO_COMPETITION_SLUG, IPHONE_17_PRO_COMPETITION_ACTIVE } = await import(
+  '../shared/iphone17ProCompetition.mjs'
+)
 const { TICKET_BUNDLES } = await import('../shared/ticketBundles.mjs')
 const { listCompetitionPeriods } = await import('../backend/api/lib/competitionPeriods.mjs')
 const { resolveAdminMainDrawCompetition } = await import('../backend/api/lib/checkoutBundle.mjs')
@@ -77,7 +79,7 @@ assert.equal(legacy2.summary, 'Updated from catalog test')
 
 const iphone = await getCompetitionBySlug(IPHONE_17_PRO_COMPETITION_SLUG)
 assert.ok(iphone, 'iPhone 17 Pro competition seeded')
-assert.equal(iphone.status, 'published')
+assert.equal(iphone.status, IPHONE_17_PRO_COMPETITION_ACTIVE ? 'published' : 'draft')
 assert.equal(iphone.allowPaidEntry, true)
 assert.equal(iphone.allowFreeOnline, true)
 assert.equal(iphone.allowPostalEntry, true)
@@ -91,8 +93,14 @@ assert.equal(iphoneSingle.qty, 1)
 
 await updateCompetition(IPHONE_17_PRO_COMPETITION_SLUG, { status: 'draft' })
 await ensureCompetitionCatalogSchema()
-const iphoneRepublished = await getCompetitionBySlug(IPHONE_17_PRO_COMPETITION_SLUG)
-assert.equal(iphoneRepublished.status, 'published', 'iPhone draw re-published after draft')
+const iphoneAfterSchema = await getCompetitionBySlug(IPHONE_17_PRO_COMPETITION_SLUG)
+assert.equal(
+  iphoneAfterSchema.status,
+  IPHONE_17_PRO_COMPETITION_ACTIVE ? 'published' : 'draft',
+  IPHONE_17_PRO_COMPETITION_ACTIVE
+    ? 'iPhone draw re-published after draft'
+    : 'iPhone draw stays inactive after schema ensure',
+)
 
 const opens = new Date('2026-06-01T10:00:00.000Z').toISOString()
 const closes = new Date('2026-07-01T22:00:00.000Z').toISOString()
