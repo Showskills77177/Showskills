@@ -103,7 +103,7 @@ export const EOF_RENDER_STACK = {
   video: {
     id: 'ffmpeg-images',
     label: 'Pexels stock photos + ffmpeg (9:16 Short)',
-    detail: 'Fetches portrait images from Pexels when PEXELS_API_KEY is set, else placeholder slides. Uses fast static slides by default (set EOF_VIDEO_KEN_BURNS=1 for slow Ken Burns).',
+    detail: 'Pexels and Pinterest (API or pin URL per scene) for stock photos, else placeholder slides. Set PEXELS_API_KEY and/or PINTEREST_ACCESS_TOKEN.',
   },
 }
 

@@ -3,6 +3,12 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { runFfmpeg } from './eofFfmpeg.mjs'
 import { buildSceneImageSearchQueries } from '../../../shared/eofSceneImageQueries.mjs'
+import {
+  isPinterestPinUrl,
+  fetchPinterestPinImage,
+  searchPinterestPartnerPins,
+  isEofPinterestApiConfigured,
+} from './eofPinterestImages.mjs'
 
 const PALETTES = ['0x16162e', '0x1a2e1f', '0x172033', '0x2a1515', '0x1f1a2e']
 
@@ -10,11 +16,36 @@ export function isEofPexelsConfigured() {
   return Boolean((process.env.PEXELS_API_KEY || process.env.EOF_PEXELS_API_KEY || '').trim())
 }
 
+export function eofImageSourceStatus() {
+  return {
+    pexels: isEofPexelsConfigured(),
+    pinterestApi: isEofPinterestApiConfigured(),
+    pinterestPinUrl: true,
+  }
+}
+
+export function eofImagesConfigurationNote() {
+  const { pexels, pinterestApi } = eofImageSourceStatus()
+  if (pexels || pinterestApi) return null
+  return 'Add PEXELS_API_KEY and/or PINTEREST_ACCESS_TOKEN on Vercel for auto image search. You can also paste a Pinterest pin link in Image search per scene.'
+}
+
 function paletteForQuery(query, index) {
   const s = String(query || '') + String(index)
   let h = 0
   for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0
   return PALETTES[h % PALETTES.length]
+}
+
+async function downloadImageToFile(imgUrl, outPath) {
+  const imgRes = await fetch(imgUrl, {
+    headers: { 'User-Agent': 'ShowSkills-EOF/1.0' },
+  })
+  if (!imgRes.ok) return false
+  const buf = Buffer.from(await imgRes.arrayBuffer())
+  if (buf.length < 8_000) return false
+  await writeFile(outPath, buf)
+  return true
 }
 
 async function searchPexelsPhoto(query, index, key) {
@@ -53,28 +84,61 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
     }
   }
 
-  const key = (process.env.PEXELS_API_KEY || process.env.EOF_PEXELS_API_KEY || '').trim()
+  const pexelsKey = (process.env.PEXELS_API_KEY || process.env.EOF_PEXELS_API_KEY || '').trim()
+  const pinterestToken = (process.env.PINTEREST_ACCESS_TOKEN || process.env.EOF_PINTEREST_ACCESS_TOKEN || '').trim()
   const queries = buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex: index })
+  const custom = String(imageQuery || '').trim()
 
-  if (key) {
-    for (const query of queries) {
-      try {
-        const hit = await searchPexelsPhoto(query, index, key)
-        if (!hit) continue
-        const imgRes = await fetch(hit.imgUrl)
-        if (!imgRes.ok) continue
-        const buf = Buffer.from(await imgRes.arrayBuffer())
-        if (buf.length < 8_000) continue
-        await writeFile(outPath, buf)
+  if (custom && isPinterestPinUrl(custom)) {
+    try {
+      const hit = await fetchPinterestPinImage(custom)
+      if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
         return {
           path: outPath,
-          source: 'pexels',
-          imageQuery: query,
-          photographer: hit.photographer,
-          pexelsId: hit.pexelsId,
+          source: 'pinterest-pin',
+          imageQuery: hit.queryUsed,
+          pinTitle: hit.title,
+        }
+      }
+    } catch (e) {
+      console.warn('[eof-scene-images] Pinterest pin fetch failed', custom, e)
+    }
+  }
+
+  for (const query of queries) {
+    if (isPinterestPinUrl(query)) continue
+
+    if (pexelsKey) {
+      try {
+        const hit = await searchPexelsPhoto(query, index, pexelsKey)
+        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
+          return {
+            path: outPath,
+            source: 'pexels',
+            imageQuery: query,
+            photographer: hit.photographer,
+            pexelsId: hit.pexelsId,
+          }
         }
       } catch (e) {
         console.warn('[eof-scene-images] Pexels fetch failed', query, e)
+      }
+    }
+
+    if (pinterestToken) {
+      try {
+        const hit = await searchPinterestPartnerPins(query, index, pinterestToken)
+        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
+          return {
+            path: outPath,
+            source: 'pinterest',
+            imageQuery: query,
+            pinId: hit.pinId,
+            pinTitle: hit.title,
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] Pinterest search failed', query, e)
       }
     }
   }
@@ -86,9 +150,11 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
     { maxBuffer: 8 * 1024 * 1024 },
   )
   if (!existsSync(outPath)) throw new Error(`Could not create image for “${fallbackQuery}”.`)
+
+  const hasAnyKey = pexelsKey || pinterestToken
   return {
     path: outPath,
-    source: key ? 'placeholder' : 'placeholder-no-pexels-key',
+    source: hasAnyKey ? 'placeholder' : 'placeholder-no-image-keys',
     imageQuery: fallbackQuery,
   }
 }

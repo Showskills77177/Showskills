@@ -90,7 +90,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [renderPhase, setRenderPhase] = useState('')
   const [renderProgress, setRenderProgress] = useState(null)
   const [renderStack, setRenderStack] = useState(null)
-  const [pexelsConfigured, setPexelsConfigured] = useState(false)
+  const [imageSources, setImageSources] = useState({ pexels: false, pinterestApi: false, pinterestPinUrl: true })
   const [imagesNote, setImagesNote] = useState('')
   const [progressTick, setProgressTick] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
@@ -128,7 +128,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setVoicePresets(j.voicePresets || [])
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
-      setPexelsConfigured(Boolean(j.pexelsConfigured))
+      setImageSources(
+        j.imageSources && typeof j.imageSources === 'object'
+          ? j.imageSources
+          : { pexels: Boolean(j.pexelsConfigured), pinterestApi: false, pinterestPinUrl: true },
+      )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
       setRenderStack(j.renderStack || null)
     } catch (e) {
@@ -343,9 +347,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   }
 
   function sceneImageSourceLabel(source) {
-    if (source === 'pexels') return 'Stock photo'
+    if (source === 'pexels') return 'Pexels'
+    if (source === 'pinterest') return 'Pinterest search'
+    if (source === 'pinterest-pin') return 'Pinterest pin'
     if (source === 'cache') return 'Cached photo'
-    if (source === 'placeholder-no-pexels-key') return 'Placeholder — add PEXELS_API_KEY'
+    if (source === 'placeholder-no-image-keys') return 'Placeholder — add Pexels or Pinterest API key'
     if (source === 'placeholder') return 'Placeholder — search missed'
     return 'Image'
   }
@@ -755,9 +761,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               'ffmpeg is not detected — redeploy staging with ffmpeg-static, or set FFMPEG_PATH on the API host.'}
           </p>
         ) : null}
-        {!loading && !pexelsConfigured ? (
+        {!loading && !imageSources.pexels && !imageSources.pinterestApi ? (
           <p className="mt-2 text-xs text-amber-400">
-            {imagesNote || 'Add PEXELS_API_KEY on Vercel for real football photos in each scene.'}
+            {imagesNote ||
+              'Add PEXELS_API_KEY and/or PINTEREST_ACCESS_TOKEN on Vercel — or paste a Pinterest pin URL in each scene Image search.'}
           </p>
         ) : null}
         {!loading && tracks.length === 0 ? (
@@ -1101,11 +1108,12 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                     />
                   </label>
                   <label className="mt-2 block text-xs text-[#aaa]">
-                    Image search
+                    Image search or Pinterest pin URL
                     <input
                       value={scene.imageQuery || ''}
                       onChange={(e) => updateScene(i, 'imageQuery', e.target.value)}
                       className={inputCls}
+                      placeholder="e.g. Ronaldo goal celebration or https://pin.it/…"
                     />
                   </label>
                   {scene.durationSec ? (
