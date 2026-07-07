@@ -5,6 +5,7 @@ import { publicCompetitionSummary } from '../lib/publicCompetitionCopy'
 import { usePublicCompetition } from '../hooks/usePublicCompetition'
 import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import {
+  IPHONE_17_PRO_COMPETITION_ACTIVE,
   IPHONE_17_PRO_COMPETITION_LABEL,
   IPHONE_17_PRO_COMPETITION_SLUG,
   IPHONE_17_PRO_COMPETITION_SUMMARY,
@@ -18,8 +19,11 @@ const DEFAULT_SUMMARY =
  * Homepage panel for the iPhone 17 Pro or Cash draw — sits below the Signed Legacy Bundle hero.
  */
 export function HomeIphone17ProPanel({ block = {}, onEnter, editorMode = false, preview = false }) {
+  if (!IPHONE_17_PRO_COMPETITION_ACTIVE && !editorMode) return null
+
   const { competition: apiCompetition, loading } = usePublicCompetition(IPHONE_17_PRO_COMPETITION_SLUG)
   const competition = resolveIphone17ProPublicCompetition({ detail: apiCompetition })
+  if (!competition && !editorMode) return null
   const countdownPeriod = pickCountdownPeriod(apiCompetition ?? competition)
 
   if (block.visible === false && !editorMode) return null

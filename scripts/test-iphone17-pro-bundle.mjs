@@ -7,7 +7,9 @@ loadEnv({ path: resolve(process.cwd(), '.env') })
 
 process.env.SQLITE_PATH = process.env.SQLITE_PATH || 'db/iphone17-pro-bundle-test.sqlite'
 
-const { IPHONE_17_PRO_COMPETITION_SLUG } = await import('../shared/iphone17ProCompetition.mjs')
+const { IPHONE_17_PRO_COMPETITION_SLUG, IPHONE_17_PRO_COMPETITION_ACTIVE } = await import(
+  '../shared/iphone17ProCompetition.mjs'
+)
 const {
   ensureCompetitionCatalogSchema,
   getCompetitionBySlug,
@@ -25,7 +27,7 @@ await ensureCompetitionCatalogSchema()
 const slug = IPHONE_17_PRO_COMPETITION_SLUG
 const comp = await getCompetitionBySlug(slug)
 assert.ok(comp, 'iPhone competition exists')
-assert.equal(comp.status, 'published')
+assert.equal(comp.status, IPHONE_17_PRO_COMPETITION_ACTIVE ? 'published' : 'draft')
 assert.equal(comp.allowPaidEntry, true)
 assert.equal(comp.allowFreeOnline, true)
 assert.equal(comp.allowPostalEntry, true)
@@ -44,18 +46,26 @@ assert.equal(value10.totalPence, 270)
 assert.equal(value10.qty, 10)
 
 const checkout = await resolveCheckoutBundle(slug, 'single')
-assert.ok(checkout.ok, checkout.error || 'checkout bundle failed')
-assert.equal(checkout.bundle.totalPence, 29)
-assert.equal(checkout.competition, slug)
+if (IPHONE_17_PRO_COMPETITION_ACTIVE) {
+  assert.ok(checkout.ok, checkout.error || 'checkout bundle failed')
+  assert.equal(checkout.bundle.totalPence, 29)
+  assert.equal(checkout.competition, slug)
+} else {
+  assert.equal(checkout.ok, false, 'inactive iPhone draw cannot checkout')
+}
 
 const legacySingle = await resolveCheckoutBundle(slug, 'medium10')
 assert.equal(legacySingle.ok, false, 'legacy bundle ids must not work on iPhone draw')
 
 const detail = await getPublicCompetitionDetail(slug)
-assert.ok(detail)
-assert.ok(detail.bundles.length >= 5)
-assert.equal(detail.bundles[0].totalPence, 29)
-assert.equal(detail.skillQuestions.length, 3)
+if (IPHONE_17_PRO_COMPETITION_ACTIVE) {
+  assert.ok(detail)
+  assert.ok(detail.bundles.length >= 5)
+  assert.equal(detail.bundles[0].totalPence, 29)
+  assert.equal(detail.skillQuestions.length, 3)
+} else {
+  assert.equal(detail, null, 'inactive iPhone draw is not public')
+}
 
 const skillRows = await listCompetitionSkillQuestions(slug, { includeAnswers: true })
 assert.equal(skillRows.length, 3)

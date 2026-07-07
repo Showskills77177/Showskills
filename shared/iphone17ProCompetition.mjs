@@ -5,6 +5,13 @@ export const IPHONE_17_PRO_COMPETITION_SLUG = 'iphone_17_pro'
 
 export const IPHONE_17_PRO_COMPETITION_LABEL = 'iPhone 17 Pro or Cash'
 
+/** Flip to true when the iPhone draw should be live on site and in checkout. */
+export const IPHONE_17_PRO_COMPETITION_ACTIVE = false
+
+export function iphone17ProCompetitionCatalogStatus() {
+  return IPHONE_17_PRO_COMPETITION_ACTIVE ? 'published' : 'draft'
+}
+
 /** UK Apple retail — iPhone 17 Pro 256GB from £1,099 (Apple UK, 2026). */
 export const IPHONE_17_PRO_RETAIL_PENCE = 109900
 

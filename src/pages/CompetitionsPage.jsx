@@ -91,7 +91,7 @@ export default function CompetitionsPage({
     const extras = competitions.filter(
       (c) => c.slug !== DRAW_COMPETITION_SLUG && c.slug !== IPHONE_17_PRO_COMPETITION_SLUG,
     )
-    return [legacy, iphone, ...extras]
+    return [...(legacy ? [legacy] : []), ...(iphone ? [iphone] : []), ...extras]
   }, [competitions])
   const loading = layoutLoading || loadingCompetitions || loadingGiveaways
 

@@ -28,7 +28,7 @@ import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
-import { IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
+import { IPHONE_17_PRO_COMPETITION_ACTIVE, IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
   HOMEPAGE_BLOCK_IDS,
@@ -317,7 +317,8 @@ export function HomePageContent({
 
   const hubVisible = isHomeBlockVisible(hubBlock)
   const winnersVisible = isHomeBlockVisible(winnersBlock)
-  const iphonePanelVisible = iphonePanelBlock?.visible !== false
+  const iphonePanelVisible =
+    IPHONE_17_PRO_COMPETITION_ACTIVE && iphonePanelBlock?.visible !== false
   const wcBallPanelVisible = wcBallPanelBlock?.visible !== false
 
   const iphonePanel =
