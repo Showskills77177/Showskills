@@ -5,17 +5,8 @@
     "api/[[...slug]].js": {
       "maxDuration": 300,
       "includeFiles": "assets/fonts/**"
-    },
-    "api/eof-daily-cron.js": {
-      "includeFiles": "assets/fonts/**"
     }
   },
-  "crons": [
-    {
-      "path": "/api/eof-daily-cron",
-      "schedule": "0 9 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/index.html",
