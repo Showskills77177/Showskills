@@ -136,6 +136,12 @@ export function estimateEofRenderDurationSec(script) {
   return Math.ceil(Math.min(150, ttsSec + mixSec))
 }
 
+/** Voice-only regen: TTS + mix + remux with cached scene stills (no image fetch). */
+export function estimateEofVoiceoverRemuxDurationSec(script) {
+  const scenes = script?.scenes?.length || 5
+  return estimateEofRenderDurationSec(script) + Math.max(20, Math.ceil(scenes * 5))
+}
+
 /** Video assembly estimate (images + ffmpeg clips + mux). */
 export function estimateEofVideoRenderDurationSec(sceneCount = 5) {
   const n = Math.max(1, sceneCount || 1)

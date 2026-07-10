@@ -20,6 +20,7 @@ import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
   saveEofMixedAudioArtifact,
   clearEofVideoArtifact,
+  clearEofVideoOnlyArtifact,
   clearEofMixedAudioArtifact,
 } from './eofProductionArtifacts.mjs'
 
@@ -43,8 +44,10 @@ export async function readEofMixedAudioInline(jobId) {
 /**
  * Generate per-scene TTS and mix with catalog music bed.
  * @param {string} jobId
+ * @param {{ preserveSceneImages?: boolean }} [opts]
  */
-export async function renderEofProductionAudio(jobId) {
+export async function renderEofProductionAudio(jobId, opts = {}) {
+  const preserveSceneImages = opts.preserveSceneImages === true
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
@@ -148,7 +151,11 @@ export async function renderEofProductionAudio(jobId) {
     await updateEofProductionRenderProgress(jobId, null)
 
     // Durable copy for Vercel: next request may land on a cold instance without /tmp files.
-    await clearEofVideoArtifact(jobId).catch(() => {})
+    if (preserveSceneImages) {
+      await clearEofVideoOnlyArtifact(jobId).catch(() => {})
+    } else {
+      await clearEofVideoArtifact(jobId).catch(() => {})
+    }
     await clearEofMixedAudioArtifact(jobId).catch(() => {})
     await saveEofMixedAudioArtifact(jobId, mixedPath)
 

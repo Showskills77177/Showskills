@@ -143,7 +143,16 @@ export async function ensureEofSceneImageOnDisk(jobId, sceneNumber) {
   return existsSync(abs) ? abs : null
 }
 
-/** Optional: clear blobs when re-rendering (frees DB space). */
+/** Clear stored MP4 only — keeps scene stills for voice-only remux. */
+export async function clearEofVideoOnlyArtifact(jobId) {
+  await ensureEofProductionSchema()
+  await query(
+    `UPDATE eof_production_jobs SET video_base64 = NULL, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE id = $1`,
+    [jobId],
+  )
+}
+
+/** Clear video + scene stills (full Short rebuild). */
 export async function clearEofVideoArtifact(jobId) {
   await ensureEofProductionSchema()
   await query(

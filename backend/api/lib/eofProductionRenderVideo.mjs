@@ -16,7 +16,7 @@ import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
-import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact, saveEofSceneImagesArtifact } from './eofProductionArtifacts.mjs'
+import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact, saveEofSceneImagesArtifact, ensureEofSceneImageOnDisk } from './eofProductionArtifacts.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 
@@ -24,10 +24,11 @@ const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
  * Build 9:16 Short MP4 from script scenes: stock images + on-screen captions.
  * Audio is optional (legacy path). Image-only Shorts are the default.
  * @param {string} jobId
- * @param {{ includeAudioIfPresent?: boolean }} [opts]
+ * @param {{ includeAudioIfPresent?: boolean, reuseSceneImages?: boolean }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
   const includeAudioIfPresent = opts.includeAudioIfPresent === true
+  const reuseSceneImages = opts.reuseSceneImages === true
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
@@ -73,8 +74,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   }
 
   try {
-    await report('images', 0, { force: true })
-    clearEofSceneImageCache(workDir)
+    await report(reuseSceneImages ? 'video' : 'images', 0, { force: true })
+    if (!reuseSceneImages) {
+      clearEofSceneImageCache(workDir)
+    }
 
     const rows = scriptScenes.map((s, i) => {
       const caption = String(s.caption || s.narration || '').trim()
@@ -89,20 +92,36 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     let imagesDone = 0
     const scenesForVideo = await mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
       const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
-      const imageMeta = await fetchEofSceneImage({
-        topic: job.topic,
-        imageQuery: row.imageQuery,
-        outPath: imagePath,
-        index: row.index,
-        refresh: true,
-      })
+      let imageMeta
+      let resolvedImagePath = imagePath
+      if (reuseSceneImages) {
+        const restored = await ensureEofSceneImageOnDisk(jobId, row.index + 1)
+        if (!restored || !existsSync(restored)) {
+          throw new Error(
+            `Scene ${row.index + 1} image is missing. Run Build Short once before regenerating voiceover only.`,
+          )
+        }
+        resolvedImagePath = restored
+        imageMeta = {
+          source: 'cache',
+          imageQuery: row.imageQuery,
+        }
+      } else {
+        imageMeta = await fetchEofSceneImage({
+          topic: job.topic,
+          imageQuery: row.imageQuery,
+          outPath: imagePath,
+          index: row.index,
+          refresh: true,
+        })
+      }
       imagesDone += 1
-      await report('images', imagesDone)
+      await report(reuseSceneImages ? 'video' : 'images', imagesDone)
       return {
         index: row.index,
         durationSec: row.durationSec,
         caption: row.caption,
-        imagePath,
+        imagePath: resolvedImagePath,
         imageSource: imageMeta.source,
         imageQueryUsed: imageMeta.imageQuery || row.imageQuery,
       }

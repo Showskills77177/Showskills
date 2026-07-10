@@ -10,7 +10,7 @@ import {
   deleteEofProductionJob,
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
-import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground } from '../lib/eofProductionRenderRunner.mjs'
+import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground, startEofProductionVoiceoverRegenerationBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
@@ -112,6 +112,33 @@ export default async function handler(req, res) {
           return json(res, 202, { ok: true, accepted: true, job })
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Build failed' })
+        }
+      }
+
+      if (action === 'regenerate-voiceover' || action === 'render-audio') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          return json(res, 202, { ok: true, accepted: true, job: existing })
+        }
+
+        try {
+          if (body.voicePreset !== undefined || body.voiceSettings !== undefined) {
+            await updateEofProductionJob(jobId, {
+              voicePreset: typeof body.voicePreset === 'string' ? body.voicePreset.trim() : undefined,
+              voiceSettings:
+                body.voiceSettings !== undefined
+                  ? normalizeElevenLabsVoiceSettings(body.voiceSettings)
+                  : undefined,
+            })
+          }
+          await startEofProductionVoiceoverRegenerationBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : 'Voiceover regeneration failed' })
         }
       }
 

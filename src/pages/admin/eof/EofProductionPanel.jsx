@@ -4,6 +4,7 @@ import {
   productionJobStatusLabel,
   estimateEofVideoRenderDurationSec,
   estimateEofRenderDurationSec,
+  estimateEofVoiceoverRemuxDurationSec,
   refreshEofRenderProgress,
   buildFallbackRenderProgress,
   EOF_DEFAULT_VOICE_PRESET,
@@ -457,7 +458,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     }
   }
 
-  async function waitForVideoComplete(jobId) {
+  async function waitForJobComplete(jobId, acceptableStatuses = ['video_rendered']) {
     const deadline = Date.now() + 12 * 60 * 1000
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -466,10 +467,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (!job) throw new Error('Job disappeared during build.')
       upsertJob(job)
       if (job.renderProgress) setRenderProgress(job.renderProgress)
-      if (job.status === 'video_rendered') return job
+      if (acceptableStatuses.includes(job.status)) return job
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Build failed')
     }
-    throw new Error('Build timed out — click Reset & retry, then Build Short again.')
+    throw new Error('Build timed out — click Reset & retry, then try again.')
+  }
+
+  async function waitForVideoComplete(jobId) {
+    return waitForJobComplete(jobId, ['video_rendered'])
   }
 
   async function buildShort() {
@@ -531,6 +536,82 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setTimeout(() => {
         resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
+  async function regenerateVoiceover() {
+    if (!selectedId || !draftScript) return
+    setBusy(true)
+    setErr('')
+    setSuccess('Regenerating voiceover with your Brian settings — reusing scene photos…')
+    setRenderPhase('rendering')
+    setVideoPreviewUrl('')
+
+    try {
+      const saved = await saveJob({ silent: true })
+      if (!saved) {
+        setErr((prev) => prev || 'Could not save voice settings — fix errors and try again.')
+        return
+      }
+
+      const estSec = estimateEofVoiceoverRemuxDurationSec(draftScript)
+      setRenderProgress({
+        percent: 3,
+        message: 'Regenerating voiceover…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'tts',
+        pipeline: 'audio',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'regenerate-voiceover',
+          jobId: selectedId,
+          voicePreset,
+          voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Voiceover regeneration failed (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForJobComplete(selectedId, ['video_rendered', 'rendered'])
+      if (finishedJob.status !== 'video_rendered' && finishedJob.status !== 'rendered') {
+        throw new Error(finishedJob.errorMessage || 'Voiceover regeneration did not finish')
+      }
+
+      if (finishedJob.status === 'video_rendered') {
+        await loadVideoPreview()
+      }
+      setRenderProgress({ percent: 100, message: 'Voiceover updated', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess(
+        finishedJob.status === 'video_rendered'
+          ? 'Voiceover regenerated — same photos, new Brian mix, Short remuxed.'
+          : 'Voiceover regenerated — run Build Short once to create the video.',
+      )
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
       setRenderPhase('failed')
       setRenderProgress(null)
@@ -1050,6 +1131,25 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     )
                   })}
                 </div>
+              </div>
+            ) : null}
+
+            {(selected.status === 'video_rendered' ||
+              selected.status === 'rendered' ||
+              selected.mixedAudioPath) &&
+            draftScript?.scenes?.length ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-[#303030] bg-[#0d0d0d] p-4">
+                <button
+                  type="button"
+                  disabled={busy || isRendering}
+                  onClick={regenerateVoiceover}
+                  className="rounded-full border border-[#3ea6ff]/50 px-4 py-2 text-xs font-semibold text-[#9ecbff] disabled:opacity-50"
+                >
+                  {busy || isRendering ? 'Regenerating…' : 'Regenerate voiceover only'}
+                </button>
+                <p className="text-[10px] text-[#717171]">
+                  Re-runs narration with your current voice settings and remuxes the Short — keeps existing scene photos (no image re-fetch).
+                </p>
               </div>
             ) : null}
 
