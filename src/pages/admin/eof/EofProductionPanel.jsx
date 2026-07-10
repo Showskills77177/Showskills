@@ -1317,7 +1317,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 placeholder='Click “Generate script” — vague topics like “world cup news” become a specific match story first.'
               />
               <p className={`mt-2 text-[11px] ${EOF.muted}`}>
-                Tip: “world cup news” is too vague alone — Generate script picks a concrete European World Cup angle (teams + stakes). Or type e.g. “Spain beat Belgium World Cup”.
+                Tip: “world cup news” is too vague alone — Generate script picks a concrete World Cup angle (teams + stakes). Or type e.g. “Spain beat Belgium World Cup”.
               </p>
             </div>
 

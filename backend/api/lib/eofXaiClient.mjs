@@ -1,6 +1,9 @@
 /**
  * xAI Grok helpers for EOF production (scripts, news topics, Studio meta).
  * Prefers Grok 4.5 via Responses API, with Chat Completions fallback.
+ *
+ * Important: grok-4.5 defaults to reasoning_effort "high" (very slow).
+ * EOF Shorts use "low" so Create / Generate script stay interactive.
  */
 function envKey(...names) {
   for (const name of names) {
@@ -18,12 +21,25 @@ export function isXaiConfigured() {
   return Boolean(getXaiApiKey())
 }
 
-/** Preferred model order — Grok 4.5 first. */
+/** Preferred model order — Grok 4.5 first, then older chat-capable models. */
 export function xaiModelCandidates() {
   const configured = envKey('XAI_MODEL', 'EOF_XAI_MODEL')
   return [configured || 'grok-4.5', 'grok-4.5-latest', 'grok-4', 'grok-3-latest', 'grok-2-latest'].filter(
     (m, i, arr) => m && arr.indexOf(m) === i,
   )
+}
+
+function resolveReasoningEffort(effort) {
+  const v = String(effort || envKey('XAI_REASONING_EFFORT', 'EOF_XAI_REASONING_EFFORT') || 'low')
+    .trim()
+    .toLowerCase()
+  if (v === 'medium' || v === 'high') return v
+  return 'low'
+}
+
+function requestTimeoutMs() {
+  const n = Number(envKey('XAI_TIMEOUT_MS', 'EOF_XAI_TIMEOUT_MS') || 55000)
+  return Number.isFinite(n) && n >= 8000 ? Math.min(n, 120000) : 55000
 }
 
 function parseJsonContent(content) {
@@ -49,34 +65,63 @@ function extractResponsesText(data) {
   return typeof choice === 'string' ? choice : ''
 }
 
+function isFatalXaiStatus(status) {
+  return status === 401 || status === 403 || status === 402
+}
+
+function modelNeedsReasoning(model) {
+  return /grok-4\.5|grok-4-5|grok-build/i.test(String(model || ''))
+}
+
+async function fetchWithTimeout(url, init, timeoutMs) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /**
  * Call Grok and return raw text (not JSON).
- * @param {{ system: string, user: string, temperature?: number }} opts
+ * @param {{ system: string, user: string, temperature?: number, reasoningEffort?: string }} opts
  */
-export async function xaiTextCompletion({ system, user, temperature = 0.4 }) {
+export async function xaiTextCompletion({ system, user, temperature = 0.4, reasoningEffort } = {}) {
   const key = getXaiApiKey()
   if (!key) throw new Error('XAI_API_KEY is not set')
 
   const models = xaiModelCandidates()
+  const effort = resolveReasoningEffort(reasoningEffort)
+  const timeoutMs = requestTimeoutMs()
   let lastError = null
 
   for (const model of models) {
     try {
-      const res = await fetch('https://api.x.ai/v1/responses', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
+      const responsesBody = {
+        model,
+        temperature,
+        input: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }
+      if (modelNeedsReasoning(model)) {
+        responsesBody.reasoning = { effort }
+      }
+
+      const res = await fetchWithTimeout(
+        'https://api.x.ai/v1/responses',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(responsesBody),
         },
-        body: JSON.stringify({
-          model,
-          temperature,
-          input: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        }),
-      })
+        timeoutMs,
+      )
 
       if (res.ok) {
         const data = await res.json()
@@ -85,23 +130,41 @@ export async function xaiTextCompletion({ system, user, temperature = 0.4 }) {
         return text.trim()
       }
 
+      if (isFatalXaiStatus(res.status)) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`xAI ${res.status}: ${errText.slice(0, 240)}`)
+      }
+
       if (res.status === 404 || res.status === 400 || res.status === 422) {
-        const chat = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${key}`,
-            'Content-Type': 'application/json',
+        const chatBody = {
+          model,
+          temperature,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        }
+        if (modelNeedsReasoning(model)) {
+          chatBody.reasoning_effort = effort
+        }
+
+        const chat = await fetchWithTimeout(
+          'https://api.x.ai/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${key}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chatBody),
           },
-          body: JSON.stringify({
-            model,
-            temperature,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: user },
-            ],
-          }),
-        })
+          timeoutMs,
+        )
         if (!chat.ok) {
+          if (isFatalXaiStatus(chat.status)) {
+            const errText = await chat.text().catch(() => '')
+            throw new Error(`xAI ${chat.status}: ${errText.slice(0, 240)}`)
+          }
           const errText = await chat.text().catch(() => '')
           throw new Error(`xAI ${chat.status}: ${errText.slice(0, 240)}`)
         }
@@ -115,7 +178,9 @@ export async function xaiTextCompletion({ system, user, temperature = 0.4 }) {
       throw new Error(`xAI ${res.status}: ${errText.slice(0, 240)}`)
     } catch (e) {
       lastError = e
-      console.warn('[eof-xai] text model failed', model, e instanceof Error ? e.message : e)
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[eof-xai] text model failed', model, msg)
+      if (/xAI (401|402|403):/.test(msg)) break
     }
   }
 
@@ -124,33 +189,43 @@ export async function xaiTextCompletion({ system, user, temperature = 0.4 }) {
 
 /**
  * Call Grok and return parsed JSON.
- * @param {{ system: string, user: string, temperature?: number }} opts
+ * @param {{ system: string, user: string, temperature?: number, reasoningEffort?: string }} opts
  */
-export async function xaiJsonCompletion({ system, user, temperature = 0.45 }) {
+export async function xaiJsonCompletion({ system, user, temperature = 0.45, reasoningEffort } = {}) {
   const key = getXaiApiKey()
   if (!key) throw new Error('XAI_API_KEY is not set')
 
   const models = xaiModelCandidates()
+  const effort = resolveReasoningEffort(reasoningEffort)
+  const timeoutMs = requestTimeoutMs()
   let lastError = null
 
   for (const model of models) {
     try {
-      // Prefer Responses API (Grok 4.5)
-      const res = await fetch('https://api.x.ai/v1/responses', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
+      const responsesBody = {
+        model,
+        temperature,
+        input: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }
+      if (modelNeedsReasoning(model)) {
+        responsesBody.reasoning = { effort }
+      }
+
+      const res = await fetchWithTimeout(
+        'https://api.x.ai/v1/responses',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(responsesBody),
         },
-        body: JSON.stringify({
-          model,
-          temperature,
-          input: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        }),
-      })
+        timeoutMs,
+      )
 
       if (res.ok) {
         const data = await res.json()
@@ -159,24 +234,37 @@ export async function xaiJsonCompletion({ system, user, temperature = 0.45 }) {
         return parseJsonContent(text)
       }
 
-      // Fallback: Chat Completions (older models / accounts)
+      if (isFatalXaiStatus(res.status)) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`xAI ${res.status}: ${errText.slice(0, 240)}`)
+      }
+
       if (res.status === 404 || res.status === 400 || res.status === 422) {
-        const chat = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${key}`,
-            'Content-Type': 'application/json',
+        const chatBody = {
+          model,
+          temperature,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        }
+        if (modelNeedsReasoning(model)) {
+          chatBody.reasoning_effort = effort
+        }
+
+        const chat = await fetchWithTimeout(
+          'https://api.x.ai/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${key}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chatBody),
           },
-          body: JSON.stringify({
-            model,
-            temperature,
-            response_format: { type: 'json_object' },
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: user },
-            ],
-          }),
-        })
+          timeoutMs,
+        )
         if (!chat.ok) {
           const errText = await chat.text().catch(() => '')
           throw new Error(`xAI ${chat.status}: ${errText.slice(0, 240)}`)
@@ -191,7 +279,9 @@ export async function xaiJsonCompletion({ system, user, temperature = 0.45 }) {
       throw new Error(`xAI ${res.status}: ${errText.slice(0, 240)}`)
     } catch (e) {
       lastError = e
-      console.warn('[eof-xai] model failed', model, e instanceof Error ? e.message : e)
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[eof-xai] model failed', model, msg)
+      if (/xAI (401|402|403):/.test(msg)) break
     }
   }
 

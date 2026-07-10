@@ -156,6 +156,16 @@ function isWeakDraft(text, topic) {
  * Vague topics like "world cup news" are resolved into a concrete headline first.
  * @param {{ topic: string, format?: string, context?: string }} input
  */
+function withBudget(promise, ms, label) {
+  let timer
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    }),
+  ])
+}
+
 export async function writeEofPlainTextDraft({ topic, format, context }) {
   const rawTopic = String(topic || '').trim()
   if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
@@ -166,7 +176,12 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
   let resolvedTopic = null
 
   try {
-    const brief = await resolveEofScriptBrief({ topic: rawTopic, format: fmt })
+    // Keep topic resolve short — never block Create job on a slow Grok call
+    const brief = await withBudget(
+      resolveEofScriptBrief({ topic: rawTopic, format: fmt }),
+      25000,
+      'topic resolve',
+    )
     if (brief?.resolved && brief.topic) {
       t = brief.topic
       resolvedTopic = brief.topic
@@ -184,7 +199,7 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
 
   for (const run of attempts) {
     try {
-      const ai = await run()
+      const ai = await withBudget(run(), 70000, 'draft provider')
       if (ai?.plainTextDraft && !isWeakDraft(ai.plainTextDraft, t)) {
         return {
           ...ai,
@@ -224,7 +239,7 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format 
 
   for (const run of attempts) {
     try {
-      const ai = await run()
+      const ai = await withBudget(run(), 70000, 'adapt provider')
       if (ai?.script?.scenes?.length >= 3) {
         ai.script.plainTextDraft = draft
         return ai
