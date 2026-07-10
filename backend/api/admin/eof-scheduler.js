@@ -5,8 +5,6 @@ import {
   getEofSchedulerSettings,
   updateEofSchedulerSettings,
 } from '../lib/eofSchedulerSettings.mjs'
-import { runEofDailyShortPipeline } from '../lib/eofDailyScheduler.mjs'
-import { pickEofEuropeanFootballNewsTopics } from '../lib/eofNewsTopics.mjs'
 import { EOF_SCRIPT_FORMATS } from '../../../shared/eofScriptTemplates.mjs'
 import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
 
@@ -15,8 +13,16 @@ function authorizeCron(req) {
   const auth = String(req.headers?.authorization || '')
   const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
   if (cronSecret && bearer && bearer === cronSecret) return true
-  if (req.headers?.['x-vercel-cron'] === '1') return true
+  // Vercel Cron sends this header on scheduled invocations
+  if (String(req.headers?.['x-vercel-cron'] || '') === '1') return true
+  const ua = String(req.headers?.['user-agent'] || '')
+  if (/vercel-cron/i.test(ua)) return true
   return false
+}
+
+async function runPipeline(opts) {
+  const { runEofDailyShortPipeline } = await import('../lib/eofDailyScheduler.mjs')
+  return runEofDailyShortPipeline(opts)
 }
 
 /** GET settings · POST update / run-now / news-topics · Cron GET/POST run */
@@ -40,7 +46,7 @@ export default async function handler(req, res) {
         try {
           const { waitUntil } = await import('@vercel/functions')
           waitUntil(
-            runEofDailyShortPipeline({ force: false, createdBy: 'vercel-cron' }).catch((e) =>
+            runPipeline({ force: false, createdBy: 'vercel-cron' }).catch((e) =>
               console.error('[eof-scheduler] cron failed', e),
             ),
           )
@@ -49,7 +55,7 @@ export default async function handler(req, res) {
           /* fall through */
         }
       }
-      const result = await runEofDailyShortPipeline({ force: false, createdBy: 'vercel-cron' })
+      const result = await runPipeline({ force: false, createdBy: 'vercel-cron' })
       return json(res, 200, { ok: true, ...result })
     }
 
@@ -82,7 +88,7 @@ export default async function handler(req, res) {
         }
         const session = await requireEofSession(req)
         const info = eofSessionInfo(session)
-        const result = await runEofDailyShortPipeline({
+        const result = await runPipeline({
           force: true,
           createdBy: info.username || 'eof-owner',
         })
@@ -96,6 +102,7 @@ export default async function handler(req, res) {
       }
 
       if (action === 'news-topics') {
+        const { pickEofEuropeanFootballNewsTopics } = await import('../lib/eofNewsTopics.mjs')
         const topics = await pickEofEuropeanFootballNewsTopics({ count: Number(body.count) || 5 })
         return json(res, 200, { ok: true, ...topics })
       }
