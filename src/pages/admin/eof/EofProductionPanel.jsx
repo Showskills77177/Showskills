@@ -754,7 +754,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         hydratedJobIdRef.current = selectedId
         hydrateDraftFromJob(j.job)
       }
-      setSuccess('New plain-text draft ready. Edit if needed, then Adapt to scenes.')
+      setSuccess(
+        j.scriptProviderLabel
+          ? `Script generated with ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}. Edit, then Adapt to scenes.`
+          : 'Script generated. Edit if needed, then Adapt to scenes.',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -1113,7 +1117,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             disabled={busy || loading}
             className={`rounded-full px-5 py-2 text-sm ${EOF.btnPrimary} disabled:opacity-50`}
           >
-            Create draft
+            Create job
           </button>
         </form>
         {!loading && voicePreset === 'brian' && !elevenLabsConfigured ? (
@@ -1259,7 +1263,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   onClick={regenerateDraft}
                   className="rounded-full border border-[#3ea6ff]/40 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
                 >
-                  Rewrite draft
+                  Generate script
                 </button>
                 <button
                   type="button"
@@ -1286,9 +1290,20 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ecbff]">
                   1 · Plain-text script (news desk / voiceover)
                 </p>
-                <span className={`text-[10px] ${EOF.muted}`}>
-                  {String(draftScript.plainTextDraft || '').trim().split(/\s+/).filter(Boolean).length} words
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`text-[10px] ${EOF.muted}`}>
+                    {String(draftScript.plainTextDraft || '').trim().split(/\s+/).filter(Boolean).length}{' '}
+                    words
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy || isRendering}
+                    onClick={regenerateDraft}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
+                  >
+                    {busy ? 'Generating…' : 'Generate script'}
+                  </button>
+                </div>
               </div>
               <textarea
                 value={draftScript.plainTextDraft || ''}
@@ -1299,10 +1314,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 }}
                 rows={8}
                 className={`${inputCls} mt-2 font-serif text-[15px] leading-relaxed text-[#f1f1f1]`}
-                placeholder="Grok writes a continuous Sky Sports-style narration here first. Edit freely, then Adapt to scenes."
+                placeholder='Click “Generate script” — vague topics like “world cup news” become a specific match story first.'
               />
               <p className={`mt-2 text-[11px] ${EOF.muted}`}>
-                This is the real script — full sentences, common sense, teams and stakes. Scenes are a compressed version for the Short.
+                Tip: “world cup news” is too vague alone — Generate script picks a concrete European World Cup angle (teams + stakes). Or type e.g. “Spain beat Belgium World Cup”.
               </p>
             </div>
 

@@ -20,6 +20,7 @@ import {
   EOF_MAX_SCENES,
 } from '../../../shared/eofScriptTemplates.mjs'
 import { isXaiConfigured, xaiJsonCompletion, xaiTextCompletion } from './eofXaiClient.mjs'
+import { resolveEofScriptBrief } from './eofNewsTopics.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -117,23 +118,64 @@ export function buildEofDraftShell({ topic, format, plainTextDraft, title, sourc
 
 function templatePlainTextDraft(topic, format) {
   const name = String(topic || '').trim() || 'This story'
-  if (format === 'news') {
-    return `${name}. Here's what we know so far from the European football desk — the result or move that matters, why clubs and fans care, and what comes next. Was this the statement moment, or just another chapter? Drop your take.`
+  if (format === 'news' || /\bworld cup\b/i.test(name)) {
+    // Concrete fallback — never the old "what we know so far" fluff
+    if (/spain/i.test(name) && /belgium/i.test(name)) {
+      return `Spain just sent a World Cup message — they beat Belgium with control, not chaos. For Belgium, another tournament night ends with the same question: talent without a ruthless edge. Spain now look like a side that can manage big games, not just dominate possession. Are Spain genuine contenders from here, or was this one good night? Comment.`
+    }
+    if (/england/i.test(name)) {
+      return `England are living on the edge again at the World Cup — the talent is obvious, the calm under pressure is not. One soft moment and the whole nation debate restarts: system, selections, and nerve. Tournament football does not care about friendly form. Can England close a big game the ugly way when it matters? Drop your take.`
+    }
+    return `${name}. On the World Cup stage, European sides are judged in ninety minutes — not highlight reels. The team that manages the big moments looks like a contender; the one that freezes becomes a debate. Who actually looks ready for the deep run — and who is bluffing? Comment below.`
   }
   return `${name} still divides football fans for a reason. The early club years built the foundation, the big-stage move raised the stakes, and the rivalry nights made the legend stick. Which era was the real peak? Comment below.`
 }
 
+const DRAFT_FLUFF_RE =
+  /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss/i
+
+function isWeakDraft(text, topic) {
+  const t = String(text || '').trim()
+  if (t.length < 120) return true
+  if (DRAFT_FLUFF_RE.test(t)) return true
+  // Must mention at least one capitalised proper-looking token beyond filler
+  const proper = (t.match(/\b[A-Z][a-z]{2,}\b/g) || []).filter(
+    (w) => !/^(The|This|That|Then|When|What|With|From|After|Before|For|And|But|Are|Was|Were|Who|How|Why|Not|One|Another)$/.test(w),
+  )
+  if (proper.length < 2) return true
+  // If topic names teams, draft should not ignore football specificity entirely
+  if (/\b(world cup|ucl|premier|liga|serie|bundesliga)\b/i.test(topic) && !/\b(world cup|fifa|spain|england|france|germany|brazil|argentina|portugal|belgium|netherlands|italy|croatia|match|group|knockout|final|tournament)\b/i.test(t)) {
+    return true
+  }
+  return false
+}
+
 /**
  * Step 1 — continuous plain-text narration (editable in the UI).
+ * Vague topics like "world cup news" are resolved into a concrete headline first.
  * @param {{ topic: string, format?: string, context?: string }} input
  */
 export async function writeEofPlainTextDraft({ topic, format, context }) {
-  const t = String(topic || '').trim()
-  if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
+  const rawTopic = String(topic || '').trim()
+  if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
   const fmt = resolveFormat(format)
-  const status = eofScriptProviderStatus()
-  const ctx = String(context || '').trim()
 
+  let t = rawTopic
+  let ctx = String(context || '').trim()
+  let resolvedTopic = null
+
+  try {
+    const brief = await resolveEofScriptBrief({ topic: rawTopic, format: fmt })
+    if (brief?.resolved && brief.topic) {
+      t = brief.topic
+      resolvedTopic = brief.topic
+      ctx = [ctx, brief.context].filter(Boolean).join('\n')
+    }
+  } catch (e) {
+    console.warn('[eof-script] topic resolve skipped', e instanceof Error ? e.message : e)
+  }
+
+  const status = eofScriptProviderStatus()
   const attempts = []
   if (status.xai) attempts.push(() => writeDraftWithXai({ topic: t, format: fmt, context: ctx }))
   if (status.openai) attempts.push(() => writeDraftWithOpenAi({ topic: t, format: fmt, context: ctx }))
@@ -142,7 +184,14 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
   for (const run of attempts) {
     try {
       const ai = await run()
-      if (ai?.plainTextDraft?.length >= 40) return ai
+      if (ai?.plainTextDraft && !isWeakDraft(ai.plainTextDraft, t)) {
+        return {
+          ...ai,
+          title: ai.title || t.slice(0, 90),
+          resolvedTopic,
+        }
+      }
+      console.warn('[eof-script] draft rejected as weak/fluff', ai?.source)
     } catch (e) {
       console.warn('[eof-script] draft provider failed', e instanceof Error ? e.message : e)
     }
@@ -152,6 +201,7 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
     plainTextDraft: templatePlainTextDraft(t, fmt),
     title: t.slice(0, 90),
     source: 'template',
+    resolvedTopic,
   }
 }
 
@@ -195,20 +245,21 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format 
  */
 export async function writeEofProductionScript({ topic, format, context }) {
   const draftResult = await writeEofPlainTextDraft({ topic, format, context })
+  const resolvedTopic = draftResult.resolvedTopic || topic
   const adapted = await adaptEofPlainTextToScenes({
     plainTextDraft: draftResult.plainTextDraft,
-    topic,
+    topic: resolvedTopic,
     format,
   })
   if (adapted?.script) {
     adapted.script.plainTextDraft = draftResult.plainTextDraft
+    adapted.script.topic = resolvedTopic
     if (!adapted.script.title && draftResult.title) adapted.script.title = draftResult.title
-    // Prefer draft provider label when adapt fell back to template
     if (adapted.source === 'template' && draftResult.source && draftResult.source !== 'template') {
       adapted.source = draftResult.source
     }
   }
-  return adapted
+  return { ...adapted, resolvedTopic }
 }
 
 function buildDraftPrompt({ topic, format, context }) {
@@ -219,19 +270,20 @@ ${EOF_EUROPEAN_FOOTBALL_SCOPE}
 
 Write ONE continuous voiceover script as plain prose — NOT JSON, NOT bullet points, NOT scene labels, NOT hashtags.
 
-Rules:
-- 90–160 words. Spoken aloud in ~35–50 seconds.
-- Sound like Sky Sports / BBC Sport / ESPN FC / ITV Sport: clear, specific, common-sense.
-- For NEWS: lead with who beat whom (or the transfer/injury/manager move), the competition, and why it matters. Then stakes and what happens next.
-- Use real European clubs, leagues, and competitions when the topic implies them (e.g. World Cup, UCL, Premier League).
-- Prefer known, defensible facts. If a score/date is uncertain, say "narrow win" / "statement result" rather than inventing exact numbers.
-- Ban empty filler: "rewrote elite", "global superstar energy", "unforgettable nights", "raw talent" with no club/era attached.
-- End with one sharp question viewers can answer in a comment.
+MANDATORY QUALITY BAR:
+- 110–170 words. Spoken aloud in ~40–55 seconds.
+- Sound like Sky Sports News / BBC Sport / ESPN FC at 10pm — specific, opinionated, common-sense.
+- FIRST SENTENCE must name the teams / player / club and the event (e.g. "Spain beat Belgium…", "Salah's contract…").
+- Include at least TWO concrete European football references (nations, clubs, competitions, managers, or roles).
+- For World Cup / news: lead with the result or decisive moment, then stakes, then what happens next.
+- Prefer known, defensible facts. If a score is uncertain, say "narrow win" / "statement result" — never invent fake 3-1 lines.
+- Ban these phrases forever: "here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss".
+- End with ONE sharp question for comments.
 - Format intent: ${format}. ${draftFormatGuide(format)}`
 
-  const user = `Topic: ${topic}
-${context ? `\nExtra context (use if helpful, do not contradict):\n${context}\n` : ''}
-Write the plain-text Short script only.`
+  const user = `Topic / headline: ${topic}
+${context ? `\nDesk brief (use these facts; do not ignore them):\n${context}\n` : ''}
+Write the plain-text Short script only. No preamble.`
 
   return { system, user }
 }

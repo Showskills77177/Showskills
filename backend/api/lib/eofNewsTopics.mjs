@@ -75,6 +75,24 @@ Never include American football / NFL.`,
 function fallbackNewsTopics() {
   return [
     {
+      headline: 'Spain edge Belgium — World Cup statement win',
+      angle: 'Spain look like contenders after a disciplined win over Belgium on the World Cup stage.',
+      desks: ['Sky Sports', 'ESPN FC'],
+      whyNow: 'World Cup knockout / group nights drive Shorts comments instantly.',
+    },
+    {
+      headline: 'England under pressure after another World Cup scare',
+      angle: 'Tournament nerves, late goals, and the same debate: style vs results.',
+      desks: ['ITV Sport', 'BBC Sport'],
+      whyNow: 'England World Cup nights always travel on Shorts.',
+    },
+    {
+      headline: 'France’s World Cup favourites tag is back under the microscope',
+      angle: 'Talent everywhere — but tournament football punishes soft moments.',
+      desks: ['L\'Équipe', 'ESPN FC'],
+      whyNow: 'Favourites narrative is perfect for debate CTAs.',
+    },
+    {
       headline: 'Premier League transfer window: who moves next?',
       angle: 'Desk-style look at the biggest European transfer storylines fans are arguing about.',
       desks: ['Sky Sports', 'The Athletic'],
@@ -86,25 +104,82 @@ function fallbackNewsTopics() {
       desks: ['ITV Sport', 'ESPN FC'],
       whyNow: 'European nights always travel on Shorts.',
     },
-    {
-      headline: 'Managerial hot seats across Europe’s top five leagues',
-      angle: 'Who is under pressure after the latest run of results.',
-      desks: ['Sky Sports', 'BBC Sport'],
-      whyNow: 'Manager news converts into debate CTAs.',
-    },
-    {
-      headline: 'Injury updates reshaping title races',
-      angle: 'Key absences and what they mean for the table.',
-      desks: ['ESPN FC', 'Goal.com'],
-      whyNow: 'Injury news is timely and visual.',
-    },
-    {
-      headline: 'La Liga / Serie A / Bundesliga storylines fans missed',
-      angle: 'Cross-league European football angles beyond the Premier League.',
-      desks: ['Marca', "L'Équipe"],
-      whyNow: 'Broadens Eyes Of Football beyond one league.',
-    },
   ]
+}
+
+/**
+ * Expand a vague topic ("world cup news") into one concrete European football brief.
+ * @param {{ topic: string, format?: string }} input
+ */
+export async function resolveEofScriptBrief({ topic, format } = {}) {
+  const raw = String(topic || '').trim()
+  if (raw.length < 2) throw new Error('Topic is required.')
+
+  const vague =
+    /^(world\s*cup|wc|football|soccer|euro|ucl|premier\s*league)?\s*(news|update|updates|headlines|today|latest)?$/i.test(
+      raw,
+    ) ||
+    /^(latest|today'?s?|breaking)\s+(world\s*cup|football|soccer)?\s*news$/i.test(raw) ||
+    raw.split(/\s+/).length <= 3 && /\b(news|update|latest|headlines)\b/i.test(raw)
+
+  if (!vague && raw.split(/\s+/).length >= 5) {
+    return { topic: raw, context: '', resolved: false, source: 'user' }
+  }
+
+  const wantsWorldCup = /\bworld\s*cup\b|\bwc26\b|\bwc\s*2026\b/i.test(raw)
+
+  if (isXaiConfigured()) {
+    try {
+      const parsed = await xaiJsonCompletion({
+        temperature: 0.3,
+        system: `You are a European football news editor for Eyes Of Football YouTube Shorts.
+
+${EOF_EUROPEAN_FOOTBALL_SCOPE}
+
+The user gave a VAGUE topic. Pick ONE specific, Short-worthy story they can narrate today.
+${wantsWorldCup ? 'Prefer a FIFA World Cup 2026 European national-team story (match result, group race, knockout stakes, star player moment).' : 'Prefer a timely European club or national-team story.'}
+Rules:
+- Name real teams / players / competitions when you are reasonably sure.
+- Do NOT invent exact scores you are unsure about — say "narrow win", "statement result", "late drama" instead.
+- Never American football / NFL.
+- Write like Sky Sports / ESPN FC / BBC Sport.`,
+        user: `Vague topic: "${raw}"
+Format hint: ${format || 'news'}
+
+Return JSON only:
+{
+  "headline": "specific YouTube-ready headline with teams/players (max 90 chars)",
+  "angle": "2-3 sentences of desk facts / stakes the narrator can use",
+  "whyNow": "why this is timely"
+}`,
+      })
+
+      const headline = String(parsed?.headline || '').trim()
+      const angle = String(parsed?.angle || '').trim()
+      const whyNow = String(parsed?.whyNow || '').trim()
+      if (headline.length >= 12) {
+        return {
+          topic: headline.slice(0, 100),
+          context: [angle, whyNow].filter(Boolean).join('\n'),
+          resolved: true,
+          source: 'xai',
+        }
+      }
+    } catch (e) {
+      console.warn('[eof-news] resolve brief failed', e instanceof Error ? e.message : e)
+    }
+  }
+
+  const pool = wantsWorldCup
+    ? fallbackNewsTopics().filter((t) => /world cup/i.test(t.headline))
+    : fallbackNewsTopics()
+  const pick = pool[0] || fallbackNewsTopics()[0]
+  return {
+    topic: pick.headline,
+    context: [pick.angle, pick.whyNow].filter(Boolean).join('\n'),
+    resolved: true,
+    source: 'template',
+  }
 }
 
 /** Pick a single topic string for the daily scheduler. */

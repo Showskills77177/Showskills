@@ -119,7 +119,7 @@ export async function createEofProductionJob({
   context = null,
 }) {
   await ensureEofProductionSchema()
-  const t = String(topic || '').trim()
+  let t = String(topic || '').trim()
   if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
 
   const track = await pickEofMusicTrackForTopic(t, musicTrackId)
@@ -137,13 +137,16 @@ export async function createEofProductionJob({
     script = written.script
     scriptSource = written.source || 'template'
     status = EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT
+    if (written.script?.topic) t = String(written.script.topic).trim() || t
   } else {
     const draft = await writeEofPlainTextDraft({ topic: t, format, context })
+    const resolvedTopic = draft.resolvedTopic || t
+    t = resolvedTopic
     script = buildEofDraftShell({
-      topic: t,
+      topic: resolvedTopic,
       format,
       plainTextDraft: draft.plainTextDraft,
-      title: draft.title,
+      title: draft.title || resolvedTopic,
       source: draft.source,
     })
     scriptSource = draft.source || 'template'
@@ -180,16 +183,18 @@ export async function regenerateEofProductionDraft(id, { format, context } = {})
   if (!job) throw new Error('Production job not found.')
   const fmt = format || job.script?.format || null
   const draft = await writeEofPlainTextDraft({ topic: job.topic, format: fmt, context })
+  const resolvedTopic = draft.resolvedTopic || job.topic
   const script = buildEofDraftShell({
-    topic: job.topic,
+    topic: resolvedTopic,
     format: fmt,
     plainTextDraft: draft.plainTextDraft,
-    title: draft.title || job.title,
+    title: draft.title || resolvedTopic,
     source: draft.source,
   })
   return updateEofProductionJob(id, {
     script,
     title: script.title,
+    topic: resolvedTopic,
     scriptSource: draft.source || 'template',
     status: EOF_PRODUCTION_JOB_STATUS.DRAFT,
     errorMessage: null,
