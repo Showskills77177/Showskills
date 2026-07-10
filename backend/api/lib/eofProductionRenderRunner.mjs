@@ -9,39 +9,20 @@ import {
 import {
   EOF_PRODUCTION_JOB_STATUS,
   buildEofRenderProgress,
-  estimateEofRenderDurationSec,
   estimateEofVideoRenderDurationSec,
 } from '../../../shared/eofProduction.mjs'
 
 /**
- * Narration + music, then images + Short MP4 — one server-side chain (Vercel waitUntil).
+ * Image Shorts only: fetch stills + assemble 9:16 MP4 with captions (no TTS/music).
  * @param {string} jobId
- * @param {{ rebuild?: boolean }} [opts]
  */
-export async function renderEofProductionFullBuild(jobId, { rebuild = false } = {}) {
+export async function renderEofProductionFullBuild(jobId) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
-
-  const needsAudio =
-    rebuild ||
-    !job.mixedAudioPath ||
-    ['draft', 'ready_script', 'failed'].includes(job.status)
+  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
   try {
-    if (needsAudio) {
-      await renderEofProductionAudio(jobId)
-    }
-
-    const afterAudio = await getEofProductionJob(jobId)
-    if (!afterAudio) throw new Error('Production job not found after audio render.')
-    if (afterAudio.status === 'failed') {
-      throw new Error(afterAudio.errorMessage || 'Audio render failed')
-    }
-    if (!afterAudio.mixedAudioPath && afterAudio.status !== 'rendered') {
-      throw new Error('Audio render did not produce mixed audio.')
-    }
-
-    return await renderEofProductionVideoJob(jobId)
+    return await renderEofProductionVideoJob(jobId, { includeAudioIfPresent: false })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Build failed'
     await markEofProductionJobFailed(jobId, message)
@@ -49,35 +30,34 @@ export async function renderEofProductionFullBuild(jobId, { rebuild = false } = 
   }
 }
 
-/** @param {string} jobId @param {{ rebuild?: boolean }} [opts] */
-export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
+/** @param {string} jobId */
+export async function startEofProductionFullBuildBackground(jobId) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
   const sceneCount = job.script?.scenes?.length || 5
   const startedAt = new Date().toISOString()
-  const estimatedTotalSec =
-    estimateEofRenderDurationSec(job.script) + estimateEofVideoRenderDurationSec(sceneCount)
+  const estimatedTotalSec = estimateEofVideoRenderDurationSec(sceneCount)
 
   await updateEofProductionJob(jobId, {
-    status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
     errorMessage: null,
   })
   await updateEofProductionRenderProgress(
     jobId,
     buildEofRenderProgress({
-      stage: 'tts',
+      stage: 'images',
       sceneIndex: 0,
       sceneCount,
       startedAt,
       estimatedTotalSec,
-      pipeline: 'audio',
+      pipeline: 'video',
     }),
   )
 
   const run = () =>
-    renderEofProductionFullBuild(jobId, opts).catch((e) => {
-      console.error('[eof-production] full build failed', jobId, e)
+    renderEofProductionFullBuild(jobId).catch((e) => {
+      console.error('[eof-production] image Short build failed', jobId, e)
     })
 
   if (process.env.VERCEL) {
@@ -94,7 +74,7 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
 }
 
 /**
- * Start audio render without blocking the HTTP response (Vercel waitUntil).
+ * Legacy audio path (kept for manual "audio only" if ever re-enabled).
  * @param {string} jobId
  */
 export async function startEofProductionRenderBackground(jobId) {
@@ -119,7 +99,7 @@ export async function startEofProductionRenderBackground(jobId) {
 /** @param {string} jobId */
 export async function startEofProductionVideoRenderBackground(jobId) {
   const run = () =>
-    renderEofProductionVideoJob(jobId).catch((e) => {
+    renderEofProductionVideoJob(jobId, { includeAudioIfPresent: false }).catch((e) => {
       console.error('[eof-production] background video render failed', jobId, e)
     })
 

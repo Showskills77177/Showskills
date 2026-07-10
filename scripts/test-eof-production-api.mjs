@@ -1,59 +1,41 @@
 #!/usr/bin/env node
-/** Smoke test EOF production + music catalog (no ffmpeg render). */
+/** Smoke test EOF image Short production (no full ffmpeg render). */
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { existsSync, rmSync, mkdirSync, statSync } from 'node:fs'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 process.env.SQLITE_PATH = 'db/eof-production-test.sqlite'
 process.env.ADMIN_USER = 'eof-prod-test'
 process.env.ADMIN_PASSWORD = 'eof-prod-test-pass-12'
 process.env.ADMIN_JWT_SECRET = 'eof-prod-test-jwt-secret-32chars!!'
 
-const failures = []
-
 async function main() {
   const { ensureEofProductionSchema } = await import('../backend/api/lib/ensureEofProductionSchema.mjs')
-  const { createEofMusicTrack, listEofMusicTracks, pickEofMusicTrackForTopic, ensureEofMusicCatalogSeeded } =
-    await import('../backend/api/lib/eofMusicTracks.mjs')
-  const { createEofProductionJob, getEofProductionJob, listEofProductionJobs, deleteEofProductionJob } = await import(
+  const { createEofProductionJob, getEofProductionJob, deleteEofProductionJob } = await import(
     '../backend/api/lib/eofProductionJobs.mjs'
   )
-  const { saveEofMixedAudioArtifact, ensureEofMixedAudioOnDisk } = await import(
-    '../backend/api/lib/eofProductionArtifacts.mjs'
-  )
-  const { eofProductionWorkDir } = await import('../backend/api/lib/eofSceneTts.mjs')
+  const { saveEofVideoArtifact, ensureEofVideoOnDisk } = await import('../backend/api/lib/eofProductionArtifacts.mjs')
+  const { eofProductionVideoAbsPath } = await import('../backend/api/lib/eofProductionVideo.mjs')
   const { runFfmpeg, isFfmpegAvailable } = await import('../backend/api/lib/eofFfmpeg.mjs')
-  const { existsSync, rmSync, mkdirSync } = await import('node:fs')
-  const { join } = await import('node:path')
   const handler = (await import('../backend/api/admin/eof-production.js')).default
   const { signAdminSession } = await import('../backend/api/lib/adminAuth.mjs')
 
   await ensureEofProductionSchema()
 
-  const seeded = await ensureEofMusicCatalogSeeded()
-  if (seeded.length < 1) throw new Error('music catalog seed failed')
-
-  await createEofMusicTrack({
-    title: 'Test neutral',
-    mood: 'neutral',
-    publicUrl: '/eof/music/test-neutral.mp3',
-    isDefault: true,
-  })
-
-  const picked = await pickEofMusicTrackForTopic('Ronaldo goals record')
-  if (!picked) throw new Error('no track picked')
-
   const job = await createEofProductionJob({
     topic: 'Lionel Messi',
     createdBy: 'test',
-    voicePreset: 'british',
+    format: 'listicle',
   })
   if (!job?.script?.scenes?.length) throw new Error('no scenes')
-  const loaded = await getEofProductionJob(job.id)
-  if (loaded.musicTrackId !== picked.id) throw new Error('music not linked')
+  if (!job.script.scenes.every((s) => s.caption && s.imageQuery)) throw new Error('scenes missing caption/image')
 
-  const tracks = await listEofMusicTracks()
-  if (tracks.length < 1) throw new Error('no tracks')
+  const debate = await createEofProductionJob({
+    topic: 'Mbappe',
+    createdBy: 'test',
+    format: 'debate',
+  })
+  if (debate.script.format !== 'debate') throw new Error('format not applied')
 
   const token = await signAdminSession({ sub: process.env.ADMIN_USER, role: 'admin' })
   const req = { method: 'GET', headers: { cookie: `admin_session=${token}` }, url: '/api/admin/eof-production' }
@@ -61,7 +43,10 @@ async function main() {
   await handler(req, res)
   const payload = JSON.parse(res.body)
   if (res.statusCode !== 200 || !payload.ok) throw new Error('production GET failed')
-  if (!payload.tracks.length) throw new Error('production GET returned no tracks')
+  if (!Array.isArray(payload.scriptFormats) || payload.scriptFormats.length < 2) {
+    throw new Error('script formats missing from GET')
+  }
+  if (!Array.isArray(payload.jobs)) throw new Error('jobs missing')
 
   const deleted = await deleteEofProductionJob(job.id)
   if (!deleted) throw new Error('delete job failed')
@@ -71,7 +56,6 @@ async function main() {
   const job2 = await createEofProductionJob({
     topic: 'Delete via API',
     createdBy: 'test',
-    voicePreset: 'british',
   })
   const delReq = {
     method: 'POST',
@@ -84,41 +68,56 @@ async function main() {
   const delPayload = JSON.parse(delRes.body)
   if (delRes.statusCode !== 200 || !delPayload.ok) throw new Error('production DELETE failed')
 
+  // Image-only video build can start without prior audio
   const job3 = await createEofProductionJob({
-    topic: 'Video without audio',
+    topic: 'Image only short',
     createdBy: 'test',
-    voicePreset: 'british',
   })
   const videoReq = {
     method: 'POST',
     headers: { cookie: `admin_session=${token}` },
     url: '/api/admin/eof-production',
-    body: { action: 'render-video', jobId: job3.id },
+    body: { action: 'build-short', jobId: job3.id },
   }
   const videoRes = { statusCode: 200, headers: {}, setHeader() {}, end(body) { this.body = body } }
   await handler(videoReq, videoRes)
-  const videoPayload = JSON.parse(videoRes.body)
-  if (videoRes.statusCode !== 400) throw new Error('render-video should require audio first')
-  if (!String(videoPayload.error || '').includes('audio')) throw new Error('unexpected render-video error')
+  if (videoRes.statusCode !== 202) {
+    throw new Error(`build-short should accept async (202), got ${videoRes.statusCode}: ${videoRes.body}`)
+  }
 
-  // Durable audio restore (simulates cold Vercel instance after render)
+  // Durable video restore (simulates cold Vercel instance)
   if (await isFfmpegAvailable()) {
     const durableJob = await createEofProductionJob({
-      topic: 'Durable audio restore',
+      topic: 'Durable video restore',
       createdBy: 'test',
-      voicePreset: 'british',
     })
-    const workDir = eofProductionWorkDir(durableJob.id)
-    mkdirSync(workDir, { recursive: true })
-    const mixedPath = join(workDir, 'mixed.mp3')
-    await runFfmpeg(['-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-q:a', '4', mixedPath])
-    const saved = await saveEofMixedAudioArtifact(durableJob.id, mixedPath)
-    if (!saved) throw new Error('saveEofMixedAudioArtifact failed')
-    rmSync(workDir, { recursive: true, force: true })
-    const restored = await ensureEofMixedAudioOnDisk(durableJob.id)
-    if (!restored || !existsSync(restored)) throw new Error('durable audio restore failed')
+    const videoPath = eofProductionVideoAbsPath(durableJob.id)
+    mkdirSync(dirname(videoPath), { recursive: true })
+    await runFfmpeg([
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=0x16162e:s=1080x1920:d=2',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-t',
+      '2',
+      videoPath,
+    ])
+    const saved = await saveEofVideoArtifact(durableJob.id, videoPath)
+    if (!saved) throw new Error('saveEofVideoArtifact failed')
+    rmSync(dirname(videoPath), { recursive: true, force: true })
+    const restored = await ensureEofVideoOnDisk(durableJob.id)
+    if (!restored || !existsSync(restored)) throw new Error('durable video restore failed')
+    if (statSync(restored).size < 1000) throw new Error('restored video too small')
     await deleteEofProductionJob(durableJob.id)
   }
+
+  await deleteEofProductionJob(debate.id)
+  await deleteEofProductionJob(job3.id)
 
   console.log('EOF production lib smoke tests passed')
 }

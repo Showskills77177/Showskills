@@ -134,7 +134,8 @@ export default function EyesOfFootballAdminPage() {
                 {[
                   ['studio', 'Studio'],
                   ['production', 'Production'],
-                  ['music', 'Music'],
+                  // Music beds disabled — image Shorts are silent; add audio in YouTube Studio.
+                  // ['music', 'Music'],
                   ['analytics', 'Analytics'],
                   ['calendar', 'Calendar'],
                   ['content', 'Content'],

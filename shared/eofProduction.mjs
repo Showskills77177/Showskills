@@ -74,9 +74,9 @@ export function productionJobStatusLabel(status) {
     draft: 'Draft',
     scripting: 'Writing script…',
     ready_script: 'Script ready',
-    rendering: 'Rendering audio…',
-    rendered: 'Audio rendered',
-    rendering_video: 'Rendering video…',
+    rendering: 'Building…',
+    rendered: 'Script ready',
+    rendering_video: 'Building video…',
     video_rendered: 'Video ready',
     failed: 'Failed',
     published: 'Published',
@@ -85,26 +85,23 @@ export function productionJobStatusLabel(status) {
 }
 
 export const EOF_RENDER_STACK = {
-  tts: {
-    id: 'edge-tts',
-    label: 'Microsoft Edge TTS (neural voices)',
-    detail: 'Free online speech API used via the node-edge-tts package — not OpenAI or ElevenLabs.',
-  },
-  audio: {
-    id: 'ffmpeg',
-    label: 'ffmpeg (bundled on staging)',
-    detail: 'Concatenates scene MP3s and mixes your music bed locally on the ShowSkills API server.',
+  script: {
+    id: 'template-openai',
+    label: 'Script writer (templates + optional OpenAI)',
+    detail:
+      'Structured Short formats by default. Set OPENAI_API_KEY for AI captions/image queries (gpt-4o-mini).',
   },
   host: {
     id: 'vercel',
     label: 'ShowSkills staging API (Vercel serverless)',
     detail:
-      'Audio and video renders run in the background with progress polling on Vercel (waitUntil). Finished MP3/MP4 are stored in the database so previews work across serverless instances.',
+      'Image fetch + ffmpeg run in the background (waitUntil). Finished MP4 is stored in the database so previews work across instances.',
   },
   video: {
     id: 'ffmpeg-images',
-    label: 'Pexels stock photos + ffmpeg (9:16 Short)',
-    detail: 'Google Image Search (Custom Search API), Pexels, Pinterest (API or pin URL), else placeholders. Set GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID and/or PEXELS_API_KEY.',
+    label: 'Images + captions → 9:16 Short (ffmpeg)',
+    detail:
+      'Google CSE, Pexels, Pinterest pin URL, or placeholders. Silent video — add music in YouTube Studio if you want.',
   },
 }
 

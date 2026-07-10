@@ -10,9 +10,9 @@ import {
   parseProductionScript,
   parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
-import { buildFactsShortScript } from '../../../shared/eofScriptTemplates.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
+import { writeEofProductionScript } from './eofScriptWriter.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -78,12 +78,18 @@ export async function getEofProductionJob(id) {
   return rowToJob(rows[0])
 }
 
-export async function createEofProductionJob({ topic, createdBy, voicePreset = 'british', musicTrackId = null }) {
+export async function createEofProductionJob({
+  topic,
+  createdBy,
+  voicePreset = 'british',
+  musicTrackId = null,
+  format = null,
+}) {
   await ensureEofProductionSchema()
   const t = String(topic || '').trim()
   if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
 
-  const script = buildFactsShortScript(t)
+  const { script } = await writeEofProductionScript({ topic: t, format })
   const track = await pickEofMusicTrackForTopic(t, musicTrackId)
   const id = randomUUID()
 
@@ -176,10 +182,11 @@ export async function updateEofProductionRenderProgress(id, progress) {
   )
 }
 
-export async function regenerateEofProductionScript(id) {
+export async function regenerateEofProductionScript(id, { format } = {}) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
-  const script = buildFactsShortScript(job.topic)
+  const fmt = format || job.script?.format || null
+  const { script } = await writeEofProductionScript({ topic: job.topic, format: fmt })
   const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
   return updateEofProductionJob(id, {
     script,
@@ -187,6 +194,8 @@ export async function regenerateEofProductionScript(id) {
     musicTrackId: track?.id || job.musicTrackId,
     status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
     errorMessage: null,
+    renderOutputPath: null,
+    narrationManifest: null,
   })
 }
 

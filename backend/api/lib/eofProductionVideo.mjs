@@ -46,15 +46,42 @@ function buildSceneVideoFilter({ dur, frames, captionFile, captionFont }) {
     base.push(`fps=${VIDEO_FPS}`)
   }
 
+  // Soft bottom gradient so white captions stay readable on any stock photo
+  base.push(
+    "drawbox=x=0:y=ih*0.62:w=iw:h=ih*0.38:color=black@0.45:t=fill",
+  )
+
   if (captionFont) {
     const escapedFont = captionFont.replace(/'/g, "'\\''")
     const escapedCaption = captionFile.replace(/'/g, "'\\''")
     base.push(
-      `drawtext=fontfile='${escapedFont}':fontcolor=white:fontsize=44:borderw=4:bordercolor=black@0.55:x=(w-text_w)/2:y=h-200:textfile='${escapedCaption}'`,
+      `drawtext=fontfile='${escapedFont}':fontcolor=white:fontsize=48:line_spacing=12:borderw=5:bordercolor=black@0.7:x=(w-text_w)/2:y=h-320:textfile='${escapedCaption}'`,
     )
   }
 
   return base.join(',')
+}
+
+/** Soft-wrap long captions so drawtext stays readable on 9:16. */
+function wrapCaptionLines(text, maxChars = 28) {
+  const words = String(text || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (!words.length) return '…'
+  const lines = []
+  let line = ''
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w
+    if (next.length > maxChars && line) {
+      lines.push(line)
+      line = w
+    } else {
+      line = next
+    }
+  }
+  if (line) lines.push(line)
+  return lines.slice(0, 4).join('\n')
 }
 
 async function encodeSceneClip({ scene, workDir, captionFont }) {
@@ -62,7 +89,7 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
   const frames = Math.max(1, Math.ceil(dur * VIDEO_FPS))
   const clipPath = join(workDir, `clip-${scene.index + 1}.mp4`)
   const captionFile = join(workDir, `caption-${scene.index + 1}.txt`)
-  const caption = String(scene.caption || '').trim().slice(0, 120)
+  const caption = wrapCaptionLines(String(scene.caption || '').trim().slice(0, 140))
   await writeFile(captionFile, caption || `Scene ${scene.index + 1}`, 'utf8')
 
   const vf = buildSceneVideoFilter({ dur, frames, captionFile, captionFont })
@@ -98,10 +125,12 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
 }
 
 /**
+ * Concatenate scene image clips into a 9:16 Short.
+ * Audio is optional — image-only Shorts are silent (YouTube can add music later).
  * @param {{
  *   jobId: string,
  *   scenes: Array<{ index: number, durationSec: number, caption?: string, imagePath: string }>,
- *   mixedAudioPath: string,
+ *   mixedAudioPath?: string | null,
  *   outputPath?: string,
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
  * }} opts
@@ -109,11 +138,10 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
 export async function renderEofProductionVideo({
   jobId,
   scenes,
-  mixedAudioPath,
+  mixedAudioPath = null,
   outputPath,
   onSceneProgress,
 }) {
-  if (!existsSync(mixedAudioPath)) throw new Error('Mixed audio missing — render audio first.')
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
   if (!sorted.length) throw new Error('No scenes to render.')
 
@@ -137,31 +165,47 @@ export async function renderEofProductionVideo({
   const listBody = clipPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n')
   await writeFile(listFile, listBody, 'utf8')
 
-  await runFfmpeg(
-    [
-      '-y',
-      '-f',
-      'concat',
-      '-safe',
-      '0',
-      '-i',
-      listFile,
-      '-i',
-      mixedAudioPath,
-      '-c:v',
-      'copy',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '192k',
-      '-movflags',
-      '+faststart',
-      '-shortest',
-      out,
-    ],
-    { maxBuffer: 16 * 1024 * 1024 },
-  )
+  const hasAudio = Boolean(mixedAudioPath && existsSync(mixedAudioPath))
+  const args = hasAudio
+    ? [
+        '-y',
+        '-f',
+        'concat',
+        '-safe',
+        '0',
+        '-i',
+        listFile,
+        '-i',
+        mixedAudioPath,
+        '-c:v',
+        'copy',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '192k',
+        '-movflags',
+        '+faststart',
+        '-shortest',
+        out,
+      ]
+    : [
+        '-y',
+        '-f',
+        'concat',
+        '-safe',
+        '0',
+        '-i',
+        listFile,
+        '-c:v',
+        'copy',
+        '-an',
+        '-movflags',
+        '+faststart',
+        out,
+      ]
+
+  await runFfmpeg(args, { maxBuffer: 16 * 1024 * 1024 })
 
   if (!existsSync(out)) throw new Error('Video render produced no output file.')
-  return { outputPath: out, relPath: eofProductionVideoRelPath(jobId) }
+  return { outputPath: out, relPath: eofProductionVideoRelPath(jobId), hasAudio }
 }

@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '../../../lib/api'
 import {
   productionJobStatusLabel,
-  estimateEofRenderDurationSec,
   estimateEofVideoRenderDurationSec,
   refreshEofRenderProgress,
   buildFallbackRenderProgress,
 } from '../../../../shared/eofProduction.mjs'
+import { EOF_DEFAULT_SCRIPT_FORMAT } from '../../../../shared/eofScriptTemplates.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
@@ -34,7 +34,7 @@ function EofRenderProgressBar({ progress, stuck, onCancel, cancelBusy }) {
   return (
     <div className="rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4" role="status" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9ecbff]">
-        <span>{progress.message || 'Rendering…'}</span>
+        <span>{progress.message || 'Building…'}</span>
         <span className="font-semibold tabular-nums">{percent}%</span>
       </div>
       <div className="mt-2 h-3 overflow-hidden rounded-full bg-[#0d1520]">
@@ -46,13 +46,10 @@ function EofRenderProgressBar({ progress, stuck, onCancel, cancelBusy }) {
       <p className="mt-2 text-[10px] text-[#717171]">
         Elapsed {formatDuration(progress.elapsedSeconds)}
         {progress.etaLabel ? ` · ${progress.etaLabel}` : ''}
-        {progress.estimatedTotalSec ? ` · ~${formatDuration(progress.estimatedTotalSec)} total est.` : ''}
       </p>
       {stuck ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <p className="text-xs text-amber-400">
-            This render may have timed out on the server (Vercel limit). Reset it, then try again.
-          </p>
+          <p className="text-xs text-amber-400">This build may have timed out. Reset, then try again.</p>
           <button
             type="button"
             disabled={cancelBusy}
@@ -69,23 +66,20 @@ function EofRenderProgressBar({ progress, stuck, onCancel, cancelBusy }) {
 
 export default function EofProductionPanel({ isOwner, active = true }) {
   const [jobs, setJobs] = useState([])
-  const [tracks, setTracks] = useState([])
-  const [voicePresets, setVoicePresets] = useState([])
+  const [scriptFormats, setScriptFormats] = useState([])
+  const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
+  const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
-  const [voicePreset, setVoicePreset] = useState('british')
   const [selectedId, setSelectedId] = useState(readStoredSelectedId)
   const [draftScript, setDraftScript] = useState(null)
   const [draftDirty, setDraftDirty] = useState(false)
   const hydratedJobIdRef = useRef(null)
-  const [musicTrackId, setMusicTrackId] = useState('')
-  const [musicVolume, setMusicVolume] = useState(0.22)
   const [err, setErr] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [renderNote, setRenderNote] = useState('')
-  const [audioPreviewUrl, setAudioPreviewUrl] = useState('')
   const [videoPreviewUrl, setVideoPreviewUrl] = useState('')
   const [renderPhase, setRenderPhase] = useState('')
   const [renderProgress, setRenderProgress] = useState(null)
@@ -129,8 +123,9 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     try {
       const j = await fetchProduction()
       setJobs(j.jobs || [])
-      setTracks(j.tracks || [])
-      setVoicePresets(j.voicePresets || [])
+      setScriptFormats(Array.isArray(j.scriptFormats) ? j.scriptFormats : [])
+      if (j.defaultScriptFormat) setFormat((prev) => prev || j.defaultScriptFormat)
+      setOpenAiScriptEnabled(Boolean(j.openAiScriptEnabled))
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
       setImageSources(
@@ -151,9 +146,8 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     try {
       const j = await fetchProduction()
       setJobs(j.jobs || [])
-      setTracks(j.tracks || [])
     } catch {
-      /* background refresh */
+      /* background */
     }
   }, [fetchProduction])
 
@@ -181,10 +175,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
 
   function hydrateDraftFromJob(job) {
     setDraftScript(job.script ? JSON.parse(JSON.stringify(job.script)) : null)
-    setMusicTrackId(job.musicTrackId || '')
-    setMusicVolume(job.musicVolume ?? 0.22)
-    setVoicePreset(job.voicePreset || 'british')
-    if (job.status !== 'rendered') setAudioPreviewUrl('')
+    if (job.script?.format) setFormat(job.script.format)
     if (job.status !== 'video_rendered') setVideoPreviewUrl('')
     setDraftDirty(false)
   }
@@ -199,7 +190,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setDraftScript(null)
       setDraftDirty(false)
       hydratedJobIdRef.current = null
-      setAudioPreviewUrl('')
+      setVideoPreviewUrl('')
       return
     }
     if (hydratedJobIdRef.current === selectedId) return
@@ -211,14 +202,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
 
   useEffect(() => {
     if (!selectedId || !selected || busy) return undefined
-    if (selected.status === 'rendered' && selected.mixedAudioPath && !audioPreviewUrl) {
-      void loadAudioPreview()
-    }
     if (selected.status === 'video_rendered' && !videoPreviewUrl) {
       void loadVideoPreview()
     }
     return undefined
-  }, [selectedId, selected?.status, selected?.mixedAudioPath, busy])
+  }, [selectedId, selected?.status, busy])
 
   useEffect(() => {
     return () => {
@@ -231,8 +219,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     selected?.status === 'rendering_video' ||
     busy ||
     renderPhase === 'rendering' ||
-    renderPhase === 'rendering-video' ||
-    renderPhase === 'saving'
+    renderPhase === 'rendering-video'
 
   useEffect(() => {
     if (!isRendering) return undefined
@@ -244,10 +231,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     void progressTick
     if (renderProgress) return refreshEofRenderProgress(renderProgress)
     if (selected?.renderProgress) return refreshEofRenderProgress(selected.renderProgress)
-    if (selected?.status === 'rendering' && draftScript) {
-      return buildFallbackRenderProgress(selected, draftScript, 'audio')
-    }
-    if (selected?.status === 'rendering_video' && draftScript) {
+    if ((selected?.status === 'rendering' || selected?.status === 'rendering_video') && draftScript) {
       return buildFallbackRenderProgress(selected, draftScript, 'video')
     }
     return null
@@ -263,7 +247,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const isRenderStuck =
     (selected?.status === 'rendering' || selected?.status === 'rendering_video') &&
     displayProgress &&
-    displayProgress.elapsedSeconds > Math.max(360, (displayProgress.estimatedTotalSec || 120) * 2)
+    displayProgress.elapsedSeconds > Math.max(240, (displayProgress.estimatedTotalSec || 60) * 2)
 
   useEffect(() => {
     if (!active || !selectedId) return undefined
@@ -316,14 +300,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         body: JSON.stringify({ action: 'cancel-render', jobId: selectedId }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error || 'Could not reset render')
+      if (!res.ok) throw new Error(j.error || 'Could not reset build')
       setRenderProgress(null)
       if (j.job) upsertJob(j.job)
-      setSuccess(
-        selected?.status === 'rendering_video'
-          ? 'Video render reset — you can click “Render video” again.'
-          : 'Render reset — you can click “Render audio + music” again.',
-      )
+      setSuccess('Build reset — you can click Build Short again.')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -339,13 +319,13 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (!selected) return step === 1 ? 'current' : 'upcoming'
     const status = selected.status
     if (step === 1) {
-      return ['draft', 'scripting', 'ready_script'].includes(status) ? 'current' : 'done'
+      return ['draft', 'scripting', 'ready_script', 'failed'].includes(status) ? 'current' : 'done'
     }
     if (step === 2) {
-      if (['rendering', 'rendering_video', 'rendered'].includes(status)) return 'current'
+      if (['rendering', 'rendering_video'].includes(status)) return 'current'
       if (status === 'video_rendered') return 'done'
       if (status === 'failed') return 'failed'
-      return ['draft', 'ready_script'].includes(status) ? 'upcoming' : 'current'
+      return 'upcoming'
     }
     if (step === 3) return status === 'video_rendered' ? 'current' : 'upcoming'
     return 'upcoming'
@@ -357,7 +337,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (source === 'pinterest') return 'Pinterest search'
     if (source === 'pinterest-pin') return 'Pinterest pin'
     if (source === 'cache') return 'Cached photo'
-    if (source === 'placeholder-no-image-keys') return 'Placeholder — add Google, Pexels, or Pinterest keys'
+    if (source === 'placeholder-no-image-keys') return 'Placeholder — add Google or Pexels keys'
     if (source === 'placeholder') return 'Placeholder — search missed'
     return 'Image'
   }
@@ -367,8 +347,8 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     return `/api/admin/eof-production-scene-image?jobId=${encodeURIComponent(selectedId)}&scene=${sceneNumber}`
   }
 
-  async function waitForFullBuildComplete(jobId) {
-    const deadline = Date.now() + 10 * 60 * 1000
+  async function waitForVideoComplete(jobId) {
+    const deadline = Date.now() + 8 * 60 * 1000
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500))
       const j = await fetchProduction()
@@ -378,7 +358,6 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       if (job.renderProgress) setRenderProgress(job.renderProgress)
       if (job.status === 'video_rendered') return job
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Build failed')
-      // Keep waiting — job may still be ready_script for a moment before server marks rendering.
     }
     throw new Error('Build timed out — click Reset & retry, then Build Short again.')
   }
@@ -387,10 +366,9 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (!selectedId || !draftScript) return
     setBusy(true)
     setErr('')
-    setSuccess('Building your Short — narration, images, and video on the server…')
-    setRenderPhase('rendering')
+    setSuccess('Building image Short — fetching photos and stitching clips…')
+    setRenderPhase('rendering-video')
     setVideoPreviewUrl('')
-    setAudioPreviewUrl('')
 
     try {
       const saved = await saveJob({ silent: true })
@@ -399,25 +377,23 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         return
       }
 
-      const rebuild = selected?.status === 'video_rendered'
-      const estSec =
-        estimateEofRenderDurationSec(draftScript) + estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5)
+      const estSec = estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5)
       setRenderProgress({
-        percent: 2,
-        message: 'Starting full build…',
+        percent: 3,
+        message: 'Starting image Short…',
         etaLabel: `~${formatDuration(estSec)} est.`,
         elapsedSeconds: 0,
         estimatedTotalSec: estSec,
         startedAt: new Date().toISOString(),
         sceneCount: draftScript?.scenes?.length || 5,
-        stage: 'tts',
-        pipeline: 'audio',
+        stage: 'images',
+        pipeline: 'video',
       })
 
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'build-short', jobId: selectedId, rebuild }),
+        body: JSON.stringify({ action: 'build-short', jobId: selectedId }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok && res.status !== 202) {
@@ -428,20 +404,14 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
       }
 
-      const finishedJob = await waitForFullBuildComplete(selectedId)
+      const finishedJob = await waitForVideoComplete(selectedId)
       if (finishedJob.status !== 'video_rendered') {
         throw new Error(finishedJob.errorMessage || 'Build did not finish with a video')
       }
 
       await loadVideoPreview()
-      const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
-      if (audioRes.ok) {
-        const blob = await audioRes.blob()
-        setAudioPreviewUrl(URL.createObjectURL(blob))
-      }
-
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
-      setSuccess('Your Short is ready — watch it below.')
+      setSuccess('Your image Short is ready — watch it below.')
       upsertJob(finishedJob)
       hydratedJobIdRef.current = selectedId
       hydrateDraftFromJob(finishedJob)
@@ -481,15 +451,19 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, voicePreset, musicTrackId: musicTrackId || null }),
+        body: JSON.stringify({ topic, format }),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j.error || 'Could not create job')
+      if (!res.ok) throw new Error(j.error || 'Could not create script')
       setTopic('')
       selectJob(j.job.id)
       if (j.job?.script) hydrateDraftFromJob(j.job)
       hydratedJobIdRef.current = j.job.id
-      setSuccess(`Script drafted for “${j.job.topic}”. Review scenes, then render audio.`)
+      setSuccess(
+        openAiScriptEnabled
+          ? `Script drafted for “${j.job.topic}” (AI or template). Edit captions, then Build Short.`
+          : `Script drafted for “${j.job.topic}”. Edit captions, then Build Short.`,
+      )
       upsertJob(j.job)
       await load()
     } catch (e) {
@@ -513,16 +487,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         body: JSON.stringify({
           jobId: selectedId,
           script: draftScript,
-          musicTrackId: musicTrackId || null,
-          musicVolume,
-          voicePreset,
         }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Save failed')
-      if (!silent) {
-        setSuccess('Script and music settings saved. Next: click “Render audio + music”.')
-      }
+      if (!silent) setSuccess('Script saved. Next: Build Short.')
       if (j.job) {
         upsertJob(j.job)
         hydratedJobIdRef.current = selectedId
@@ -530,44 +499,39 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       }
       return true
     } catch (e) {
-      if (!silent) setErr(e instanceof Error ? e.message : 'Error')
-      if (silent) setErr(e instanceof Error ? e.message : 'Error')
+      setErr(e instanceof Error ? e.message : 'Error')
       return false
     } finally {
       if (!silent) setBusy(false)
     }
   }
 
-  async function waitForRenderComplete(jobId) {
-    const deadline = Date.now() + 6 * 60 * 1000
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      const j = await fetchProduction()
-      const job = (j.jobs || []).find((row) => row.id === jobId)
-      if (!job) throw new Error('Job disappeared during render.')
-      upsertJob(job)
-      if (job.renderProgress) setRenderProgress(job.renderProgress)
-      if (job.status === 'rendered') return job
-      if (job.status === 'failed') throw new Error(job.errorMessage || 'Render failed')
-      if (job.status !== 'rendering') return job
+  async function regenerateScript() {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    setSuccess('')
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate-script', jobId: selectedId, format }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not rewrite script')
+      setVideoPreviewUrl('')
+      setRenderProgress(null)
+      if (j.job) {
+        upsertJob(j.job)
+        hydratedJobIdRef.current = selectedId
+        hydrateDraftFromJob(j.job)
+      }
+      setSuccess('Script rewritten. Review captions and image searches, then Build Short.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
     }
-    throw new Error('Render timed out — click Reset & retry, then render again.')
-  }
-
-  async function waitForVideoComplete(jobId) {
-    const deadline = Date.now() + 8 * 60 * 1000
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      const j = await fetchProduction()
-      const job = (j.jobs || []).find((row) => row.id === jobId)
-      if (!job) throw new Error('Job disappeared during video render.')
-      upsertJob(job)
-      if (job.renderProgress) setRenderProgress(job.renderProgress)
-      if (job.status === 'video_rendered') return job
-      if (job.status === 'failed') throw new Error(job.errorMessage || 'Video render failed')
-      if (job.status !== 'rendering_video') return job
-    }
-    throw new Error('Video render timed out — click Reset & retry.')
   }
 
   async function loadVideoPreview() {
@@ -583,153 +547,6 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setVideoPreviewUrl(URL.createObjectURL(blob))
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not load video preview')
-    }
-  }
-
-  async function renderVideo() {
-    if (!selectedId) return
-    setBusy(true)
-    setErr('')
-    setSuccess('')
-    setRenderPhase('rendering-video')
-    setVideoPreviewUrl('')
-    try {
-      const estSec = estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5)
-      setRenderProgress({
-        percent: 3,
-        message: 'Starting video render…',
-        etaLabel: `~${formatDuration(estSec)} est.`,
-        elapsedSeconds: 0,
-        estimatedTotalSec: estSec,
-        startedAt: new Date().toISOString(),
-        sceneCount: draftScript?.scenes?.length || 5,
-        stage: 'images',
-        pipeline: 'video',
-      })
-      setSuccess('Building 9:16 Short with images + captions…')
-
-      const res = await apiFetch('/api/admin/eof-production', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'render-video', jobId: selectedId }),
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok && res.status !== 202) throw new Error(j.error || 'Video render failed')
-
-      const finishedJob = await waitForVideoComplete(selectedId)
-      if (finishedJob.status !== 'video_rendered') {
-        throw new Error(finishedJob.errorMessage || 'Video render did not complete')
-      }
-
-      await loadVideoPreview()
-      setRenderProgress({ percent: 100, message: 'Video render complete', etaLabel: '0:00 left', pipeline: 'video' })
-      setSuccess('Your Short is ready — watch it below.')
-      upsertJob(finishedJob)
-      hydratedJobIdRef.current = selectedId
-      hydrateDraftFromJob(finishedJob)
-    } catch (e) {
-      setRenderPhase('failed')
-      setRenderProgress(null)
-      setErr(e instanceof Error ? e.message : 'Error')
-      await refreshJobsQuiet()
-    } finally {
-      stopRenderPolling()
-      setBusy(false)
-      setRenderPhase('')
-    }
-  }
-
-  async function renderAudio() {
-    if (!selectedId) return
-    setBusy(true)
-    setErr('')
-    setSuccess('')
-    setRenderPhase('saving')
-    setAudioPreviewUrl('')
-    try {
-      const saved = await saveJob({ silent: true })
-      if (!saved) return
-
-      setRenderPhase('rendering')
-      const estSec = estimateEofRenderDurationSec(draftScript)
-      setRenderProgress({
-        percent: 2,
-        message: 'Starting narration render…',
-        etaLabel: `~${formatDuration(estSec)} est.`,
-        elapsedSeconds: 0,
-        estimatedTotalSec: estSec,
-        startedAt: new Date().toISOString(),
-        sceneCount: draftScript?.scenes?.length || 1,
-        stage: 'tts',
-        sceneIndex: 0,
-      })
-      setSuccess('Rendering narration and mixing music… Keep this tab open.')
-
-      const res = await apiFetch('/api/admin/eof-production', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'render', jobId: selectedId }),
-      })
-      const j = await res.json().catch(() => ({}))
-
-      let finishedJob = null
-      if (res.status === 202 || j.accepted) {
-        if (j.job) upsertJob(j.job)
-        finishedJob = await waitForRenderComplete(selectedId)
-      } else if (res.ok) {
-        finishedJob = j.job || null
-        if (typeof j.audioDataUrl === 'string' && j.audioDataUrl.startsWith('data:audio/')) {
-          setAudioPreviewUrl(j.audioDataUrl)
-        }
-      } else {
-        throw new Error(j.error || 'Render failed')
-      }
-
-      if (!finishedJob || finishedJob.status !== 'rendered') {
-        throw new Error(finishedJob?.errorMessage || 'Render did not complete')
-      }
-
-      if (!audioPreviewUrl) {
-        const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
-        if (audioRes.ok) {
-          const blob = await audioRes.blob()
-          setAudioPreviewUrl(URL.createObjectURL(blob))
-        }
-      }
-
-      setRenderPhase('done')
-      setRenderProgress({ percent: 100, message: 'Render complete', etaLabel: '0:00 left' })
-      setSuccess(
-        finishedJob.mixedAudioPath
-          ? 'Audio rendered. Preview below, then video assembly is next.'
-          : 'Audio rendered.',
-      )
-      upsertJob(finishedJob)
-      hydratedJobIdRef.current = selectedId
-      hydrateDraftFromJob(finishedJob)
-    } catch (e) {
-      setRenderPhase('failed')
-      setRenderProgress(null)
-      setErr(e instanceof Error ? e.message : 'Error')
-      await refreshJobsQuiet()
-    } finally {
-      stopRenderPolling()
-      setBusy(false)
-      setRenderPhase('')
-    }
-  }
-
-  async function loadAudioPreview() {
-    if (!selectedId || !selected?.mixedAudioPath) return
-    setErr('')
-    try {
-      const audioRes = await apiFetch(`/api/admin/eof-production-audio?jobId=${encodeURIComponent(selectedId)}`)
-      const j = await audioRes.json().catch(() => ({}))
-      if (!audioRes.ok) throw new Error(j.error || 'Could not load audio preview')
-      const blob = await audioRes.blob()
-      setAudioPreviewUrl(URL.createObjectURL(blob))
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not load audio preview')
     }
   }
 
@@ -764,7 +581,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         setSelectedId(null)
         setDraftScript(null)
         setDraftDirty(false)
-        setAudioPreviewUrl('')
+        setVideoPreviewUrl('')
         setRenderProgress(null)
       }
       setSuccess(`Deleted “${label}”.`)
@@ -780,7 +597,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     setDraftScript((prev) => {
       if (!prev?.scenes) return prev
       const scenes = [...prev.scenes]
-      scenes[index] = { ...scenes[index], [field]: value }
+      const next = { ...scenes[index], [field]: value }
+      // Keep narration aligned with on-screen caption for older rows / APIs
+      if (field === 'caption') next.narration = value
+      scenes[index] = next
       return { ...prev, scenes }
     })
   }
@@ -793,14 +613,15 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     <div className="space-y-6">
       {loading ? <p className={`text-sm ${EOF.muted}`}>Loading production…</p> : null}
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
-        <h2 className="text-base font-semibold text-white">Auto production</h2>
+        <h2 className="text-base font-semibold text-white">Image Shorts</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          Write a script, build a 9:16 Short (stock images + narration + music), then watch the result.
+          Write a punchy script → fetch stock images → stitch a silent 9:16 Short with on-screen captions.
+          Add music later in YouTube Studio if you want.
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
             ['1', 'Write script'],
-            ['2', 'Build Short'],
+            ['2', 'Build video'],
             ['3', 'Watch result'],
           ].map(([n, label]) => {
             const state = workflowStepState(Number(n))
@@ -819,40 +640,54 @@ export default function EofProductionPanel({ isOwner, active = true }) {
             )
           })}
         </ol>
+
         {!loading && !ffmpegAvailable ? (
           <p className="mt-2 text-xs text-amber-400">
-            {renderNote ||
-              'ffmpeg is not detected — redeploy staging with ffmpeg-static, or set FFMPEG_PATH on the API host.'}
+            {renderNote || 'ffmpeg is not detected — video build needs ffmpeg-static on the host.'}
           </p>
         ) : null}
         {!loading && !imageSources.google && !imageSources.pexels && !imageSources.pinterestApi ? (
           <p className="mt-2 text-xs text-amber-400">
             {imagesNote ||
-              'Add GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID (Google Images), PEXELS_API_KEY, and/or PINTEREST_ACCESS_TOKEN — or paste Pinterest pin URLs per scene.'}
+              'Add GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID or PEXELS_API_KEY for real photos — or paste Pinterest pin URLs per scene.'}
           </p>
-        ) : null}
-        {!loading && tracks.length === 0 ? (
-          <p className="mt-2 text-xs text-amber-400">
-            Add at least one music track in the Music tab, or refresh after the default catalog is seeded.
+        ) : (
+          <p className="mt-2 text-[11px] text-[#6ee07d]">
+            Images:{' '}
+            {[
+              imageSources.google && 'Google',
+              imageSources.pexels && 'Pexels',
+              imageSources.pinterestApi && 'Pinterest API',
+              'Pin URLs',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
-        ) : null}
+        )}
+        <p className={`mt-1 text-[11px] ${EOF.muted}`}>
+          Scripts:{' '}
+          {openAiScriptEnabled
+            ? 'OpenAI enabled (falls back to templates if the API fails)'
+            : 'Built-in formats (set OPENAI_API_KEY on staging for AI writing)'}
+        </p>
 
         {renderStack ? (
           <details className={`mt-3 text-xs ${EOF.muted}`}>
-            <summary className="cursor-pointer text-[#aaa]">What API / platform renders the audio?</summary>
+            <summary className="cursor-pointer text-[#aaa]">How does this work?</summary>
             <ul className="mt-2 list-disc space-y-1 pl-4 text-[#717171]">
-              <li>
-                <span className="text-[#aaa]">{renderStack.tts.label}</span> — {renderStack.tts.detail}
-              </li>
-              <li>
-                <span className="text-[#aaa]">{renderStack.audio.label}</span> — {renderStack.audio.detail}
-              </li>
-              <li>
-                <span className="text-[#aaa]">{renderStack.host.label}</span> — {renderStack.host.detail}
-              </li>
+              {renderStack.script ? (
+                <li>
+                  <span className="text-[#aaa]">{renderStack.script.label}</span> — {renderStack.script.detail}
+                </li>
+              ) : null}
               {renderStack.video ? (
                 <li>
                   <span className="text-[#aaa]">{renderStack.video.label}</span> — {renderStack.video.detail}
+                </li>
+              ) : null}
+              {renderStack.host ? (
+                <li>
+                  <span className="text-[#aaa]">{renderStack.host.label}</span> — {renderStack.host.detail}
                 </li>
               ) : null}
             </ul>
@@ -881,22 +716,21 @@ export default function EofProductionPanel({ isOwner, active = true }) {
             />
           </label>
           <label className="text-xs text-[#aaa]">
-            Voice
-            <select
-              value={voicePreset}
-              onChange={(e) => setVoicePreset(e.target.value)}
-              className={inputCls}
-            >
-              {voicePresets.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.label}
+            Script format
+            <select value={format} onChange={(e) => setFormat(e.target.value)} className={inputCls}>
+              {(scriptFormats.length
+                ? scriptFormats
+                : [{ id: EOF_DEFAULT_SCRIPT_FORMAT, label: '5 facts listicle' }]
+              ).map((f) => (
+                <option key={f.id} value={f.id} title={f.detail}>
+                  {f.label}
                 </option>
               ))}
             </select>
           </label>
           <button
             type="submit"
-            disabled={busy || loading || tracks.length === 0}
+            disabled={busy || loading}
             className={`rounded-full px-5 py-2 text-sm ${EOF.btnPrimary} disabled:opacity-50`}
           >
             Create script
@@ -904,7 +738,10 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         </form>
 
         {success ? (
-          <p className="mt-3 rounded-lg border border-[#2ba640]/40 bg-[#1a2e1f] px-3 py-2 text-sm text-[#6ee07d]" role="status">
+          <p
+            className="mt-3 rounded-lg border border-[#2ba640]/40 bg-[#1a2e1f] px-3 py-2 text-sm text-[#6ee07d]"
+            role="status"
+          >
             {success}
           </p>
         ) : null}
@@ -927,11 +764,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                       selectedId === j.id ? 'bg-[#272727] text-white' : 'text-[#aaa] hover:bg-[#1a1a1a]'
                     }`}
                   >
-                    <div className="font-medium truncate">{j.title || j.topic}</div>
+                    <div className="truncate font-medium">{j.title || j.topic}</div>
                     <div className="text-[10px] text-[#717171]">
                       {(j.status === 'rendering' || j.status === 'rendering_video') &&
                       j.renderProgress?.percent != null
-                        ? `Rendering… ${Math.round(j.renderProgress.percent)}%`
+                        ? `Building… ${Math.round(j.renderProgress.percent)}%`
                         : productionJobStatusLabel(j.status)}
                     </div>
                   </button>
@@ -958,6 +795,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 <h3 className="font-semibold text-white">{draftScript.title}</h3>
                 <p className={`text-xs ${EOF.muted}`}>
                   {selected.topic}
+                  {draftScript.format ? ` · ${draftScript.format}` : ''}
                   <span className="ml-2 text-[#9ecbff]">· {productionJobStatusLabel(selected.status)}</span>
                   {draftDirty ? <span className="ml-2 text-amber-400">· unsaved changes</span> : null}
                 </p>
@@ -983,39 +821,21 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 >
                   Save script
                 </button>
-                <details className="self-center text-xs text-[#717171]">
-                  <summary className="cursor-pointer text-[#aaa]">Manual steps</summary>
-                  <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || selected.status === 'rendering' || selected.status === 'rendering_video'}
-                  onClick={renderAudio}
-                  className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white disabled:opacity-50"
+                  disabled={busy || isRendering}
+                  onClick={regenerateScript}
+                  className="rounded-full border border-[#3ea6ff]/40 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
                 >
-                  {selected.status === 'rendering' ? 'Rendering audio…' : 'Audio only'}
+                  Rewrite script
                 </button>
-                <button
-                  type="button"
-                  disabled={
-                    busy ||
-                    selected.status === 'rendering' ||
-                    selected.status === 'rendering_video' ||
-                    !['rendered', 'video_rendered', 'failed'].includes(selected.status)
-                  }
-                  onClick={renderVideo}
-                  className="rounded-full border border-[#3ea6ff]/50 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
-                >
-                  {selected.status === 'rendering_video' ? 'Rendering video…' : 'Video only'}
-                </button>
-                  </div>
-                </details>
                 <button
                   type="button"
                   disabled={deletingId === selected.id}
                   onClick={() => deleteJob(selected.id)}
                   className="rounded-full border border-[#ff4e45]/40 px-4 py-1.5 text-xs text-[#ff9b95] disabled:opacity-50"
                 >
-                  {deletingId === selected.id ? 'Deleting…' : 'Delete script'}
+                  {deletingId === selected.id ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
             </div>
@@ -1023,7 +843,6 @@ export default function EofProductionPanel({ isOwner, active = true }) {
             {displayProgress &&
             (selected.status === 'rendering' ||
               selected.status === 'rendering_video' ||
-              renderPhase === 'rendering' ||
               renderPhase === 'rendering-video') ? (
               <div className="mt-4">
                 <EofRenderProgressBar
@@ -1042,7 +861,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               >
                 <p className="text-sm font-semibold text-[#6ee07d]">Your Short is ready</p>
                 <p className={`mt-1 text-xs ${EOF.muted}`}>
-                  Stock images per scene, mixed with narration and music — preview below.
+                  Silent 9:16 video — images + captions. Upload to YouTube and add a music bed there if you want.
                 </p>
                 {videoPreviewUrl ? (
                   <video
@@ -1066,11 +885,14 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                 {selected.narrationManifest?.length ? (
                   <div className="mt-5">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
-                      What went into this Short
+                      Scenes in this Short
                     </p>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {selected.narrationManifest.map((scene, i) => (
-                        <div key={scene.sceneId || i} className="overflow-hidden rounded-lg border border-[#303030] bg-[#0d0d0d]">
+                        <div
+                          key={scene.sceneId || i}
+                          className="overflow-hidden rounded-lg border border-[#303030] bg-[#0d0d0d]"
+                        >
                           <img
                             alt=""
                             className="h-36 w-full object-cover"
@@ -1079,9 +901,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                           />
                           <div className="p-2">
                             <p className="text-[10px] font-semibold text-[#9ecbff]">Scene {(scene.index ?? i) + 1}</p>
-                            <p className="mt-1 line-clamp-2 text-[10px] text-[#aaa]">{scene.caption || draftScript.scenes?.[i]?.caption}</p>
+                            <p className="mt-1 line-clamp-2 text-[10px] text-[#aaa]">
+                              {scene.caption || draftScript.scenes?.[i]?.caption}
+                            </p>
                             <p className="mt-1 text-[10px] text-[#717171]">
-                              {scene.durationSec ? `${scene.durationSec.toFixed(1)}s` : '—'}
+                              {scene.durationSec ? `${Number(scene.durationSec).toFixed(1)}s` : '—'}
                               {scene.imageSource ? ` · ${sceneImageSourceLabel(scene.imageSource)}` : ''}
                             </p>
                           </div>
@@ -1090,56 +914,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                     </div>
                   </div>
                 ) : null}
-
-                {audioPreviewUrl ? (
-                  <details className="mt-4 text-xs text-[#aaa]">
-                    <summary className="cursor-pointer">Mixed audio track</summary>
-                    <audio controls className="mt-2 w-full" src={audioPreviewUrl}>
-                      Your browser does not support audio playback.
-                    </audio>
-                  </details>
-                ) : null}
               </div>
             ) : null}
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs text-[#aaa]">
-                Music bed
-                <select
-                  value={musicTrackId}
-                  onChange={(e) => {
-                    markDraftDirty()
-                    setMusicTrackId(e.target.value)
-                  }}
-                  className={inputCls}
-                >
-                  <option value="">Auto (default / mood)</option>
-                  {tracks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title} ({t.mood}){t.isDefault ? ' ★' : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs text-[#aaa]">
-                Music volume ({Math.round(musicVolume * 100)}%)
-                <input
-                  type="range"
-                  min={0.05}
-                  max={0.5}
-                  step={0.01}
-                  value={musicVolume}
-                  onChange={(e) => {
-                    markDraftDirty()
-                    setMusicVolume(Number(e.target.value))
-                  }}
-                  className="mt-2 w-full"
-                />
-              </label>
-            </div>
-
             <label className="mt-4 block text-xs text-[#aaa]">
-              Description
+              YouTube description
               <textarea
                 rows={2}
                 value={draftScript.description || ''}
@@ -1152,24 +931,28 @@ export default function EofProductionPanel({ isOwner, active = true }) {
             </label>
 
             <div className="mt-4 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
+                Scenes — on-screen text + image search
+              </p>
               {draftScript.scenes?.map((scene, i) => (
                 <div key={scene.id || i} className="rounded-lg border border-[#303030] p-3">
-                  <p className="text-[10px] font-bold uppercase text-[#717171]">Scene {i + 1}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase text-[#717171]">
+                      Scene {i + 1}
+                      {scene.role ? ` · ${scene.role}` : ''}
+                    </p>
+                    {scene.durationSec ? (
+                      <span className="text-[10px] text-[#3ea6ff]">~{Number(scene.durationSec).toFixed(1)}s</span>
+                    ) : null}
+                  </div>
                   <label className="mt-2 block text-xs text-[#aaa]">
-                    Narration
+                    On-screen caption (what viewers read)
                     <textarea
                       rows={2}
-                      value={scene.narration || ''}
-                      onChange={(e) => updateScene(i, 'narration', e.target.value)}
-                      className={inputCls}
-                    />
-                  </label>
-                  <label className="mt-2 block text-xs text-[#aaa]">
-                    On-screen caption
-                    <input
                       value={scene.caption || ''}
                       onChange={(e) => updateScene(i, 'caption', e.target.value)}
                       className={inputCls}
+                      maxLength={140}
                     />
                   </label>
                   <label className="mt-2 block text-xs text-[#aaa]">
@@ -1181,16 +964,27 @@ export default function EofProductionPanel({ isOwner, active = true }) {
                       placeholder="e.g. Ronaldo goal celebration or https://pin.it/…"
                     />
                   </label>
-                  {scene.durationSec ? (
-                    <p className="mt-1 text-[10px] text-[#3ea6ff]">{scene.durationSec.toFixed(1)}s (after render)</p>
-                  ) : null}
+                  <label className="mt-2 block text-xs text-[#aaa]">
+                    Seconds on screen
+                    <input
+                      type="number"
+                      min={2}
+                      max={8}
+                      step={0.1}
+                      value={scene.durationSec ?? ''}
+                      onChange={(e) =>
+                        updateScene(i, 'durationSec', e.target.value === '' ? null : Number(e.target.value))
+                      }
+                      className={inputCls}
+                    />
+                  </label>
                 </div>
               ))}
             </div>
 
             {selected.status === 'failed' && selected.errorMessage ? (
               <p className="mt-4 rounded-lg border border-[#ff4e45]/40 bg-[#2a1515] px-3 py-2 text-sm text-[#ff9b95]">
-                Render failed: {selected.errorMessage}
+                Build failed: {selected.errorMessage}
               </p>
             ) : null}
           </div>

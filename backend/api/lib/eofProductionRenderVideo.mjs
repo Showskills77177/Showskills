@@ -5,6 +5,7 @@ import {
   buildEofRenderProgress,
   estimateEofVideoRenderDurationSec,
 } from '../../../shared/eofProduction.mjs'
+import { estimateCaptionDurationSec } from '../../../shared/eofScriptTemplates.mjs'
 import {
   getEofProductionJob,
   updateEofProductionJob,
@@ -20,27 +21,30 @@ import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact } from './eofProduction
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 
 /**
- * Build 9:16 Short MP4 from rendered audio + scene images/captions.
+ * Build 9:16 Short MP4 from script scenes: stock images + on-screen captions.
+ * Audio is optional (legacy path). Image-only Shorts are the default.
  * @param {string} jobId
+ * @param {{ includeAudioIfPresent?: boolean }} [opts]
  */
-export async function renderEofProductionVideoJob(jobId) {
+export async function renderEofProductionVideoJob(jobId, opts = {}) {
+  const includeAudioIfPresent = opts.includeAudioIfPresent === true
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
-  const manifest = job.narrationManifest || []
   const scriptScenes = job.script?.scenes || []
-  if (!manifest.length && !scriptScenes.length) {
-    throw new Error('Job has no rendered scenes — run audio render first.')
+  if (!scriptScenes.length) {
+    throw new Error('Job has no script scenes — write a script first.')
   }
 
   const workDir = eofProductionWorkDir(jobId)
-  // Restore mixed audio from DB when this Vercel instance never saw the audio render.
-  const mixedPath = (await ensureEofMixedAudioOnDisk(jobId)) || join(workDir, 'mixed.mp3')
-  if (!existsSync(mixedPath)) {
-    throw new Error('Mixed audio not found — render audio first.')
+
+  let mixedPath = null
+  if (includeAudioIfPresent) {
+    mixedPath = (await ensureEofMixedAudioOnDisk(jobId)) || join(workDir, 'mixed.mp3')
+    if (!existsSync(mixedPath)) mixedPath = null
   }
 
-  const sceneCount = Math.max(manifest.length, scriptScenes.length)
+  const sceneCount = scriptScenes.length
   const renderStartedAt = new Date().toISOString()
   const estimatedTotalSec = estimateEofVideoRenderDurationSec(sceneCount)
 
@@ -72,19 +76,15 @@ export async function renderEofProductionVideoJob(jobId) {
     await report('images', 0, { force: true })
     clearEofSceneImageCache(workDir)
 
-    const rows = manifest.length
-      ? manifest.map((m, i) => ({
-          index: m.index ?? i,
-          durationSec: m.durationSec,
-          caption: m.caption ?? scriptScenes[i]?.caption,
-          imageQuery: m.imageQuery ?? scriptScenes[i]?.imageQuery,
-        }))
-      : scriptScenes.map((s, i) => ({
-          index: i,
-          durationSec: s.durationSec || 4,
-          caption: s.caption,
-          imageQuery: s.imageQuery,
-        }))
+    const rows = scriptScenes.map((s, i) => {
+      const caption = String(s.caption || s.narration || '').trim()
+      return {
+        index: i,
+        durationSec: Number(s.durationSec) || estimateCaptionDurationSec(caption),
+        caption,
+        imageQuery: s.imageQuery,
+      }
+    })
 
     let imagesDone = 0
     const scenesForVideo = await mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
@@ -121,11 +121,10 @@ export async function renderEofProductionVideoJob(jobId) {
     await report('mux', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)
 
-    const updatedManifest = (manifest.length ? manifest : rows).map((entry, i) => {
-      const videoScene = scenesForVideo.find((s) => s.index === (entry.index ?? i)) || scenesForVideo[i]
+    const updatedManifest = rows.map((entry, i) => {
+      const videoScene = scenesForVideo.find((s) => s.index === entry.index) || scenesForVideo[i]
       return {
-        ...(typeof entry === 'object' ? entry : {}),
-        index: entry.index ?? i,
+        index: entry.index,
         durationSec: videoScene?.durationSec ?? entry.durationSec,
         caption: videoScene?.caption ?? entry.caption,
         imageQuery: entry.imageQuery,
@@ -134,6 +133,17 @@ export async function renderEofProductionVideoJob(jobId) {
       }
     })
 
+    // Keep script durations in sync with what we rendered
+    const nextScript = {
+      ...job.script,
+      scenes: scriptScenes.map((s, i) => ({
+        ...s,
+        durationSec: updatedManifest[i]?.durationSec ?? s.durationSec,
+        caption: updatedManifest[i]?.caption ?? s.caption,
+        narration: updatedManifest[i]?.caption ?? s.narration,
+      })),
+    }
+
     const videoAbs = eofProductionVideoAbsPath(jobId)
     await saveEofVideoArtifact(jobId, videoAbs)
 
@@ -141,6 +151,7 @@ export async function renderEofProductionVideoJob(jobId) {
       status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED,
       renderOutputPath: relPath,
       narrationManifest: updatedManifest,
+      script: nextScript,
       errorMessage: null,
     })
   } catch (e) {

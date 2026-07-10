@@ -1,7 +1,6 @@
 import { json, readJsonBody } from '../lib/http.mjs'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 import { requireEofSession, requireEofOwner, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
-import { ensureEofMusicCatalogSeeded, listEofMusicTracks } from '../lib/eofMusicTracks.mjs'
 import {
   listEofProductionJobs,
   createEofProductionJob,
@@ -11,11 +10,12 @@ import {
   deleteEofProductionJob,
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
-import { renderEofProductionAudio, readEofMixedAudioInline } from '../lib/eofProductionRender.mjs'
-import { startEofProductionRenderBackground, startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground } from '../lib/eofProductionRenderRunner.mjs'
+import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
-import { EOF_VOICE_PRESETS, EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
+import { EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
+import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
+import { isEofOpenAiScriptConfigured } from '../lib/eofScriptWriter.mjs'
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -41,22 +41,13 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      await ensureEofMusicCatalogSeeded()
-
       let jobs = []
-      let tracks = []
       let ffmpeg = false
 
       try {
         jobs = await listEofProductionJobs()
       } catch (e) {
         console.error('[eof-production] jobs', e)
-      }
-
-      try {
-        tracks = await listEofMusicTracks()
-      } catch (e) {
-        console.error('[eof-production] tracks', e)
       }
 
       try {
@@ -68,12 +59,15 @@ export default async function handler(req, res) {
       return json(res, 200, {
         ok: true,
         jobs,
-        tracks,
-        voicePresets: Object.values(EOF_VOICE_PRESETS),
+        tracks: [],
+        voicePresets: [],
+        scriptFormats: EOF_SCRIPT_FORMATS,
+        defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
+        openAiScriptEnabled: isEofOpenAiScriptConfigured(),
         ffmpegAvailable: ffmpeg,
         renderNote: ffmpeg
           ? null
-          : 'Audio render needs ffmpeg (bundled ffmpeg-static on deploy, or FFMPEG_PATH locally).',
+          : 'Video build needs ffmpeg (bundled ffmpeg-static on deploy, or FFMPEG_PATH locally).',
         pexelsConfigured: eofImageSourceStatus().pexels,
         imageSources: eofImageSourceStatus(),
         imagesNote: eofImagesConfigurationNote(),
@@ -86,36 +80,7 @@ export default async function handler(req, res) {
       const body = await readJsonBody(req)
       const action = typeof body.action === 'string' ? body.action : 'create'
 
-      if (action === 'render') {
-        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
-        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
-        const existing = await getEofProductionJob(jobId)
-        if (!existing) return json(res, 404, { error: 'Job not found.' })
-        if (existing.status === 'rendering') {
-          return json(res, 202, { ok: true, accepted: true, job: existing })
-        }
-
-        const asyncRender = body.wait !== true
-        if (asyncRender) {
-          try {
-            await startEofProductionRenderBackground(jobId)
-            const job = await getEofProductionJob(jobId)
-            return json(res, 202, { ok: true, accepted: true, job })
-          } catch (e) {
-            return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
-          }
-        }
-
-        try {
-          const job = await renderEofProductionAudio(jobId)
-          const audioDataUrl = await readEofMixedAudioInline(jobId)
-          return json(res, 200, { ok: true, job, audioDataUrl })
-        } catch (e) {
-          return json(res, 500, { error: e instanceof Error ? e.message : 'Render failed' })
-        }
-      }
-
-      if (action === 'build-short') {
+      if (action === 'build-short' || action === 'render-video') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const existing = await getEofProductionJob(jobId)
@@ -125,33 +90,15 @@ export default async function handler(req, res) {
         }
 
         try {
-          const rebuild = body.rebuild === true || existing.status === 'video_rendered'
-          await startEofProductionFullBuildBackground(jobId, { rebuild })
+          if (action === 'build-short') {
+            await startEofProductionFullBuildBackground(jobId)
+          } else {
+            await startEofProductionVideoRenderBackground(jobId)
+          }
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Build failed' })
-        }
-      }
-
-      if (action === 'render-video') {
-        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
-        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
-        const existing = await getEofProductionJob(jobId)
-        if (!existing) return json(res, 404, { error: 'Job not found.' })
-        if (existing.status === 'rendering_video') {
-          return json(res, 202, { ok: true, accepted: true, job: existing })
-        }
-        if (!existing.mixedAudioPath && existing.status !== 'rendered' && existing.status !== 'video_rendered') {
-          return json(res, 400, { error: 'Render audio first before building the video.' })
-        }
-
-        try {
-          await startEofProductionVideoRenderBackground(jobId)
-          const job = await getEofProductionJob(jobId)
-          return json(res, 202, { ok: true, accepted: true, job })
-        } catch (e) {
-          return json(res, 500, { error: e instanceof Error ? e.message : 'Video render failed' })
         }
       }
 
@@ -171,8 +118,13 @@ export default async function handler(req, res) {
       if (action === 'regenerate-script') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
-        const job = await regenerateEofProductionScript(jobId)
-        return json(res, 200, { ok: true, job })
+        const format = typeof body.format === 'string' ? body.format.trim() : null
+        try {
+          const job = await regenerateEofProductionScript(jobId, { format })
+          return json(res, 200, { ok: true, job })
+        } catch (e) {
+          return json(res, 400, { error: e instanceof Error ? e.message : 'Could not rewrite script' })
+        }
       }
 
       if (action === 'cancel-render') {
@@ -187,17 +139,26 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, job })
       }
 
+      // Legacy audio action — redirect to image Short build
+      if (action === 'render') {
+        return json(res, 400, {
+          error: 'Audio narration is disabled. Use Build Short (images + captions only).',
+        })
+      }
+
       const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
-      const voicePreset = typeof body.voicePreset === 'string' ? body.voicePreset : 'british'
-      const musicTrackId = typeof body.musicTrackId === 'string' ? body.musicTrackId.trim() : null
+      const format = typeof body.format === 'string' ? body.format.trim() : EOF_DEFAULT_SCRIPT_FORMAT
       try {
         const job = await createEofProductionJob({
           topic,
           createdBy: info.username,
-          voicePreset,
-          musicTrackId,
+          format,
         })
-        return json(res, 201, { ok: true, job })
+        return json(res, 201, {
+          ok: true,
+          job,
+          scriptSource: isEofOpenAiScriptConfigured() ? 'openai-or-template' : 'template',
+        })
       } catch (e) {
         return json(res, 400, { error: e instanceof Error ? e.message : 'Could not create job' })
       }
