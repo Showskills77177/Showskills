@@ -6,6 +6,8 @@ import {
   updateEofProductionJob,
   markEofProductionJobFailed,
   updateEofProductionRenderProgress,
+  resetEofVoiceRegenerationBaseline,
+  incrementEofVoiceRegenerationCount,
 } from './eofProductionJobs.mjs'
 import { getEofMusicTrack, resolveEofMusicTrackFilePath } from './eofMusicTracks.mjs'
 import {
@@ -44,10 +46,11 @@ export async function readEofMixedAudioInline(jobId) {
 /**
  * Generate per-scene TTS and mix with catalog music bed.
  * @param {string} jobId
- * @param {{ preserveSceneImages?: boolean }} [opts]
+ * @param {{ preserveSceneImages?: boolean, voiceRegenerationMode?: boolean }} [opts]
  */
 export async function renderEofProductionAudio(jobId, opts = {}) {
   const preserveSceneImages = opts.preserveSceneImages === true
+  const voiceRegenerationMode = opts.voiceRegenerationMode === true
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
@@ -103,23 +106,33 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
 
     await reportProgress('tts', 0, { force: true })
 
+    const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
+
     let scenesDone = 0
     const sceneManifest = await mapWithConcurrency(job.script.scenes, TTS_CONCURRENCY, async (scene, i) => {
       const outPath = join(workDir, `scene-${i + 1}.mp3`)
-      await synthesizeEofSceneNarration({
+      const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]
+      const ttsResult = await synthesizeEofSceneNarration({
         text: scene.narration,
         voicePreset: job.voicePreset,
         voiceSettings: job.voiceSettings,
+        regenerateFromRequestId:
+          voiceRegenerationMode && prior?.elevenLabsRequestId ? prior.elevenLabsRequestId : null,
         outPath,
       })
+      const audioPath = typeof ttsResult === 'string' ? ttsResult : ttsResult.outPath
       scenesDone += 1
       await reportProgress('tts', scenesDone)
       return {
         sceneId: scene.id,
         index: i,
-        audioPath: outPath,
+        audioPath,
         caption: scene.caption,
         imageQuery: scene.imageQuery,
+        elevenLabsRequestId:
+          typeof ttsResult === 'object' && ttsResult.requestId ? ttsResult.requestId : prior?.elevenLabsRequestId || null,
+        imageSource: prior?.imageSource || null,
+        imageQueryUsed: prior?.imageQueryUsed || scene.imageQuery,
       }
     })
 
@@ -159,12 +172,19 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
     await clearEofMixedAudioArtifact(jobId).catch(() => {})
     await saveEofMixedAudioArtifact(jobId, mixedPath)
 
+    const regenPatch = voiceRegenerationMode
+      ? { voiceRegenerationCount: incrementEofVoiceRegenerationCount(job) }
+      : preserveSceneImages
+        ? {}
+        : resetEofVoiceRegenerationBaseline(job.script)
+
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
       narrationManifest: sceneManifestWithDur,
       mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
       renderOutputPath: null,
       errorMessage: null,
+      ...regenPatch,
       script: {
         ...job.script,
         scenes: job.script.scenes.map((scene, i) => ({

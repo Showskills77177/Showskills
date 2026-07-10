@@ -13,6 +13,7 @@ import {
   parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
+import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { writeEofProductionScript } from './eofScriptWriter.mjs'
@@ -20,8 +21,9 @@ import { writeEofProductionScript } from './eofScriptWriter.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 /** Job metadata only — never pull durable media base64 into list/detail payloads. */
-const EOF_JOB_SELECT = `id, topic, title, status, script_json, music_track_id, music_volume,
-  voice_preset, voice_settings_json, narration_manifest_json, mixed_audio_path, render_output_path,
+const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
+  voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
+  narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
 function parseVoiceSettingsJson(raw) {
@@ -64,6 +66,9 @@ function rowToJob(row) {
     musicVolume: Number(row.music_volume) || EOF_DEFAULT_MUSIC_VOLUME,
     voicePreset: row.voice_preset || 'brian',
     voiceSettings: parseVoiceSettingsJson(row.voice_settings_json),
+    voiceRegenerationCount: Number(row.voice_regeneration_count) || 0,
+    voiceNarrationHash: row.voice_narration_hash || null,
+    scriptSource: row.script_source || null,
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -109,7 +114,7 @@ export async function createEofProductionJob({
   const t = String(topic || '').trim()
   if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
 
-  const { script } = await writeEofProductionScript({ topic: t, format })
+  const { script, source: scriptSource } = await writeEofProductionScript({ topic: t, format })
   const track = await pickEofMusicTrackForTopic(t, musicTrackId)
   const id = randomUUID()
   const preset = EOF_VOICE_PRESETS[voicePreset] || EOF_VOICE_PRESETS[EOF_DEFAULT_VOICE_PRESET]
@@ -118,14 +123,15 @@ export async function createEofProductionJob({
 
   await query(
     `INSERT INTO eof_production_jobs
-     (id, topic, title, status, script_json, music_track_id, music_volume, voice_preset, voice_settings_json, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [
       id,
       t,
       script.title,
       EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
       JSON.stringify(script),
+      scriptSource || 'template',
       track?.id || null,
       EOF_DEFAULT_MUSIC_VOLUME,
       voicePreset,
@@ -164,6 +170,13 @@ export async function updateEofProductionJob(id, patch) {
     patch.narrationManifest !== undefined ? patch.narrationManifest : job.narrationManifest
   const renderOutputPath =
     patch.renderOutputPath !== undefined ? patch.renderOutputPath : job.renderOutputPath
+  const scriptSource = patch.scriptSource !== undefined ? patch.scriptSource : job.scriptSource
+  const voiceRegenerationCount =
+    patch.voiceRegenerationCount !== undefined
+      ? Math.max(0, Number(patch.voiceRegenerationCount) || 0)
+      : job.voiceRegenerationCount
+  const voiceNarrationHash =
+    patch.voiceNarrationHash !== undefined ? patch.voiceNarrationHash : job.voiceNarrationHash
 
   await query(
     `UPDATE eof_production_jobs
@@ -171,14 +184,17 @@ export async function updateEofProductionJob(id, patch) {
          title = $3,
          status = $4,
          script_json = $5,
-         music_track_id = $6,
-         music_volume = $7,
-         voice_preset = $8,
-         voice_settings_json = $9,
-         error_message = $10,
-         mixed_audio_path = $11,
-         narration_manifest_json = $12,
-         render_output_path = $13,
+         script_source = $6,
+         music_track_id = $7,
+         music_volume = $8,
+         voice_preset = $9,
+         voice_settings_json = $10,
+         error_message = $11,
+         mixed_audio_path = $12,
+         narration_manifest_json = $13,
+         render_output_path = $14,
+         voice_regeneration_count = $15,
+         voice_narration_hash = $16,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -187,6 +203,7 @@ export async function updateEofProductionJob(id, patch) {
       title,
       status,
       script ? JSON.stringify(script) : null,
+      scriptSource,
       musicTrackId,
       musicVolume,
       voicePreset,
@@ -195,6 +212,8 @@ export async function updateEofProductionJob(id, patch) {
       mixedAudioPath,
       narrationManifest ? JSON.stringify(narrationManifest) : null,
       renderOutputPath,
+      voiceRegenerationCount,
+      voiceNarrationHash,
     ],
   )
 
@@ -221,17 +240,31 @@ export async function regenerateEofProductionScript(id, { format } = {}) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
   const fmt = format || job.script?.format || null
-  const { script } = await writeEofProductionScript({ topic: job.topic, format: fmt })
+  const { script, source: scriptSource } = await writeEofProductionScript({ topic: job.topic, format: fmt })
   const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
   return updateEofProductionJob(id, {
     script,
     title: script.title,
+    scriptSource,
     musicTrackId: track?.id || job.musicTrackId,
     status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
     errorMessage: null,
     renderOutputPath: null,
     narrationManifest: null,
+    voiceRegenerationCount: 0,
+    voiceNarrationHash: null,
   })
+}
+
+export function resetEofVoiceRegenerationBaseline(script) {
+  return {
+    voiceRegenerationCount: 0,
+    voiceNarrationHash: hashEofNarrationLines(script),
+  }
+}
+
+export function incrementEofVoiceRegenerationCount(job) {
+  return Math.max(0, Number(job?.voiceRegenerationCount) || 0) + 1
 }
 
 function removeEofProductionJobFiles(jobId) {

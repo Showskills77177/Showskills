@@ -119,7 +119,10 @@ export async function renderEofProductionVoiceoverOnly(jobId) {
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
   try {
-    await renderEofProductionAudio(jobId, { preserveSceneImages: true })
+    await renderEofProductionAudio(jobId, {
+      preserveSceneImages: true,
+      voiceRegenerationMode: true,
+    })
 
     const refreshed = await getEofProductionJob(jobId)
     const flags = await getEofArtifactFlags(jobId)

@@ -15,7 +15,7 @@ import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
-import { isEofOpenAiScriptConfigured, eofScriptProviderStatus } from '../lib/eofScriptWriter.mjs'
+import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel } from '../lib/eofScriptWriter.mjs'
 import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
 import {
   EOF_ELEVENLABS_VOICE_FIELDS,
@@ -23,6 +23,7 @@ import {
   normalizeElevenLabsVoiceSettings,
   resolveElevenLabsVoiceSettings,
 } from '../../../shared/eofElevenLabsVoice.mjs'
+import { eofVoiceRegenerationStatus } from '../../../shared/eofVoiceRegeneration.mjs'
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -77,6 +78,12 @@ export default async function handler(req, res) {
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
         scriptProviders: eofScriptProviderStatus(),
+        preferredScriptProvider: preferredEofScriptProvider(),
+        scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
+        elevenLabsVoiceRegeneration: {
+          limit: 3,
+          note: 'Up to 3 free voice-setting regenerations per Short (same captions, slider tweaks only). Rebuild Short uses credits.',
+        },
         ffmpegAvailable: ffmpeg,
         renderNote: ffmpeg
           ? null
@@ -134,6 +141,13 @@ export default async function handler(req, res) {
                   : undefined,
             })
           }
+
+          const refreshed = await getEofProductionJob(jobId)
+          const regen = eofVoiceRegenerationStatus(refreshed)
+          if (!regen.canRegenerate) {
+            return json(res, 400, { error: regen.blockedReason || 'Voice regeneration is not available.' })
+          }
+
           await startEofProductionVoiceoverRegenerationBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -195,7 +209,8 @@ export default async function handler(req, res) {
         return json(res, 201, {
           ok: true,
           job,
-          scriptSource: isEofOpenAiScriptConfigured() ? 'openai-or-template' : 'template',
+          scriptSource: job.scriptSource || preferredEofScriptProvider(),
+          scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
         })
       } catch (e) {
         return json(res, 400, { error: e instanceof Error ? e.message : 'Could not create job' })

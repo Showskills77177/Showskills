@@ -21,6 +21,15 @@ export function isEofElevenLabsConfigured() {
   return Boolean(getElevenLabsApiKey())
 }
 
+function readElevenLabsRequestId(res) {
+  return (
+    res.headers.get('request-id') ||
+    res.headers.get('x-request-id') ||
+    res.headers.get('history-item-id') ||
+    null
+  )
+}
+
 /**
  * @param {{
  *   text: string,
@@ -28,6 +37,7 @@ export function isEofElevenLabsConfigured() {
  *   voiceId?: string,
  *   modelId?: string,
  *   voiceSettings?: Record<string, unknown> | null,
+ *   regenerateFromRequestId?: string | null,
  *   stability?: number,
  *   similarityBoost?: number,
  *   style?: number,
@@ -40,6 +50,7 @@ export async function synthesizeElevenLabsSpeech({
   voiceId = ELEVENLABS_BRIAN_VOICE_ID,
   modelId,
   voiceSettings,
+  regenerateFromRequestId,
   stability,
   similarityBoost,
   style,
@@ -62,6 +73,22 @@ export async function synthesizeElevenLabsSpeech({
 
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(vid)}?output_format=${encodeURIComponent(outputFormat)}`
 
+  const priorId = String(regenerateFromRequestId || '').trim()
+  const payload = {
+    text: line,
+    model_id: model,
+    voice_settings: {
+      stability: settings.stability,
+      similarity_boost: settings.similarityBoost,
+      style: settings.style,
+      speed: settings.speed,
+      use_speaker_boost: true,
+    },
+  }
+  if (priorId) {
+    payload.previous_request_ids = [priorId]
+  }
+
   const maxAttempts = 3
   let lastError = null
 
@@ -74,17 +101,7 @@ export async function synthesizeElevenLabsSpeech({
           Accept: 'audio/mpeg',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          text: line,
-          model_id: model,
-          voice_settings: {
-            stability: settings.stability,
-            similarity_boost: settings.similarityBoost,
-            style: settings.style,
-            speed: settings.speed,
-            use_speaker_boost: true,
-          },
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
@@ -92,12 +109,13 @@ export async function synthesizeElevenLabsSpeech({
         throw new Error(`ElevenLabs ${res.status}: ${errText.slice(0, 240) || res.statusText}`)
       }
 
+      const requestId = readElevenLabsRequestId(res)
       const buf = Buffer.from(await res.arrayBuffer())
       if (buf.length < 500) throw new Error('ElevenLabs returned empty audio.')
 
       mkdirSync(dirname(outPath), { recursive: true })
       await writeFile(outPath, buf)
-      return { outPath, voiceSettings: settings }
+      return { outPath, voiceSettings: settings, requestId, regeneratedFromRequestId: priorId || null }
     } catch (e) {
       lastError = e
       if (attempt < maxAttempts) {

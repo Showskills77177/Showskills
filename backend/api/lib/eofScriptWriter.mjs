@@ -36,6 +36,22 @@ export function eofScriptProviderStatus() {
   }
 }
 
+/** Primary LLM provider for new scripts (first configured). */
+export function preferredEofScriptProvider() {
+  const s = eofScriptProviderStatus()
+  if (s.xai) return 'xai'
+  if (s.openai) return 'openai'
+  if (s.groq) return 'groq'
+  return 'template'
+}
+
+export function eofScriptProviderLabel(provider) {
+  if (provider === 'xai') return 'xAI Grok'
+  if (provider === 'openai') return 'OpenAI'
+  if (provider === 'groq') return 'Groq'
+  return 'template'
+}
+
 /** True when any LLM script provider is configured. */
 export function isEofOpenAiScriptConfigured() {
   const s = eofScriptProviderStatus()
@@ -130,11 +146,18 @@ async function chatJsonCompletion({ url, headers, body }) {
   if (!content) throw new Error('empty script content')
   let parsed
   try {
-    parsed = JSON.parse(content)
+    parsed = parseJsonContent(content)
   } catch {
     throw new Error('script was not valid JSON')
   }
   return parsed
+}
+
+function parseJsonContent(content) {
+  const raw = String(content || '').trim()
+  const fenced = /^```(?:json)?\s*([\s\S]*?)```\s*$/i.exec(raw)
+  const body = fenced ? fenced[1].trim() : raw
+  return JSON.parse(body)
 }
 
 function finalizeScript(parsed, topic, format, source) {
@@ -148,22 +171,36 @@ function finalizeScript(parsed, topic, format, source) {
 
 async function writeEofScriptWithXai({ topic, format }) {
   const key = envKey('XAI_API_KEY', 'EOF_XAI_API_KEY')
-  const model = envKey('XAI_MODEL', 'EOF_XAI_MODEL') || 'grok-3-latest'
+  const configured = envKey('XAI_MODEL', 'EOF_XAI_MODEL')
+  const models = [configured || 'grok-3-latest', 'grok-2-latest', 'grok-2-1212', 'grok-beta'].filter(
+    (m, i, arr) => m && arr.indexOf(m) === i,
+  )
   const { system, user } = buildPrompt({ topic, format })
-  const parsed = await chatJsonCompletion({
-    url: 'https://api.x.ai/v1/chat/completions',
-    headers: { Authorization: `Bearer ${key}` },
-    body: {
-      model,
-      temperature: 0.55,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    },
-  })
-  return finalizeScript(parsed, topic, format, 'xai')
+
+  let lastError = null
+  for (const model of models) {
+    try {
+      const parsed = await chatJsonCompletion({
+        url: 'https://api.x.ai/v1/chat/completions',
+        headers: { Authorization: `Bearer ${key}` },
+        body: {
+          model,
+          temperature: 0.55,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        },
+      })
+      return finalizeScript(parsed, topic, format, 'xai')
+    } catch (e) {
+      lastError = e
+      console.warn('[eof-script] xAI model failed', model, e instanceof Error ? e.message : e)
+    }
+  }
+
+  throw lastError || new Error('xAI script generation failed')
 }
 
 async function writeEofScriptWithOpenAi({ topic, format }) {

@@ -15,6 +15,7 @@ import {
   EOF_ELEVENLABS_VOICE_LIMITS,
   normalizeElevenLabsVoiceSettings,
 } from '../../../../shared/eofElevenLabsVoice.mjs'
+import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
@@ -85,6 +86,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [voiceSettings, setVoiceSettings] = useState(() => normalizeElevenLabsVoiceSettings(null))
   const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
   const [scriptProviders, setScriptProviders] = useState({ xai: false, openai: false, groq: false })
+  const [preferredScriptProvider, setPreferredScriptProvider] = useState('template')
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
   const [selectedId, setSelectedId] = useState(readStoredSelectedId)
@@ -153,6 +155,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           ? j.scriptProviders
           : { xai: false, openai: false, groq: false },
       )
+      if (j.preferredScriptProvider) setPreferredScriptProvider(j.preferredScriptProvider)
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
       setImageSources(
@@ -199,6 +202,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   }, [selectedId])
 
   const selected = jobs.find((j) => j.id === selectedId) || null
+
+  const voiceRegen = useMemo(() => {
+    if (!selected || !draftScript) {
+      return { canRegenerate: false, remaining: 0, limit: 3, blockedReason: null }
+    }
+    return eofVoiceRegenerationStatus({ ...selected, script: draftScript })
+  }, [selected, draftScript])
 
   function hydrateDraftFromJob(job) {
     setDraftScript(job.script ? JSON.parse(JSON.stringify(job.script)) : null)
@@ -653,9 +663,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (j.job?.script) hydrateDraftFromJob(j.job)
       hydratedJobIdRef.current = j.job.id
       setSuccess(
-        openAiScriptEnabled
-          ? `Script drafted for “${j.job.topic}” (AI or template). Edit captions, then Build Short.`
-          : `Script drafted for “${j.job.topic}”. Edit captions, then Build Short.`,
+        j.scriptProviderLabel
+          ? `Script drafted with ${j.scriptProviderLabel} for “${j.job.topic}”. Edit captions, then Build Short.`
+          : openAiScriptEnabled
+            ? `Script drafted for “${j.job.topic}” (AI or template). Edit captions, then Build Short.`
+            : `Script drafted for “${j.job.topic}”. Edit captions, then Build Short.`,
       )
       upsertJob(j.job)
       await load()
@@ -862,13 +874,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
           Scripts:{' '}
           {openAiScriptEnabled
-            ? [
-                scriptProviders.xai && 'xAI Grok',
-                scriptProviders.openai && 'OpenAI',
-                scriptProviders.groq && 'Groq (free tier)',
-              ]
-                .filter(Boolean)
-                .join(' → ') + ' (templates if all fail)'
+            ? scriptProviders.xai
+              ? `xAI Grok (primary)${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.groq ? ' · Groq fallback' : ''}`
+              : [
+                  scriptProviders.openai && 'OpenAI',
+                  scriptProviders.groq && 'Groq (free tier)',
+                ]
+                  .filter(Boolean)
+                  .join(' → ') + ' (templates if all fail)'
             : 'Built-in templates — set XAI_API_KEY, OPENAI_API_KEY, or free GROQ_API_KEY for deeper AI scripts'}
         </p>
 
@@ -1023,6 +1036,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   {selected.topic}
                   {draftScript.format ? ` · ${draftScript.format}` : ''}
                   {selected.voicePreset ? ` · voice ${selected.voicePreset}` : ''}
+                  {selected.scriptSource && selected.scriptSource !== 'template'
+                    ? ` · script ${selected.scriptSource === 'xai' ? 'Grok' : selected.scriptSource}`
+                    : preferredScriptProvider === 'xai' && !selected.scriptSource
+                      ? ' · script Grok'
+                      : ''}
                   <span className="ml-2 text-[#9ecbff]">· {productionJobStatusLabel(selected.status)}</span>
                   {draftDirty ? <span className="ml-2 text-amber-400">· unsaved changes</span> : null}
                 </p>
@@ -1141,14 +1159,21 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-[#303030] bg-[#0d0d0d] p-4">
                 <button
                   type="button"
-                  disabled={busy || isRendering}
+                  disabled={busy || isRendering || !voiceRegen.canRegenerate}
                   onClick={regenerateVoiceover}
+                  title={voiceRegen.blockedReason || undefined}
                   className="rounded-full border border-[#3ea6ff]/50 px-4 py-2 text-xs font-semibold text-[#9ecbff] disabled:opacity-50"
                 >
-                  {busy || isRendering ? 'Regenerating…' : 'Regenerate voiceover only'}
+                  {busy || isRendering
+                    ? 'Regenerating…'
+                    : `Regenerate voiceover only (${voiceRegen.remaining}/${voiceRegen.limit} free)`}
                 </button>
                 <p className="text-[10px] text-[#717171]">
-                  Re-runs narration with your current voice settings and remuxes the Short — keeps existing scene photos (no image re-fetch).
+                  Same captions, new Brian sliders only — remuxes with cached photos (ElevenLabs free regen rule: up to{' '}
+                  {voiceRegen.limit} slider tweaks per Short).
+                  {voiceRegen.blockedReason ? (
+                    <span className="mt-1 block text-amber-400">{voiceRegen.blockedReason}</span>
+                  ) : null}
                 </p>
               </div>
             ) : null}

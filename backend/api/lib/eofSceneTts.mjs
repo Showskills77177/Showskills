@@ -37,9 +37,21 @@ function resolveVoicePreset(voicePreset) {
 }
 
 /**
- * @param {{ text: string, voicePreset: string, voiceSettings?: Record<string, unknown> | null, outPath: string }} opts
+ * @param {{
+ *   text: string,
+ *   voicePreset: string,
+ *   voiceSettings?: Record<string, unknown> | null,
+ *   regenerateFromRequestId?: string | null,
+ *   outPath: string,
+ * }} opts
  */
-export async function synthesizeEofSceneNarration({ text, voicePreset, voiceSettings, outPath }) {
+export async function synthesizeEofSceneNarration({
+  text,
+  voicePreset,
+  voiceSettings,
+  regenerateFromRequestId,
+  outPath,
+}) {
   const preset = resolveVoicePreset(voicePreset)
   const line = String(text || '').trim()
   if (!line) throw new Error('Empty narration text.')
@@ -59,13 +71,15 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, voiceSett
       voiceId: preset.voiceId,
       modelId: preset.modelId,
       voiceSettings: resolved,
+      regenerateFromRequestId,
     })
-    return result.outPath
+    return result
   }
 
   return synthesizeWithEdgeTts({ text: line, preset, outPath })
 }
 
+/** @returns {Promise<string | { outPath: string, requestId?: string | null }>} */
 async function synthesizeWithEdgeTts({ text, preset, outPath }) {
   const lang = String(preset.voice || '').startsWith('en-GB') ? 'en-GB' : 'en-US'
   const maxAttempts = 3
