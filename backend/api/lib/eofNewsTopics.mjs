@@ -1,8 +1,8 @@
 /**
- * European football news topic picker — Sky Sports / ESPN / ITV Sport desk style.
- * Uses Grok 4.5 to propose today's most Short-worthy European football stories.
+ * Football news topic picker — Sky Sports / ESPN / ITV Sport desk style.
+ * Worldwide association football (World Cup 2026 included). Always call it football — never soccer.
  */
-import { EOF_EUROPEAN_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
+import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
 import { isXaiConfigured, xaiJsonCompletion } from './eofXaiClient.mjs'
 
 export const EOF_NEWS_DESKS = [
@@ -13,7 +13,7 @@ export const EOF_NEWS_DESKS = [
   'The Athletic',
   'Goal.com',
   'Marca',
-  'L\'Équipe',
+  "L'Équipe",
 ]
 
 /**
@@ -27,15 +27,16 @@ export async function pickEofEuropeanFootballNewsTopics(opts = {}) {
     try {
       const parsed = await xaiJsonCompletion({
         temperature: 0.4,
-        system: `You are a European football news editor for Eyes Of Football YouTube Shorts.
+        system: `You are a football news editor for Eyes Of Football YouTube Shorts.
 
-${EOF_EUROPEAN_FOOTBALL_SCOPE}
+${EOF_FOOTBALL_SCOPE}
 
 Write like the most respected sports desks: ${EOF_NEWS_DESKS.join(', ')}.
-Pick CURRENT, Short-worthy European football stories (transfers, injuries, managerial, match fallout, contracts).
-Do NOT invent fake breaking news with invented scores or quotes. Prefer widely discussed real storylines; if unsure of exact details, keep the headline general but still specific (club + player + situation).
+Pick CURRENT, Short-worthy football stories worldwide (World Cup 2026, transfers, injuries, managerial, match fallout, contracts, international windows).
+Always call it football — never soccer.
+Do NOT invent fake breaking news with invented scores or quotes. Prefer widely discussed real storylines; if unsure of exact details, keep the headline general but still specific (club/nation + player + situation).
 Never include American football / NFL.`,
-        user: `Return JSON with ${count} topics for today's European football Shorts:
+        user: `Return JSON with ${count} topics for today's football Shorts:
 {
   "topics": [
     {
@@ -87,28 +88,28 @@ function fallbackNewsTopics() {
       whyNow: 'England World Cup nights always travel on Shorts.',
     },
     {
-      headline: 'France’s World Cup favourites tag is back under the microscope',
+      headline: 'Brazil’s World Cup favourites tag is back under the microscope',
       angle: 'Talent everywhere — but tournament football punishes soft moments.',
-      desks: ['L\'Équipe', 'ESPN FC'],
+      desks: ["L'Équipe", 'ESPN FC'],
       whyNow: 'Favourites narrative is perfect for debate CTAs.',
     },
     {
       headline: 'Premier League transfer window: who moves next?',
-      angle: 'Desk-style look at the biggest European transfer storylines fans are arguing about.',
+      angle: 'Desk-style look at the biggest transfer storylines fans are arguing about.',
       desks: ['Sky Sports', 'The Athletic'],
       whyNow: 'Transfer chatter drives Shorts comments every day.',
     },
     {
-      headline: 'Champions League nights that still decide careers',
-      angle: 'UCL pressure stories from Europe’s biggest clubs.',
-      desks: ['ITV Sport', 'ESPN FC'],
-      whyNow: 'European nights always travel on Shorts.',
+      headline: 'Messi, Mbappé, Haaland — who owns the World Cup narrative?',
+      angle: 'Global superstars and what the tournament is asking of them now.',
+      desks: ['ESPN FC', 'Goal.com'],
+      whyNow: 'Star power + World Cup = Shorts engagement.',
     },
   ]
 }
 
 /**
- * Expand a vague topic ("world cup news") into one concrete European football brief.
+ * Expand a vague topic ("world cup news") into one concrete football brief.
  * @param {{ topic: string, format?: string }} input
  */
 export async function resolveEofScriptBrief({ topic, format } = {}) {
@@ -120,7 +121,7 @@ export async function resolveEofScriptBrief({ topic, format } = {}) {
       raw,
     ) ||
     /^(latest|today'?s?|breaking)\s+(world\s*cup|football|soccer)?\s*news$/i.test(raw) ||
-    raw.split(/\s+/).length <= 3 && /\b(news|update|latest|headlines)\b/i.test(raw)
+    (raw.split(/\s+/).length <= 3 && /\b(news|update|latest|headlines)\b/i.test(raw))
 
   if (!vague && raw.split(/\s+/).length >= 5) {
     return { topic: raw, context: '', resolved: false, source: 'user' }
@@ -132,13 +133,14 @@ export async function resolveEofScriptBrief({ topic, format } = {}) {
     try {
       const parsed = await xaiJsonCompletion({
         temperature: 0.3,
-        system: `You are a European football news editor for Eyes Of Football YouTube Shorts.
+        system: `You are a football news editor for Eyes Of Football YouTube Shorts.
 
-${EOF_EUROPEAN_FOOTBALL_SCOPE}
+${EOF_FOOTBALL_SCOPE}
 
-The user gave a VAGUE topic. Pick ONE specific, Short-worthy story they can narrate today.
-${wantsWorldCup ? 'Prefer a FIFA World Cup 2026 European national-team story (match result, group race, knockout stakes, star player moment).' : 'Prefer a timely European club or national-team story.'}
+The user gave a VAGUE topic. Pick ONE specific, Short-worthy football story they can narrate today.
+${wantsWorldCup ? 'Prefer a FIFA World Cup 2026 story (any nation — match result, group race, knockout stakes, star player moment).' : 'Prefer a timely club or international football story from anywhere in the world.'}
 Rules:
+- Always call it football — never soccer.
 - Name real teams / players / competitions when you are reasonably sure.
 - Do NOT invent exact scores you are unsure about — say "narrow win", "statement result", "late drama" instead.
 - Never American football / NFL.
@@ -187,7 +189,7 @@ export async function pickEofDailyNewsTopic() {
   const { topics, source } = await pickEofEuropeanFootballNewsTopics({ count: 5 })
   const first = topics[0]
   return {
-    topic: first?.headline || 'Premier League transfer window: who moves next?',
+    topic: first?.headline || 'Spain edge Belgium — World Cup statement win',
     angle: first?.angle || '',
     desks: first?.desks || ['Sky Sports'],
     source,

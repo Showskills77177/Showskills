@@ -136,7 +136,7 @@ export default function EofSchedulerPanel({ isOwner, onOpenJob }) {
         <h2 className="text-base font-semibold text-white">Daily Short scheduler</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           {note ||
-            'Automatically composes a European football news Short with Grok 4.5, builds it, writes title/hashtags (#shortsfeed), picks a thumbnail, and sends it to YouTube Studio.'}
+            'Automatically composes a football news Short (World Cup + worldwide) with Grok 4.5, builds it, writes title/hashtags (#shortsfeed), picks a thumbnail, and sends it to YouTube Studio.'}
         </p>
 
         {success ? (
@@ -253,7 +253,7 @@ export default function EofSchedulerPanel({ isOwner, onOpenJob }) {
       {newsTopics.length ? (
         <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
           <h3 className="text-sm font-semibold text-white">
-            Today’s European football angles {newsSource ? `(${newsSource === 'xai' ? 'Grok 4.5' : newsSource})` : ''}
+            Today’s football angles {newsSource ? `(${newsSource === 'xai' ? 'Grok 4.5' : newsSource})` : ''}
           </h3>
           <ul className="mt-3 space-y-3">
             {newsTopics.map((t, i) => (

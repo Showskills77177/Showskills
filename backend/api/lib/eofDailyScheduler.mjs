@@ -1,6 +1,6 @@
 /**
  * Daily EOF Short automation:
- * pick European football news → Grok 4.5 script → Build Short → Studio meta (#shortsfeed) → YouTube.
+ * pick football news (worldwide / World Cup) → Grok 4.5 script → Build Short → Studio meta (#shortsfeed) → YouTube.
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { createEofProductionJob, getEofProductionJob, updateEofProductionJob } from './eofProductionJobs.mjs'

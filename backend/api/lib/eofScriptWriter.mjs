@@ -9,14 +9,15 @@
  *   3) Groq          (GROQ_API_KEY) — free-tier Llama
  * Falls back to structured templates when none work.
  *
- * Scope: European football (soccer) ONLY — never American football / NFL.
+ * Scope: football worldwide (World Cup, all leagues) — call it football, never soccer.
+ * Never American football / NFL.
  */
 import {
   buildFactsShortScript,
   normalizeEofScript,
   EOF_DEFAULT_SCRIPT_FORMAT,
   EOF_SCRIPT_FORMATS,
-  EOF_EUROPEAN_FOOTBALL_SCOPE,
+  EOF_FOOTBALL_SCOPE,
   EOF_MAX_SCENES,
 } from '../../../shared/eofScriptTemplates.mjs'
 import { isXaiConfigured, xaiJsonCompletion, xaiTextCompletion } from './eofXaiClient.mjs'
@@ -70,30 +71,30 @@ export function isEofOpenAiScriptConfigured() {
 function formatGuide(format) {
   return {
     listicle:
-      '5 scenes: cold-open hook that creates a curiosity gap, then 3 specific European football angles (club/era/rivalry/style/pressure), then a comment CTA.',
+      '5 scenes: cold-open hook that creates a curiosity gap, then 3 specific football angles (club/nation/era/rivalry/style/pressure), then a comment CTA.',
     hook_reveal:
       '5 scenes: bold claim → origin context → the turning-point season/move → the peak night or era → CTA. Build tension; pay it off in scene 4.',
     debate:
       '5 scenes: hot take → strongest critic angle → strongest fan angle → nuanced verdict → ask viewers to pick a side.',
     timeline:
-      '5 scenes: career arc — start, breakthrough, peak, late-career/legacy, CTA. Each scene = one European club/competition era.',
+      '5 scenes: career arc — start, breakthrough, peak, late-career/legacy, CTA. Each scene = one club/nation/tournament era.',
     news:
-      '5 scenes in Sky Sports / ESPN FC / ITV Sport / BBC Sport / The Athletic newsroom style: BREAKING hook → what happened → why it matters → what happens next → viewer CTA.',
+      '5 scenes in Sky Sports / ESPN FC / ITV Sport / BBC Sport / The Athletic newsroom style: BREAKING hook → what happened → why it matters → what happens next → viewer CTA. World Cup, club, or international football worldwide.',
   }[format]
 }
 
 function draftFormatGuide(format) {
   return {
     listicle:
-      'Write like a sharp football column: open with the surprising angle, then 3 concrete European-football beats, end with a question for comments.',
+      'Write like a sharp football column: open with the surprising angle, then 3 concrete football beats, end with a question for comments.',
     hook_reveal:
-      'Build tension: bold claim, context, turning point, payoff. Sound like a narrator who knows the clubs and eras.',
+      'Build tension: bold claim, context, turning point, payoff. Sound like a narrator who knows the clubs, nations, and eras.',
     debate:
       'Present a hot take, the critic case, the fan case, then a fair verdict. End with a side to pick.',
     timeline:
-      'Tell the career in eras — start, breakthrough, peak, legacy — with real clubs/competitions, not empty praise.',
+      'Tell the career in eras — start, breakthrough, peak, legacy — with real clubs/nations/tournaments, not empty praise.',
     news:
-      'Write like Sky Sports / BBC Sport / ESPN FC desk copy for a 30–45s Short. Lead with the result or event (teams, competition, what happened). Then context, stakes, and what comes next. Common sense over fluff.',
+      'Write like Sky Sports / BBC Sport / ESPN FC desk copy for a 30–45s Short. Lead with the result or event (teams, competition, what happened). World Cup 2026 and global football welcome. Then context, stakes, and what comes next. Always say football — never soccer.',
   }[format]
 }
 
@@ -108,7 +109,7 @@ export function buildEofDraftShell({ topic, format, plainTextDraft, title, sourc
     topic: t,
     title: String(title || t).trim().slice(0, 100),
     description: '',
-    tags: ['shortsfeed', 'football', 'soccer'],
+    tags: ['shortsfeed', 'football'],
     format: fmt,
     plainTextDraft: draft,
     scenes: [],
@@ -144,7 +145,7 @@ function isWeakDraft(text, topic) {
   )
   if (proper.length < 2) return true
   // If topic names teams, draft should not ignore football specificity entirely
-  if (/\b(world cup|ucl|premier|liga|serie|bundesliga)\b/i.test(topic) && !/\b(world cup|fifa|spain|england|france|germany|brazil|argentina|portugal|belgium|netherlands|italy|croatia|match|group|knockout|final|tournament)\b/i.test(t)) {
+  if (/\b(world cup|ucl|premier|liga|serie|bundesliga)\b/i.test(topic) && !/\b(world cup|fifa|spain|england|france|germany|brazil|argentina|portugal|belgium|netherlands|italy|croatia|mexico|usa|japan|korea|match|group|knockout|final|tournament)\b/i.test(t)) {
     return true
   }
   return false
@@ -263,19 +264,20 @@ export async function writeEofProductionScript({ topic, format, context }) {
 }
 
 function buildDraftPrompt({ topic, format, context }) {
-  const system = `You are a senior European football writer for Eyes Of Football (YouTube Shorts).
+  const system = `You are a senior football writer for Eyes Of Football (YouTube Shorts).
 
 HARD SCOPE:
-${EOF_EUROPEAN_FOOTBALL_SCOPE}
+${EOF_FOOTBALL_SCOPE}
 
 Write ONE continuous voiceover script as plain prose — NOT JSON, NOT bullet points, NOT scene labels, NOT hashtags.
 
 MANDATORY QUALITY BAR:
 - 110–170 words. Spoken aloud in ~40–55 seconds.
 - Sound like Sky Sports News / BBC Sport / ESPN FC at 10pm — specific, opinionated, common-sense.
+- Always say football — never soccer.
 - FIRST SENTENCE must name the teams / player / club and the event (e.g. "Spain beat Belgium…", "Salah's contract…").
-- Include at least TWO concrete European football references (nations, clubs, competitions, managers, or roles).
-- For World Cup / news: lead with the result or decisive moment, then stakes, then what happens next.
+- Include at least TWO concrete football references (nations, clubs, competitions, managers, or roles).
+- For World Cup / news: lead with the result or decisive moment, then stakes, then what happens next. World Cup 2026 and global football are in scope.
 - Prefer known, defensible facts. If a score is uncertain, say "narrow win" / "statement result" — never invent fake 3-1 lines.
 - Ban these phrases forever: "here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss".
 - End with ONE sharp question for comments.
@@ -292,15 +294,16 @@ function buildAdaptPrompt({ draft, topic, format }) {
   const system = `You adapt an APPROVED Eyes Of Football narration into YouTube Short scenes.
 
 HARD SCOPE:
-${EOF_EUROPEAN_FOOTBALL_SCOPE}
+${EOF_FOOTBALL_SCOPE}
 
 Hard rules:
 - Exactly 5 scenes (4–6 only if the draft truly needs it; never more than ${EOF_MAX_SCENES}).
 - Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 14 words. Punchy. Mobile-first. No hashtags in captions.
+- Always say football — never soccer.
 - PRESERVE the draft's facts, teams, and meaning — compress, do not replace with generic filler.
 - Hook (scene 1) from the draft's lead. CTA (last scene) from the draft's question.
-- Each scene needs imageQuery: short English stock-photo search (teams/players + action/stadium/celebration).
-- tags must include "shortsfeed" and European football keywords (never NFL).
+- Each scene needs imageQuery: short English stock-photo search (teams/players + action/stadium/celebration) using the word football, not soccer.
+- tags must include "shortsfeed" and football keywords (never NFL / American football).
 - Return JSON only.
 - Format: ${format}. ${formatGuide(format)}`
 

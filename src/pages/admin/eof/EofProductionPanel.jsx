@@ -971,7 +971,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Production Shorts</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          European football only — write a plain news-desk script first, adapt it into scenes, then Build Short. Grok 4.5 by default (or set OPENAI_MODEL=gpt-4.1).
+          Football worldwide (World Cup 2026 included) — write a plain news-desk script first, adapt it into scenes, then Build Short. Always call it football, never soccer. Grok 4.5 by default (or set OPENAI_MODEL=gpt-4.1).
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
@@ -1035,7 +1035,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             : 'Built-in templates — set XAI_API_KEY for Grok 4.5, or OPENAI_API_KEY / GROQ_API_KEY'}
         </p>
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
-          Scope: European football only. Default format is <span className="text-[#9ecbff]">Breaking news</span> (Sky / ESPN / ITV style). Example topic: “Spain beat Belgium World Cup”.
+          Scope: football worldwide — World Cup, club, and international. Always say <span className="text-[#9ecbff]">football</span>, never soccer. Default format is Breaking news. Example: “Spain beat Belgium World Cup”.
         </p>
 
         {renderStack ? (
@@ -1072,7 +1072,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
         <form onSubmit={createJob} className="mt-4 flex flex-wrap items-end gap-3">
           <label className="min-w-[200px] flex-1 text-xs text-[#aaa]">
-            Topic (player, club, or European football news headline)
+            Topic (player, club, nation, or football news headline)
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}

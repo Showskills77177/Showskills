@@ -8,33 +8,33 @@ function newSceneId() {
   return `eof-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-/** European football (soccer) Short formats — never American football / NFL. */
+/** Football Short formats — association football worldwide; never American football / NFL. */
 export const EOF_SCRIPT_FORMATS = [
   {
     id: 'listicle',
     label: '5 facts listicle',
-    detail: 'Hook → 3 European football angles → closer. Best default for player topics.',
+    detail: 'Hook → 3 football angles → closer. Best default for player topics.',
   },
   {
     id: 'hook_reveal',
     label: 'Hook & reveal',
-    detail: 'Bold claim, build-up, twist, payoff, CTA — Premier League / UCL / top-5 leagues.',
+    detail: 'Bold claim, build-up, twist, payoff, CTA — clubs, nations, World Cup, UCL.',
   },
   {
     id: 'debate',
     label: 'Hot take / debate',
-    detail: 'Controversial European football take with counterpoint and verdict.',
+    detail: 'Controversial football take with counterpoint and verdict.',
   },
   {
     id: 'timeline',
     label: 'Career timeline',
-    detail: 'Origin → rise → peak → legacy → now (European clubs & competitions).',
+    detail: 'Origin → rise → peak → legacy → now (clubs, nations, tournaments).',
   },
   {
     id: 'news',
     label: 'Breaking news',
     detail:
-      'Sky Sports / ESPN / ITV Sport style — transfer, match, injury, or managerial news from European football.',
+      'Sky Sports / ESPN / ITV Sport style — transfer, match, injury, managerial, or World Cup news from football worldwide.',
   },
 ]
 
@@ -43,8 +43,17 @@ export const EOF_DEFAULT_SCRIPT_FORMAT = 'news'
 export const EOF_MAX_SCENES = 8
 export const EOF_MIN_SCENES = 1
 
-/** European football scope for prompts and templates. */
-export const EOF_EUROPEAN_FOOTBALL_SCOPE = `European football (soccer) ONLY — Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Eredivisie, Primeira Liga, Scottish Premiership, Championship, UEFA Champions League, Europa League, Conference League, and UEFA national teams. NEVER American football, NFL, NBA, MLB, NHL, or college football.`
+/**
+ * Association football worldwide (call it football — never “soccer” in scripts).
+ * Includes World Cup 2026, all confederations, club + international.
+ * Still never American football / NFL.
+ */
+export const EOF_FOOTBALL_SCOPE = `Association football (the beautiful game) WORLDWIDE — always call it football, never soccer.
+Include: FIFA World Cup 2026 and all World Cups, continental tournaments (UEFA Euro, Copa América, AFCON, Asian Cup, Gold Cup), club football everywhere (Premier League, La Liga, Serie A, Bundesliga, Ligue 1, MLS, Liga MX, Brasileirão, Argentine Primera, Saudi Pro League, A-League, J-League, etc.), UEFA Champions League / Europa / Conference, Copa Libertadores, and national teams from every confederation.
+NEVER American football, NFL, NBA, MLB, NHL, or college football.`
+
+/** @deprecated use EOF_FOOTBALL_SCOPE — kept so older imports keep working */
+export const EOF_EUROPEAN_FOOTBALL_SCOPE = EOF_FOOTBALL_SCOPE
 
 /**
  * Reading-time duration for on-screen captions (Shorts pace).
@@ -96,7 +105,7 @@ function tagify(topic) {
     .split(/\s+/)[0]
     ?.toLowerCase()
     .replace(/[^a-z0-9]/g, '')
-  return ['football', 'shorts', 'shortsfeed', 'soccer', first].filter(Boolean)
+  return ['football', 'shorts', 'shortsfeed', first].filter(Boolean)
 }
 
 function listicleScript(name) {
@@ -110,7 +119,7 @@ function listicleScript(name) {
   return {
     topic: name,
     title: `5 things about ${name}`,
-    description: `Quick visual facts about ${name}. European football Short. #Shorts #shortsfeed #football`,
+    description: `Quick visual facts about ${name}. Football Short. #Shorts #shortsfeed #football`,
     tags: tagify(name),
     format: 'listicle',
     scenes: lines.map((l) => createEofScene(l)),
@@ -173,7 +182,7 @@ function timelineScript(name) {
 
 /** Sky Sports / ESPN / ITV Sport style breaking-news Short. */
 function newsScript(topic) {
-  const headline = String(topic || '').trim() || 'European football news'
+  const headline = String(topic || '').trim() || 'World Cup football news'
   const lines = [
     {
       role: 'hook',
@@ -262,7 +271,9 @@ export function normalizeEofScript(script, topicFallback = '') {
     .filter(Boolean)
     .slice(0, EOF_MAX_SCENES)
 
-  const tags = Array.isArray(script.tags) ? script.tags.map(String) : tagify(topic)
+  const tags = Array.isArray(script.tags)
+    ? script.tags.map(String).filter((t) => t.toLowerCase() !== 'soccer')
+    : tagify(topic)
   const withShortsfeed = tags.includes('shortsfeed') ? tags : [...tags, 'shortsfeed']
   const format = String(script.format || EOF_DEFAULT_SCRIPT_FORMAT)
 

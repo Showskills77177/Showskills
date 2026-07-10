@@ -72,7 +72,7 @@ export default async function handler(req, res) {
         formats: EOF_SCRIPT_FORMATS,
         voicePresets: Object.values(EOF_VOICE_PRESETS),
         note:
-          'Daily cron composes a European football news Short with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube.',
+          'Daily cron composes a football news Short (worldwide + World Cup) with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube.',
       })
     }
 

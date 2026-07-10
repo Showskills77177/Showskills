@@ -1,7 +1,7 @@
 const SCENE_IMAGE_THEMES = [
   (name) => `${name} football player action`,
   (name) => `${name} celebrating goal`,
-  (name) => `${name} soccer stadium`,
+  (name) => `${name} football stadium`,
   (name) => `${name} football portrait`,
   (name) => `${name} match highlights`,
 ]
@@ -18,9 +18,8 @@ export function buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex = 0
     custom,
     themed,
     name ? `${name} football` : '',
-    name ? `${name} soccer` : '',
     'football player stadium',
-    'soccer match crowd',
+    'football match crowd',
   ]
   return [...new Set(queries.map((q) => q.trim()).filter((q) => q.length > 1))]
 }

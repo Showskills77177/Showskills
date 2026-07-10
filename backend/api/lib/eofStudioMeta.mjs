@@ -2,7 +2,7 @@
  * Studio metadata for EOF Shorts — title, description, hashtags, thumbnail scene.
  * Always includes #shortsfeed. Uses Grok 4.5 when available.
  */
-import { EOF_EUROPEAN_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
+import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
 import { isXaiConfigured, xaiJsonCompletion } from './eofXaiClient.mjs'
 
 export const EOF_REQUIRED_HASHTAG = 'shortsfeed'
@@ -15,7 +15,7 @@ export const EOF_REQUIRED_HASHTAG = 'shortsfeed'
  * }} input
  */
 export async function composeEofStudioMeta(input) {
-  const topic = String(input.topic || input.script?.title || 'European football').trim()
+  const topic = String(input.topic || input.script?.title || 'football').trim()
   const format = String(input.format || input.script?.format || 'news')
   const captions = (input.script?.scenes || []).map((s) => s.caption).filter(Boolean).slice(0, 8)
 
@@ -25,15 +25,16 @@ export async function composeEofStudioMeta(input) {
         temperature: 0.35,
         system: `You write YouTube Shorts packaging for Eyes Of Football.
 
-${EOF_EUROPEAN_FOOTBALL_SCOPE}
+${EOF_FOOTBALL_SCOPE}
 
 Rules:
 - Title max 90 chars, scroll-stopping, no clickbait lies.
 - Description 1–2 short lines + hashtags.
+- Always say football — never soccer.
 - tags: 8–12 items, lowercase, no # prefix.
 - ALWAYS include the tag "shortsfeed".
 - Also include "shorts" and "football".
-- Never NFL / American football tags.
+- Never NFL / American football tags or the word soccer.
 - thumbnailSceneIndex: 0-based index of the best scene for a custom thumbnail (usually the hook).`,
         user: `Topic: ${topic}
 Format: ${format}
@@ -68,8 +69,9 @@ function normalizeStudioMeta(parsed, script, topic) {
     ? parsed.tags.map((t) => String(t).replace(/^#/, '').trim().toLowerCase()).filter(Boolean)
     : Array.isArray(script?.tags)
       ? script.tags.map((t) => String(t).replace(/^#/, '').trim().toLowerCase()).filter(Boolean)
-      : ['football', 'shorts', 'soccer']
+      : ['football', 'shorts']
 
+  tags = tags.filter((t) => t !== 'soccer')
   if (!tags.includes(EOF_REQUIRED_HASHTAG)) tags = [EOF_REQUIRED_HASHTAG, ...tags]
   if (!tags.includes('shorts')) tags.push('shorts')
   if (!tags.includes('football')) tags.push('football')
