@@ -98,6 +98,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [draftScript, setDraftScript] = useState(null)
   const [draftDirty, setDraftDirty] = useState(false)
   const hydratedJobIdRef = useRef(null)
+  const [scriptBillingNote, setScriptBillingNote] = useState('')
   const [err, setErr] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
@@ -161,6 +162,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           : { xai: false, openai: false, groq: false },
       )
       if (j.preferredScriptProvider) setPreferredScriptProvider(j.preferredScriptProvider)
+      setScriptBillingNote(typeof j.scriptBillingNote === 'string' ? j.scriptBillingNote : '')
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
       setImageSources(
@@ -682,11 +684,18 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       selectJob(j.job.id)
       if (j.job?.script) hydrateDraftFromJob(j.job)
       hydratedJobIdRef.current = j.job.id
-      setSuccess(
-        j.scriptProviderLabel
-          ? `Plain-text draft written with ${j.scriptProviderLabel}. Edit it, then Adapt to scenes.`
-          : `Plain-text draft ready for “${j.job.topic}”. Edit it, then Adapt to scenes.`,
-      )
+      if (j.scriptWarning) {
+        setErr(j.scriptWarning)
+        setSuccess(
+          `Fallback draft ready for “${j.job.topic}”. Edit it, then Adapt to scenes — or fix AI billing and click Generate script.`,
+        )
+      } else {
+        setSuccess(
+          j.scriptProviderLabel
+            ? `Plain-text draft written with ${j.scriptProviderLabel}. Edit it, then Adapt to scenes.`
+            : `Plain-text draft ready for “${j.job.topic}”. Edit it, then Adapt to scenes.`,
+        )
+      }
       upsertJob(j.job)
       await load()
     } catch (e) {
@@ -754,11 +763,16 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         hydratedJobIdRef.current = selectedId
         hydrateDraftFromJob(j.job)
       }
-      setSuccess(
-        j.scriptProviderLabel
-          ? `Script generated with ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}. Edit, then Adapt to scenes.`
-          : 'Script generated. Edit if needed, then Adapt to scenes.',
-      )
+      if (j.scriptWarning) {
+        setErr(j.scriptWarning)
+        setSuccess('Fallback draft loaded. Edit it, or fix AI billing and Generate again.')
+      } else {
+        setSuccess(
+          j.scriptProviderLabel
+            ? `Script generated with ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}. Edit, then Adapt to scenes.`
+            : 'Script generated. Edit if needed, then Adapt to scenes.',
+        )
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -1034,6 +1048,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   .join(' → ') + ' (templates if all fail)'
             : 'Built-in templates — set XAI_API_KEY for Grok 4.5, or OPENAI_API_KEY / GROQ_API_KEY'}
         </p>
+        {scriptBillingNote ? (
+          <p className="mt-2 rounded-lg border border-amber-500/40 bg-[#2a2210] px-3 py-2 text-xs text-amber-200">
+            {scriptBillingNote}
+          </p>
+        ) : null}
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
           Scope: football worldwide — World Cup, club, and international. Always say <span className="text-[#9ecbff]">football</span>, never soccer. Default format is Breaking news. Example: “Spain beat Belgium World Cup”.
         </p>

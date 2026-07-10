@@ -17,7 +17,7 @@ import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
-import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel } from '../lib/eofScriptWriter.mjs'
+import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel, buildEofScriptWarning } from '../lib/eofScriptWriter.mjs'
 import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
 import {
   EOF_ELEVENLABS_VOICE_FIELDS,
@@ -82,6 +82,10 @@ export default async function handler(req, res) {
         scriptProviders: eofScriptProviderStatus(),
         preferredScriptProvider: preferredEofScriptProvider(),
         scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
+        // Soft advisory — xAI key alone is not enough without team credits
+        scriptBillingNote: eofScriptProviderStatus().xai
+          ? 'xAI key is set, but the xAI team needs credits (console.x.ai). Without credits, Create/Generate falls back to built-in drafts.'
+          : null,
         elevenLabsVoiceRegeneration: {
           limit: 3,
           note: 'Up to 3 free voice-setting regenerations per Short (same captions, slider tweaks only). Rebuild Short uses credits.',
@@ -182,7 +186,11 @@ export default async function handler(req, res) {
         const format = typeof body.format === 'string' ? body.format.trim() : null
         try {
           const job = await regenerateEofProductionScript(jobId, { format })
-          return json(res, 200, { ok: true, job })
+          return json(res, 200, {
+            ok: true,
+            job,
+            scriptWarning: buildEofScriptWarning(job),
+          })
         } catch (e) {
           return json(res, 400, { error: e instanceof Error ? e.message : 'Could not rewrite script' })
         }
@@ -198,6 +206,7 @@ export default async function handler(req, res) {
             ok: true,
             job,
             scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
+            scriptWarning: buildEofScriptWarning(job),
           })
         } catch (e) {
           return json(res, 400, { error: e instanceof Error ? e.message : 'Could not regenerate draft' })
@@ -269,6 +278,7 @@ export default async function handler(req, res) {
           job,
           scriptSource: job.scriptSource || preferredEofScriptProvider(),
           scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
+          scriptWarning: buildEofScriptWarning(job),
         })
       } catch (e) {
         return json(res, 400, { error: e instanceof Error ? e.message : 'Could not create job' })

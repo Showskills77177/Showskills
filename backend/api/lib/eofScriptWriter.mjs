@@ -118,18 +118,40 @@ export function buildEofDraftShell({ topic, format, plainTextDraft, title, sourc
 }
 
 function templatePlainTextDraft(topic, format) {
-  const name = String(topic || '').trim() || 'This story'
-  if (format === 'news' || /\bworld cup\b/i.test(name)) {
-    // Concrete fallback — never the old "what we know so far" fluff
-    if (/spain/i.test(name) && /belgium/i.test(name)) {
+  const name = String(topic || '').trim() || 'This football story'
+  const clean = name.replace(/\s+/g, ' ')
+  if (format === 'news' || /\bworld cup|transfer|injury|manager|final|derby\b/i.test(clean)) {
+    if (/spain/i.test(clean) && /belgium/i.test(clean)) {
       return `Spain just sent a World Cup message — they beat Belgium with control, not chaos. For Belgium, another tournament night ends with the same question: talent without a ruthless edge. Spain now look like a side that can manage big games, not just dominate possession. Are Spain genuine contenders from here, or was this one good night? Comment.`
     }
-    if (/england/i.test(name)) {
+    if (/england/i.test(clean) && /\bworld cup\b/i.test(clean)) {
       return `England are living on the edge again at the World Cup — the talent is obvious, the calm under pressure is not. One soft moment and the whole nation debate restarts: system, selections, and nerve. Tournament football does not care about friendly form. Can England close a big game the ugly way when it matters? Drop your take.`
     }
-    return `${name}. On the World Cup stage, European sides are judged in ninety minutes — not highlight reels. The team that manages the big moments looks like a contender; the one that freezes becomes a debate. Who actually looks ready for the deep run — and who is bluffing? Comment below.`
+    return `${clean} — that is the football story fans are arguing about right now. The result changes the table talk, the dressing-room pressure, and what comes next in the competition. Ignore the noise: tournament and club football are decided by who handles the big moments, not who wins the highlight reel. Who comes out of this looking stronger — and who is in trouble? Comment below.`
   }
-  return `${name} still divides football fans for a reason. The early club years built the foundation, the big-stage move raised the stakes, and the rivalry nights made the legend stick. Which era was the real peak? Comment below.`
+  if (format === 'debate') {
+    return `${clean} splits football opinion for a reason. One side sees proven quality on the biggest nights; the other sees gaps that get exposed when the game turns ugly. Strip away the tribal noise and you still have a real football argument about levels, roles, and clutch moments. Which side are you on — and why? Comment.`
+  }
+  if (format === 'timeline') {
+    return `${clean} did not arrive fully formed. The early years built the habits, the breakthrough season changed the ceiling, and the peak nights locked in the reputation. Late-career chapters always reopen the same debate: was the peak even better than fans remember? Which era defines ${clean} for you? Comment below.`
+  }
+  return `${clean} still divides football fans for a reason. The early club years built the foundation, the big-stage move raised the stakes, and the rivalry nights made the legend stick. Which era was the real peak? Comment below.`
+}
+
+/** Human-readable warning when AI script writing fell back to templates. */
+export function buildEofScriptWarning(jobOrSource, providers = eofScriptProviderStatus()) {
+  const source =
+    typeof jobOrSource === 'string'
+      ? jobOrSource
+      : jobOrSource?.scriptSource || jobOrSource?.script?.draftSource || null
+  if (source && source !== 'template') return null
+  if (providers.xai) {
+    return 'xAI Grok failed — usually no credits on your xAI team (console.x.ai). This is a built-in fallback draft. Add credits, or set OPENAI_API_KEY / GROQ_API_KEY on Vercel for real AI scripts.'
+  }
+  if (!providers.openai && !providers.groq) {
+    return 'No working AI script provider. Set XAI_API_KEY (with credits), OPENAI_API_KEY, or free GROQ_API_KEY on Vercel.'
+  }
+  return 'AI script providers failed — using a built-in fallback draft. Check API keys and billing.'
 }
 
 const DRAFT_FLUFF_RE =
