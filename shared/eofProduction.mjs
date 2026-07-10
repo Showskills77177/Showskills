@@ -86,10 +86,10 @@ export function productionJobStatusLabel(status) {
 
 export const EOF_RENDER_STACK = {
   script: {
-    id: 'template-openai',
-    label: 'Script writer (templates + optional OpenAI)',
+    id: 'ai-or-template',
+    label: 'Script writer (Grok / OpenAI / Groq / templates)',
     detail:
-      'Structured Short formats by default. Set OPENAI_API_KEY for AI captions/image queries (gpt-4o-mini).',
+      'Uses XAI_API_KEY (Grok), then OPENAI_API_KEY (gpt-4o), then free GROQ_API_KEY. Falls back to deeper built-in Short formats.',
   },
   host: {
     id: 'vercel',
@@ -99,9 +99,9 @@ export const EOF_RENDER_STACK = {
   },
   video: {
     id: 'ffmpeg-images',
-    label: 'Images + captions → 9:16 Short (ffmpeg)',
+    label: 'Images + pop-in captions → 9:16 Short (ffmpeg)',
     detail:
-      'Google CSE, Pexels, Pinterest pin URL, or placeholders. Silent video — add music in YouTube Studio if you want.',
+      'Pexels / Google / Pinterest when keyed; otherwise free Wikimedia Commons. Burned-in captions with bundled bold font.',
   },
 }
 

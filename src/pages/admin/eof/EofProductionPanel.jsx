@@ -69,6 +69,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
   const [scriptFormats, setScriptFormats] = useState([])
   const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
   const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
+  const [scriptProviders, setScriptProviders] = useState({ xai: false, openai: false, groq: false })
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
   const [selectedId, setSelectedId] = useState(readStoredSelectedId)
@@ -126,6 +127,11 @@ export default function EofProductionPanel({ isOwner, active = true }) {
       setScriptFormats(Array.isArray(j.scriptFormats) ? j.scriptFormats : [])
       if (j.defaultScriptFormat) setFormat((prev) => prev || j.defaultScriptFormat)
       setOpenAiScriptEnabled(Boolean(j.openAiScriptEnabled))
+      setScriptProviders(
+        j.scriptProviders && typeof j.scriptProviders === 'object'
+          ? j.scriptProviders
+          : { xai: false, openai: false, groq: false },
+      )
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
       setImageSources(
@@ -336,8 +342,9 @@ export default function EofProductionPanel({ isOwner, active = true }) {
     if (source === 'google') return 'Google Images'
     if (source === 'pinterest') return 'Pinterest search'
     if (source === 'pinterest-pin') return 'Pinterest pin'
+    if (source === 'wikimedia') return 'Wikimedia Commons'
     if (source === 'cache') return 'Cached photo'
-    if (source === 'placeholder-no-image-keys') return 'Placeholder — add Google or Pexels keys'
+    if (source === 'placeholder-no-image-keys') return 'Placeholder — search missed'
     if (source === 'placeholder') return 'Placeholder — search missed'
     return 'Image'
   }
@@ -649,7 +656,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         {!loading && !imageSources.google && !imageSources.pexels && !imageSources.pinterestApi ? (
           <p className="mt-2 text-xs text-amber-400">
             {imagesNote ||
-              'Add GOOGLE_CSE_API_KEY + GOOGLE_CSE_ID or PEXELS_API_KEY for real photos — or paste Pinterest pin URLs per scene.'}
+              'Using free Wikimedia photos. Add PEXELS_API_KEY or GOOGLE_CSE_* for better football stock — or paste Pinterest pin URLs.'}
           </p>
         ) : (
           <p className="mt-2 text-[11px] text-[#6ee07d]">
@@ -658,6 +665,7 @@ export default function EofProductionPanel({ isOwner, active = true }) {
               imageSources.google && 'Google',
               imageSources.pexels && 'Pexels',
               imageSources.pinterestApi && 'Pinterest API',
+              imageSources.wikimedia && 'Wikimedia',
               'Pin URLs',
             ]
               .filter(Boolean)
@@ -667,8 +675,14 @@ export default function EofProductionPanel({ isOwner, active = true }) {
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
           Scripts:{' '}
           {openAiScriptEnabled
-            ? 'OpenAI enabled (falls back to templates if the API fails)'
-            : 'Built-in formats (set OPENAI_API_KEY on staging for AI writing)'}
+            ? [
+                scriptProviders.xai && 'xAI Grok',
+                scriptProviders.openai && 'OpenAI',
+                scriptProviders.groq && 'Groq (free tier)',
+              ]
+                .filter(Boolean)
+                .join(' → ') + ' (templates if all fail)'
+            : 'Built-in templates — set XAI_API_KEY, OPENAI_API_KEY, or free GROQ_API_KEY for deeper AI scripts'}
         </p>
 
         {renderStack ? (

@@ -66,11 +66,11 @@ function tagify(topic) {
 
 function listicleScript(name) {
   const lines = [
-    { role: 'hook', caption: `Stop scrolling — ${name} facts you never knew`, imageQuery: defaultSceneImageQuery(name, 0) },
-    { role: 'body', caption: `${name} rewrote what “elite” looks like on the pitch`, imageQuery: defaultSceneImageQuery(name, 1) },
-    { role: 'body', caption: `From breakthrough seasons to global superstar energy`, imageQuery: defaultSceneImageQuery(name, 2) },
-    { role: 'body', caption: `Records, trophies, and moments fans still argue about`, imageQuery: defaultSceneImageQuery(name, 3) },
-    { role: 'cta', caption: `Which ${name} moment is #1? Comment below`, imageQuery: defaultSceneImageQuery(name, 4) },
+    { role: 'hook', caption: `The ${name} detail most fans still miss`, imageQuery: defaultSceneImageQuery(name, 0) },
+    { role: 'body', caption: `Breakthrough club years forged the first version of ${name}`, imageQuery: defaultSceneImageQuery(name, 1) },
+    { role: 'body', caption: `Then the big-stage move changed how defenders faced ${name}`, imageQuery: defaultSceneImageQuery(name, 2) },
+    { role: 'body', caption: `Rivalries and pressure nights made the legend stick`, imageQuery: defaultSceneImageQuery(name, 3) },
+    { role: 'cta', caption: `Best ${name} era — early club or peak years? Comment`, imageQuery: defaultSceneImageQuery(name, 4) },
   ]
   return {
     topic: name,
@@ -84,11 +84,11 @@ function listicleScript(name) {
 
 function hookRevealScript(name) {
   const lines = [
-    { role: 'hook', caption: `Everyone talks about ${name}… but this is the real story`, imageQuery: defaultSceneImageQuery(name, 0) },
-    { role: 'body', caption: `The early years looked nothing like the legend we know`, imageQuery: defaultSceneImageQuery(name, 1) },
-    { role: 'body', caption: `Then one season flipped the entire narrative`, imageQuery: defaultSceneImageQuery(name, 2) },
-    { role: 'body', caption: `Pressure, rivals, and nights that built a dynasty`, imageQuery: defaultSceneImageQuery(name, 3) },
-    { role: 'cta', caption: `Save this if ${name} is still underrated`, imageQuery: defaultSceneImageQuery(name, 4) },
+    { role: 'hook', caption: `${name} wasn’t built the way highlight reels pretend`, imageQuery: defaultSceneImageQuery(name, 0) },
+    { role: 'body', caption: `Early seasons: learning the hard way under big pressure`, imageQuery: defaultSceneImageQuery(name, 1) },
+    { role: 'body', caption: `One transfer / one role change flipped the whole story`, imageQuery: defaultSceneImageQuery(name, 2) },
+    { role: 'body', caption: `After that, every rivalry night felt personal`, imageQuery: defaultSceneImageQuery(name, 3) },
+    { role: 'cta', caption: `Was ${name} peak overrated or still underrated?`, imageQuery: defaultSceneImageQuery(name, 4) },
   ]
   return {
     topic: name,
@@ -102,11 +102,11 @@ function hookRevealScript(name) {
 
 function debateScript(name) {
   const lines = [
-    { role: 'hook', caption: `Hot take: ${name} is more influential than the stats say`, imageQuery: defaultSceneImageQuery(name, 0) },
-    { role: 'body', caption: `Critics point at the numbers. Fans point at the moments`, imageQuery: defaultSceneImageQuery(name, 1) },
-    { role: 'body', caption: `Head-to-head eras make every comparison unfair`, imageQuery: defaultSceneImageQuery(name, 2) },
-    { role: 'body', caption: `Influence isn’t only trophies — it’s how the game feels`, imageQuery: defaultSceneImageQuery(name, 3) },
-    { role: 'cta', caption: `Agree or disagree? Drop your take on ${name}`, imageQuery: defaultSceneImageQuery(name, 4) },
+    { role: 'hook', caption: `Hot take: ${name} changed football more than the stats show`, imageQuery: defaultSceneImageQuery(name, 0) },
+    { role: 'body', caption: `Critics: look at the numbers and the late-career drop`, imageQuery: defaultSceneImageQuery(name, 1) },
+    { role: 'body', caption: `Fans: look at the eras, rivals, and nights that stuck`, imageQuery: defaultSceneImageQuery(name, 2) },
+    { role: 'body', caption: `Truth: influence is style + pressure, not one trophy list`, imageQuery: defaultSceneImageQuery(name, 3) },
+    { role: 'cta', caption: `Team stats or team moments on ${name}? Pick a side`, imageQuery: defaultSceneImageQuery(name, 4) },
   ]
   return {
     topic: name,
@@ -120,11 +120,11 @@ function debateScript(name) {
 
 function timelineScript(name) {
   const lines = [
-    { role: 'hook', caption: `${name}: a career in 5 slides`, imageQuery: defaultSceneImageQuery(name, 0) },
-    { role: 'body', caption: `Start: raw talent, big club pressure, early lessons`, imageQuery: defaultSceneImageQuery(name, 1) },
-    { role: 'body', caption: `Rise: breakout seasons and a style the world copied`, imageQuery: defaultSceneImageQuery(name, 2) },
-    { role: 'body', caption: `Peak: trophies, records, unforgettable nights`, imageQuery: defaultSceneImageQuery(name, 3) },
-    { role: 'cta', caption: `Legacy: still shaping debates years later`, imageQuery: defaultSceneImageQuery(name, 4) },
+    { role: 'hook', caption: `${name} in 5 eras — not 5 empty compliments`, imageQuery: defaultSceneImageQuery(name, 0) },
+    { role: 'body', caption: `Start: first club pressure and the first real role`, imageQuery: defaultSceneImageQuery(name, 1) },
+    { role: 'body', caption: `Breakthrough: the season the world finally noticed`, imageQuery: defaultSceneImageQuery(name, 2) },
+    { role: 'body', caption: `Peak: big nights, rivalries, and the signature style`, imageQuery: defaultSceneImageQuery(name, 3) },
+    { role: 'cta', caption: `Which ${name} chapter was the real peak? Comment`, imageQuery: defaultSceneImageQuery(name, 4) },
   ]
   return {
     topic: name,

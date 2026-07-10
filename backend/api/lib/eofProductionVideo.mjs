@@ -1,12 +1,19 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { mapWithConcurrency } from './eofAsyncPool.mjs'
 
+const BUNDLED_CAPTION_FONT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../assets/fonts/EofCaptionBold.ttf',
+)
+
 const CAPTION_FONT_CANDIDATES = [
   process.env.EOF_CAPTION_FONT,
+  BUNDLED_CAPTION_FONT,
   '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
   '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
   '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
@@ -34,7 +41,11 @@ export function eofProductionVideoAbsPath(jobId) {
   return join(eofProductionJobDirPath(jobId), 'short.mp4')
 }
 
-function buildSceneVideoFilter({ dur, frames, captionFile, captionFont }) {
+/**
+ * Pop-in captions: fade + slight size settle, bold white with dark outline.
+ * Falls back to gradient-only if no font is available on the host.
+ */
+function buildSceneVideoFilter({ frames, captionFile, captionFont }) {
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
     'crop=1080:1920',
@@ -47,15 +58,16 @@ function buildSceneVideoFilter({ dur, frames, captionFile, captionFont }) {
   }
 
   // Soft bottom gradient so white captions stay readable on any stock photo
-  base.push(
-    "drawbox=x=0:y=ih*0.62:w=iw:h=ih*0.38:color=black@0.45:t=fill",
-  )
+  base.push('drawbox=x=0:y=ih*0.58:w=iw:h=ih*0.42:color=black@0.52:t=fill')
 
   if (captionFont) {
     const escapedFont = captionFont.replace(/'/g, "'\\''")
     const escapedCaption = captionFile.replace(/'/g, "'\\''")
+    // Soft pop: fade in over ~0.28s, settle at full size
+    const alpha = "if(lt(t\\,0.28)\\,t/0.28\\,1)"
+    const fontsize = "if(lt(t\\,0.22)\\,44+t*55\\,56)"
     base.push(
-      `drawtext=fontfile='${escapedFont}':fontcolor=white:fontsize=48:line_spacing=12:borderw=5:bordercolor=black@0.7:x=(w-text_w)/2:y=h-320:textfile='${escapedCaption}'`,
+      `drawtext=fontfile='${escapedFont}':fontcolor=white:fontsize='${fontsize}':alpha='${alpha}':line_spacing=14:borderw=6:bordercolor=black@0.78:x=(w-text_w)/2:y=h-360:textfile='${escapedCaption}'`,
     )
   }
 
@@ -63,7 +75,7 @@ function buildSceneVideoFilter({ dur, frames, captionFile, captionFont }) {
 }
 
 /** Soft-wrap long captions so drawtext stays readable on 9:16. */
-function wrapCaptionLines(text, maxChars = 28) {
+function wrapCaptionLines(text, maxChars = 22) {
   const words = String(text || '')
     .trim()
     .split(/\s+/)
@@ -92,7 +104,7 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
   const caption = wrapCaptionLines(String(scene.caption || '').trim().slice(0, 140))
   await writeFile(captionFile, caption || `Scene ${scene.index + 1}`, 'utf8')
 
-  const vf = buildSceneVideoFilter({ dur, frames, captionFile, captionFont })
+  const vf = buildSceneVideoFilter({ frames, captionFile, captionFont })
 
   await runFfmpeg(
     [
@@ -149,6 +161,9 @@ export async function renderEofProductionVideo({
   const workDir = dirname(out)
   mkdirSync(workDir, { recursive: true })
   const captionFont = resolveCaptionFont()
+  if (!captionFont) {
+    console.warn('[eof-video] No caption font found — captions will be missing from the Short.')
+  }
 
   let clipsDone = 0
   const clipPaths = await mapWithConcurrency(sorted, CLIP_CONCURRENCY, async (scene) => {

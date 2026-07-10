@@ -15,7 +15,7 @@ import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
-import { isEofOpenAiScriptConfigured } from '../lib/eofScriptWriter.mjs'
+import { isEofOpenAiScriptConfigured, eofScriptProviderStatus } from '../lib/eofScriptWriter.mjs'
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -64,6 +64,7 @@ export default async function handler(req, res) {
         scriptFormats: EOF_SCRIPT_FORMATS,
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
+        scriptProviders: eofScriptProviderStatus(),
         ffmpegAvailable: ffmpeg,
         renderNote: ffmpeg
           ? null
