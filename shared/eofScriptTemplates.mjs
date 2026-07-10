@@ -2,31 +2,43 @@ import { randomUUID } from 'node:crypto'
 
 import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
 
-/** Short formats for image + on-screen text videos (no voiceover). */
+/** European football (soccer) Short formats — never American football / NFL. */
 export const EOF_SCRIPT_FORMATS = [
   {
     id: 'listicle',
     label: '5 facts listicle',
-    detail: 'Hook → 3 facts → closer. Best default for player topics.',
+    detail: 'Hook → 3 European football angles → closer. Best default for player topics.',
   },
   {
     id: 'hook_reveal',
     label: 'Hook & reveal',
-    detail: 'Bold claim, build-up, twist, payoff, CTA.',
+    detail: 'Bold claim, build-up, twist, payoff, CTA — Premier League / UCL / top-5 leagues.',
   },
   {
     id: 'debate',
     label: 'Hot take / debate',
-    detail: 'Controversial take with counterpoint and verdict.',
+    detail: 'Controversial European football take with counterpoint and verdict.',
   },
   {
     id: 'timeline',
     label: 'Career timeline',
-    detail: 'Origin → rise → peak → legacy → now.',
+    detail: 'Origin → rise → peak → legacy → now (European clubs & competitions).',
+  },
+  {
+    id: 'news',
+    label: 'Breaking news',
+    detail:
+      'Sky Sports / ESPN / ITV Sport style — transfer, match, injury, or managerial news from European football.',
   },
 ]
 
 export const EOF_DEFAULT_SCRIPT_FORMAT = 'listicle'
+
+export const EOF_MAX_SCENES = 8
+export const EOF_MIN_SCENES = 1
+
+/** European football scope for prompts and templates. */
+export const EOF_EUROPEAN_FOOTBALL_SCOPE = `European football (soccer) ONLY — Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Eredivisie, Primeira Liga, Scottish Premiership, Championship, UEFA Champions League, Europa League, Conference League, and UEFA national teams. NEVER American football, NFL, NBA, MLB, NHL, or college football.`
 
 /**
  * Reading-time duration for on-screen captions (Shorts pace).
@@ -38,22 +50,39 @@ export function estimateCaptionDurationSec(caption) {
     .split(/\s+/)
     .filter(Boolean).length
   if (!words) return 3
-  // ~2.2 words/sec on mobile + beat before cut
   return Math.round(Math.min(6.5, Math.max(2.4, words / 2.2 + 0.9)) * 10) / 10
 }
 
-function scene({ caption, imageQuery, role, durationSec }) {
-  const text = String(caption || '').trim()
-  const dur = durationSec ?? estimateCaptionDurationSec(text)
+/**
+ * Create or repair a scene. Preserves existing id when provided.
+ * @param {{
+ *   caption?: string,
+ *   narration?: string,
+ *   imageQuery?: string,
+ *   role?: string,
+ *   durationSec?: number,
+ *   id?: string,
+ * }} input
+ */
+export function createEofScene(input = {}) {
+  const text = String(input.caption || input.narration || '').trim()
+  const dur =
+    input.durationSec != null && Number.isFinite(Number(input.durationSec))
+      ? Number(input.durationSec)
+      : estimateCaptionDurationSec(text)
   return {
-    id: randomUUID(),
-    /** On-screen text is the product; keep narration in sync for older rows. */
+    id: String(input.id || '').trim() || randomUUID(),
     narration: text,
     caption: text,
-    imageQuery: String(imageQuery || '').trim(),
-    role: role || 'body',
+    imageQuery: String(input.imageQuery || '').trim(),
+    role: input.role || 'body',
     durationSec: dur,
   }
+}
+
+/** @deprecated use createEofScene */
+function scene(opts) {
+  return createEofScene(opts)
 }
 
 function tagify(topic) {
@@ -61,7 +90,7 @@ function tagify(topic) {
     .split(/\s+/)[0]
     ?.toLowerCase()
     .replace(/[^a-z0-9]/g, '')
-  return ['football', 'shorts', 'soccer', first].filter(Boolean)
+  return ['football', 'shorts', 'shortsfeed', 'soccer', first].filter(Boolean)
 }
 
 function listicleScript(name) {
@@ -75,10 +104,10 @@ function listicleScript(name) {
   return {
     topic: name,
     title: `5 things about ${name}`,
-    description: `Quick visual facts about ${name}. Built for YouTube Shorts. #Shorts #football`,
+    description: `Quick visual facts about ${name}. European football Short. #Shorts #shortsfeed #football`,
     tags: tagify(name),
     format: 'listicle',
-    scenes: lines.map((l) => scene(l)),
+    scenes: lines.map((l) => createEofScene(l)),
   }
 }
 
@@ -93,10 +122,10 @@ function hookRevealScript(name) {
   return {
     topic: name,
     title: `The real story of ${name}`,
-    description: `Hook-to-reveal Short about ${name}. #Shorts #football`,
+    description: `Hook-to-reveal Short about ${name}. #Shorts #shortsfeed #football`,
     tags: tagify(name),
     format: 'hook_reveal',
-    scenes: lines.map((l) => scene(l)),
+    scenes: lines.map((l) => createEofScene(l)),
   }
 }
 
@@ -111,10 +140,10 @@ function debateScript(name) {
   return {
     topic: name,
     title: `Hot take: ${name}`,
-    description: `Debate-style Short about ${name}. #Shorts #football`,
+    description: `Debate-style Short about ${name}. #Shorts #shortsfeed #football`,
     tags: tagify(name),
     format: 'debate',
-    scenes: lines.map((l) => scene(l)),
+    scenes: lines.map((l) => createEofScene(l)),
   }
 }
 
@@ -129,10 +158,50 @@ function timelineScript(name) {
   return {
     topic: name,
     title: `${name} career timeline`,
-    description: `Visual timeline Short about ${name}. #Shorts #football`,
+    description: `Visual timeline Short about ${name}. #Shorts #shortsfeed #football`,
     tags: tagify(name),
     format: 'timeline',
-    scenes: lines.map((l) => scene(l)),
+    scenes: lines.map((l) => createEofScene(l)),
+  }
+}
+
+/** Sky Sports / ESPN / ITV Sport style breaking-news Short. */
+function newsScript(topic) {
+  const headline = String(topic || '').trim() || 'European football news'
+  const lines = [
+    {
+      role: 'hook',
+      caption: `BREAKING: ${headline.slice(0, 80)}`,
+      imageQuery: defaultSceneImageQuery(headline, 0),
+    },
+    {
+      role: 'body',
+      caption: `What we know so far — the key detail fans need`,
+      imageQuery: defaultSceneImageQuery(headline, 1),
+    },
+    {
+      role: 'body',
+      caption: `Why it matters for the club, the league, and the table`,
+      imageQuery: defaultSceneImageQuery(headline, 2),
+    },
+    {
+      role: 'body',
+      caption: `What happens next — the next 48 hours to watch`,
+      imageQuery: defaultSceneImageQuery(headline, 3),
+    },
+    {
+      role: 'cta',
+      caption: `Good move or panic? Drop your take in the comments`,
+      imageQuery: defaultSceneImageQuery(headline, 4),
+    },
+  ]
+  return {
+    topic: headline,
+    title: headline.slice(0, 90),
+    description: `${headline}. Eyes Of Football news Short. #Shorts #shortsfeed #football #transfernews`,
+    tags: [...tagify(headline), 'transfernews', 'footballnews'].slice(0, 12),
+    format: 'news',
+    scenes: lines.map((l) => createEofScene(l)),
   }
 }
 
@@ -152,6 +221,8 @@ export function buildFactsShortScript(topic, opts = {}) {
       return debateScript(name)
     case 'timeline':
       return timelineScript(name)
+    case 'news':
+      return newsScript(name)
     case 'listicle':
     default:
       return listicleScript(name)
@@ -160,6 +231,7 @@ export function buildFactsShortScript(topic, opts = {}) {
 
 /**
  * Normalize / repair a script after manual edits or AI output.
+ * Preserves scene ids when present so Rebuild Short stays aligned.
  * @param {object} script
  * @param {string} [topicFallback]
  */
@@ -172,7 +244,8 @@ export function normalizeEofScript(script, topicFallback = '') {
       const caption = String(s?.caption || s?.narration || s?.text || '').trim()
       if (!caption) return null
       const imageQuery = String(s?.imageQuery || s?.image_query || defaultSceneImageQuery(topic, i)).trim()
-      return scene({
+      return createEofScene({
+        id: s?.id,
         caption: caption.slice(0, 140),
         imageQuery,
         role: s?.role || (i === 0 ? 'hook' : i === scenesIn.length - 1 ? 'cta' : 'body'),
@@ -180,14 +253,22 @@ export function normalizeEofScript(script, topicFallback = '') {
       })
     })
     .filter(Boolean)
+    .slice(0, EOF_MAX_SCENES)
 
   if (!scenes.length) return null
+
+  const tags = Array.isArray(script.tags) ? script.tags.map(String) : tagify(topic)
+  const withShortsfeed = tags.includes('shortsfeed') ? tags : [...tags, 'shortsfeed']
 
   return {
     topic,
     title: String(script.title || `Short about ${topic}`).trim().slice(0, 100),
-    description: String(script.description || `Visual Short about ${topic}. #Shorts #football`).trim().slice(0, 500),
-    tags: Array.isArray(script.tags) ? script.tags.map(String).slice(0, 12) : tagify(topic),
+    description: String(
+      script.description || `Visual Short about ${topic}. #Shorts #shortsfeed #football`,
+    )
+      .trim()
+      .slice(0, 500),
+    tags: withShortsfeed.slice(0, 12),
     format: String(script.format || EOF_DEFAULT_SCRIPT_FORMAT),
     scenes,
   }
@@ -199,7 +280,7 @@ export function normalizeEofScript(script, topicFallback = '') {
  */
 export function inferMusicMoodFromTopic(topic) {
   const t = String(topic || '').toLowerCase()
-  if (/goal|win|celebration|record|best|greatest|legend/.test(t)) return 'dramatic'
+  if (/goal|win|celebration|record|best|greatest|legend|breaking|transfer/.test(t)) return 'dramatic'
   if (/calm|story|history|legacy|career/.test(t)) return 'calm'
   if (/skills|trick|fun|viral/.test(t)) return 'upbeat'
   return 'neutral'

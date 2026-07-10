@@ -9,6 +9,7 @@ import EofPublishCalendar from './eof/EofPublishCalendar'
 import EofUploadStudio from './eof/EofUploadStudio'
 import EofProductionPanel from './eof/EofProductionPanel'
 import EofMusicLibrary from './eof/EofMusicLibrary'
+import EofSchedulerPanel from './eof/EofSchedulerPanel'
 import EofProjectList from './eof/EofProjectList'
 import { EOF } from './eof/eofStudioTheme'
 
@@ -20,6 +21,7 @@ function readStoredView() {
     if (
       stored === 'studio' ||
       stored === 'production' ||
+      stored === 'scheduler' ||
       stored === 'music' ||
       stored === 'analytics' ||
       stored === 'calendar' ||
@@ -135,6 +137,7 @@ export default function EyesOfFootballAdminPage() {
                 {[
                   ['studio', 'Studio'],
                   ['production', 'Production'],
+                  ['scheduler', 'Scheduler'],
                   ['music', 'Music'],
                   ['analytics', 'Analytics'],
                   ['calendar', 'Calendar'],
@@ -165,6 +168,13 @@ export default function EyesOfFootballAdminPage() {
                     setStudioDraft(draft)
                     selectView('studio')
                   }}
+                />
+              </div>
+
+              <div hidden={view !== 'scheduler'} className="mt-6">
+                <EofSchedulerPanel
+                  isOwner={isOwner}
+                  onOpenJob={() => selectView('production')}
                 />
               </div>
 

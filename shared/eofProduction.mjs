@@ -104,9 +104,9 @@ export function productionJobStatusLabel(status) {
 export const EOF_RENDER_STACK = {
   script: {
     id: 'ai-or-template',
-    label: 'Script writer (xAI Grok → OpenAI → Groq → templates)',
+    label: 'Script writer (xAI Grok 4.5 → OpenAI → Groq → templates)',
     detail:
-      'Uses XAI_API_KEY (Grok) first when set, then OPENAI_API_KEY (gpt-4o), then free GROQ_API_KEY. Falls back to built-in Short formats.',
+      'Uses XAI_API_KEY with Grok 4.5 first (European football only + Breaking news desk style), then OPENAI_API_KEY, then GROQ_API_KEY. Falls back to built-in Short formats.',
   },
   host: {
     id: 'vercel',

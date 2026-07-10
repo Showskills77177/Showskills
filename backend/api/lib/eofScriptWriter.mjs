@@ -1,17 +1,22 @@
 /**
  * Script writer for EOF image Shorts.
  * Provider order (first configured wins):
- *   1) xAI Grok  (XAI_API_KEY)
- *   2) OpenAI    (OPENAI_API_KEY) — default gpt-4o
- *   3) Groq      (GROQ_API_KEY) — free-tier Llama
+ *   1) xAI Grok 4.5  (XAI_API_KEY)
+ *   2) OpenAI        (OPENAI_API_KEY) — default gpt-4o
+ *   3) Groq          (GROQ_API_KEY) — free-tier Llama
  * Falls back to structured templates when none work.
+ *
+ * Scope: European football (soccer) ONLY — never American football / NFL.
  */
 import {
   buildFactsShortScript,
   normalizeEofScript,
   EOF_DEFAULT_SCRIPT_FORMAT,
   EOF_SCRIPT_FORMATS,
+  EOF_EUROPEAN_FOOTBALL_SCOPE,
+  EOF_MAX_SCENES,
 } from '../../../shared/eofScriptTemplates.mjs'
+import { isXaiConfigured, xaiJsonCompletion } from './eofXaiClient.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -30,7 +35,7 @@ function envKey(...names) {
 
 export function eofScriptProviderStatus() {
   return {
-    xai: Boolean(envKey('XAI_API_KEY', 'EOF_XAI_API_KEY')),
+    xai: isXaiConfigured(),
     openai: Boolean(envKey('OPENAI_API_KEY')),
     groq: Boolean(envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')),
   }
@@ -46,7 +51,7 @@ export function preferredEofScriptProvider() {
 }
 
 export function eofScriptProviderLabel(provider) {
-  if (provider === 'xai') return 'xAI Grok'
+  if (provider === 'xai') return 'xAI Grok 4.5'
   if (provider === 'openai') return 'OpenAI'
   if (provider === 'groq') return 'Groq'
   return 'template'
@@ -90,27 +95,33 @@ export async function writeEofProductionScript({ topic, format }) {
 function formatGuide(format) {
   return {
     listicle:
-      '5 scenes: cold-open hook that creates a curiosity gap, then 3 specific angles (era/club/rivalry/style/pressure), then a comment CTA. Title like a Short thumbnail line.',
+      '5 scenes: cold-open hook that creates a curiosity gap, then 3 specific European football angles (club/era/rivalry/style/pressure), then a comment CTA.',
     hook_reveal:
       '5 scenes: bold claim → origin context → the turning-point season/move → the peak night or era → CTA. Build tension; pay it off in scene 4.',
     debate:
       '5 scenes: hot take → strongest critic angle → strongest fan angle → nuanced verdict → ask viewers to pick a side.',
     timeline:
-      '5 scenes: career arc — start, breakthrough, peak, late-career/legacy, CTA. Each scene = one era, not vague praise.',
+      '5 scenes: career arc — start, breakthrough, peak, late-career/legacy, CTA. Each scene = one European club/competition era.',
+    news:
+      '5 scenes in Sky Sports / ESPN FC / ITV Sport / BBC Sport / The Athletic / Goal.com newsroom style: BREAKING hook → what we know → why it matters → what happens next → viewer CTA. Topic may be a transfer, injury, managerial change, match fallout, or contract story.',
   }[format]
 }
 
 function buildPrompt({ topic, format }) {
-  const system = `You are a senior YouTube Shorts writer for Eyes Of Football — a football channel that wins the scroll with depth, not fluff.
+  const system = `You are the senior YouTube Shorts writer for Eyes Of Football — a European football (soccer) channel.
+
+HARD SCOPE:
+${EOF_EUROPEAN_FOOTBALL_SCOPE}
 
 Hard rules:
-- Exactly 5 scenes.
+- Exactly 5 scenes (you may use 4–6 only if the story truly needs it; never more than ${EOF_MAX_SCENES}).
 - Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 14 words. Punchy. Mobile-first. No hashtags in captions.
-- Ban empty filler: never write vague lines like "rewrote elite", "global superstar energy", "moments fans still argue about", "raw talent", or "unforgettable nights" unless you attach a concrete angle (club, rivalry, role, era, style trait).
+- Ban empty filler: never write vague lines like "rewrote elite", "global superstar energy", "moments fans still argue about", "raw talent", or "unforgettable nights" unless you attach a concrete European club/rivalry/role/era angle.
 - Prefer specific, defensible angles: breakthrough club, signature role, famous rivalry, pressure narrative, late-career chapter. Do NOT invent exact match scores, trophy counts, or dates you are unsure about — use career language instead.
-- Hook (scene 1) must create a curiosity gap ("why / how / the part nobody talks about").
+- Hook (scene 1) must create a curiosity gap ("why / how / the part nobody talks about") — for news format, lead like a respected sports desk (Sky Sports, ESPN, ITV Sport).
 - CTA (scene 5) must ask a clear question viewers can answer in one comment.
-- Each scene needs imageQuery: short English stock-photo search (player name + action/stadium/celebration/portrait). Make queries photo-searchable.
+- Each scene needs imageQuery: short English stock-photo search (player/club + action/stadium/celebration/portrait). Make queries photo-searchable.
+- tags must include "shortsfeed" and European football keywords (never NFL/American football tags).
 - Return JSON only.
 - Format: ${format}. ${formatGuide(format)}`
 
@@ -165,42 +176,14 @@ function finalizeScript(parsed, topic, format, source) {
   if (!normalized || normalized.scenes.length < 3) {
     throw new Error('script had too few scenes')
   }
-  normalized.scenes = normalized.scenes.slice(0, 6)
+  normalized.scenes = normalized.scenes.slice(0, EOF_MAX_SCENES)
   return { script: normalized, source }
 }
 
 async function writeEofScriptWithXai({ topic, format }) {
-  const key = envKey('XAI_API_KEY', 'EOF_XAI_API_KEY')
-  const configured = envKey('XAI_MODEL', 'EOF_XAI_MODEL')
-  const models = [configured || 'grok-3-latest', 'grok-2-latest', 'grok-2-1212', 'grok-beta'].filter(
-    (m, i, arr) => m && arr.indexOf(m) === i,
-  )
   const { system, user } = buildPrompt({ topic, format })
-
-  let lastError = null
-  for (const model of models) {
-    try {
-      const parsed = await chatJsonCompletion({
-        url: 'https://api.x.ai/v1/chat/completions',
-        headers: { Authorization: `Bearer ${key}` },
-        body: {
-          model,
-          temperature: 0.55,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        },
-      })
-      return finalizeScript(parsed, topic, format, 'xai')
-    } catch (e) {
-      lastError = e
-      console.warn('[eof-script] xAI model failed', model, e instanceof Error ? e.message : e)
-    }
-  }
-
-  throw lastError || new Error('xAI script generation failed')
+  const parsed = await xaiJsonCompletion({ system, user, temperature: 0.5 })
+  return finalizeScript(parsed, topic, format, 'xai')
 }
 
 async function writeEofScriptWithOpenAi({ topic, format }) {

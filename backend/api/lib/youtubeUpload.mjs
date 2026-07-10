@@ -312,6 +312,31 @@ export async function publishYoutubeVideoNow(videoId) {
   })
 }
 
+/**
+ * Upload video bytes to a resumable YouTube upload URL (server-side).
+ * @param {string} uploadUrl
+ * @param {Buffer} buffer
+ * @param {string} [contentType]
+ */
+export async function putYoutubeResumableUpload(uploadUrl, buffer, contentType = 'video/mp4') {
+  const res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(buffer.length),
+    },
+    body: buffer,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const msg = data?.error?.message || `YouTube video PUT failed (${res.status})`
+    throw new Error(msg)
+  }
+  const videoId = data?.id
+  if (!videoId) throw new Error('YouTube upload did not return a video id')
+  return { youtubeVideoId: videoId, raw: data }
+}
+
 export async function scheduleYoutubeVideo(videoId, publishAtIso) {
   return updateYoutubeVideoStatus(videoId, {
     privacyStatus: 'private',

@@ -177,6 +177,8 @@ export async function updateEofProductionJob(id, patch) {
       : job.voiceRegenerationCount
   const voiceNarrationHash =
     patch.voiceNarrationHash !== undefined ? patch.voiceNarrationHash : job.voiceNarrationHash
+  const youtubeProjectId =
+    patch.youtubeProjectId !== undefined ? patch.youtubeProjectId : job.youtubeProjectId
 
   await query(
     `UPDATE eof_production_jobs
@@ -195,6 +197,7 @@ export async function updateEofProductionJob(id, patch) {
          render_output_path = $14,
          voice_regeneration_count = $15,
          voice_narration_hash = $16,
+         youtube_project_id = $17,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -214,6 +217,7 @@ export async function updateEofProductionJob(id, patch) {
       renderOutputPath,
       voiceRegenerationCount,
       voiceNarrationHash,
+      youtubeProjectId,
     ],
   )
 

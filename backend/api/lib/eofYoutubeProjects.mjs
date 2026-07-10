@@ -233,7 +233,7 @@ export async function completeEofUpload({
   const project = await getEofProject(projectId)
   if (!project) throw new Error('Project not found')
 
-  if (thumbnailBase64 && project.contentType === 'long') {
+  if (thumbnailBase64 && (project.contentType === 'long' || project.contentType === 'short')) {
     try {
       const buf = Buffer.from(thumbnailBase64, 'base64')
       if (buf.length > 0) {

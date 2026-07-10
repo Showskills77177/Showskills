@@ -1,0 +1,120 @@
+import { json, readJsonBody } from '../lib/http.mjs'
+import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
+import { requireEofSession, requireEofOwner, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
+import {
+  getEofSchedulerSettings,
+  updateEofSchedulerSettings,
+} from '../lib/eofSchedulerSettings.mjs'
+import { runEofDailyShortPipeline } from '../lib/eofDailyScheduler.mjs'
+import { pickEofEuropeanFootballNewsTopics } from '../lib/eofNewsTopics.mjs'
+import { EOF_SCRIPT_FORMATS } from '../../../shared/eofScriptTemplates.mjs'
+import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
+
+function authorizeCron(req) {
+  const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
+  const auth = String(req.headers?.authorization || '')
+  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+  if (cronSecret && bearer && bearer === cronSecret) return true
+  if (req.headers?.['x-vercel-cron'] === '1') return true
+  return false
+}
+
+/** GET settings · POST update / run-now / news-topics · Cron GET/POST run */
+export default async function handler(req, res) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    return res.status(204).end()
+  }
+
+  if (!isShowSkillsStagingServerEnabled()) {
+    return json(res, 404, { error: 'Eyes Of Football scheduler is only available on staging.' })
+  }
+
+  const isCron = authorizeCron(req)
+
+  try {
+    if (isCron && (req.method === 'GET' || req.method === 'POST')) {
+      if (process.env.VERCEL) {
+        try {
+          const { waitUntil } = await import('@vercel/functions')
+          waitUntil(
+            runEofDailyShortPipeline({ force: false, createdBy: 'vercel-cron' }).catch((e) =>
+              console.error('[eof-scheduler] cron failed', e),
+            ),
+          )
+          return json(res, 202, { ok: true, accepted: true, message: 'Daily Short pipeline started.' })
+        } catch {
+          /* fall through */
+        }
+      }
+      const result = await runEofDailyShortPipeline({ force: false, createdBy: 'vercel-cron' })
+      return json(res, 200, { ok: true, ...result })
+    }
+
+    if (req.method === 'GET') {
+      try {
+        await requireEofSession(req)
+      } catch (e) {
+        return json(res, e.statusCode || 401, { error: 'Unauthorized' })
+      }
+      const settings = await getEofSchedulerSettings()
+      return json(res, 200, {
+        ok: true,
+        settings,
+        formats: EOF_SCRIPT_FORMATS,
+        voicePresets: Object.values(EOF_VOICE_PRESETS),
+        note:
+          'Daily cron composes a European football news Short with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube.',
+      })
+    }
+
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req)
+      const action = typeof body.action === 'string' ? body.action : 'update'
+
+      if (action === 'run-now' || action === 'run') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, { error: 'Only the channel owner can run the scheduler.' })
+        }
+        const session = await requireEofSession(req)
+        const info = eofSessionInfo(session)
+        const result = await runEofDailyShortPipeline({
+          force: true,
+          createdBy: info.username || 'eof-owner',
+        })
+        return json(res, 200, { ok: true, ...result })
+      }
+
+      try {
+        await requireEofOwner(req)
+      } catch (e) {
+        return json(res, e.statusCode || 403, { error: 'Only the channel owner can change the scheduler.' })
+      }
+
+      if (action === 'news-topics') {
+        const topics = await pickEofEuropeanFootballNewsTopics({ count: Number(body.count) || 5 })
+        return json(res, 200, { ok: true, ...topics })
+      }
+
+      const settings = await updateEofSchedulerSettings({
+        enabled: body.enabled,
+        hourUtc: body.hourUtc,
+        minuteUtc: body.minuteUtc,
+        format: body.format,
+        voicePreset: body.voicePreset,
+        publishDelayMinutes: body.publishDelayMinutes,
+      })
+      return json(res, 200, { ok: true, settings })
+    }
+
+    res.setHeader('Allow', 'GET, POST, OPTIONS')
+    return json(res, 405, { error: 'Method not allowed' })
+  } catch (e) {
+    console.error('[eof-scheduler]', e)
+    return json(res, 500, { error: e instanceof Error ? e.message : 'Scheduler error' })
+  }
+}

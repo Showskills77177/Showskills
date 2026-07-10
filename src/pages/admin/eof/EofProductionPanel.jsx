@@ -9,7 +9,12 @@ import {
   buildFallbackRenderProgress,
   EOF_DEFAULT_VOICE_PRESET,
 } from '../../../../shared/eofProduction.mjs'
-import { EOF_DEFAULT_SCRIPT_FORMAT } from '../../../../shared/eofScriptTemplates.mjs'
+import {
+  EOF_DEFAULT_SCRIPT_FORMAT,
+  createEofScene,
+  EOF_MAX_SCENES,
+  EOF_MIN_SCENES,
+} from '../../../../shared/eofScriptTemplates.mjs'
 import {
   EOF_ELEVENLABS_VOICE_FIELDS,
   EOF_ELEVENLABS_VOICE_LIMITS,
@@ -812,6 +817,58 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     })
   }
 
+  function addScene(afterIndex = null) {
+    markDraftDirty()
+    setDraftScript((prev) => {
+      if (!prev?.scenes) return prev
+      if (prev.scenes.length >= EOF_MAX_SCENES) return prev
+      const topic = prev.topic || selected?.topic || 'football'
+      const insertAt =
+        afterIndex == null || afterIndex < 0 ? prev.scenes.length : Math.min(prev.scenes.length, afterIndex + 1)
+      const newScene = createEofScene({
+        caption: 'New scene — write the on-screen line',
+        imageQuery: `${topic} football`,
+        role: insertAt === 0 ? 'hook' : 'body',
+        durationSec: 3,
+      })
+      const scenes = [...prev.scenes]
+      scenes.splice(insertAt, 0, newScene)
+      // Keep last scene as CTA when possible
+      if (scenes.length > 1) {
+        scenes[scenes.length - 1] = { ...scenes[scenes.length - 1], role: 'cta' }
+        if (scenes[0]) scenes[0] = { ...scenes[0], role: scenes[0].role || 'hook' }
+      }
+      return { ...prev, scenes }
+    })
+    setSuccess(`Scene added. Edit the caption, then Rebuild Short to include it.`)
+  }
+
+  function removeScene(index) {
+    markDraftDirty()
+    setDraftScript((prev) => {
+      if (!prev?.scenes || prev.scenes.length <= EOF_MIN_SCENES) return prev
+      const scenes = prev.scenes.filter((_, i) => i !== index)
+      if (scenes[0]) scenes[0] = { ...scenes[0], role: 'hook' }
+      if (scenes.length > 1) scenes[scenes.length - 1] = { ...scenes[scenes.length - 1], role: 'cta' }
+      return { ...prev, scenes }
+    })
+    setSuccess('Scene removed. Rebuild Short to update voiceover, images, and video.')
+  }
+
+  function moveScene(index, direction) {
+    markDraftDirty()
+    setDraftScript((prev) => {
+      if (!prev?.scenes) return prev
+      const target = index + direction
+      if (target < 0 || target >= prev.scenes.length) return prev
+      const scenes = [...prev.scenes]
+      const tmp = scenes[index]
+      scenes[index] = scenes[target]
+      scenes[target] = tmp
+      return { ...prev, scenes }
+    })
+  }
+
   if (!isOwner) {
     return <p className={`text-sm ${EOF.muted}`}>Production automation is available to the channel owner.</p>
   }
@@ -822,7 +879,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Production Shorts</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          Write a punchy script → voiceover + stock images → 9:16 Short with TikTok-style popping captions. Download or send straight to YouTube Studio.
+          European football (soccer) only — Grok 4.5 scripts, voiceover + stock images → 9:16 Short with TikTok-style popping captions. Add scenes manually, then Rebuild Short. Download or send to YouTube Studio.
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
@@ -875,14 +932,17 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           Scripts:{' '}
           {openAiScriptEnabled
             ? scriptProviders.xai
-              ? `xAI Grok (primary)${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.groq ? ' · Groq fallback' : ''}`
+              ? `xAI Grok 4.5 (primary)${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.groq ? ' · Groq fallback' : ''}`
               : [
                   scriptProviders.openai && 'OpenAI',
                   scriptProviders.groq && 'Groq (free tier)',
                 ]
                   .filter(Boolean)
                   .join(' → ') + ' (templates if all fail)'
-            : 'Built-in templates — set XAI_API_KEY, OPENAI_API_KEY, or free GROQ_API_KEY for deeper AI scripts'}
+            : 'Built-in templates — set XAI_API_KEY for Grok 4.5, or OPENAI_API_KEY / GROQ_API_KEY'}
+        </p>
+        <p className={`mt-1 text-[11px] ${EOF.muted}`}>
+          Scope: European football only (Premier League, La Liga, Serie A, Bundesliga, Ligue 1, UCL…). Never American football / NFL. Use format <span className="text-[#9ecbff]">Breaking news</span> for Sky Sports / ESPN / ITV-style Shorts.
         </p>
 
         {renderStack ? (
@@ -919,12 +979,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
         <form onSubmit={createJob} className="mt-4 flex flex-wrap items-end gap-3">
           <label className="min-w-[200px] flex-1 text-xs text-[#aaa]">
-            Topic (e.g. Cristiano Ronaldo)
+            Topic (player, club, or European football news headline)
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               className={inputCls}
-              placeholder="Player or theme"
+              placeholder={format === 'news' ? 'e.g. Salah contract talks intensify' : 'e.g. Cristiano Ronaldo'}
               minLength={2}
               required
             />
@@ -1279,6 +1339,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             ) : null}
 
             <label className="mt-4 block text-xs text-[#aaa]">
+              YouTube title
+              <input
+                value={draftScript.title || ''}
+                onChange={(e) => {
+                  markDraftDirty()
+                  setDraftScript((s) => ({ ...s, title: e.target.value }))
+                }}
+                className={inputCls}
+                maxLength={100}
+              />
+            </label>
+
+            <label className="mt-4 block text-xs text-[#aaa]">
               YouTube description
               <textarea
                 rows={2}
@@ -1291,10 +1364,37 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               />
             </label>
 
+            <label className="mt-4 block text-xs text-[#aaa]">
+              Tags (include shortsfeed)
+              <input
+                value={Array.isArray(draftScript.tags) ? draftScript.tags.join(', ') : ''}
+                onChange={(e) => {
+                  markDraftDirty()
+                  const tags = e.target.value
+                    .split(/[,#]+/)
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                  setDraftScript((s) => ({ ...s, tags }))
+                }}
+                className={inputCls}
+                placeholder="shortsfeed, football, shorts, …"
+              />
+            </label>
+
             <div className="mt-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
-                Scenes — on-screen text + image search
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
+                  Scenes — on-screen text + image search ({draftScript.scenes?.length || 0}/{EOF_MAX_SCENES})
+                </p>
+                <button
+                  type="button"
+                  disabled={busy || (draftScript.scenes?.length || 0) >= EOF_MAX_SCENES}
+                  onClick={() => addScene()}
+                  className="rounded-full border border-[#3ea6ff]/40 px-3 py-1 text-[11px] text-[#9ecbff] disabled:opacity-50"
+                >
+                  + Add scene
+                </button>
+              </div>
               {draftScript.scenes?.map((scene, i) => (
                 <div key={scene.id || i} className="rounded-lg border border-[#303030] p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -1302,9 +1402,37 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       Scene {i + 1}
                       {scene.role ? ` · ${scene.role}` : ''}
                     </p>
-                    {scene.durationSec ? (
-                      <span className="text-[10px] text-[#3ea6ff]">~{Number(scene.durationSec).toFixed(1)}s</span>
-                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {scene.durationSec ? (
+                        <span className="text-[10px] text-[#3ea6ff]">~{Number(scene.durationSec).toFixed(1)}s</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={busy || i === 0}
+                        onClick={() => moveScene(i, -1)}
+                        className="text-[10px] text-[#aaa] hover:text-white disabled:opacity-30"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || i >= (draftScript.scenes?.length || 0) - 1}
+                        onClick={() => moveScene(i, 1)}
+                        className="text-[10px] text-[#aaa] hover:text-white disabled:opacity-30"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || (draftScript.scenes?.length || 0) <= EOF_MIN_SCENES}
+                        onClick={() => removeScene(i)}
+                        className="text-[10px] text-[#ff9b95] hover:underline disabled:opacity-30"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   <label className="mt-2 block text-xs text-[#aaa]">
                     On-screen caption (what viewers read)
@@ -1339,6 +1467,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       className={inputCls}
                     />
                   </label>
+                  <button
+                    type="button"
+                    disabled={busy || (draftScript.scenes?.length || 0) >= EOF_MAX_SCENES}
+                    onClick={() => addScene(i)}
+                    className="mt-2 text-[10px] text-[#3ea6ff] hover:underline disabled:opacity-50"
+                  >
+                    + Add scene after this
+                  </button>
                 </div>
               ))}
             </div>
