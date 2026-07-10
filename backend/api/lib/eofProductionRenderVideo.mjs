@@ -13,8 +13,9 @@ import {
 } from './eofProductionJobs.mjs'
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
-import { renderEofProductionVideo, eofProductionVideoRelPath } from './eofProductionVideo.mjs'
+import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
+import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact } from './eofProductionArtifacts.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 
@@ -33,7 +34,8 @@ export async function renderEofProductionVideoJob(jobId) {
   }
 
   const workDir = eofProductionWorkDir(jobId)
-  const mixedPath = join(workDir, 'mixed.mp3')
+  // Restore mixed audio from DB when this Vercel instance never saw the audio render.
+  const mixedPath = (await ensureEofMixedAudioOnDisk(jobId)) || join(workDir, 'mixed.mp3')
   if (!existsSync(mixedPath)) {
     throw new Error('Mixed audio not found — render audio first.')
   }
@@ -131,6 +133,9 @@ export async function renderEofProductionVideoJob(jobId) {
         imageQueryUsed: videoScene?.imageQueryUsed || entry.imageQuery,
       }
     })
+
+    const videoAbs = eofProductionVideoAbsPath(jobId)
+    await saveEofVideoArtifact(jobId, videoAbs)
 
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED,

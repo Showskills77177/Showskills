@@ -17,14 +17,20 @@ import {
 import { mixEofNarrationWithMusic, isFfmpegAvailable } from './eofAudioMix.mjs'
 import { hasBundledFfmpeg } from './eofFfmpeg.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
+import {
+  saveEofMixedAudioArtifact,
+  clearEofVideoArtifact,
+  clearEofMixedAudioArtifact,
+} from './eofProductionArtifacts.mjs'
 
 const TTS_CONCURRENCY = Number(process.env.EOF_TTS_CONCURRENCY) || 3
 
 const MAX_INLINE_AUDIO_BYTES = 3_500_000
 
 export async function readEofMixedAudioInline(jobId) {
-  const mixedPath = join(eofProductionWorkDir(jobId), 'mixed.mp3')
   try {
+    const { ensureEofMixedAudioOnDisk } = await import('./eofProductionArtifacts.mjs')
+    const mixedPath = (await ensureEofMixedAudioOnDisk(jobId)) || join(eofProductionWorkDir(jobId), 'mixed.mp3')
     const info = await stat(mixedPath)
     if (!info.isFile() || info.size > MAX_INLINE_AUDIO_BYTES) return null
     const buf = await readFile(mixedPath)
@@ -139,6 +145,11 @@ export async function renderEofProductionAudio(jobId) {
 
     await reportProgress('done', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)
+
+    // Durable copy for Vercel: next request may land on a cold instance without /tmp files.
+    await clearEofVideoArtifact(jobId).catch(() => {})
+    await clearEofMixedAudioArtifact(jobId).catch(() => {})
+    await saveEofMixedAudioArtifact(jobId, mixedPath)
 
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.RENDERED,

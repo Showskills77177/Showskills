@@ -13,14 +13,16 @@ const DEFAULT_EOF_MUSIC_CATALOG = [
     mood: 'neutral',
     publicUrl: '/eof/music/default-neutral.mp3',
     isDefault: true,
-    licenseNote: 'YouTube Audio Library — upload the MP3 under public/eof/music/ before rendering.',
+    licenseNote:
+      'Placeholder bed ships for pipeline testing. Replace with a YouTube Audio Library MP3 before publishing to YouTube.',
   },
   {
     title: 'Dramatic bed',
     mood: 'dramatic',
     publicUrl: '/eof/music/default-dramatic.mp3',
     isDefault: false,
-    licenseNote: 'YouTube Audio Library — upload the MP3 under public/eof/music/ before rendering.',
+    licenseNote:
+      'Placeholder bed ships for pipeline testing. Replace with a YouTube Audio Library MP3 before publishing to YouTube.',
   },
 ]
 

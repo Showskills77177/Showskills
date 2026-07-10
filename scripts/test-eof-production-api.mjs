@@ -18,6 +18,13 @@ async function main() {
   const { createEofProductionJob, getEofProductionJob, listEofProductionJobs, deleteEofProductionJob } = await import(
     '../backend/api/lib/eofProductionJobs.mjs'
   )
+  const { saveEofMixedAudioArtifact, ensureEofMixedAudioOnDisk } = await import(
+    '../backend/api/lib/eofProductionArtifacts.mjs'
+  )
+  const { eofProductionWorkDir } = await import('../backend/api/lib/eofSceneTts.mjs')
+  const { runFfmpeg, isFfmpegAvailable } = await import('../backend/api/lib/eofFfmpeg.mjs')
+  const { existsSync, rmSync, mkdirSync } = await import('node:fs')
+  const { join } = await import('node:path')
   const handler = (await import('../backend/api/admin/eof-production.js')).default
   const { signAdminSession } = await import('../backend/api/lib/adminAuth.mjs')
 
@@ -93,6 +100,25 @@ async function main() {
   const videoPayload = JSON.parse(videoRes.body)
   if (videoRes.statusCode !== 400) throw new Error('render-video should require audio first')
   if (!String(videoPayload.error || '').includes('audio')) throw new Error('unexpected render-video error')
+
+  // Durable audio restore (simulates cold Vercel instance after render)
+  if (await isFfmpegAvailable()) {
+    const durableJob = await createEofProductionJob({
+      topic: 'Durable audio restore',
+      createdBy: 'test',
+      voicePreset: 'british',
+    })
+    const workDir = eofProductionWorkDir(durableJob.id)
+    mkdirSync(workDir, { recursive: true })
+    const mixedPath = join(workDir, 'mixed.mp3')
+    await runFfmpeg(['-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-q:a', '4', mixedPath])
+    const saved = await saveEofMixedAudioArtifact(durableJob.id, mixedPath)
+    if (!saved) throw new Error('saveEofMixedAudioArtifact failed')
+    rmSync(workDir, { recursive: true, force: true })
+    const restored = await ensureEofMixedAudioOnDisk(durableJob.id)
+    if (!restored || !existsSync(restored)) throw new Error('durable audio restore failed')
+    await deleteEofProductionJob(durableJob.id)
+  }
 
   console.log('EOF production lib smoke tests passed')
 }

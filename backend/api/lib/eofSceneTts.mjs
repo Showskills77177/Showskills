@@ -40,16 +40,31 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }
   mkdirSync(dirname(outPath), { recursive: true })
 
   const lang = preset.voice.startsWith('en-GB') ? 'en-GB' : 'en-US'
-  const tts = new EdgeTTS({
-    voice: preset.voice,
-    lang,
-    rate: preset.rate,
-    timeout: 16000,
-  })
+  const maxAttempts = 3
+  let lastError = null
 
-  await tts.ttsPromise(line, outPath)
-  if (!existsSync(outPath)) throw new Error('TTS output file missing.')
-  return outPath
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const tts = new EdgeTTS({
+        voice: preset.voice,
+        lang,
+        rate: preset.rate,
+        timeout: 22000,
+      })
+      await tts.ttsPromise(line, outPath)
+      if (existsSync(outPath)) return outPath
+      throw new Error('TTS output file missing.')
+    } catch (e) {
+      lastError = e
+      // Brief backoff helps when Edge rate-limits or Sec-MS-GEC clock skews.
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 400 * attempt))
+      }
+    }
+  }
+
+  const msg = lastError instanceof Error ? lastError.message : String(lastError || 'TTS failed')
+  throw new Error(`Edge TTS failed after ${maxAttempts} attempts: ${msg}`)
 }
 
 /**

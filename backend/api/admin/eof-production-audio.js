@@ -1,9 +1,8 @@
 import { createReadStream, existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 import { requireEofSession } from '../lib/eofYoutubeAuth.mjs'
 import { getEofProductionJob } from '../lib/eofProductionJobs.mjs'
-import { eofProductionWorkDir } from '../lib/eofSceneTts.mjs'
+import { ensureEofMixedAudioOnDisk } from '../lib/eofProductionArtifacts.mjs'
 
 /** Stream rendered mixed MP3 for a production job. */
 export default async function handler(req, res) {
@@ -62,14 +61,14 @@ export default async function handler(req, res) {
     return
   }
 
-  const audioPath = join(eofProductionWorkDir(jobId), 'mixed.mp3')
-  if (!existsSync(audioPath)) {
+  const audioPath = await ensureEofMixedAudioOnDisk(jobId)
+  if (!audioPath || !existsSync(audioPath)) {
     res.statusCode = 404
     res.setHeader('Content-Type', 'application/json')
     res.end(
       JSON.stringify({
         error:
-          'Mixed audio file is not on this server instance. Re-run “Render audio + music” to preview again.',
+          'Mixed audio is not available. Re-run “Render audio + music” or Build Short to generate it again.',
       }),
     )
     return

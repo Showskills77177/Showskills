@@ -98,7 +98,8 @@ export const EOF_RENDER_STACK = {
   host: {
     id: 'vercel',
     label: 'ShowSkills staging API (Vercel serverless)',
-    detail: 'Audio and video renders run in the background with progress polling on Vercel (waitUntil).',
+    detail:
+      'Audio and video renders run in the background with progress polling on Vercel (waitUntil). Finished MP3/MP4 are stored in the database so previews work across serverless instances.',
   },
   video: {
     id: 'ffmpeg-images',

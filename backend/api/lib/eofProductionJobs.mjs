@@ -16,6 +16,11 @@ import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
+/** Job metadata only — never pull durable media base64 into list/detail payloads. */
+const EOF_JOB_SELECT = `id, topic, title, status, script_json, music_track_id, music_volume,
+  voice_preset, narration_manifest_json, mixed_audio_path, render_output_path,
+  youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
+
 function normalizeTimestamp(value) {
   if (value == null || value === '') return null
   if (value instanceof Date) return value.toISOString()
@@ -61,7 +66,7 @@ function rowToJob(row) {
 export async function listEofProductionJobs(limit = 50) {
   await ensureEofProductionSchema()
   const { rows } = await query(
-    `SELECT * FROM eof_production_jobs ORDER BY created_at DESC LIMIT $1`,
+    `SELECT ${EOF_JOB_SELECT} FROM eof_production_jobs ORDER BY created_at DESC LIMIT $1`,
     [limit],
   )
   return rows.map(rowToJob)
@@ -69,7 +74,7 @@ export async function listEofProductionJobs(limit = 50) {
 
 export async function getEofProductionJob(id) {
   await ensureEofProductionSchema()
-  const { rows } = await query(`SELECT * FROM eof_production_jobs WHERE id = $1`, [id])
+  const { rows } = await query(`SELECT ${EOF_JOB_SELECT} FROM eof_production_jobs WHERE id = $1`, [id])
   return rowToJob(rows[0])
 }
 
