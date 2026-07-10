@@ -20,6 +20,7 @@ export const EOF_VOICE_PRESETS = {
     engine: 'elevenlabs',
     voiceId: 'nPczCjzI2devNBz1zQrb',
     modelId: 'eleven_multilingual_v2',
+    speed: 1.0,
     stability: 0.45,
     similarityBoost: 0.75,
     style: 0.35,

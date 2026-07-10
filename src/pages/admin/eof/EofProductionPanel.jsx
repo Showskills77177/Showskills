@@ -9,6 +9,11 @@ import {
   EOF_DEFAULT_VOICE_PRESET,
 } from '../../../../shared/eofProduction.mjs'
 import { EOF_DEFAULT_SCRIPT_FORMAT } from '../../../../shared/eofScriptTemplates.mjs'
+import {
+  EOF_ELEVENLABS_VOICE_FIELDS,
+  EOF_ELEVENLABS_VOICE_LIMITS,
+  normalizeElevenLabsVoiceSettings,
+} from '../../../../shared/eofElevenLabsVoice.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
@@ -73,6 +78,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [voicePresets, setVoicePresets] = useState([])
   const [voicePreset, setVoicePreset] = useState(EOF_DEFAULT_VOICE_PRESET)
   const [elevenLabsConfigured, setElevenLabsConfigured] = useState(false)
+  const [elevenLabsVoiceDefaults, setElevenLabsVoiceDefaults] = useState(() =>
+    normalizeElevenLabsVoiceSettings(null),
+  )
+  const [voiceSettings, setVoiceSettings] = useState(() => normalizeElevenLabsVoiceSettings(null))
   const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
   const [scriptProviders, setScriptProviders] = useState({ xai: false, openai: false, groq: false })
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
@@ -134,6 +143,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setVoicePresets(Array.isArray(j.voicePresets) ? j.voicePresets : [])
       if (j.defaultVoicePreset) setVoicePreset((prev) => prev || j.defaultVoicePreset)
       setElevenLabsConfigured(Boolean(j.elevenLabsConfigured))
+      if (j.elevenLabsVoiceDefaults) {
+        setElevenLabsVoiceDefaults(normalizeElevenLabsVoiceSettings(j.elevenLabsVoiceDefaults))
+      }
       setOpenAiScriptEnabled(Boolean(j.openAiScriptEnabled))
       setScriptProviders(
         j.scriptProviders && typeof j.scriptProviders === 'object'
@@ -191,6 +203,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     setDraftScript(job.script ? JSON.parse(JSON.stringify(job.script)) : null)
     if (job.script?.format) setFormat(job.script.format)
     if (job.voicePreset) setVoicePreset(job.voicePreset)
+    if (job.voiceSettings) {
+      setVoiceSettings(normalizeElevenLabsVoiceSettings(job.voiceSettings))
+    } else if (job.voicePreset === 'brian') {
+      setVoiceSettings(normalizeElevenLabsVoiceSettings(elevenLabsVoiceDefaults))
+    }
     if (job.status !== 'video_rendered') setVideoPreviewUrl('')
     setDraftDirty(false)
   }
@@ -328,6 +345,16 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
   function markDraftDirty() {
     setDraftDirty(true)
+  }
+
+  function updateVoiceSetting(key, value) {
+    setVoiceSettings((prev) => normalizeElevenLabsVoiceSettings({ ...prev, [key]: value }))
+    markDraftDirty()
+  }
+
+  function resetBrianVoiceSettings() {
+    setVoiceSettings(normalizeElevenLabsVoiceSettings(elevenLabsVoiceDefaults))
+    markDraftDirty()
   }
 
   function workflowStepState(step) {
@@ -573,6 +600,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           jobId: selectedId,
           script: draftScript,
           voicePreset,
+          voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -924,7 +952,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   <select
                     value={voicePreset}
                     onChange={(e) => {
-                      setVoicePreset(e.target.value)
+                      const next = e.target.value
+                      setVoicePreset(next)
+                      if (next === 'brian') {
+                        setVoiceSettings((prev) =>
+                          prev ? normalizeElevenLabsVoiceSettings(prev) : normalizeElevenLabsVoiceSettings(elevenLabsVoiceDefaults),
+                        )
+                      }
                       markDraftDirty()
                     }}
                     className={`${inputCls} mt-0.5 min-w-[160px] py-1.5 text-xs`}
@@ -977,6 +1011,47 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 </button>
               </div>
             </div>
+
+            {voicePreset === 'brian' ? (
+              <div className="mt-4 rounded-lg border border-[#303030] bg-[#0d0d0d] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
+                    Brian voice tuning (ElevenLabs)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={resetBrianVoiceSettings}
+                    className="text-[10px] text-[#3ea6ff] hover:underline"
+                  >
+                    Reset to defaults
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  {EOF_ELEVENLABS_VOICE_FIELDS.map((field) => {
+                    const limits = EOF_ELEVENLABS_VOICE_LIMITS[field.key]
+                    const val = voiceSettings[field.key] ?? limits.default
+                    return (
+                      <label key={field.key} className="block text-xs text-[#aaa]">
+                        <span className="flex items-center justify-between gap-2">
+                          <span>{field.label}</span>
+                          <span className="tabular-nums text-[#9ecbff]">{Number(val).toFixed(2)}</span>
+                        </span>
+                        <input
+                          type="range"
+                          min={limits.min}
+                          max={limits.max}
+                          step={limits.step}
+                          value={val}
+                          onChange={(e) => updateVoiceSetting(field.key, e.target.value)}
+                          className="mt-1 w-full accent-[#3ea6ff]"
+                        />
+                        <span className="mt-0.5 block text-[10px] text-[#717171]">{field.hint}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {displayProgress &&
             (selected.status === 'rendering' ||

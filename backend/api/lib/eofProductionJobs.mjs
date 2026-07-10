@@ -8,9 +8,11 @@ import {
   EOF_PRODUCTION_JOB_STATUS,
   EOF_DEFAULT_MUSIC_VOLUME,
   EOF_DEFAULT_VOICE_PRESET,
+  EOF_VOICE_PRESETS,
   parseProductionScript,
   parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
+import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { writeEofProductionScript } from './eofScriptWriter.mjs'
@@ -19,8 +21,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 /** Job metadata only — never pull durable media base64 into list/detail payloads. */
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, music_track_id, music_volume,
-  voice_preset, narration_manifest_json, mixed_audio_path, render_output_path,
+  voice_preset, voice_settings_json, narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
+
+function parseVoiceSettingsJson(raw) {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return normalizeElevenLabsVoiceSettings(parsed)
+  } catch {
+    return null
+  }
+}
+
+function defaultVoiceSettingsForPreset(voicePreset) {
+  const preset = EOF_VOICE_PRESETS[voicePreset] || EOF_VOICE_PRESETS[EOF_DEFAULT_VOICE_PRESET]
+  if (preset?.engine !== 'elevenlabs') return null
+  return resolveElevenLabsVoiceSettings(preset, null)
+}
 
 function normalizeTimestamp(value) {
   if (value == null || value === '') return null
@@ -45,6 +63,7 @@ function rowToJob(row) {
     musicTrackId: row.music_track_id || null,
     musicVolume: Number(row.music_volume) || EOF_DEFAULT_MUSIC_VOLUME,
     voicePreset: row.voice_preset || 'brian',
+    voiceSettings: parseVoiceSettingsJson(row.voice_settings_json),
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -93,11 +112,14 @@ export async function createEofProductionJob({
   const { script } = await writeEofProductionScript({ topic: t, format })
   const track = await pickEofMusicTrackForTopic(t, musicTrackId)
   const id = randomUUID()
+  const preset = EOF_VOICE_PRESETS[voicePreset] || EOF_VOICE_PRESETS[EOF_DEFAULT_VOICE_PRESET]
+  const voiceSettings =
+    preset?.engine === 'elevenlabs' ? resolveElevenLabsVoiceSettings(preset, null) : null
 
   await query(
     `INSERT INTO eof_production_jobs
-     (id, topic, title, status, script_json, music_track_id, music_volume, voice_preset, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+     (id, topic, title, status, script_json, music_track_id, music_volume, voice_preset, voice_settings_json, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       id,
       t,
@@ -107,6 +129,7 @@ export async function createEofProductionJob({
       track?.id || null,
       EOF_DEFAULT_MUSIC_VOLUME,
       voicePreset,
+      voiceSettings ? JSON.stringify(voiceSettings) : null,
       createdBy || null,
     ],
   )
@@ -125,6 +148,15 @@ export async function updateEofProductionJob(id, patch) {
   const musicVolume =
     patch.musicVolume !== undefined ? Number(patch.musicVolume) : job.musicVolume
   const voicePreset = patch.voicePreset !== undefined ? patch.voicePreset : job.voicePreset
+  let voiceSettings =
+    patch.voiceSettings !== undefined ? patch.voiceSettings : job.voiceSettings
+  if (voiceSettings && typeof voiceSettings === 'object') {
+    voiceSettings = normalizeElevenLabsVoiceSettings(voiceSettings)
+  } else if ((EOF_VOICE_PRESETS[voicePreset] || {}).engine === 'elevenlabs') {
+    voiceSettings = defaultVoiceSettingsForPreset(voicePreset)
+  } else {
+    voiceSettings = null
+  }
   const status = patch.status !== undefined ? patch.status : job.status
   const errorMessage = patch.errorMessage !== undefined ? patch.errorMessage : job.errorMessage
   const mixedAudioPath = patch.mixedAudioPath !== undefined ? patch.mixedAudioPath : job.mixedAudioPath
@@ -142,10 +174,11 @@ export async function updateEofProductionJob(id, patch) {
          music_track_id = $6,
          music_volume = $7,
          voice_preset = $8,
-         error_message = $9,
-         mixed_audio_path = $10,
-         narration_manifest_json = $11,
-         render_output_path = $12,
+         voice_settings_json = $9,
+         error_message = $10,
+         mixed_audio_path = $11,
+         narration_manifest_json = $12,
+         render_output_path = $13,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -157,6 +190,7 @@ export async function updateEofProductionJob(id, patch) {
       musicTrackId,
       musicVolume,
       voicePreset,
+      voiceSettings ? JSON.stringify(voiceSettings) : null,
       errorMessage,
       mixedAudioPath,
       narrationManifest ? JSON.stringify(narrationManifest) : null,

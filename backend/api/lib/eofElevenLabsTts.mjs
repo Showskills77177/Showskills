@@ -5,6 +5,10 @@
 import { writeFile } from 'node:fs/promises'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import {
+  normalizeElevenLabsVoiceSettings,
+  resolveElevenLabsVoiceSettings,
+} from '../../../shared/eofElevenLabsVoice.mjs'
 
 /** Premade “Brian — Deep, Resonant and Comforting” */
 export const ELEVENLABS_BRIAN_VOICE_ID = 'nPczCjzI2devNBz1zQrb'
@@ -23,9 +27,11 @@ export function isEofElevenLabsConfigured() {
  *   outPath: string,
  *   voiceId?: string,
  *   modelId?: string,
+ *   voiceSettings?: Record<string, unknown> | null,
  *   stability?: number,
  *   similarityBoost?: number,
  *   style?: number,
+ *   speed?: number,
  * }} opts
  */
 export async function synthesizeElevenLabsSpeech({
@@ -33,15 +39,21 @@ export async function synthesizeElevenLabsSpeech({
   outPath,
   voiceId = ELEVENLABS_BRIAN_VOICE_ID,
   modelId,
-  stability = 0.45,
-  similarityBoost = 0.75,
-  style = 0.35,
+  voiceSettings,
+  stability,
+  similarityBoost,
+  style,
+  speed,
 }) {
   const key = getElevenLabsApiKey()
   if (!key) throw new Error('ELEVENLABS_API_KEY is not set on the server.')
 
   const line = String(text || '').trim()
   if (!line) throw new Error('Empty narration text.')
+
+  const settings = voiceSettings
+    ? normalizeElevenLabsVoiceSettings(voiceSettings)
+    : normalizeElevenLabsVoiceSettings({ stability, similarityBoost, style, speed })
 
   const model =
     (modelId || process.env.ELEVENLABS_MODEL || process.env.EOF_ELEVENLABS_MODEL || 'eleven_multilingual_v2').trim()
@@ -66,9 +78,10 @@ export async function synthesizeElevenLabsSpeech({
           text: line,
           model_id: model,
           voice_settings: {
-            stability,
-            similarity_boost: similarityBoost,
-            style,
+            stability: settings.stability,
+            similarity_boost: settings.similarityBoost,
+            style: settings.style,
+            speed: settings.speed,
             use_speaker_boost: true,
           },
         }),
@@ -84,7 +97,7 @@ export async function synthesizeElevenLabsSpeech({
 
       mkdirSync(dirname(outPath), { recursive: true })
       await writeFile(outPath, buf)
-      return outPath
+      return { outPath, voiceSettings: settings }
     } catch (e) {
       lastError = e
       if (attempt < maxAttempts) {
@@ -96,3 +109,5 @@ export async function synthesizeElevenLabsSpeech({
   const msg = lastError instanceof Error ? lastError.message : String(lastError || 'TTS failed')
   throw new Error(`ElevenLabs TTS failed after ${maxAttempts} attempts: ${msg}`)
 }
+
+export { resolveElevenLabsVoiceSettings, normalizeElevenLabsVoiceSettings }

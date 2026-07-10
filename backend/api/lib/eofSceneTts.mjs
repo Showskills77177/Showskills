@@ -3,6 +3,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EdgeTTS } from 'node-edge-tts'
 import { EOF_VOICE_PRESETS, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
+import { resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { runFfprobe } from './eofFfmpeg.mjs'
 import { isEofElevenLabsConfigured, synthesizeElevenLabsSpeech } from './eofElevenLabsTts.mjs'
 
@@ -36,9 +37,9 @@ function resolveVoicePreset(voicePreset) {
 }
 
 /**
- * @param {{ text: string, voicePreset: string, outPath: string }} opts
+ * @param {{ text: string, voicePreset: string, voiceSettings?: Record<string, unknown> | null, outPath: string }} opts
  */
-export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }) {
+export async function synthesizeEofSceneNarration({ text, voicePreset, voiceSettings, outPath }) {
   const preset = resolveVoicePreset(voicePreset)
   const line = String(text || '').trim()
   if (!line) throw new Error('Empty narration text.')
@@ -51,15 +52,15 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }
         'Brian (ElevenLabs) needs ELEVENLABS_API_KEY on the server. Add it in Vercel env, or pick a free Edge voice.',
       )
     }
-    return synthesizeElevenLabsSpeech({
+    const resolved = resolveElevenLabsVoiceSettings(preset, voiceSettings)
+    const result = await synthesizeElevenLabsSpeech({
       text: line,
       outPath,
       voiceId: preset.voiceId,
       modelId: preset.modelId,
-      stability: preset.stability,
-      similarityBoost: preset.similarityBoost,
-      style: preset.style,
+      voiceSettings: resolved,
     })
+    return result.outPath
   }
 
   return synthesizeWithEdgeTts({ text: line, preset, outPath })

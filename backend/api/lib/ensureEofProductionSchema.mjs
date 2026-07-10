@@ -90,7 +90,7 @@ export async function ensureEofProductionSchema() {
 }
 
 async function addEofProductionJobColumns() {
-  const columns = ['render_progress_json', 'mixed_audio_base64', 'video_base64', 'scene_images_base64_json']
+  const columns = ['render_progress_json', 'mixed_audio_base64', 'video_base64', 'scene_images_base64_json', 'voice_settings_json']
   if (dbIsPostgres()) {
     for (const col of columns) {
       await query(`ALTER TABLE eof_production_jobs ADD COLUMN IF NOT EXISTS ${col} TEXT`)

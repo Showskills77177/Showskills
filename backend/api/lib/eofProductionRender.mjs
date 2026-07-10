@@ -106,6 +106,7 @@ export async function renderEofProductionAudio(jobId) {
       await synthesizeEofSceneNarration({
         text: scene.narration,
         voicePreset: job.voicePreset,
+        voiceSettings: job.voiceSettings,
         outPath,
       })
       scenesDone += 1

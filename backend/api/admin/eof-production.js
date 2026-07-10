@@ -17,6 +17,12 @@ import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '.
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
 import { isEofOpenAiScriptConfigured, eofScriptProviderStatus } from '../lib/eofScriptWriter.mjs'
 import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
+import {
+  EOF_ELEVENLABS_VOICE_FIELDS,
+  EOF_ELEVENLABS_VOICE_LIMITS,
+  normalizeElevenLabsVoiceSettings,
+  resolveElevenLabsVoiceSettings,
+} from '../../../shared/eofElevenLabsVoice.mjs'
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -64,6 +70,9 @@ export default async function handler(req, res) {
         voicePresets: Object.values(EOF_VOICE_PRESETS),
         defaultVoicePreset: EOF_DEFAULT_VOICE_PRESET,
         elevenLabsConfigured: isEofElevenLabsConfigured(),
+        elevenLabsVoiceFields: EOF_ELEVENLABS_VOICE_FIELDS,
+        elevenLabsVoiceLimits: EOF_ELEVENLABS_VOICE_LIMITS,
+        elevenLabsVoiceDefaults: resolveElevenLabsVoiceSettings(EOF_VOICE_PRESETS.brian, null),
         scriptFormats: EOF_SCRIPT_FORMATS,
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
@@ -181,6 +190,10 @@ export default async function handler(req, res) {
         musicTrackId: body.musicTrackId,
         musicVolume: body.musicVolume,
         voicePreset: body.voicePreset,
+        voiceSettings:
+          body.voiceSettings !== undefined
+            ? normalizeElevenLabsVoiceSettings(body.voiceSettings)
+            : undefined,
       })
       return json(res, 200, { ok: true, job })
     }
