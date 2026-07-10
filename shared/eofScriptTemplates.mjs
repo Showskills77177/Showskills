@@ -1,6 +1,12 @@
-import { randomUUID } from 'node:crypto'
-
 import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
+
+/** Browser + Node safe UUID (avoid node:crypto in client bundles). */
+function newSceneId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return `eof-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 /** European football (soccer) Short formats — never American football / NFL. */
 export const EOF_SCRIPT_FORMATS = [
@@ -71,7 +77,7 @@ export function createEofScene(input = {}) {
       ? Number(input.durationSec)
       : estimateCaptionDurationSec(text)
   return {
-    id: String(input.id || '').trim() || randomUUID(),
+    id: String(input.id || '').trim() || newSceneId(),
     narration: text,
     caption: text,
     imageQuery: String(input.imageQuery || '').trim(),
