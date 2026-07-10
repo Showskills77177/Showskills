@@ -7,6 +7,7 @@ import { ensureEofProductionSchema } from './ensureEofProductionSchema.mjs'
 import {
   EOF_PRODUCTION_JOB_STATUS,
   EOF_DEFAULT_MUSIC_VOLUME,
+  EOF_DEFAULT_VOICE_PRESET,
   parseProductionScript,
   parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
@@ -43,7 +44,7 @@ function rowToJob(row) {
     script: parseProductionScript(row.script_json),
     musicTrackId: row.music_track_id || null,
     musicVolume: Number(row.music_volume) || EOF_DEFAULT_MUSIC_VOLUME,
-    voicePreset: row.voice_preset || 'british',
+    voicePreset: row.voice_preset || 'brian',
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -81,7 +82,7 @@ export async function getEofProductionJob(id) {
 export async function createEofProductionJob({
   topic,
   createdBy,
-  voicePreset = 'british',
+  voicePreset = EOF_DEFAULT_VOICE_PRESET,
   musicTrackId = null,
   format = null,
 }) {

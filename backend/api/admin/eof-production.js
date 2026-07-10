@@ -13,9 +13,10 @@ import {
 import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
-import { EOF_RENDER_STACK } from '../../../shared/eofProduction.mjs'
+import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
 import { isEofOpenAiScriptConfigured, eofScriptProviderStatus } from '../lib/eofScriptWriter.mjs'
+import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -60,7 +61,9 @@ export default async function handler(req, res) {
         ok: true,
         jobs,
         tracks: [],
-        voicePresets: [],
+        voicePresets: Object.values(EOF_VOICE_PRESETS),
+        defaultVoicePreset: EOF_DEFAULT_VOICE_PRESET,
+        elevenLabsConfigured: isEofElevenLabsConfigured(),
         scriptFormats: EOF_SCRIPT_FORMATS,
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
@@ -81,7 +84,7 @@ export default async function handler(req, res) {
       const body = await readJsonBody(req)
       const action = typeof body.action === 'string' ? body.action : 'create'
 
-      if (action === 'build-short' || action === 'render-video') {
+      if (action === 'build-short' || action === 'render-video' || action === 'render') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const existing = await getEofProductionJob(jobId)
@@ -91,10 +94,10 @@ export default async function handler(req, res) {
         }
 
         try {
-          if (action === 'build-short') {
-            await startEofProductionFullBuildBackground(jobId)
-          } else {
+          if (action === 'render-video') {
             await startEofProductionVideoRenderBackground(jobId)
+          } else {
+            await startEofProductionFullBuildBackground(jobId)
           }
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -140,20 +143,18 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, job })
       }
 
-      // Legacy audio action — redirect to image Short build
-      if (action === 'render') {
-        return json(res, 400, {
-          error: 'Audio narration is disabled. Use Build Short (images + captions only).',
-        })
-      }
-
       const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
       const format = typeof body.format === 'string' ? body.format.trim() : EOF_DEFAULT_SCRIPT_FORMAT
+      const voicePreset =
+        typeof body.voicePreset === 'string' && body.voicePreset.trim()
+          ? body.voicePreset.trim()
+          : EOF_DEFAULT_VOICE_PRESET
       try {
         const job = await createEofProductionJob({
           topic,
           createdBy: info.username,
           format,
+          voicePreset,
         })
         return json(res, 201, {
           ok: true,

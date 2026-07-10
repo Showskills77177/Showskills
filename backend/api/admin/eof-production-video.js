@@ -38,10 +38,12 @@ export default async function handler(req, res) {
   }
 
   let jobId = ''
+  let download = false
   try {
     const raw = typeof req.url === 'string' ? req.url : '/'
     const url = new URL(raw, 'http://localhost')
     jobId = (url.searchParams.get('jobId') || '').trim()
+    download = url.searchParams.get('download') === '1'
   } catch {
     jobId = ''
   }
@@ -73,8 +75,17 @@ export default async function handler(req, res) {
     return
   }
 
+  const safeName = String(job.title || job.topic || 'eof-short')
+    .replace(/[^\w\-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60) || 'eof-short'
+
   res.statusCode = 200
   res.setHeader('Content-Type', 'video/mp4')
   res.setHeader('Cache-Control', 'private, no-store')
+  if (download) {
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.mp4"`)
+  }
   createReadStream(videoPath).pipe(res)
 }

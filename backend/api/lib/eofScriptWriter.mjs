@@ -89,7 +89,7 @@ function buildPrompt({ topic, format }) {
 
 Hard rules:
 - Exactly 5 scenes.
-- Each caption is ON-SCREEN TEXT only (no voiceover). Max 14 words. Punchy. Mobile-first. No hashtags in captions.
+- Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 14 words. Punchy. Mobile-first. No hashtags in captions.
 - Ban empty filler: never write vague lines like "rewrote elite", "global superstar energy", "moments fans still argue about", "raw talent", or "unforgettable nights" unless you attach a concrete angle (club, rivalry, role, era, style trait).
 - Prefer specific, defensible angles: breakthrough club, signature role, famous rivalry, pressure narrative, late-career chapter. Do NOT invent exact match scores, trophy counts, or dates you are unsure about — use career language instead.
 - Hook (scene 1) must create a curiosity gap ("why / how / the part nobody talks about").

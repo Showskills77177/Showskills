@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { mapWithConcurrency } from './eofAsyncPool.mjs'
+import { buildTikTokCaptionBeats, buildTikTokDrawtextFilters } from './eofTikTokCaptions.mjs'
 
 const BUNDLED_CAPTION_FONT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -42,10 +43,9 @@ export function eofProductionVideoAbsPath(jobId) {
 }
 
 /**
- * Pop-in captions: fade + slight size settle, bold white with dark outline.
- * Falls back to gradient-only if no font is available on the host.
+ * TikTok-style popping captions (chunk beats + bounce), not a static subtitle bar.
  */
-function buildSceneVideoFilter({ frames, captionFile, captionFont }) {
+function buildSceneVideoFilter({ frames, caption, durationSec, captionFont }) {
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
     'crop=1080:1920',
@@ -57,54 +57,29 @@ function buildSceneVideoFilter({ frames, captionFile, captionFont }) {
     base.push(`fps=${VIDEO_FPS}`)
   }
 
-  // Soft bottom gradient so white captions stay readable on any stock photo
-  base.push('drawbox=x=0:y=ih*0.58:w=iw:h=ih*0.42:color=black@0.52:t=fill')
+  // Soft mid vignette only — captions sit mid-frame like TikTok, not in a subtitle box
+  base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
 
   if (captionFont) {
-    const escapedFont = captionFont.replace(/'/g, "'\\''")
-    const escapedCaption = captionFile.replace(/'/g, "'\\''")
-    // Soft pop: fade in over ~0.28s, settle at full size
-    const alpha = "if(lt(t\\,0.28)\\,t/0.28\\,1)"
-    const fontsize = "if(lt(t\\,0.22)\\,44+t*55\\,56)"
-    base.push(
-      `drawtext=fontfile='${escapedFont}':fontcolor=white:fontsize='${fontsize}':alpha='${alpha}':line_spacing=14:borderw=6:bordercolor=black@0.78:x=(w-text_w)/2:y=h-360:textfile='${escapedCaption}'`,
-    )
+    const beats = buildTikTokCaptionBeats(caption, durationSec)
+    base.push(...buildTikTokDrawtextFilters({ beats, captionFont }))
   }
 
   return base.join(',')
-}
-
-/** Soft-wrap long captions so drawtext stays readable on 9:16. */
-function wrapCaptionLines(text, maxChars = 22) {
-  const words = String(text || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (!words.length) return '…'
-  const lines = []
-  let line = ''
-  for (const w of words) {
-    const next = line ? `${line} ${w}` : w
-    if (next.length > maxChars && line) {
-      lines.push(line)
-      line = w
-    } else {
-      line = next
-    }
-  }
-  if (line) lines.push(line)
-  return lines.slice(0, 4).join('\n')
 }
 
 async function encodeSceneClip({ scene, workDir, captionFont }) {
   const dur = Math.max(2, Number(scene.durationSec) || 3)
   const frames = Math.max(1, Math.ceil(dur * VIDEO_FPS))
   const clipPath = join(workDir, `clip-${scene.index + 1}.mp4`)
-  const captionFile = join(workDir, `caption-${scene.index + 1}.txt`)
-  const caption = wrapCaptionLines(String(scene.caption || '').trim().slice(0, 140))
-  await writeFile(captionFile, caption || `Scene ${scene.index + 1}`, 'utf8')
+  const caption = String(scene.caption || '').trim().slice(0, 140) || `Scene ${scene.index + 1}`
 
-  const vf = buildSceneVideoFilter({ frames, captionFile, captionFont })
+  const vf = buildSceneVideoFilter({
+    frames,
+    caption,
+    durationSec: dur,
+    captionFont,
+  })
 
   await runFfmpeg(
     [
@@ -138,7 +113,7 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
 
 /**
  * Concatenate scene image clips into a 9:16 Short.
- * Audio is optional — image-only Shorts are silent (YouTube can add music later).
+ * Audio is optional — muxed when mixedAudioPath is present.
  * @param {{
  *   jobId: string,
  *   scenes: Array<{ index: number, durationSec: number, caption?: string, imagePath: string }>,

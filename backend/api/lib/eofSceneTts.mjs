@@ -2,8 +2,9 @@ import { mkdirSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { EdgeTTS } from 'node-edge-tts'
-import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
+import { EOF_VOICE_PRESETS, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { runFfprobe } from './eofFfmpeg.mjs'
+import { isEofElevenLabsConfigured, synthesizeElevenLabsSpeech } from './eofElevenLabsTts.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -29,17 +30,43 @@ export function eofProductionMixedAudioRelPath(jobId) {
   return `storage/eof/jobs/${jobId}/mixed.mp3`
 }
 
+function resolveVoicePreset(voicePreset) {
+  const id = String(voicePreset || EOF_DEFAULT_VOICE_PRESET).trim()
+  return EOF_VOICE_PRESETS[id] || EOF_VOICE_PRESETS[EOF_DEFAULT_VOICE_PRESET] || EOF_VOICE_PRESETS.brian
+}
+
 /**
  * @param {{ text: string, voicePreset: string, outPath: string }} opts
  */
 export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }) {
-  const preset = EOF_VOICE_PRESETS[voicePreset] || EOF_VOICE_PRESETS.british
+  const preset = resolveVoicePreset(voicePreset)
   const line = String(text || '').trim()
   if (!line) throw new Error('Empty narration text.')
 
   mkdirSync(dirname(outPath), { recursive: true })
 
-  const lang = preset.voice.startsWith('en-GB') ? 'en-GB' : 'en-US'
+  if (preset.engine === 'elevenlabs') {
+    if (!isEofElevenLabsConfigured()) {
+      throw new Error(
+        'Brian (ElevenLabs) needs ELEVENLABS_API_KEY on the server. Add it in Vercel env, or pick a free Edge voice.',
+      )
+    }
+    return synthesizeElevenLabsSpeech({
+      text: line,
+      outPath,
+      voiceId: preset.voiceId,
+      modelId: preset.modelId,
+      stability: preset.stability,
+      similarityBoost: preset.similarityBoost,
+      style: preset.style,
+    })
+  }
+
+  return synthesizeWithEdgeTts({ text: line, preset, outPath })
+}
+
+async function synthesizeWithEdgeTts({ text, preset, outPath }) {
+  const lang = String(preset.voice || '').startsWith('en-GB') ? 'en-GB' : 'en-US'
   const maxAttempts = 3
   let lastError = null
 
@@ -48,15 +75,14 @@ export async function synthesizeEofSceneNarration({ text, voicePreset, outPath }
       const tts = new EdgeTTS({
         voice: preset.voice,
         lang,
-        rate: preset.rate,
+        rate: preset.rate || '-8%',
         timeout: 22000,
       })
-      await tts.ttsPromise(line, outPath)
+      await tts.ttsPromise(text, outPath)
       if (existsSync(outPath)) return outPath
       throw new Error('TTS output file missing.')
     } catch (e) {
       lastError = e
-      // Brief backoff helps when Edge rate-limits or Sec-MS-GEC clock skews.
       if (attempt < maxAttempts) {
         await new Promise((r) => setTimeout(r, 400 * attempt))
       }

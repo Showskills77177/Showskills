@@ -1,12 +1,12 @@
 import { createReadStream, existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 import { requireEofSession } from '../lib/eofYoutubeAuth.mjs'
 import { getEofProductionJob } from '../lib/eofProductionJobs.mjs'
+import { ensureEofSceneImageOnDisk } from '../lib/eofProductionArtifacts.mjs'
+import { fetchEofSceneImage, eofSceneImageAbsPath } from '../lib/eofSceneImages.mjs'
 import { eofProductionWorkDir } from '../lib/eofSceneTts.mjs'
-import { eofSceneImageAbsPath } from '../lib/eofSceneImages.mjs'
 
-/** Stream a scene still used in the rendered Short. */
+/** Stream a scene still used in the rendered Short (restores from DB on cold instances). */
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -65,11 +65,34 @@ export default async function handler(req, res) {
     return
   }
 
-  const imagePath = eofSceneImageAbsPath(eofProductionWorkDir(jobId), scene)
-  if (!existsSync(imagePath)) {
+  let imagePath = await ensureEofSceneImageOnDisk(jobId, scene)
+
+  // Last resort: re-fetch from image providers using saved query metadata
+  if (!imagePath || !existsSync(imagePath)) {
+    const manifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
+    const entry = manifest.find((row) => Number(row.index) === scene - 1) || manifest[scene - 1]
+    const imageQuery = entry?.imageQueryUsed || entry?.imageQuery || job.script?.scenes?.[scene - 1]?.imageQuery
+    if (imageQuery) {
+      try {
+        const outPath = eofSceneImageAbsPath(eofProductionWorkDir(jobId), scene)
+        await fetchEofSceneImage({
+          topic: job.topic,
+          imageQuery,
+          outPath,
+          index: scene - 1,
+          refresh: true,
+        })
+        if (existsSync(outPath)) imagePath = outPath
+      } catch (e) {
+        console.warn('[eof-scene-image] lazy re-fetch failed', jobId, scene, e)
+      }
+    }
+  }
+
+  if (!imagePath || !existsSync(imagePath)) {
     res.statusCode = 404
     res.setHeader('Content-Type', 'application/json')
-    res.end(JSON.stringify({ error: 'Scene image not on this server — re-run Build Short.' }))
+    res.end(JSON.stringify({ error: 'Scene image not available — re-run Build Short.' }))
     return
   }
 

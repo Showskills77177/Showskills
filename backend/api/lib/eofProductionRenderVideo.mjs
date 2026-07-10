@@ -16,7 +16,7 @@ import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
-import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact } from './eofProductionArtifacts.mjs'
+import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact, saveEofSceneImagesArtifact } from './eofProductionArtifacts.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 
@@ -145,6 +145,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
 
     const videoAbs = eofProductionVideoAbsPath(jobId)
+    await saveEofSceneImagesArtifact(jobId, workDir)
     await saveEofVideoArtifact(jobId, videoAbs)
 
     return updateEofProductionJob(jobId, {

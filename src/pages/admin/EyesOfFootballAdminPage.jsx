@@ -39,6 +39,7 @@ export default function EyesOfFootballAdminPage() {
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(null)
   const [view, setView] = useState(readStoredView)
+  const [studioDraft, setStudioDraft] = useState(null)
 
   const selectView = useCallback((id) => {
     setView(id)
@@ -134,8 +135,7 @@ export default function EyesOfFootballAdminPage() {
                 {[
                   ['studio', 'Studio'],
                   ['production', 'Production'],
-                  // Music beds disabled — image Shorts are silent; add audio in YouTube Studio.
-                  // ['music', 'Music'],
+                  ['music', 'Music'],
                   ['analytics', 'Analytics'],
                   ['calendar', 'Calendar'],
                   ['content', 'Content'],
@@ -158,7 +158,14 @@ export default function EyesOfFootballAdminPage() {
               </div>
 
               <div hidden={view !== 'production'} className="mt-6">
-                <EofProductionPanel isOwner={isOwner} active={view === 'production'} />
+                <EofProductionPanel
+                  isOwner={isOwner}
+                  active={view === 'production'}
+                  onSendToStudio={(draft) => {
+                    setStudioDraft(draft)
+                    selectView('studio')
+                  }}
+                />
               </div>
 
               <div hidden={view !== 'music'} className="mt-6">
@@ -166,7 +173,13 @@ export default function EyesOfFootballAdminPage() {
               </div>
 
               <div hidden={view !== 'studio'} className="mt-6">
-                <EofUploadStudio canUse={canUpload} isOwner={session?.isOwner} onDone={() => load()} />
+                <EofUploadStudio
+                  canUse={canUpload}
+                  isOwner={session?.isOwner}
+                  initialDraft={studioDraft}
+                  onInitialDraftConsumed={() => setStudioDraft(null)}
+                  onDone={() => load()}
+                />
               </div>
 
               <div hidden={view !== 'calendar'} className="mt-6 grid gap-6 lg:grid-cols-2">

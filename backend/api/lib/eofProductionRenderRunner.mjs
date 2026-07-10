@@ -1,3 +1,6 @@
+/**
+ * Image Shorts with voiceover: TTS + music mix → stills + captions → muxed 9:16 MP4.
+ */
 import { renderEofProductionAudio } from './eofProductionRender.mjs'
 import { renderEofProductionVideoJob } from './eofProductionRenderVideo.mjs'
 import {
@@ -9,11 +12,17 @@ import {
 import {
   EOF_PRODUCTION_JOB_STATUS,
   buildEofRenderProgress,
+  estimateEofRenderDurationSec,
   estimateEofVideoRenderDurationSec,
 } from '../../../shared/eofProduction.mjs'
 
+function estimateFullBuildSec(script) {
+  const scenes = script?.scenes?.length || 5
+  return estimateEofRenderDurationSec(script) + estimateEofVideoRenderDurationSec(scenes)
+}
+
 /**
- * Image Shorts only: fetch stills + assemble 9:16 MP4 with captions (no TTS/music).
+ * Full Short: narration (Edge TTS) + images + captions + mux.
  * @param {string} jobId
  */
 export async function renderEofProductionFullBuild(jobId) {
@@ -22,7 +31,8 @@ export async function renderEofProductionFullBuild(jobId) {
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
   try {
-    return await renderEofProductionVideoJob(jobId, { includeAudioIfPresent: false })
+    await renderEofProductionAudio(jobId)
+    return await renderEofProductionVideoJob(jobId, { includeAudioIfPresent: true })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Build failed'
     await markEofProductionJobFailed(jobId, message)
@@ -37,27 +47,27 @@ export async function startEofProductionFullBuildBackground(jobId) {
 
   const sceneCount = job.script?.scenes?.length || 5
   const startedAt = new Date().toISOString()
-  const estimatedTotalSec = estimateEofVideoRenderDurationSec(sceneCount)
+  const estimatedTotalSec = estimateFullBuildSec(job.script)
 
   await updateEofProductionJob(jobId, {
-    status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
     errorMessage: null,
   })
   await updateEofProductionRenderProgress(
     jobId,
     buildEofRenderProgress({
-      stage: 'images',
+      stage: 'tts',
       sceneIndex: 0,
       sceneCount,
       startedAt,
       estimatedTotalSec,
-      pipeline: 'video',
+      pipeline: 'audio',
     }),
   )
 
   const run = () =>
     renderEofProductionFullBuild(jobId).catch((e) => {
-      console.error('[eof-production] image Short build failed', jobId, e)
+      console.error('[eof-production] full Short build failed', jobId, e)
     })
 
   if (process.env.VERCEL) {
@@ -74,7 +84,7 @@ export async function startEofProductionFullBuildBackground(jobId) {
 }
 
 /**
- * Legacy audio path (kept for manual "audio only" if ever re-enabled).
+ * Legacy audio-only path.
  * @param {string} jobId
  */
 export async function startEofProductionRenderBackground(jobId) {
@@ -99,7 +109,7 @@ export async function startEofProductionRenderBackground(jobId) {
 /** @param {string} jobId */
 export async function startEofProductionVideoRenderBackground(jobId) {
   const run = () =>
-    renderEofProductionVideoJob(jobId, { includeAudioIfPresent: false }).catch((e) => {
+    renderEofProductionVideoJob(jobId, { includeAudioIfPresent: true }).catch((e) => {
       console.error('[eof-production] background video render failed', jobId, e)
     })
 

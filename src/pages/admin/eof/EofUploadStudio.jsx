@@ -77,7 +77,7 @@ async function uploadVideoToYoutube(payload, onProgress) {
   return complete
 }
 
-export default function EofUploadStudio({ canUse, isOwner, onDone }) {
+export default function EofUploadStudio({ canUse, isOwner, onDone, initialDraft, onInitialDraftConsumed }) {
   const [tab, setTab] = useState('details')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -108,6 +108,22 @@ export default function EofUploadStudio({ canUse, isOwner, onDone }) {
   const [successMessage, setSuccessMessage] = useState('')
   const [lastChecks, setLastChecks] = useState(null)
   const videoRef = useRef(null)
+  const consumedDraftRef = useRef(null)
+
+  useEffect(() => {
+    if (!initialDraft?.file || consumedDraftRef.current === initialDraft) return
+    consumedDraftRef.current = initialDraft
+    setFile(initialDraft.file)
+    if (initialDraft.title) setTitle(String(initialDraft.title).slice(0, 100))
+    if (initialDraft.description) setDescription(String(initialDraft.description))
+    if (initialDraft.tags) setTags(String(initialDraft.tags))
+    setVideoContentType('short')
+    setAddShortsHashtag(true)
+    setFormatManual(false)
+    setSuccessMessage('Loaded from Production — review details and upload to YouTube.')
+    setFormErr('')
+    onInitialDraftConsumed?.()
+  }, [initialDraft, onInitialDraftConsumed])
 
   useEffect(() => {
     if (!file) {

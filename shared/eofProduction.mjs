@@ -13,21 +13,37 @@ export const EOF_PRODUCTION_JOB_STATUS = {
 }
 
 export const EOF_VOICE_PRESETS = {
+  brian: {
+    id: 'brian',
+    label: 'Brian (ElevenLabs)',
+    detail: 'Deep, resonant football-narrator voice — requires ELEVENLABS_API_KEY',
+    engine: 'elevenlabs',
+    voiceId: 'nPczCjzI2devNBz1zQrb',
+    modelId: 'eleven_multilingual_v2',
+    stability: 0.45,
+    similarityBoost: 0.75,
+    style: 0.35,
+  },
   british: {
     id: 'british',
-    label: 'British narrator',
+    label: 'British (Edge, free)',
+    detail: 'Microsoft Edge neural TTS fallback — no API key',
     engine: 'edge',
     voice: 'en-GB-RyanNeural',
     rate: '-8%',
   },
   british_calm: {
     id: 'british_calm',
-    label: 'British (slower)',
+    label: 'British calm (Edge, free)',
+    detail: 'Slower Edge neural TTS fallback',
     engine: 'edge',
     voice: 'en-GB-ThomasNeural',
     rate: '-12%',
   },
 }
+
+/** Default narrator for new production jobs. */
+export const EOF_DEFAULT_VOICE_PRESET = 'brian'
 
 export const EOF_MUSIC_MOODS = [
   { id: 'neutral', label: 'Neutral / general' },
@@ -95,13 +111,13 @@ export const EOF_RENDER_STACK = {
     id: 'vercel',
     label: 'ShowSkills staging API (Vercel serverless)',
     detail:
-      'Image fetch + ffmpeg run in the background (waitUntil). Finished MP4 is stored in the database so previews work across instances.',
+      'TTS + image fetch + ffmpeg run in the background (waitUntil). Finished MP4 and scene stills are stored in the database so previews work across instances.',
   },
   video: {
-    id: 'ffmpeg-images',
-    label: 'Images + pop-in captions → 9:16 Short (ffmpeg)',
+    id: 'ffmpeg-images-audio',
+    label: 'Voiceover + images + pop-in captions → 9:16 Short',
     detail:
-      'Pexels / Google / Pinterest when keyed; otherwise free Wikimedia Commons. Burned-in captions with bundled bold font.',
+      'ElevenLabs Brian narration (or Edge fallback), Wikimedia/Pexels/Google images, TikTok-style popping captions, then mux into short.mp4.',
   },
 }
 
@@ -179,7 +195,7 @@ export function buildEofRenderProgress(input) {
   } else if (input.stage === 'tts') {
     const ttsWeight = 0.86
     percent = Math.min(86, Math.round(((sceneIndex + 0.35) / sceneCount) * 100 * ttsWeight))
-    message = `Narrating scene ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount} (Edge TTS)…`
+    message = `Narrating scene ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount}…`
   } else if (input.stage === 'mix') {
     percent = 94
     message = 'Mixing narration with music bed (ffmpeg)…'
@@ -256,7 +272,7 @@ export function buildFallbackRenderProgress(job, script, pipeline = 'audio') {
       ? job?.renderProgress?.message || `Building Short video (${sceneCount} scenes)…`
       : job?.renderProgress?.stage === 'mix'
         ? 'Mixing narration with music bed (ffmpeg)…'
-        : `Rendering… narrating up to ${sceneCount} scenes (Edge TTS)`
+        : `Rendering… narrating up to ${sceneCount} scenes`
 
   return {
     percent,
