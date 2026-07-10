@@ -63,7 +63,7 @@ export async function runEofDailyShortPipeline(opts = {}) {
   try {
     const news = await pickEofDailyNewsTopic()
     const format = settings.format || 'news'
-    const voicePreset = settings.voicePreset || 'brian'
+    const voicePreset = settings.voicePreset || 'british'
 
     const job = await createEofProductionJob({
       topic: news.topic,

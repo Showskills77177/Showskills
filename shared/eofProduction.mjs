@@ -13,22 +13,10 @@ export const EOF_PRODUCTION_JOB_STATUS = {
 }
 
 export const EOF_VOICE_PRESETS = {
-  brian: {
-    id: 'brian',
-    label: 'Brian (ElevenLabs)',
-    detail: 'Deep, resonant football-narrator voice — requires ELEVENLABS_API_KEY',
-    engine: 'elevenlabs',
-    voiceId: 'nPczCjzI2devNBz1zQrb',
-    modelId: 'eleven_multilingual_v2',
-    speed: 1.0,
-    stability: 0.45,
-    similarityBoost: 0.75,
-    style: 0.35,
-  },
   british: {
     id: 'british',
     label: 'British (Edge, free)',
-    detail: 'Microsoft Edge neural TTS fallback — no API key',
+    detail: 'Microsoft Edge neural TTS — default, no API credits',
     engine: 'edge',
     voice: 'en-GB-RyanNeural',
     rate: '-8%',
@@ -41,10 +29,22 @@ export const EOF_VOICE_PRESETS = {
     voice: 'en-GB-ThomasNeural',
     rate: '-12%',
   },
+  brian: {
+    id: 'brian',
+    label: 'Brian (ElevenLabs)',
+    detail: 'Deep football-narrator voice — uses ELEVENLABS_API_KEY credits (select only when needed)',
+    engine: 'elevenlabs',
+    voiceId: 'nPczCjzI2devNBz1zQrb',
+    modelId: 'eleven_multilingual_v2',
+    speed: 1.0,
+    stability: 0.45,
+    similarityBoost: 0.75,
+    style: 0.35,
+  },
 }
 
-/** Default narrator for new production jobs. */
-export const EOF_DEFAULT_VOICE_PRESET = 'brian'
+/** Default narrator for new production jobs — free Edge TTS (no ElevenLabs credits). */
+export const EOF_DEFAULT_VOICE_PRESET = 'british'
 
 export const EOF_MUSIC_MOODS = [
   { id: 'neutral', label: 'Neutral / general' },

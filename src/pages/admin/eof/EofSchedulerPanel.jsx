@@ -199,7 +199,7 @@ export default function EofSchedulerPanel({ isOwner, onOpenJob }) {
                 onChange={(e) => setSettings((s) => ({ ...s, voicePreset: e.target.value }))}
                 className={inputCls}
               >
-                {(voicePresets.length ? voicePresets : [{ id: 'brian', label: 'Brian' }]).map((v) => (
+                {(voicePresets.length ? voicePresets : [{ id: 'british', label: 'British (Edge, free)' }]).map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.label}
                   </option>

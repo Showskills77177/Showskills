@@ -69,7 +69,7 @@ function rowToJob(row) {
     script: parseProductionScript(row.script_json),
     musicTrackId: row.music_track_id || null,
     musicVolume: Number(row.music_volume) || EOF_DEFAULT_MUSIC_VOLUME,
-    voicePreset: row.voice_preset || 'brian',
+    voicePreset: row.voice_preset || EOF_DEFAULT_VOICE_PRESET,
     voiceSettings: parseVoiceSettingsJson(row.voice_settings_json),
     voiceRegenerationCount: Number(row.voice_regeneration_count) || 0,
     voiceNarrationHash: row.voice_narration_hash || null,

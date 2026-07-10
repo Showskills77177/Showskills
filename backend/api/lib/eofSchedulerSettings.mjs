@@ -18,7 +18,7 @@ export async function ensureEofSchedulerSchema() {
         hour_utc INTEGER NOT NULL DEFAULT 9,
         minute_utc INTEGER NOT NULL DEFAULT 0,
         format TEXT NOT NULL DEFAULT 'news',
-        voice_preset TEXT NOT NULL DEFAULT 'brian',
+        voice_preset TEXT NOT NULL DEFAULT 'british',
         publish_delay_minutes INTEGER NOT NULL DEFAULT 30,
         last_run_at TIMESTAMPTZ,
         last_job_id TEXT,
@@ -36,7 +36,7 @@ export async function ensureEofSchedulerSchema() {
         hour_utc INTEGER NOT NULL DEFAULT 9,
         minute_utc INTEGER NOT NULL DEFAULT 0,
         format TEXT NOT NULL DEFAULT 'news',
-        voice_preset TEXT NOT NULL DEFAULT 'brian',
+        voice_preset TEXT NOT NULL DEFAULT 'british',
         publish_delay_minutes INTEGER NOT NULL DEFAULT 30,
         last_run_at TEXT,
         last_job_id TEXT,
@@ -52,7 +52,12 @@ export async function ensureEofSchedulerSchema() {
   if (!rows[0]) {
     await query(
       `INSERT INTO eof_scheduler_settings (id, enabled, hour_utc, minute_utc, format, voice_preset, publish_delay_minutes)
-       VALUES ('default', 0, 9, 0, 'news', 'brian', 30)`,
+       VALUES ('default', 0, 9, 0, 'news', 'british', 30)`,
+    )
+  } else {
+    // One-time: stop burning ElevenLabs on the default scheduler row
+    await query(
+      `UPDATE eof_scheduler_settings SET voice_preset = 'british' WHERE id = 'default' AND voice_preset = 'brian'`,
     )
   }
 
@@ -67,7 +72,7 @@ function rowToSettings(row) {
     hourUtc: Number(row.hour_utc) || 9,
     minuteUtc: Number(row.minute_utc) || 0,
     format: row.format || 'news',
-    voicePreset: row.voice_preset || 'brian',
+    voicePreset: row.voice_preset || 'british',
     publishDelayMinutes: Math.max(0, Number(row.publish_delay_minutes) || 30),
     lastRunAt: row.last_run_at || null,
     lastJobId: row.last_job_id || null,
@@ -87,7 +92,7 @@ export async function getEofSchedulerSettings() {
     hourUtc: 9,
     minuteUtc: 0,
     format: 'news',
-    voicePreset: 'brian',
+    voicePreset: 'british',
     publishDelayMinutes: 30,
     lastRunAt: null,
     lastJobId: null,

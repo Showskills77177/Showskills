@@ -1104,7 +1104,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             >
               {(voicePresets.length
                 ? voicePresets
-                : [{ id: EOF_DEFAULT_VOICE_PRESET, label: 'Brian (ElevenLabs)' }]
+                : [{ id: EOF_DEFAULT_VOICE_PRESET, label: 'British (Edge, free)' }]
               ).map((v) => (
                 <option key={v.id} value={v.id} title={v.detail}>
                   {v.label}
@@ -1217,7 +1217,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   >
                     {(voicePresets.length
                       ? voicePresets
-                      : [{ id: EOF_DEFAULT_VOICE_PRESET, label: 'Brian (ElevenLabs)' }]
+                      : [{ id: EOF_DEFAULT_VOICE_PRESET, label: 'British (Edge, free)' }]
                     ).map((v) => (
                       <option key={v.id} value={v.id}>
                         {v.label}
