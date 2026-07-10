@@ -70,6 +70,8 @@ export async function runEofDailyShortPipeline(opts = {}) {
       createdBy: opts.createdBy || 'eof-scheduler',
       format,
       voicePreset,
+      mode: 'full',
+      context: [news.angle, news.whyNow].filter(Boolean).join('\n'),
     })
     jobId = job.id
 

@@ -1,8 +1,11 @@
 /**
- * Script writer for EOF image Shorts.
+ * Script writer for EOF image Shorts — two-step flow:
+ *   1) Plain-text desk draft (continuous narration)
+ *   2) Adapt draft → Short scenes (captions + image queries)
+ *
  * Provider order (first configured wins):
  *   1) xAI Grok 4.5  (XAI_API_KEY)
- *   2) OpenAI        (OPENAI_API_KEY) — default gpt-4o
+ *   2) OpenAI        (OPENAI_API_KEY) — default gpt-4o / set OPENAI_MODEL=gpt-4.1
  *   3) Groq          (GROQ_API_KEY) — free-tier Llama
  * Falls back to structured templates when none work.
  *
@@ -16,7 +19,7 @@ import {
   EOF_EUROPEAN_FOOTBALL_SCOPE,
   EOF_MAX_SCENES,
 } from '../../../shared/eofScriptTemplates.mjs'
-import { isXaiConfigured, xaiJsonCompletion } from './eofXaiClient.mjs'
+import { isXaiConfigured, xaiJsonCompletion, xaiTextCompletion } from './eofXaiClient.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -63,35 +66,6 @@ export function isEofOpenAiScriptConfigured() {
   return s.xai || s.openai || s.groq
 }
 
-/**
- * @param {{ topic: string, format?: string }} input
- */
-export async function writeEofProductionScript({ topic, format }) {
-  const t = String(topic || '').trim()
-  if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
-  const fmt = resolveFormat(format)
-  const status = eofScriptProviderStatus()
-
-  const attempts = []
-  if (status.xai) attempts.push(() => writeEofScriptWithXai({ topic: t, format: fmt }))
-  if (status.openai) attempts.push(() => writeEofScriptWithOpenAi({ topic: t, format: fmt }))
-  if (status.groq) attempts.push(() => writeEofScriptWithGroq({ topic: t, format: fmt }))
-
-  for (const run of attempts) {
-    try {
-      const ai = await run()
-      if (ai?.script) return ai
-    } catch (e) {
-      console.warn('[eof-script] provider failed', e instanceof Error ? e.message : e)
-    }
-  }
-
-  return {
-    script: buildFactsShortScript(t, { format: fmt }),
-    source: 'template',
-  }
-}
-
 function formatGuide(format) {
   return {
     listicle:
@@ -103,29 +77,187 @@ function formatGuide(format) {
     timeline:
       '5 scenes: career arc — start, breakthrough, peak, late-career/legacy, CTA. Each scene = one European club/competition era.',
     news:
-      '5 scenes in Sky Sports / ESPN FC / ITV Sport / BBC Sport / The Athletic / Goal.com newsroom style: BREAKING hook → what we know → why it matters → what happens next → viewer CTA. Topic may be a transfer, injury, managerial change, match fallout, or contract story.',
+      '5 scenes in Sky Sports / ESPN FC / ITV Sport / BBC Sport / The Athletic newsroom style: BREAKING hook → what happened → why it matters → what happens next → viewer CTA.',
   }[format]
 }
 
-function buildPrompt({ topic, format }) {
-  const system = `You are the senior YouTube Shorts writer for Eyes Of Football — a European football (soccer) channel.
+function draftFormatGuide(format) {
+  return {
+    listicle:
+      'Write like a sharp football column: open with the surprising angle, then 3 concrete European-football beats, end with a question for comments.',
+    hook_reveal:
+      'Build tension: bold claim, context, turning point, payoff. Sound like a narrator who knows the clubs and eras.',
+    debate:
+      'Present a hot take, the critic case, the fan case, then a fair verdict. End with a side to pick.',
+    timeline:
+      'Tell the career in eras — start, breakthrough, peak, legacy — with real clubs/competitions, not empty praise.',
+    news:
+      'Write like Sky Sports / BBC Sport / ESPN FC desk copy for a 30–45s Short. Lead with the result or event (teams, competition, what happened). Then context, stakes, and what comes next. Common sense over fluff.',
+  }[format]
+}
+
+/**
+ * Shell script object for draft-only jobs (no scenes yet).
+ */
+export function buildEofDraftShell({ topic, format, plainTextDraft, title, source }) {
+  const t = String(topic || '').trim() || 'Football'
+  const fmt = resolveFormat(format)
+  const draft = String(plainTextDraft || '').trim()
+  return {
+    topic: t,
+    title: String(title || t).trim().slice(0, 100),
+    description: '',
+    tags: ['shortsfeed', 'football', 'soccer'],
+    format: fmt,
+    plainTextDraft: draft,
+    scenes: [],
+    draftSource: source || null,
+  }
+}
+
+function templatePlainTextDraft(topic, format) {
+  const name = String(topic || '').trim() || 'This story'
+  if (format === 'news') {
+    return `${name}. Here's what we know so far from the European football desk — the result or move that matters, why clubs and fans care, and what comes next. Was this the statement moment, or just another chapter? Drop your take.`
+  }
+  return `${name} still divides football fans for a reason. The early club years built the foundation, the big-stage move raised the stakes, and the rivalry nights made the legend stick. Which era was the real peak? Comment below.`
+}
+
+/**
+ * Step 1 — continuous plain-text narration (editable in the UI).
+ * @param {{ topic: string, format?: string, context?: string }} input
+ */
+export async function writeEofPlainTextDraft({ topic, format, context }) {
+  const t = String(topic || '').trim()
+  if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
+  const fmt = resolveFormat(format)
+  const status = eofScriptProviderStatus()
+  const ctx = String(context || '').trim()
+
+  const attempts = []
+  if (status.xai) attempts.push(() => writeDraftWithXai({ topic: t, format: fmt, context: ctx }))
+  if (status.openai) attempts.push(() => writeDraftWithOpenAi({ topic: t, format: fmt, context: ctx }))
+  if (status.groq) attempts.push(() => writeDraftWithGroq({ topic: t, format: fmt, context: ctx }))
+
+  for (const run of attempts) {
+    try {
+      const ai = await run()
+      if (ai?.plainTextDraft?.length >= 40) return ai
+    } catch (e) {
+      console.warn('[eof-script] draft provider failed', e instanceof Error ? e.message : e)
+    }
+  }
+
+  return {
+    plainTextDraft: templatePlainTextDraft(t, fmt),
+    title: t.slice(0, 90),
+    source: 'template',
+  }
+}
+
+/**
+ * Step 2 — split approved plain text into Short scenes.
+ * @param {{ plainTextDraft: string, topic: string, format?: string }} input
+ */
+export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format }) {
+  const draft = String(plainTextDraft || '').trim()
+  if (draft.length < 40) throw new Error('Plain-text draft is too short — write or generate a fuller script first.')
+  const t = String(topic || '').trim() || 'Football'
+  const fmt = resolveFormat(format)
+  const status = eofScriptProviderStatus()
+
+  const attempts = []
+  if (status.xai) attempts.push(() => adaptWithXai({ draft, topic: t, format: fmt }))
+  if (status.openai) attempts.push(() => adaptWithOpenAi({ draft, topic: t, format: fmt }))
+  if (status.groq) attempts.push(() => adaptWithGroq({ draft, topic: t, format: fmt }))
+
+  for (const run of attempts) {
+    try {
+      const ai = await run()
+      if (ai?.script?.scenes?.length >= 3) {
+        ai.script.plainTextDraft = draft
+        return ai
+      }
+    } catch (e) {
+      console.warn('[eof-script] adapt provider failed', e instanceof Error ? e.message : e)
+    }
+  }
+
+  // Last resort: template scenes, but keep the human/AI draft attached
+  const script = buildFactsShortScript(t, { format: fmt })
+  script.plainTextDraft = draft
+  return { script, source: 'template' }
+}
+
+/**
+ * One-shot (scheduler / legacy): draft then adapt.
+ * @param {{ topic: string, format?: string, context?: string }} input
+ */
+export async function writeEofProductionScript({ topic, format, context }) {
+  const draftResult = await writeEofPlainTextDraft({ topic, format, context })
+  const adapted = await adaptEofPlainTextToScenes({
+    plainTextDraft: draftResult.plainTextDraft,
+    topic,
+    format,
+  })
+  if (adapted?.script) {
+    adapted.script.plainTextDraft = draftResult.plainTextDraft
+    if (!adapted.script.title && draftResult.title) adapted.script.title = draftResult.title
+    // Prefer draft provider label when adapt fell back to template
+    if (adapted.source === 'template' && draftResult.source && draftResult.source !== 'template') {
+      adapted.source = draftResult.source
+    }
+  }
+  return adapted
+}
+
+function buildDraftPrompt({ topic, format, context }) {
+  const system = `You are a senior European football writer for Eyes Of Football (YouTube Shorts).
+
+HARD SCOPE:
+${EOF_EUROPEAN_FOOTBALL_SCOPE}
+
+Write ONE continuous voiceover script as plain prose — NOT JSON, NOT bullet points, NOT scene labels, NOT hashtags.
+
+Rules:
+- 90–160 words. Spoken aloud in ~35–50 seconds.
+- Sound like Sky Sports / BBC Sport / ESPN FC / ITV Sport: clear, specific, common-sense.
+- For NEWS: lead with who beat whom (or the transfer/injury/manager move), the competition, and why it matters. Then stakes and what happens next.
+- Use real European clubs, leagues, and competitions when the topic implies them (e.g. World Cup, UCL, Premier League).
+- Prefer known, defensible facts. If a score/date is uncertain, say "narrow win" / "statement result" rather than inventing exact numbers.
+- Ban empty filler: "rewrote elite", "global superstar energy", "unforgettable nights", "raw talent" with no club/era attached.
+- End with one sharp question viewers can answer in a comment.
+- Format intent: ${format}. ${draftFormatGuide(format)}`
+
+  const user = `Topic: ${topic}
+${context ? `\nExtra context (use if helpful, do not contradict):\n${context}\n` : ''}
+Write the plain-text Short script only.`
+
+  return { system, user }
+}
+
+function buildAdaptPrompt({ draft, topic, format }) {
+  const system = `You adapt an APPROVED Eyes Of Football narration into YouTube Short scenes.
 
 HARD SCOPE:
 ${EOF_EUROPEAN_FOOTBALL_SCOPE}
 
 Hard rules:
-- Exactly 5 scenes (you may use 4–6 only if the story truly needs it; never more than ${EOF_MAX_SCENES}).
+- Exactly 5 scenes (4–6 only if the draft truly needs it; never more than ${EOF_MAX_SCENES}).
 - Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 14 words. Punchy. Mobile-first. No hashtags in captions.
-- Ban empty filler: never write vague lines like "rewrote elite", "global superstar energy", "moments fans still argue about", "raw talent", or "unforgettable nights" unless you attach a concrete European club/rivalry/role/era angle.
-- Prefer specific, defensible angles: breakthrough club, signature role, famous rivalry, pressure narrative, late-career chapter. Do NOT invent exact match scores, trophy counts, or dates you are unsure about — use career language instead.
-- Hook (scene 1) must create a curiosity gap ("why / how / the part nobody talks about") — for news format, lead like a respected sports desk (Sky Sports, ESPN, ITV Sport).
-- CTA (scene 5) must ask a clear question viewers can answer in one comment.
-- Each scene needs imageQuery: short English stock-photo search (player/club + action/stadium/celebration/portrait). Make queries photo-searchable.
-- tags must include "shortsfeed" and European football keywords (never NFL/American football tags).
+- PRESERVE the draft's facts, teams, and meaning — compress, do not replace with generic filler.
+- Hook (scene 1) from the draft's lead. CTA (last scene) from the draft's question.
+- Each scene needs imageQuery: short English stock-photo search (teams/players + action/stadium/celebration).
+- tags must include "shortsfeed" and European football keywords (never NFL).
 - Return JSON only.
 - Format: ${format}. ${formatGuide(format)}`
 
   const user = `Topic: ${topic}
+
+Approved narration draft:
+"""
+${draft}
+"""
 
 Return JSON:
 {
@@ -164,6 +296,22 @@ async function chatJsonCompletion({ url, headers, body }) {
   return parsed
 }
 
+async function chatTextCompletion({ url, headers, body }) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(`${res.status}: ${errText.slice(0, 240)}`)
+  }
+  const data = await res.json()
+  const content = data?.choices?.[0]?.message?.content
+  if (!content?.trim()) throw new Error('empty draft content')
+  return String(content).trim()
+}
+
 function parseJsonContent(content) {
   const raw = String(content || '').trim()
   const fenced = /^```(?:json)?\s*([\s\S]*?)```\s*$/i.exec(raw)
@@ -171,31 +319,103 @@ function parseJsonContent(content) {
   return JSON.parse(body)
 }
 
-function finalizeScript(parsed, topic, format, source) {
-  const normalized = normalizeEofScript({ ...parsed, format }, topic)
+function finalizeScript(parsed, topic, format, source, plainTextDraft) {
+  const normalized = normalizeEofScript(
+    { ...parsed, format, plainTextDraft: plainTextDraft || parsed?.plainTextDraft },
+    topic,
+  )
   if (!normalized || normalized.scenes.length < 3) {
     throw new Error('script had too few scenes')
   }
   normalized.scenes = normalized.scenes.slice(0, EOF_MAX_SCENES)
+  if (plainTextDraft) normalized.plainTextDraft = plainTextDraft
   return { script: normalized, source }
 }
 
-async function writeEofScriptWithXai({ topic, format }) {
-  const { system, user } = buildPrompt({ topic, format })
-  const parsed = await xaiJsonCompletion({ system, user, temperature: 0.5 })
-  return finalizeScript(parsed, topic, format, 'xai')
+function cleanDraftText(text) {
+  let t = String(text || '').trim()
+  // Strip accidental markdown fences / "Script:" prefixes
+  t = t.replace(/^```(?:\w+)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  t = t.replace(/^(?:script|narration|voiceover)\s*:\s*/i, '').trim()
+  return t
 }
 
-async function writeEofScriptWithOpenAi({ topic, format }) {
+function titleFromDraft(topic, draft) {
+  const first = String(draft || '')
+    .split(/[.!?]/)
+    .map((s) => s.trim())
+    .find(Boolean)
+  if (first && first.length >= 12 && first.length <= 90) return first
+  return String(topic || '').trim().slice(0, 90)
+}
+
+async function writeDraftWithXai({ topic, format, context }) {
+  const { system, user } = buildDraftPrompt({ topic, format, context })
+  const text = cleanDraftText(await xaiTextCompletion({ system, user, temperature: 0.35 }))
+  if (text.length < 40) throw new Error('draft too short')
+  return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'xai' }
+}
+
+async function writeDraftWithOpenAi({ topic, format, context }) {
   const key = envKey('OPENAI_API_KEY')
   const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
-  const { system, user } = buildPrompt({ topic, format })
+  const { system, user } = buildDraftPrompt({ topic, format, context })
+  const text = cleanDraftText(
+    await chatTextCompletion({
+      url: 'https://api.openai.com/v1/chat/completions',
+      headers: { Authorization: `Bearer ${key}` },
+      body: {
+        model,
+        temperature: 0.4,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      },
+    }),
+  )
+  if (text.length < 40) throw new Error('draft too short')
+  return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'openai' }
+}
+
+async function writeDraftWithGroq({ topic, format, context }) {
+  const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
+  const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
+  const { system, user } = buildDraftPrompt({ topic, format, context })
+  const text = cleanDraftText(
+    await chatTextCompletion({
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      headers: { Authorization: `Bearer ${key}` },
+      body: {
+        model,
+        temperature: 0.4,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      },
+    }),
+  )
+  if (text.length < 40) throw new Error('draft too short')
+  return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'groq' }
+}
+
+async function adaptWithXai({ draft, topic, format }) {
+  const { system, user } = buildAdaptPrompt({ draft, topic, format })
+  const parsed = await xaiJsonCompletion({ system, user, temperature: 0.35 })
+  return finalizeScript(parsed, topic, format, 'xai', draft)
+}
+
+async function adaptWithOpenAi({ draft, topic, format }) {
+  const key = envKey('OPENAI_API_KEY')
+  const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
+  const { system, user } = buildAdaptPrompt({ draft, topic, format })
   const parsed = await chatJsonCompletion({
     url: 'https://api.openai.com/v1/chat/completions',
     headers: { Authorization: `Bearer ${key}` },
     body: {
       model,
-      temperature: 0.55,
+      temperature: 0.4,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
@@ -203,19 +423,19 @@ async function writeEofScriptWithOpenAi({ topic, format }) {
       ],
     },
   })
-  return finalizeScript(parsed, topic, format, 'openai')
+  return finalizeScript(parsed, topic, format, 'openai', draft)
 }
 
-async function writeEofScriptWithGroq({ topic, format }) {
+async function adaptWithGroq({ draft, topic, format }) {
   const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
   const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
-  const { system, user } = buildPrompt({ topic, format })
+  const { system, user } = buildAdaptPrompt({ draft, topic, format })
   const parsed = await chatJsonCompletion({
     url: 'https://api.groq.com/openai/v1/chat/completions',
     headers: { Authorization: `Bearer ${key}` },
     body: {
       model,
-      temperature: 0.55,
+      temperature: 0.4,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
@@ -223,5 +443,5 @@ async function writeEofScriptWithGroq({ topic, format }) {
       ],
     },
   })
-  return finalizeScript(parsed, topic, format, 'groq')
+  return finalizeScript(parsed, topic, format, 'groq', draft)
 }

@@ -7,6 +7,8 @@ import {
   getEofProductionJob,
   updateEofProductionJob,
   regenerateEofProductionScript,
+  regenerateEofProductionDraft,
+  adaptEofProductionDraftToScenes,
   deleteEofProductionJob,
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
@@ -105,6 +107,11 @@ export default async function handler(req, res) {
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const existing = await getEofProductionJob(jobId)
         if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (!(existing.script?.scenes?.length >= 1)) {
+          return json(res, 400, {
+            error: 'Adapt the plain-text script to scenes before building the Short.',
+          })
+        }
         if (existing.status === 'rendering' || existing.status === 'rendering_video') {
           return json(res, 202, { ok: true, accepted: true, job: existing })
         }
@@ -178,6 +185,57 @@ export default async function handler(req, res) {
           return json(res, 200, { ok: true, job })
         } catch (e) {
           return json(res, 400, { error: e instanceof Error ? e.message : 'Could not rewrite script' })
+        }
+      }
+
+      if (action === 'regenerate-draft') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const format = typeof body.format === 'string' ? body.format.trim() : null
+        try {
+          const job = await regenerateEofProductionDraft(jobId, { format })
+          return json(res, 200, {
+            ok: true,
+            job,
+            scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
+          })
+        } catch (e) {
+          return json(res, 400, { error: e instanceof Error ? e.message : 'Could not regenerate draft' })
+        }
+      }
+
+      if (action === 'adapt-to-scenes') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const format = typeof body.format === 'string' ? body.format.trim() : null
+        const plainTextDraft =
+          typeof body.plainTextDraft === 'string' ? body.plainTextDraft : undefined
+        try {
+          // Persist any unsaved draft text from the UI before adapting
+          if (plainTextDraft !== undefined) {
+            const existing = await getEofProductionJob(jobId)
+            if (!existing) return json(res, 404, { error: 'Job not found.' })
+            await updateEofProductionJob(jobId, {
+              script: {
+                ...(existing.script || {}),
+                plainTextDraft,
+                topic: existing.topic,
+                format: format || existing.script?.format,
+                scenes: existing.script?.scenes || [],
+                title: existing.script?.title || existing.title || existing.topic,
+                description: existing.script?.description || '',
+                tags: existing.script?.tags || ['shortsfeed', 'football'],
+              },
+            })
+          }
+          const job = await adaptEofProductionDraftToScenes(jobId, { format, plainTextDraft })
+          return json(res, 200, {
+            ok: true,
+            job,
+            scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
+          })
+        } catch (e) {
+          return json(res, 400, { error: e instanceof Error ? e.message : 'Could not adapt to scenes' })
         }
       }
 

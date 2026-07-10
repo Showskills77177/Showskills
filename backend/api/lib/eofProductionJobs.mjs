@@ -16,7 +16,12 @@ import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
-import { writeEofProductionScript } from './eofScriptWriter.mjs'
+import {
+  writeEofProductionScript,
+  writeEofPlainTextDraft,
+  adaptEofPlainTextToScenes,
+  buildEofDraftShell,
+} from './eofScriptWriter.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -109,17 +114,41 @@ export async function createEofProductionJob({
   voicePreset = EOF_DEFAULT_VOICE_PRESET,
   musicTrackId = null,
   format = null,
+  /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
+  mode = 'draft',
+  context = null,
 }) {
   await ensureEofProductionSchema()
   const t = String(topic || '').trim()
   if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
 
-  const { script, source: scriptSource } = await writeEofProductionScript({ topic: t, format })
   const track = await pickEofMusicTrackForTopic(t, musicTrackId)
   const id = randomUUID()
   const preset = EOF_VOICE_PRESETS[voicePreset] || EOF_VOICE_PRESETS[EOF_DEFAULT_VOICE_PRESET]
   const voiceSettings =
     preset?.engine === 'elevenlabs' ? resolveElevenLabsVoiceSettings(preset, null) : null
+
+  let script
+  let scriptSource
+  let status
+
+  if (mode === 'full') {
+    const written = await writeEofProductionScript({ topic: t, format, context })
+    script = written.script
+    scriptSource = written.source || 'template'
+    status = EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT
+  } else {
+    const draft = await writeEofPlainTextDraft({ topic: t, format, context })
+    script = buildEofDraftShell({
+      topic: t,
+      format,
+      plainTextDraft: draft.plainTextDraft,
+      title: draft.title,
+      source: draft.source,
+    })
+    scriptSource = draft.source || 'template'
+    status = EOF_PRODUCTION_JOB_STATUS.DRAFT
+  }
 
   await query(
     `INSERT INTO eof_production_jobs
@@ -129,7 +158,7 @@ export async function createEofProductionJob({
       id,
       t,
       script.title,
-      EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+      status,
       JSON.stringify(script),
       scriptSource || 'template',
       track?.id || null,
@@ -141,6 +170,88 @@ export async function createEofProductionJob({
   )
 
   return getEofProductionJob(id)
+}
+
+/**
+ * Regenerate plain-text draft only (keeps job; clears scenes until Adapt).
+ */
+export async function regenerateEofProductionDraft(id, { format, context } = {}) {
+  const job = await getEofProductionJob(id)
+  if (!job) throw new Error('Production job not found.')
+  const fmt = format || job.script?.format || null
+  const draft = await writeEofPlainTextDraft({ topic: job.topic, format: fmt, context })
+  const script = buildEofDraftShell({
+    topic: job.topic,
+    format: fmt,
+    plainTextDraft: draft.plainTextDraft,
+    title: draft.title || job.title,
+    source: draft.source,
+  })
+  return updateEofProductionJob(id, {
+    script,
+    title: script.title,
+    scriptSource: draft.source || 'template',
+    status: EOF_PRODUCTION_JOB_STATUS.DRAFT,
+    errorMessage: null,
+    renderOutputPath: null,
+    narrationManifest: null,
+    mixedAudioPath: null,
+    voiceRegenerationCount: 0,
+    voiceNarrationHash: null,
+  })
+}
+
+/**
+ * Adapt saved plain-text draft into Short scenes.
+ */
+export async function adaptEofProductionDraftToScenes(id, { format, plainTextDraft } = {}) {
+  const job = await getEofProductionJob(id)
+  if (!job) throw new Error('Production job not found.')
+  const draft = String(plainTextDraft || job.script?.plainTextDraft || '').trim()
+  if (draft.length < 40) {
+    throw new Error('Write or generate a plain-text script first (at least a short paragraph).')
+  }
+  const fmt = format || job.script?.format || null
+  const { script, source: scriptSource } = await adaptEofPlainTextToScenes({
+    plainTextDraft: draft,
+    topic: job.topic,
+    format: fmt,
+  })
+  script.plainTextDraft = draft
+  const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
+  return updateEofProductionJob(id, {
+    script,
+    title: script.title,
+    scriptSource,
+    musicTrackId: track?.id || job.musicTrackId,
+    status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+    errorMessage: null,
+    renderOutputPath: null,
+    narrationManifest: null,
+    voiceRegenerationCount: 0,
+    voiceNarrationHash: null,
+  })
+}
+
+export async function regenerateEofProductionScript(id, { format } = {}) {
+  const job = await getEofProductionJob(id)
+  if (!job) throw new Error('Production job not found.')
+  const fmt = format || job.script?.format || null
+  // Full rewrite: new draft + adapt (keeps one-click path for "Rewrite script")
+  const { script, source: scriptSource } = await writeEofProductionScript({ topic: job.topic, format: fmt })
+  const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
+  return updateEofProductionJob(id, {
+    script,
+    title: script.title,
+    scriptSource,
+    musicTrackId: track?.id || job.musicTrackId,
+    status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+    errorMessage: null,
+    renderOutputPath: null,
+    narrationManifest: null,
+    voiceRegenerationCount: 0,
+    voiceNarrationHash: null,
+  })
 }
 
 export async function updateEofProductionJob(id, patch) {
@@ -238,26 +349,6 @@ export async function updateEofProductionRenderProgress(id, progress) {
     `UPDATE eof_production_jobs SET render_progress_json = $2, updated_at = ${nowSql()} WHERE id = $1`,
     [id, progress ? JSON.stringify(progress) : null],
   )
-}
-
-export async function regenerateEofProductionScript(id, { format } = {}) {
-  const job = await getEofProductionJob(id)
-  if (!job) throw new Error('Production job not found.')
-  const fmt = format || job.script?.format || null
-  const { script, source: scriptSource } = await writeEofProductionScript({ topic: job.topic, format: fmt })
-  const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
-  return updateEofProductionJob(id, {
-    script,
-    title: script.title,
-    scriptSource,
-    musicTrackId: track?.id || job.musicTrackId,
-    status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
-    errorMessage: null,
-    renderOutputPath: null,
-    narrationManifest: null,
-    voiceRegenerationCount: 0,
-    voiceNarrationHash: null,
-  })
 }
 
 export function resetEofVoiceRegenerationBaseline(script) {

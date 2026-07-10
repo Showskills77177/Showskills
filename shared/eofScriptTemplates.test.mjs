@@ -14,7 +14,7 @@ describe('eofScriptTemplates', () => {
     assert.equal(script.scenes.length, 5)
     assert.match(script.title, /Ronaldo/)
     assert.ok(script.scenes.every((s) => s.caption && s.imageQuery && s.durationSec > 0))
-    assert.equal(script.format, 'listicle')
+    assert.equal(script.format, 'news')
   })
 
   it('supports multiple formats', () => {

@@ -376,16 +376,31 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   function workflowStepState(step) {
     if (!selected) return step === 1 ? 'current' : 'upcoming'
     const status = selected.status
+    const hasScenes = (draftScript?.scenes?.length || selected?.script?.scenes?.length || 0) >= 1
+    const hasDraft = Boolean(String(draftScript?.plainTextDraft || selected?.script?.plainTextDraft || '').trim())
     if (step === 1) {
-      return ['draft', 'scripting', 'ready_script', 'failed'].includes(status) ? 'current' : 'done'
+      // Write draft
+      if (status === 'draft' || (hasDraft && !hasScenes)) return 'current'
+      if (hasDraft || hasScenes || status === 'ready_script' || status === 'video_rendered') return 'done'
+      return 'current'
     }
     if (step === 2) {
+      // Adapt to scenes
+      if (!hasDraft && !hasScenes) return 'upcoming'
+      if (hasScenes && ['ready_script', 'rendering', 'rendering_video', 'video_rendered', 'rendered'].includes(status)) {
+        return status === 'ready_script' || status === 'rendered' ? 'current' : 'done'
+      }
+      if (hasDraft && !hasScenes) return 'current'
+      return 'upcoming'
+    }
+    if (step === 3) {
       if (['rendering', 'rendering_video'].includes(status)) return 'current'
       if (status === 'video_rendered') return 'done'
       if (status === 'failed') return 'failed'
+      if (hasScenes) return 'upcoming'
       return 'upcoming'
     }
-    if (step === 3) return status === 'video_rendered' ? 'current' : 'upcoming'
+    if (step === 4) return status === 'video_rendered' ? 'current' : 'upcoming'
     return 'upcoming'
   }
 
@@ -669,10 +684,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       hydratedJobIdRef.current = j.job.id
       setSuccess(
         j.scriptProviderLabel
-          ? `Script drafted with ${j.scriptProviderLabel} for “${j.job.topic}”. Edit captions, then Build Short.`
-          : openAiScriptEnabled
-            ? `Script drafted for “${j.job.topic}” (AI or template). Edit captions, then Build Short.`
-            : `Script drafted for “${j.job.topic}”. Edit captions, then Build Short.`,
+          ? `Plain-text draft written with ${j.scriptProviderLabel}. Edit it, then Adapt to scenes.`
+          : `Plain-text draft ready for “${j.job.topic}”. Edit it, then Adapt to scenes.`,
       )
       upsertJob(j.job)
       await load()
@@ -703,7 +716,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Save failed')
-      if (!silent) setSuccess('Script saved. Next: Build Short.')
+      if (!silent) {
+        const hasScenes = (draftScript.scenes?.length || 0) >= 1
+        setSuccess(hasScenes ? 'Script saved. Next: Build Short.' : 'Draft saved. Next: Adapt to scenes.')
+      }
       if (j.job) {
         upsertJob(j.job)
         hydratedJobIdRef.current = selectedId
@@ -715,6 +731,78 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       return false
     } finally {
       if (!silent) setBusy(false)
+    }
+  }
+
+  async function regenerateDraft() {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    setSuccess('')
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate-draft', jobId: selectedId, format }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not regenerate draft')
+      setVideoPreviewUrl('')
+      setRenderProgress(null)
+      if (j.job) {
+        upsertJob(j.job)
+        hydratedJobIdRef.current = selectedId
+        hydrateDraftFromJob(j.job)
+      }
+      setSuccess('New plain-text draft ready. Edit if needed, then Adapt to scenes.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function adaptToScenes() {
+    if (!selectedId || !draftScript) return
+    const plain = String(draftScript.plainTextDraft || '').trim()
+    if (plain.length < 40) {
+      setErr('Write a fuller plain-text script first (at least a short paragraph).')
+      return
+    }
+    setBusy(true)
+    setErr('')
+    setSuccess('')
+    try {
+      // Save draft text first so Adapt uses the latest edits
+      await saveJob({ silent: true })
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'adapt-to-scenes',
+          jobId: selectedId,
+          format,
+          plainTextDraft: plain,
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not adapt to scenes')
+      setVideoPreviewUrl('')
+      setRenderProgress(null)
+      if (j.job) {
+        upsertJob(j.job)
+        hydratedJobIdRef.current = selectedId
+        hydrateDraftFromJob(j.job)
+      }
+      setSuccess(
+        j.scriptProviderLabel
+          ? `Scenes adapted with ${j.scriptProviderLabel}. Tweak captions, then Build Short.`
+          : 'Scenes ready. Tweak captions, then Build Short.',
+      )
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -738,7 +826,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         hydratedJobIdRef.current = selectedId
         hydrateDraftFromJob(j.job)
       }
-      setSuccess('Script rewritten. Review captions and image searches, then Build Short.')
+      setSuccess('Full rewrite done (new draft + scenes). Review, then Build Short.')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -879,13 +967,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Production Shorts</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          European football (soccer) only — Grok 4.5 scripts, voiceover + stock images → 9:16 Short with TikTok-style popping captions. Add scenes manually, then Rebuild Short. Download or send to YouTube Studio.
+          European football only — write a plain news-desk script first, adapt it into scenes, then Build Short. Grok 4.5 by default (or set OPENAI_MODEL=gpt-4.1).
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
-            ['1', 'Write script'],
-            ['2', 'Build video'],
-            ['3', 'Watch result'],
+            ['1', 'Write draft'],
+            ['2', 'Adapt to scenes'],
+            ['3', 'Build video'],
+            ['4', 'Watch result'],
           ].map(([n, label]) => {
             const state = workflowStepState(Number(n))
             const cls =
@@ -942,7 +1031,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             : 'Built-in templates — set XAI_API_KEY for Grok 4.5, or OPENAI_API_KEY / GROQ_API_KEY'}
         </p>
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
-          Scope: European football only (Premier League, La Liga, Serie A, Bundesliga, Ligue 1, UCL…). Never American football / NFL. Use format <span className="text-[#9ecbff]">Breaking news</span> for Sky Sports / ESPN / ITV-style Shorts.
+          Scope: European football only. Default format is <span className="text-[#9ecbff]">Breaking news</span> (Sky / ESPN / ITV style). Example topic: “Spain beat Belgium World Cup”.
         </p>
 
         {renderStack ? (
@@ -984,7 +1073,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               className={inputCls}
-              placeholder={format === 'news' ? 'e.g. Salah contract talks intensify' : 'e.g. Cristiano Ronaldo'}
+              placeholder={format === 'news' ? 'e.g. Spain beat Belgium at the World Cup' : 'e.g. Cristiano Ronaldo'}
               minLength={2}
               required
             />
@@ -1024,7 +1113,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             disabled={busy || loading}
             className={`rounded-full px-5 py-2 text-sm ${EOF.btnPrimary} disabled:opacity-50`}
           >
-            Create script
+            Create draft
           </button>
         </form>
         {!loading && voicePreset === 'brian' && !elevenLabsConfigured ? (
@@ -1134,9 +1223,21 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 </label>
                 <button
                   type="button"
-                  disabled={busy || (isRendering && !isRenderStuck)}
+                  disabled={busy || isRendering || String(draftScript.plainTextDraft || '').trim().length < 40}
+                  onClick={adaptToScenes}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
+                >
+                  Adapt to scenes
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    (isRendering && !isRenderStuck) ||
+                    !(draftScript.scenes?.length >= 1)
+                  }
                   onClick={buildShort}
-                  className={`rounded-full px-5 py-2 text-sm font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
+                  className="rounded-full border border-[#2ba640]/50 bg-[#1a2e1f] px-4 py-2 text-sm font-semibold text-[#6ee07d] disabled:opacity-50"
                 >
                   {busy || isRendering
                     ? 'Building…'
@@ -1150,15 +1251,24 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   onClick={() => saveJob()}
                   className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-white disabled:opacity-50"
                 >
-                  Save script
+                  Save
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || isRendering}
+                  onClick={regenerateDraft}
+                  className="rounded-full border border-[#3ea6ff]/40 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
+                >
+                  Rewrite draft
                 </button>
                 <button
                   type="button"
                   disabled={busy || isRendering}
                   onClick={regenerateScript}
-                  className="rounded-full border border-[#3ea6ff]/40 px-4 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
+                  className="rounded-full border border-[#303030] px-4 py-1.5 text-xs text-[#aaa] disabled:opacity-50"
+                  title="Regenerate plain text and scenes in one go"
                 >
-                  Rewrite script
+                  Full rewrite
                 </button>
                 <button
                   type="button"
@@ -1169,6 +1279,31 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   {deletingId === selected.id ? 'Deleting…' : 'Delete'}
                 </button>
               </div>
+            </div>
+
+            <div className="mt-5 rounded-lg border border-[#3ea6ff]/25 bg-[#0d1520] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9ecbff]">
+                  1 · Plain-text script (news desk / voiceover)
+                </p>
+                <span className={`text-[10px] ${EOF.muted}`}>
+                  {String(draftScript.plainTextDraft || '').trim().split(/\s+/).filter(Boolean).length} words
+                </span>
+              </div>
+              <textarea
+                value={draftScript.plainTextDraft || ''}
+                onChange={(e) => {
+                  const plainTextDraft = e.target.value
+                  setDraftScript((prev) => (prev ? { ...prev, plainTextDraft } : prev))
+                  markDraftDirty()
+                }}
+                rows={8}
+                className={`${inputCls} mt-2 font-serif text-[15px] leading-relaxed text-[#f1f1f1]`}
+                placeholder="Grok writes a continuous Sky Sports-style narration here first. Edit freely, then Adapt to scenes."
+              />
+              <p className={`mt-2 text-[11px] ${EOF.muted}`}>
+                This is the real script — full sentences, common sense, teams and stakes. Scenes are a compressed version for the Short.
+              </p>
             </div>
 
             {voicePreset === 'brian' ? (
@@ -1384,7 +1519,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <div className="mt-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[#717171]">
-                  Scenes — on-screen text + image search ({draftScript.scenes?.length || 0}/{EOF_MAX_SCENES})
+                  Scenes — step 2 · on-screen text + image search ({draftScript.scenes?.length || 0}/{EOF_MAX_SCENES})
                 </p>
                 <button
                   type="button"

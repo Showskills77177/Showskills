@@ -38,7 +38,7 @@ export const EOF_SCRIPT_FORMATS = [
   },
 ]
 
-export const EOF_DEFAULT_SCRIPT_FORMAT = 'listicle'
+export const EOF_DEFAULT_SCRIPT_FORMAT = 'news'
 
 export const EOF_MAX_SCENES = 8
 export const EOF_MIN_SCENES = 1
@@ -244,6 +244,7 @@ export function buildFactsShortScript(topic, opts = {}) {
 export function normalizeEofScript(script, topicFallback = '') {
   if (!script || typeof script !== 'object') return null
   const topic = String(script.topic || topicFallback || '').trim() || 'Football'
+  const plainTextDraft = String(script.plainTextDraft || script.plain_text_draft || '').trim()
   const scenesIn = Array.isArray(script.scenes) ? script.scenes : []
   const scenes = scenesIn
     .map((s, i) => {
@@ -261,10 +262,23 @@ export function normalizeEofScript(script, topicFallback = '') {
     .filter(Boolean)
     .slice(0, EOF_MAX_SCENES)
 
-  if (!scenes.length) return null
-
   const tags = Array.isArray(script.tags) ? script.tags.map(String) : tagify(topic)
   const withShortsfeed = tags.includes('shortsfeed') ? tags : [...tags, 'shortsfeed']
+  const format = String(script.format || EOF_DEFAULT_SCRIPT_FORMAT)
+
+  // Draft-only scripts are valid before "Adapt to scenes"
+  if (!scenes.length) {
+    if (!plainTextDraft) return null
+    return {
+      topic,
+      title: String(script.title || topic).trim().slice(0, 100),
+      description: String(script.description || '').trim().slice(0, 500),
+      tags: withShortsfeed.slice(0, 12),
+      format,
+      plainTextDraft,
+      scenes: [],
+    }
+  }
 
   return {
     topic,
@@ -275,7 +289,8 @@ export function normalizeEofScript(script, topicFallback = '') {
       .trim()
       .slice(0, 500),
     tags: withShortsfeed.slice(0, 12),
-    format: String(script.format || EOF_DEFAULT_SCRIPT_FORMAT),
+    format,
+    plainTextDraft: plainTextDraft || undefined,
     scenes,
   }
 }

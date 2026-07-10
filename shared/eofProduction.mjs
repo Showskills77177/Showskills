@@ -88,11 +88,11 @@ export function parseProductionScript(raw) {
 
 export function productionJobStatusLabel(status) {
   const map = {
-    draft: 'Draft',
+    draft: 'Text draft',
     scripting: 'Writing script…',
-    ready_script: 'Script ready',
+    ready_script: 'Scenes ready',
     rendering: 'Building…',
-    rendered: 'Script ready',
+    rendered: 'Scenes ready',
     rendering_video: 'Building video…',
     video_rendered: 'Video ready',
     failed: 'Failed',
@@ -104,9 +104,9 @@ export function productionJobStatusLabel(status) {
 export const EOF_RENDER_STACK = {
   script: {
     id: 'ai-or-template',
-    label: 'Script writer (xAI Grok 4.5 → OpenAI → Groq → templates)',
+    label: 'Script writer (draft text → adapt to scenes)',
     detail:
-      'Uses XAI_API_KEY with Grok 4.5 first (European football only + Breaking news desk style), then OPENAI_API_KEY, then GROQ_API_KEY. Falls back to built-in Short formats.',
+      'Step 1: Grok/OpenAI/Groq writes a plain news-desk narration. Step 2: Adapt to scenes compresses it into Short captions. Set XAI_API_KEY (Grok 4.5), or OPENAI_MODEL=gpt-4.1 / GROQ_API_KEY.',
   },
   host: {
     id: 'vercel',

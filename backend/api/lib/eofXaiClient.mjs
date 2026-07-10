@@ -50,6 +50,79 @@ function extractResponsesText(data) {
 }
 
 /**
+ * Call Grok and return raw text (not JSON).
+ * @param {{ system: string, user: string, temperature?: number }} opts
+ */
+export async function xaiTextCompletion({ system, user, temperature = 0.4 }) {
+  const key = getXaiApiKey()
+  if (!key) throw new Error('XAI_API_KEY is not set')
+
+  const models = xaiModelCandidates()
+  let lastError = null
+
+  for (const model of models) {
+    try {
+      const res = await fetch('https://api.x.ai/v1/responses', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature,
+          input: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        const text = extractResponsesText(data)
+        if (!text?.trim()) throw new Error('empty Grok response')
+        return text.trim()
+      }
+
+      if (res.status === 404 || res.status === 400 || res.status === 422) {
+        const chat = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            temperature,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+          }),
+        })
+        if (!chat.ok) {
+          const errText = await chat.text().catch(() => '')
+          throw new Error(`xAI ${chat.status}: ${errText.slice(0, 240)}`)
+        }
+        const data = await chat.json()
+        const content = data?.choices?.[0]?.message?.content
+        if (!content?.trim()) throw new Error('empty Grok chat content')
+        return String(content).trim()
+      }
+
+      const errText = await res.text().catch(() => '')
+      throw new Error(`xAI ${res.status}: ${errText.slice(0, 240)}`)
+    } catch (e) {
+      lastError = e
+      console.warn('[eof-xai] text model failed', model, e instanceof Error ? e.message : e)
+    }
+  }
+
+  throw lastError || new Error('xAI Grok text request failed')
+}
+
+/**
  * Call Grok and return parsed JSON.
  * @param {{ system: string, user: string, temperature?: number }} opts
  */
