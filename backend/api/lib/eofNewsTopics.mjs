@@ -112,7 +112,7 @@ function fallbackNewsTopics() {
  * Expand a vague topic ("world cup news") into one concrete football brief.
  * @param {{ topic: string, format?: string }} input
  */
-export async function resolveEofScriptBrief({ topic, format } = {}) {
+export async function resolveEofScriptBrief({ topic, format, scriptProvider } = {}) {
   const raw = String(topic || '').trim()
   if (raw.length < 2) throw new Error('Topic is required.')
 
@@ -128,8 +128,9 @@ export async function resolveEofScriptBrief({ topic, format } = {}) {
   }
 
   const wantsWorldCup = /\bworld\s*cup\b|\bwc26\b|\bwc\s*2026\b/i.test(raw)
+  const skipXai = String(scriptProvider || '').toLowerCase() === 'groq'
 
-  if (isXaiConfigured()) {
+  if (isXaiConfigured() && !skipXai) {
     try {
       const parsed = await xaiJsonCompletion({
         temperature: 0.3,

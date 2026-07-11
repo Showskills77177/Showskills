@@ -17,7 +17,7 @@ import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
-import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel, buildEofScriptWarning } from '../lib/eofScriptWriter.mjs'
+import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel, buildEofScriptWarning, listEofScriptProviderOptions } from '../lib/eofScriptWriter.mjs'
 import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
 import {
   EOF_ELEVENLABS_VOICE_FIELDS,
@@ -26,6 +26,11 @@ import {
   resolveElevenLabsVoiceSettings,
 } from '../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../shared/eofVoiceRegeneration.mjs'
+
+function parseScriptProvider(body) {
+  const v = typeof body?.scriptProvider === 'string' ? body.scriptProvider.trim().toLowerCase() : ''
+  return v === 'groq' || v === 'xai' || v === 'openai' || v === 'auto' ? v : null
+}
 
 /** GET hub data · POST create/render/update production jobs */
 export default async function handler(req, res) {
@@ -80,12 +85,22 @@ export default async function handler(req, res) {
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
         scriptProviders: eofScriptProviderStatus(),
+        scriptProviderOptions: listEofScriptProviderOptions(),
         preferredScriptProvider: preferredEofScriptProvider(),
         scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
-        // Soft advisory — xAI key alone is not enough without team credits
-        scriptBillingNote: eofScriptProviderStatus().xai
-          ? 'xAI key is set, but the xAI team needs credits (console.x.ai). Without credits, Create/Generate falls back to built-in drafts.'
-          : null,
+        scriptBillingNote: (() => {
+          const s = eofScriptProviderStatus()
+          if (s.groq) {
+            return 'Groq (free) is ready — pick “Groq” in Script AI or leave Auto (Groq first).'
+          }
+          if (s.xai && !s.openai) {
+            return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'
+          }
+          if (!s.openai && !s.xai) {
+            return 'No script AI configured. Add free GROQ_API_KEY at console.groq.com → Vercel env → redeploy.'
+          }
+          return null
+        })(),
         elevenLabsVoiceRegeneration: {
           limit: 3,
           note: 'Up to 3 free voice-setting regenerations per Short (same captions, slider tweaks only). Rebuild Short uses credits.',
@@ -184,8 +199,9 @@ export default async function handler(req, res) {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const format = typeof body.format === 'string' ? body.format.trim() : null
+        const scriptProvider = parseScriptProvider(body)
         try {
-          const job = await regenerateEofProductionScript(jobId, { format })
+          const job = await regenerateEofProductionScript(jobId, { format, scriptProvider })
           return json(res, 200, {
             ok: true,
             job,
@@ -200,8 +216,9 @@ export default async function handler(req, res) {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const format = typeof body.format === 'string' ? body.format.trim() : null
+        const scriptProvider = parseScriptProvider(body)
         try {
-          const job = await regenerateEofProductionDraft(jobId, { format })
+          const job = await regenerateEofProductionDraft(jobId, { format, scriptProvider })
           return json(res, 200, {
             ok: true,
             job,
@@ -219,6 +236,7 @@ export default async function handler(req, res) {
         const format = typeof body.format === 'string' ? body.format.trim() : null
         const plainTextDraft =
           typeof body.plainTextDraft === 'string' ? body.plainTextDraft : undefined
+        const scriptProvider = parseScriptProvider(body)
         try {
           // Persist any unsaved draft text from the UI before adapting
           if (plainTextDraft !== undefined) {
@@ -237,7 +255,7 @@ export default async function handler(req, res) {
               },
             })
           }
-          const job = await adaptEofProductionDraftToScenes(jobId, { format, plainTextDraft })
+          const job = await adaptEofProductionDraftToScenes(jobId, { format, plainTextDraft, scriptProvider })
           return json(res, 200, {
             ok: true,
             job,
@@ -266,12 +284,14 @@ export default async function handler(req, res) {
         typeof body.voicePreset === 'string' && body.voicePreset.trim()
           ? body.voicePreset.trim()
           : EOF_DEFAULT_VOICE_PRESET
+      const scriptProvider = parseScriptProvider(body)
       try {
         const job = await createEofProductionJob({
           topic,
           createdBy: info.username,
           format,
           voicePreset,
+          scriptProvider,
         })
         return json(res, 201, {
           ok: true,

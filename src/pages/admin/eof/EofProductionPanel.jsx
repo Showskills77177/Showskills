@@ -25,6 +25,17 @@ import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
 const SELECTED_JOB_KEY = 'eof_production_selected_job'
+const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
+
+function readStoredScriptProvider() {
+  try {
+    const v = localStorage.getItem(SCRIPT_PROVIDER_KEY)
+    if (v === 'auto' || v === 'groq' || v === 'xai' || v === 'openai') return v
+  } catch {
+    /* ignore */
+  }
+  return 'auto'
+}
 
 function readStoredSelectedId() {
   try {
@@ -91,6 +102,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [voiceSettings, setVoiceSettings] = useState(() => normalizeElevenLabsVoiceSettings(null))
   const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
   const [scriptProviders, setScriptProviders] = useState({ xai: false, openai: false, groq: false })
+  const [scriptProviderOptions, setScriptProviderOptions] = useState([])
+  const [scriptProvider, setScriptProvider] = useState(readStoredScriptProvider)
   const [preferredScriptProvider, setPreferredScriptProvider] = useState('template')
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
@@ -161,6 +174,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           ? j.scriptProviders
           : { xai: false, openai: false, groq: false },
       )
+      setScriptProviderOptions(Array.isArray(j.scriptProviderOptions) ? j.scriptProviderOptions : [])
       if (j.preferredScriptProvider) setPreferredScriptProvider(j.preferredScriptProvider)
       setScriptBillingNote(typeof j.scriptBillingNote === 'string' ? j.scriptBillingNote : '')
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
@@ -676,7 +690,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, format, voicePreset }),
+        body: JSON.stringify({ topic, format, voicePreset, scriptProvider }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not create script')
@@ -752,7 +766,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate-draft', jobId: selectedId, format }),
+        body: JSON.stringify({ action: 'regenerate-draft', jobId: selectedId, format, scriptProvider }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not regenerate draft')
@@ -801,6 +815,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           jobId: selectedId,
           format,
           plainTextDraft: plain,
+          scriptProvider,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -833,7 +848,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate-script', jobId: selectedId, format }),
+        body: JSON.stringify({ action: 'regenerate-script', jobId: selectedId, format, scriptProvider }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not rewrite script')
@@ -1038,16 +1053,24 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
           Scripts:{' '}
           {openAiScriptEnabled
-            ? scriptProviders.xai
-              ? `xAI Grok 4.5 (primary)${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.groq ? ' · Groq fallback' : ''}`
-              : [
-                  scriptProviders.openai && 'OpenAI',
-                  scriptProviders.groq && 'Groq (free tier)',
-                ]
-                  .filter(Boolean)
-                  .join(' → ') + ' (templates if all fail)'
-            : 'Built-in templates — set XAI_API_KEY for Grok 4.5, or OPENAI_API_KEY / GROQ_API_KEY'}
+            ? scriptProviders.groq
+              ? `Groq Llama 3.3 70B (free) preferred in Auto${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.xai ? ' · xAI fallback' : ''}`
+              : scriptProviders.xai
+                ? `xAI Grok 4.5${scriptProviders.openai ? ' · OpenAI fallback' : ''}`
+                : [scriptProviders.openai && 'OpenAI', scriptProviders.groq && 'Groq (free)']
+                    .filter(Boolean)
+                    .join(' → ') + ' (templates if all fail)'
+            : 'Built-in templates — add free GROQ_API_KEY (console.groq.com) on Vercel'}
         </p>
+        {!scriptProviders.groq ? (
+          <p className="mt-1 text-[11px] text-[#9ecbff]">
+            Free scripts: create a key at{' '}
+            <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="underline">
+              console.groq.com
+            </a>{' '}
+            → add <code className="text-[#9ecbff]">GROQ_API_KEY</code> on Vercel → redeploy → pick Groq above.
+          </p>
+        ) : null}
         {scriptBillingNote ? (
           <p className="mt-2 rounded-lg border border-amber-500/40 bg-[#2a2210] px-3 py-2 text-xs text-amber-200">
             {scriptBillingNote}
@@ -1110,6 +1133,37 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               ).map((f) => (
                 <option key={f.id} value={f.id} title={f.detail}>
                   {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-[#aaa]">
+            Script AI
+            <select
+              value={scriptProvider}
+              onChange={(e) => {
+                const next = e.target.value
+                setScriptProvider(next)
+                try {
+                  localStorage.setItem(SCRIPT_PROVIDER_KEY, next)
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className={inputCls}
+            >
+              {(scriptProviderOptions.length
+                ? scriptProviderOptions
+                : [
+                    { id: 'auto', label: 'Auto', configured: true },
+                    { id: 'groq', label: 'Groq — Llama 3.3 70B (free)', configured: false },
+                    { id: 'xai', label: 'xAI Grok 4.5', configured: false },
+                    { id: 'openai', label: 'OpenAI', configured: false },
+                  ]
+              ).map((p) => (
+                <option key={p.id} value={p.id} disabled={p.id !== 'auto' && !p.configured} title={p.detail}>
+                  {p.label}
+                  {p.id !== 'auto' && !p.configured ? ' (not configured)' : ''}
                 </option>
               ))}
             </select>

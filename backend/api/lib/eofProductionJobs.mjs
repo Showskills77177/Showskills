@@ -114,6 +114,7 @@ export async function createEofProductionJob({
   voicePreset = EOF_DEFAULT_VOICE_PRESET,
   musicTrackId = null,
   format = null,
+  scriptProvider = null,
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
@@ -133,13 +134,13 @@ export async function createEofProductionJob({
   let status
 
   if (mode === 'full') {
-    const written = await writeEofProductionScript({ topic: t, format, context })
+    const written = await writeEofProductionScript({ topic: t, format, context, scriptProvider })
     script = written.script
     scriptSource = written.source || 'template'
     status = EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT
     if (written.script?.topic) t = String(written.script.topic).trim() || t
   } else {
-    const draft = await writeEofPlainTextDraft({ topic: t, format, context })
+    const draft = await writeEofPlainTextDraft({ topic: t, format, context, scriptProvider })
     const resolvedTopic = draft.resolvedTopic || t
     t = resolvedTopic
     script = buildEofDraftShell({
@@ -178,11 +179,16 @@ export async function createEofProductionJob({
 /**
  * Regenerate plain-text draft only (keeps job; clears scenes until Adapt).
  */
-export async function regenerateEofProductionDraft(id, { format, context } = {}) {
+export async function regenerateEofProductionDraft(id, { format, context, scriptProvider } = {}) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
   const fmt = format || job.script?.format || null
-  const draft = await writeEofPlainTextDraft({ topic: job.topic, format: fmt, context })
+  const draft = await writeEofPlainTextDraft({
+    topic: job.topic,
+    format: fmt,
+    context,
+    scriptProvider,
+  })
   const resolvedTopic = draft.resolvedTopic || job.topic
   const script = buildEofDraftShell({
     topic: resolvedTopic,
@@ -209,7 +215,7 @@ export async function regenerateEofProductionDraft(id, { format, context } = {})
 /**
  * Adapt saved plain-text draft into Short scenes.
  */
-export async function adaptEofProductionDraftToScenes(id, { format, plainTextDraft } = {}) {
+export async function adaptEofProductionDraftToScenes(id, { format, plainTextDraft, scriptProvider } = {}) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
   const draft = String(plainTextDraft || job.script?.plainTextDraft || '').trim()
@@ -221,6 +227,7 @@ export async function adaptEofProductionDraftToScenes(id, { format, plainTextDra
     plainTextDraft: draft,
     topic: job.topic,
     format: fmt,
+    scriptProvider,
   })
   script.plainTextDraft = draft
   const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
@@ -238,12 +245,15 @@ export async function adaptEofProductionDraftToScenes(id, { format, plainTextDra
   })
 }
 
-export async function regenerateEofProductionScript(id, { format } = {}) {
+export async function regenerateEofProductionScript(id, { format, scriptProvider } = {}) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
   const fmt = format || job.script?.format || null
-  // Full rewrite: new draft + adapt (keeps one-click path for "Rewrite script")
-  const { script, source: scriptSource } = await writeEofProductionScript({ topic: job.topic, format: fmt })
+  const { script, source: scriptSource } = await writeEofProductionScript({
+    topic: job.topic,
+    format: fmt,
+    scriptProvider,
+  })
   const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
   return updateEofProductionJob(id, {
     script,

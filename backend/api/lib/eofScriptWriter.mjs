@@ -3,10 +3,8 @@
  *   1) Plain-text desk draft (continuous narration)
  *   2) Adapt draft → Short scenes (captions + image queries)
  *
- * Provider order (first configured wins):
- *   1) xAI Grok 4.5  (XAI_API_KEY)
- *   2) OpenAI        (OPENAI_API_KEY) — default gpt-4o / set OPENAI_MODEL=gpt-4.1
- *   3) Groq          (GROQ_API_KEY) — free-tier Llama
+ * Auto provider order when configured: Groq (free) → OpenAI → xAI Grok.
+ * UI can force a provider via scriptProvider (groq | xai | openai | auto).
  * Falls back to structured templates when none work.
  *
  * Scope: football worldwide (World Cup, all leagues) — call it football, never soccer.
@@ -46,19 +44,73 @@ export function eofScriptProviderStatus() {
   }
 }
 
-/** Primary LLM provider for new scripts (first configured). */
+const SCRIPT_PROVIDER_IDS = new Set(['auto', 'groq', 'xai', 'openai'])
+
+/** UI + API: script AI options (Groq is the free tier). */
+export function listEofScriptProviderOptions() {
+  const status = eofScriptProviderStatus()
+  return [
+    {
+      id: 'auto',
+      label: 'Auto',
+      configured: true,
+      detail: 'Groq (free) first when set, then OpenAI, then xAI Grok.',
+    },
+    {
+      id: 'groq',
+      label: 'Groq — Llama 3.3 70B (free)',
+      configured: status.groq,
+      detail: 'Free at console.groq.com — set GROQ_API_KEY on Vercel.',
+    },
+    {
+      id: 'xai',
+      label: 'xAI Grok 4.5',
+      configured: status.xai,
+      detail: 'Needs paid xAI team credits at console.x.ai.',
+    },
+    {
+      id: 'openai',
+      label: 'OpenAI',
+      configured: status.openai,
+      detail: 'Set OPENAI_API_KEY (optional OPENAI_MODEL=gpt-4.1).',
+    },
+  ]
+}
+
+function defaultAutoProviderOrder(status) {
+  const order = []
+  if (status.groq) order.push('groq')
+  if (status.openai) order.push('openai')
+  if (status.xai) order.push('xai')
+  return order
+}
+
+/** Ordered provider ids to try for draft/adapt (respects UI pick + EOF_SCRIPT_PROVIDER env). */
+export function resolveScriptProviderAttemptOrder(scriptProvider) {
+  const status = eofScriptProviderStatus()
+  const configured = defaultAutoProviderOrder(status)
+  const envPick = envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER').toLowerCase()
+  const pick = String(scriptProvider || envPick || 'auto').toLowerCase()
+
+  if (pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)) return configured
+
+  if (!status[pick]) return configured
+  return [pick, ...configured.filter((id) => id !== pick)]
+}
+
+/** Primary LLM provider for new scripts. */
 export function preferredEofScriptProvider() {
-  const s = eofScriptProviderStatus()
-  if (s.xai) return 'xai'
-  if (s.openai) return 'openai'
-  if (s.groq) return 'groq'
-  return 'template'
+  const order = resolveScriptProviderAttemptOrder('auto')
+  return order[0] || 'template'
 }
 
 export function eofScriptProviderLabel(provider) {
   if (provider === 'xai') return 'xAI Grok 4.5'
   if (provider === 'openai') return 'OpenAI'
-  if (provider === 'groq') return 'Groq'
+  if (provider === 'groq') {
+    const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
+    return model.includes('llama') ? 'Groq Llama 3.3 70B (free)' : `Groq ${model}`
+  }
   return 'template'
 }
 
@@ -145,8 +197,11 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
       ? jobOrSource
       : jobOrSource?.scriptSource || jobOrSource?.script?.draftSource || null
   if (source && source !== 'template') return null
+  if (providers.groq) {
+    return 'Groq failed — check GROQ_API_KEY on Vercel (console.groq.com). Using a built-in fallback draft.'
+  }
   if (providers.xai) {
-    return 'xAI Grok failed — usually no credits on your xAI team (console.x.ai). This is a built-in fallback draft. Add credits, or set OPENAI_API_KEY / GROQ_API_KEY on Vercel for real AI scripts.'
+    return 'xAI Grok failed — usually no credits on your xAI team (console.x.ai). Add free GROQ_API_KEY on Vercel, pick Groq in Script AI, and Generate again.'
   }
   if (!providers.openai && !providers.groq) {
     return 'No working AI script provider. Set XAI_API_KEY (with credits), OPENAI_API_KEY, or free GROQ_API_KEY on Vercel.'
@@ -188,7 +243,7 @@ function withBudget(promise, ms, label) {
   ])
 }
 
-export async function writeEofPlainTextDraft({ topic, format, context }) {
+export async function writeEofPlainTextDraft({ topic, format, context, scriptProvider }) {
   const rawTopic = String(topic || '').trim()
   if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
   const fmt = resolveFormat(format)
@@ -198,9 +253,8 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
   let resolvedTopic = null
 
   try {
-    // Keep topic resolve short — never block Create job on a slow Grok call
     const brief = await withBudget(
-      resolveEofScriptBrief({ topic: rawTopic, format: fmt }),
+      resolveEofScriptBrief({ topic: rawTopic, format: fmt, scriptProvider }),
       25000,
       'topic resolve',
     )
@@ -213,11 +267,13 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
     console.warn('[eof-script] topic resolve skipped', e instanceof Error ? e.message : e)
   }
 
-  const status = eofScriptProviderStatus()
+  const order = resolveScriptProviderAttemptOrder(scriptProvider)
   const attempts = []
-  if (status.xai) attempts.push(() => writeDraftWithXai({ topic: t, format: fmt, context: ctx }))
-  if (status.openai) attempts.push(() => writeDraftWithOpenAi({ topic: t, format: fmt, context: ctx }))
-  if (status.groq) attempts.push(() => writeDraftWithGroq({ topic: t, format: fmt, context: ctx }))
+  for (const id of order) {
+    if (id === 'xai') attempts.push(() => writeDraftWithXai({ topic: t, format: fmt, context: ctx }))
+    if (id === 'openai') attempts.push(() => writeDraftWithOpenAi({ topic: t, format: fmt, context: ctx }))
+    if (id === 'groq') attempts.push(() => writeDraftWithGroq({ topic: t, format: fmt, context: ctx }))
+  }
 
   for (const run of attempts) {
     try {
@@ -247,17 +303,19 @@ export async function writeEofPlainTextDraft({ topic, format, context }) {
  * Step 2 — split approved plain text into Short scenes.
  * @param {{ plainTextDraft: string, topic: string, format?: string }} input
  */
-export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format }) {
+export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format, scriptProvider }) {
   const draft = String(plainTextDraft || '').trim()
   if (draft.length < 40) throw new Error('Plain-text draft is too short — write or generate a fuller script first.')
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
-  const status = eofScriptProviderStatus()
 
+  const order = resolveScriptProviderAttemptOrder(scriptProvider)
   const attempts = []
-  if (status.xai) attempts.push(() => adaptWithXai({ draft, topic: t, format: fmt }))
-  if (status.openai) attempts.push(() => adaptWithOpenAi({ draft, topic: t, format: fmt }))
-  if (status.groq) attempts.push(() => adaptWithGroq({ draft, topic: t, format: fmt }))
+  for (const id of order) {
+    if (id === 'xai') attempts.push(() => adaptWithXai({ draft, topic: t, format: fmt }))
+    if (id === 'openai') attempts.push(() => adaptWithOpenAi({ draft, topic: t, format: fmt }))
+    if (id === 'groq') attempts.push(() => adaptWithGroq({ draft, topic: t, format: fmt }))
+  }
 
   for (const run of attempts) {
     try {
@@ -281,13 +339,14 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format 
  * One-shot (scheduler / legacy): draft then adapt.
  * @param {{ topic: string, format?: string, context?: string }} input
  */
-export async function writeEofProductionScript({ topic, format, context }) {
-  const draftResult = await writeEofPlainTextDraft({ topic, format, context })
+export async function writeEofProductionScript({ topic, format, context, scriptProvider }) {
+  const draftResult = await writeEofPlainTextDraft({ topic, format, context, scriptProvider })
   const resolvedTopic = draftResult.resolvedTopic || topic
   const adapted = await adaptEofPlainTextToScenes({
     plainTextDraft: draftResult.plainTextDraft,
     topic: resolvedTopic,
     format,
+    scriptProvider,
   })
   if (adapted?.script) {
     adapted.script.plainTextDraft = draftResult.plainTextDraft
@@ -366,42 +425,56 @@ Return JSON:
   return { system, user }
 }
 
-async function chatJsonCompletion({ url, headers, body }) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '')
-    throw new Error(`${res.status}: ${errText.slice(0, 240)}`)
-  }
-  const data = await res.json()
-  const content = data?.choices?.[0]?.message?.content
-  if (!content) throw new Error('empty script content')
-  let parsed
+async function chatTextCompletion({ url, headers, body, timeoutMs = 55000 }) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    parsed = parseJsonContent(content)
-  } catch {
-    throw new Error('script was not valid JSON')
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(`${res.status}: ${errText.slice(0, 240)}`)
+    }
+    const data = await res.json()
+    const content = data?.choices?.[0]?.message?.content
+    if (!content?.trim()) throw new Error('empty draft content')
+    return String(content).trim()
+  } finally {
+    clearTimeout(timer)
   }
-  return parsed
 }
 
-async function chatTextCompletion({ url, headers, body }) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '')
-    throw new Error(`${res.status}: ${errText.slice(0, 240)}`)
+async function chatJsonCompletion({ url, headers, body, timeoutMs = 55000 }) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(`${res.status}: ${errText.slice(0, 240)}`)
+    }
+    const data = await res.json()
+    const content = data?.choices?.[0]?.message?.content
+    if (!content) throw new Error('empty script content')
+    let parsed
+    try {
+      parsed = parseJsonContent(content)
+    } catch {
+      throw new Error('script was not valid JSON')
+    }
+    return parsed
+  } finally {
+    clearTimeout(timer)
   }
-  const data = await res.json()
-  const content = data?.choices?.[0]?.message?.content
-  if (!content?.trim()) throw new Error('empty draft content')
-  return String(content).trim()
 }
 
 function parseJsonContent(content) {
