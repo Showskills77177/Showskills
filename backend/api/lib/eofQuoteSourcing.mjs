@@ -1,20 +1,24 @@
 /**
  * Quote script sourcing for Eyes Of Football Shorts.
- * Finds attributed football quotes (pressers, studio, desks) and turns them
- * into desk briefs the Shorts writer can use — scheduler-ready.
+ * Finds attributed football quotes and builds a desk brief for Shorts.
  *
- * Sources (in order):
- *   1) Perplexity Sonar (live web — BBC, Sky, The Sun, AP-style desks)
- *   2) RSS headlines that look quote-driven
- *   3) Optional preferred Instagram / quote pages (names only — Sonar searches them)
+ * Free-first (no Perplexity required):
+ *   1) Guardian Open Platform (free API key) + BBC/Sky/Guardian RSS
+ *   2) Groq / OpenAI / xAI extract one bite-worthy attributed quote from those articles
+ *
+ * Optional paid:
+ *   3) Perplexity Sonar — only if EOF_USE_PERPLEXITY=1 and PERPLEXITY_API_KEY is set
  *
  * Env:
- *   PERPLEXITY_API_KEY
- *   EOF_QUOTE_PAGES=page1,page2   (optional Instagram/TikTok/X handles or site names)
+ *   GUARDIAN_API_KEY=...          free at open-platform.theguardian.com
+ *   GROQ_API_KEY=...              free writer / quote extractor
+ *   EOF_QUOTE_PAGES=page1,page2   optional Instagram/quote page names for prompts
+ *   EOF_USE_PERPLEXITY=1          opt-in paid live search
+ *   PERPLEXITY_API_KEY=...        optional paid (ignored unless EOF_USE_PERPLEXITY=1)
  */
 import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
-import { isPerplexityConfigured, getPerplexityApiKey, perplexityModel } from './eofPerplexityClient.mjs'
-import { fetchFootballDeskHeadlines, formatDeskHeadlinesForPrompt } from './eofFootballDeskResearch.mjs'
+import { shouldUsePerplexity, getPerplexityApiKey, perplexityModel } from './eofPerplexityClient.mjs'
+import { fetchFreeFootballDeskPack, isGuardianConfigured } from './eofFreeNewsSourcing.mjs'
 
 /** Default public quote / football-talk sources the researcher should prefer. */
 export const EOF_DEFAULT_QUOTE_PAGES = [
@@ -62,6 +66,137 @@ function parseJsonLoose(content) {
   return JSON.parse(body)
 }
 
+function normalizeQuoteHit(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const speaker = String(raw.speaker || raw.who || '').trim()
+  const quote = String(raw.quote || raw.text || '').trim()
+  if (speaker.length < 2 || quote.length < 12) return null
+  return {
+    speaker: speaker.slice(0, 80),
+    role: String(raw.role || raw.title || '').trim().slice(0, 80),
+    quote: quote.slice(0, 280),
+    outlet: String(raw.outlet || raw.source || raw.desk || '').trim().slice(0, 80),
+    context: String(raw.context || raw.about || '').trim().slice(0, 240),
+    whyItBites: String(raw.whyItBites || raw.why || '').trim().slice(0, 200),
+    target: String(raw.target || raw.aboutPlayer || '').trim().slice(0, 80),
+    ctaQuestion: String(raw.ctaQuestion || raw.cta || '').trim().slice(0, 140),
+    sources: Array.isArray(raw.sources) ? raw.sources.map(String).slice(0, 5) : [],
+  }
+}
+
+const QUOTE_EXTRACT_SYSTEM = `You extract ONE attributed football quote for a YouTube Short.
+
+${EOF_FOOTBALL_SCOPE}
+
+Rules:
+- Use ONLY the provided articles/headlines. Do not invent fake quotes.
+- Prefer strong, clear, bite-worthy quotes (criticism, worry, rivalry, hot takes).
+- Always say football — never soccer.
+- Return JSON only.`
+
+function quoteExtractUser({ topic, format, articlesText, pages }) {
+  return `Topic hint: ${topic || '(any timely football quote from the articles)'}
+Format: ${format}
+Preferred desks/pages: ${pages.slice(0, 12).join(', ')}
+
+Articles / headlines:
+${articlesText || '(none)'}
+
+Return JSON:
+{
+  "speaker": "Wayne Rooney",
+  "role": "ex-England / pundit",
+  "quote": "what they said (from the articles)",
+  "exact": true,
+  "outlet": "BBC Sport / Sky Sports / The Guardian / press conference",
+  "context": "when/where and what it was about",
+  "target": "who or what the quote is about",
+  "whyItBites": "why fans will argue in comments",
+  "ctaQuestion": "one sharp agree/disagree question",
+  "sources": ["outlet names"]
+}`
+}
+
+async function chatJson({ url, key, model, system, user }) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 45000)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(`${res.status}: ${errText.slice(0, 200)}`)
+    }
+    const data = await res.json()
+    return parseJsonLoose(data?.choices?.[0]?.message?.content || '')
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Extract quote JSON with free Groq first, then OpenAI. */
+async function extractQuoteWithFreeLlms({ topic, format, articlesText, pages }) {
+  const system = QUOTE_EXTRACT_SYSTEM
+  const user = quoteExtractUser({ topic, format, articlesText, pages })
+  const groqKey = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
+  const openaiKey = envKey('OPENAI_API_KEY')
+
+  if (groqKey) {
+    const preferred = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL')
+    const models = [
+      preferred,
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'openai/gpt-oss-20b',
+    ].filter(Boolean)
+    const unique = [...new Set(models)]
+    let lastErr
+    for (const model of unique) {
+      try {
+        return await chatJson({
+          url: 'https://api.groq.com/openai/v1/chat/completions',
+          key: groqKey,
+          model,
+          system,
+          user,
+        })
+      } catch (e) {
+        lastErr = e
+        const msg = String(e?.message || e)
+        if (/404|400|decommissioned|model_not_found|does not exist|invalid.?model/i.test(msg)) continue
+        throw e
+      }
+    }
+    throw lastErr || new Error('Groq quote extract failed')
+  }
+  if (openaiKey) {
+    const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
+    return chatJson({
+      url: 'https://api.openai.com/v1/chat/completions',
+      key: openaiKey,
+      model,
+      system,
+      user,
+    })
+  }
+  return null
+}
+
 async function perplexityJson({ system, user, temperature = 0.2 }) {
   const key = getPerplexityApiKey()
   if (!key) throw new Error('PERPLEXITY_API_KEY is not set')
@@ -104,85 +239,63 @@ async function perplexityJson({ system, user, temperature = 0.2 }) {
   throw new Error('Perplexity quote sourcing failed')
 }
 
-function normalizeQuoteHit(raw) {
-  if (!raw || typeof raw !== 'object') return null
-  const speaker = String(raw.speaker || raw.who || '').trim()
-  const quote = String(raw.quote || raw.text || '').trim()
-  if (speaker.length < 2 || quote.length < 12) return null
-  return {
-    speaker: speaker.slice(0, 80),
-    role: String(raw.role || raw.title || '').trim().slice(0, 80),
-    quote: quote.slice(0, 280),
-    outlet: String(raw.outlet || raw.source || raw.desk || '').trim().slice(0, 80),
-    context: String(raw.context || raw.about || '').trim().slice(0, 240),
-    whyItBites: String(raw.whyItBites || raw.why || '').trim().slice(0, 200),
-    target: String(raw.target || raw.aboutPlayer || '').trim().slice(0, 80),
-    ctaQuestion: String(raw.ctaQuestion || raw.cta || '').trim().slice(0, 140),
-    sources: Array.isArray(raw.sources) ? raw.sources.map(String).slice(0, 5) : [],
-  }
-}
-
 /**
  * Find one strong attributed football quote for a Short.
- * @param {{ topic?: string, format?: string }} opts
+ * Free path first; Perplexity only if configured.
  */
 export async function sourceEofFootballQuote({ topic = '', format = 'quote' } = {}) {
   const pages = allEofQuoteSourcePages()
-  const rss = await fetchFootballDeskHeadlines({ topic: topic || 'football quote press conference', limit: 10 }).catch(
-    () => [],
-  )
-  const rssText = formatDeskHeadlinesForPrompt(rss)
 
-  if (isPerplexityConfigured()) {
+  // 1) Free articles (Guardian + RSS)
+  let articlesText = ''
+  let packSources = { guardian: 0, rss: 0, guardianConfigured: isGuardianConfigured() }
+  try {
+    const pack = await fetchFreeFootballDeskPack({
+      topic: topic || 'football quote press conference manager said',
+      limit: 10,
+    })
+    articlesText = pack.text
+    packSources = pack.sources
+    console.info('[eof-quote] free pack', packSources)
+  } catch (e) {
+    console.warn('[eof-quote] free pack failed', e instanceof Error ? e.message : e)
+  }
+
+  // 2) Groq/OpenAI extract quote from free articles
+  if (articlesText) {
+    try {
+      const parsed = await extractQuoteWithFreeLlms({ topic, format, articlesText, pages })
+      const hit = normalizeQuoteHit(parsed)
+      if (hit) {
+        return {
+          quote: hit,
+          source: packSources.guardian ? 'guardian+groq' : 'rss+groq',
+          pages,
+          packSources,
+        }
+      }
+    } catch (e) {
+      console.warn('[eof-quote] free LLM extract failed', e instanceof Error ? e.message : e)
+    }
+  }
+
+  // 3) Optional paid Perplexity (EOF_USE_PERPLEXITY=1 only)
+  if (shouldUsePerplexity()) {
     try {
       const parsed = await perplexityJson({
         temperature: 0.2,
-        system: `You find SHAREABLE football quotes for YouTube Shorts.
-
-${EOF_FOOTBALL_SCOPE}
-
-Rules:
-- Return ONE real, attributed quote (named speaker + what they said).
-- Prefer press conferences, BBC/Sky studio, The Athletic, newspapers, Reuters/AP-style reporting.
-- Prefer strong, clear, bite-worthy quotes (criticism, worry, rivalry, hot takes) — not bland filler.
-- Always say football — never soccer.
-- If the user gave a topic, the quote must relate to it.
-- Do NOT invent fake quotes. If unsure of exact wording, paraphrase carefully and mark exact:false.
-- Prefer sources among: ${pages.slice(0, 16).join(', ')}.
-
-Return JSON only.`,
-        user: `Find one strong football quote for a Short.
-Topic hint: ${topic || '(any timely football quote today)'}
-Format: ${format}
-
-Recent desk headlines (optional context):
-${rssText || '(none)'}
-
-Return JSON:
-{
-  "speaker": "Wayne Rooney",
-  "role": "ex-England / pundit",
-  "quote": "exact or careful paraphrase of what they said",
-  "exact": true,
-  "outlet": "BBC Sport / Sky Sports / press conference",
-  "context": "when/where and what it was about",
-  "target": "who or what the quote is about",
-  "whyItBites": "why fans will argue in comments",
-  "ctaQuestion": "one sharp agree/disagree question",
-  "sources": ["outlet or URL titles"]
-}`,
+        system: `${QUOTE_EXTRACT_SYSTEM}
+Prefer BBC/Sky/Guardian/newspaper desks. Prefer sources among: ${pages.slice(0, 16).join(', ')}.`,
+        user: quoteExtractUser({ topic, format, articlesText, pages }),
       })
-
       const hit = normalizeQuoteHit(parsed)
-      if (hit) {
-        return { quote: hit, source: 'perplexity', pages }
-      }
+      if (hit) return { quote: hit, source: 'perplexity', pages, packSources }
     } catch (e) {
       console.warn('[eof-quote] Perplexity quote source failed', e instanceof Error ? e.message : e)
     }
   }
 
-  // Template fallbacks — still usable offline / without Perplexity
+  // 4) Offline templates
   const fallbacks = [
     {
       speaker: 'Wayne Rooney',
@@ -210,10 +323,13 @@ Return JSON:
 
   const topicLc = String(topic || '').toLowerCase()
   const pick =
-    fallbacks.find((f) => topicLc && (`${f.speaker} ${f.target} ${f.quote}`.toLowerCase().includes(topicLc.split(/\s+/)[0] || '___'))) ||
-    fallbacks[0]
+    fallbacks.find((f) => {
+      const first = topicLc.split(/\s+/).find((w) => w.length > 3)
+      if (!first) return false
+      return `${f.speaker} ${f.target} ${f.quote}`.toLowerCase().includes(first)
+    }) || fallbacks[0]
 
-  return { quote: pick, source: 'template', pages }
+  return { quote: pick, source: 'template', pages, packSources }
 }
 
 /** Turn a quote hit into desk-brief context for the Shorts writer. */
@@ -248,5 +364,13 @@ export async function pickEofDailyQuoteTopic() {
     desks: quote.sources?.length ? quote.sources : [quote.outlet || 'Sky Sports'].filter(Boolean),
     source,
     quote,
+  }
+}
+
+export function eofFreeSourcingStatus() {
+  return {
+    guardian: isGuardianConfigured(),
+    rss: true,
+    perplexityOptIn: shouldUsePerplexity(),
   }
 }

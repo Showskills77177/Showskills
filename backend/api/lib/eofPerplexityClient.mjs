@@ -1,8 +1,9 @@
 /**
- * Perplexity Sonar — live web-grounded football research for EOF scripts.
- * Yesterday's plan: Sonar sources articles/citations; Groq/OpenAI writes the Short.
+ * Perplexity Sonar — optional paid live web research for EOF scripts.
+ * Default path is free: Guardian Open Platform + RSS + Groq (see eofFreeNewsSourcing.mjs).
  *
- * Env:
+ * Env (opt-in only — never called unless both are set):
+ *   EOF_USE_PERPLEXITY=1
  *   PERPLEXITY_API_KEY / EOF_PERPLEXITY_API_KEY
  *   PERPLEXITY_MODEL (default sonar-pro)
  */
@@ -20,8 +21,15 @@ export function getPerplexityApiKey() {
   return envKey('PERPLEXITY_API_KEY', 'EOF_PERPLEXITY_API_KEY')
 }
 
+/** True when a Perplexity key exists (does not mean we will call it). */
 export function isPerplexityConfigured() {
   return Boolean(getPerplexityApiKey())
+}
+
+/** Paid Sonar is opt-in so a leftover key never burns credits. */
+export function shouldUsePerplexity() {
+  const flag = envKey('EOF_USE_PERPLEXITY', 'EOF_ENABLE_PERPLEXITY').toLowerCase()
+  return isPerplexityConfigured() && ['1', 'true', 'yes', 'on'].includes(flag)
 }
 
 export function perplexityModel() {
@@ -109,7 +117,7 @@ async function postSonar({ messages, temperature = 0.2, timeoutMs = 45000 }) {
  * @returns {Promise<{ text: string, citations: Array<{url:string,title:string}>, source: 'perplexity' } | null>}
  */
 export async function researchFootballTopicWithPerplexity({ topic, format = 'news' } = {}) {
-  if (!isPerplexityConfigured()) return null
+  if (!shouldUsePerplexity()) return null
   const t = String(topic || '').trim()
   if (t.length < 2) return null
 

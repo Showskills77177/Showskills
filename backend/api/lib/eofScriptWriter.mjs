@@ -30,10 +30,11 @@ import {
   deskBriefToContext,
 } from './eofFootballDeskResearch.mjs'
 import {
-  isPerplexityConfigured,
+  shouldUsePerplexity,
   researchFootballTopicWithPerplexity,
   formatPerplexityResearchForPrompt,
 } from './eofPerplexityClient.mjs'
+import { fetchFreeFootballDeskPack, isGuardianConfigured } from './eofFreeNewsSourcing.mjs'
 import {
   sourceEofFootballQuote,
   quoteHitToContext,
@@ -60,7 +61,8 @@ export function eofScriptProviderStatus() {
     xai: isXaiConfigured(),
     openai: Boolean(envKey('OPENAI_API_KEY')),
     groq: Boolean(envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')),
-    perplexity: isPerplexityConfigured(),
+    guardian: isGuardianConfigured(),
+    perplexity: shouldUsePerplexity(),
   }
 }
 
@@ -128,8 +130,12 @@ export function eofScriptProviderLabel(provider) {
   if (provider === 'xai') return 'xAI Grok 4.5'
   if (provider === 'openai') return 'OpenAI'
   if (provider === 'groq') {
-    const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
-    return model.includes('llama') ? 'Groq Llama 3.3 70B (free)' : `Groq ${model}`
+    const model = groqModelCandidates()[0]
+    return model.includes('llama-3.3')
+      ? 'Groq Llama 3.3 70B (free)'
+      : model.includes('8b')
+        ? 'Groq Llama 3.1 8B (free)'
+        : `Groq ${model}`
   }
   return 'template'
 }
@@ -224,14 +230,38 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
       ? jobOrSource
       : jobOrSource?.scriptSource || jobOrSource?.script?.draftSource || null
   if (source && source !== 'template') return null
+
+  const detail =
+    typeof jobOrSource === 'object' && jobOrSource
+      ? String(jobOrSource.scriptFailureDetail || jobOrSource.failureDetail || '').trim()
+      : ''
+
   if (providers.groq) {
-    return 'Groq failed — check GROQ_API_KEY on Vercel (console.groq.com). Using a built-in fallback draft.'
+    if (/401|403|invalid.?api.?key|incorrect.?api.?key/i.test(detail)) {
+      return `Groq rejected the API key (${detail.slice(0, 120)}). Fix GROQ_API_KEY on Vercel at console.groq.com, then Redeploy.`
+    }
+    if (/429|rate.?limit|quota|tpm|rpm/i.test(detail)) {
+      return `Groq rate-limited this request (${detail.slice(0, 120)}). Wait ~1 minute and Regenerate script.`
+    }
+    if (/decommissioned|model_not_found|does not exist|404/i.test(detail)) {
+      return `Groq model unavailable (${detail.slice(0, 140)}). Set GROQ_MODEL=llama-3.1-8b-instant on Vercel and Redeploy.`
+    }
+    if (/timed out|timeout|abort/i.test(detail)) {
+      return 'Groq timed out on the multi-pass write. Click Regenerate script once more (usually works on retry).'
+    }
+    if (/weak|fluff|rejected/i.test(detail)) {
+      return 'Groq returned a draft we rejected as too weak/generic. Click Regenerate script for another pass.'
+    }
+    if (detail) {
+      return `Groq failed (${detail.slice(0, 160)}). Using a built-in fallback draft — Regenerate after fixing.`
+    }
+    return 'Groq did not return a usable script. Click Regenerate script (or check GROQ_API_KEY on Vercel).'
   }
   if (providers.xai) {
     return 'xAI Grok failed — usually no credits on your xAI team (console.x.ai). Add free GROQ_API_KEY on Vercel, pick Groq in Script AI, and Generate again.'
   }
   if (!providers.openai && !providers.groq) {
-    return 'No working AI script provider. Set XAI_API_KEY (with credits), OPENAI_API_KEY, or free GROQ_API_KEY on Vercel.'
+    return 'No working AI script provider. Set free GROQ_API_KEY at console.groq.com → Vercel env → Redeploy.'
   }
   return 'AI script providers failed — using a built-in fallback draft. Check API keys and billing.'
 }
@@ -239,27 +269,105 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
 const DRAFT_FLUFF_RE =
   /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
+/** Strict quality gate — prefers punchy Shorts VO. */
 function isWeakDraft(text, topic) {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
-  if (words < 70 || words > 200) return true
+  if (words < 70 || words > 220) return true
   if (DRAFT_FLUFF_RE.test(t)) return true
-  // Book-like: too many long sentences / commas
   const sentences = t.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean)
   if (sentences.length < 4) return true
   const longSentences = sentences.filter((s) => s.split(/\s+/).length > 28).length
   if (longSentences >= 2) return true
   if (!t.includes('?')) return true
-  // Must mention at least one capitalised proper-looking token beyond filler
   const proper = (t.match(/\b[A-Z][a-z]{2,}\b/g) || []).filter(
     (w) => !/^(The|This|That|Then|When|What|With|From|After|Before|For|And|But|Are|Was|Were|Who|How|Why|Not|One|Another|Today|Still)$/.test(w),
   )
   if (proper.length < 2) return true
-  // If topic names teams, draft should not ignore football specificity entirely
   if (/\b(world cup|ucl|premier|liga|serie|bundesliga)\b/i.test(topic) && !/\b(world cup|fifa|spain|england|france|germany|brazil|argentina|portugal|belgium|netherlands|italy|croatia|mexico|usa|japan|korea|match|group|knockout|final|tournament)\b/i.test(t)) {
     return true
   }
   return false
+}
+
+/** Looser gate — still better than the canned template. */
+function isUsableAiDraft(text) {
+  const t = String(text || '').trim()
+  const words = t.split(/\s+/).filter(Boolean).length
+  if (words < 55 || words > 320) return false
+  if (DRAFT_FLUFF_RE.test(t) && words < 100) return false
+  return true
+}
+
+function groqModelCandidates() {
+  const preferred = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL')
+  const defaults = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-20b']
+  if (!preferred) return defaults
+  return [preferred, ...defaults.filter((m) => m !== preferred)]
+}
+
+function isRetryableGroqModelError(err) {
+  const msg = String(err?.message || err || '')
+  return /404|400|decommissioned|model_not_found|does not exist|invalid.?model|unknown.?model|not.?currently.?supported/i.test(msg)
+}
+
+async function groqChatText({ system, user, temperature = 0.4, timeoutMs = 45000 }) {
+  const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
+  if (!key) throw new Error('GROQ_API_KEY is not set')
+  let lastErr
+  for (const model of groqModelCandidates()) {
+    try {
+      return await chatTextCompletion({
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        headers: { Authorization: `Bearer ${key}` },
+        body: {
+          model,
+          temperature,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        },
+        timeoutMs,
+      })
+    } catch (e) {
+      lastErr = e
+      console.warn('[eof-script] groq text model failed', model, e instanceof Error ? e.message : e)
+      if (isRetryableGroqModelError(e)) continue
+      throw e
+    }
+  }
+  throw lastErr || new Error('Groq text completion failed')
+}
+
+async function groqChatJson({ system, user, temperature = 0.25, timeoutMs = 45000 }) {
+  const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
+  if (!key) throw new Error('GROQ_API_KEY is not set')
+  let lastErr
+  for (const model of groqModelCandidates()) {
+    try {
+      return await chatJsonCompletion({
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        headers: { Authorization: `Bearer ${key}` },
+        body: {
+          model,
+          temperature,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        },
+        timeoutMs,
+      })
+    } catch (e) {
+      lastErr = e
+      console.warn('[eof-script] groq json model failed', model, e instanceof Error ? e.message : e)
+      if (isRetryableGroqModelError(e)) continue
+      throw e
+    }
+  }
+  throw lastErr || new Error('Groq JSON completion failed')
 }
 
 /**
@@ -319,19 +427,26 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     }
   }
 
-  // Live desk headlines (BBC / Guardian / Sky RSS) + optional Perplexity Sonar sourcing
+  // Free live sourcing: Guardian Open Platform + BBC/Sky/Guardian RSS (no Perplexity)
   let headlinesText = ''
   try {
-    const headlines = await withBudget(fetchFootballDeskHeadlines({ topic: t, limit: 8 }), 12000, 'desk RSS')
-    headlinesText = formatDeskHeadlinesForPrompt(headlines)
+    const pack = await withBudget(fetchFreeFootballDeskPack({ topic: t, limit: 8 }), 15000, 'free desk pack')
+    headlinesText = pack.text || ''
     if (headlinesText) {
-      console.info('[eof-script] desk headlines', headlines.length)
+      console.info('[eof-script] free desk pack', pack.sources)
     }
   } catch (e) {
-    console.warn('[eof-script] desk RSS skipped', e instanceof Error ? e.message : e)
+    console.warn('[eof-script] free desk pack skipped', e instanceof Error ? e.message : e)
+    try {
+      const headlines = await withBudget(fetchFootballDeskHeadlines({ topic: t, limit: 8 }), 12000, 'desk RSS')
+      headlinesText = formatDeskHeadlinesForPrompt(headlines)
+    } catch (e2) {
+      console.warn('[eof-script] desk RSS skipped', e2 instanceof Error ? e2.message : e2)
+    }
   }
 
-  if (isPerplexityConfigured()) {
+  // Paid Perplexity only when EOF_USE_PERPLEXITY=1
+  if (shouldUsePerplexity()) {
     try {
       const px = await withBudget(
         researchFootballTopicWithPerplexity({ topic: t, format: fmt }),
@@ -362,9 +477,11 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     }
   }
 
+  let failureDetail = ''
+  let softBest = null
   for (const run of attempts) {
     try {
-      const ai = await withBudget(run(), 110000, 'draft pipeline')
+      const ai = await withBudget(run(), 90000, 'draft pipeline')
       if (ai?.plainTextDraft && !isWeakDraft(ai.plainTextDraft, t)) {
         return {
           ...ai,
@@ -372,10 +489,26 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
           resolvedTopic,
         }
       }
-      console.warn('[eof-script] draft rejected as weak/fluff', ai?.source, ai?.plainTextDraft?.slice?.(0, 80))
+      if (ai?.plainTextDraft && isUsableAiDraft(ai.plainTextDraft)) {
+        softBest = {
+          ...ai,
+          title: ai.title || t.slice(0, 90),
+          resolvedTopic,
+        }
+        failureDetail = `weak draft rejected then soft-accepted candidate from ${ai.source}`
+        console.warn('[eof-script] draft soft-weak, keeping as candidate', ai?.source, ai?.plainTextDraft?.slice?.(0, 80))
+      } else {
+        failureDetail = `weak/fluff draft rejected from ${ai?.source || 'ai'}`
+        console.warn('[eof-script] draft rejected as weak/fluff', ai?.source, ai?.plainTextDraft?.slice?.(0, 80))
+      }
     } catch (e) {
-      console.warn('[eof-script] draft provider failed', e instanceof Error ? e.message : e)
+      failureDetail = e instanceof Error ? e.message : String(e)
+      console.warn('[eof-script] draft provider failed', failureDetail)
     }
+  }
+
+  if (softBest) {
+    return softBest
   }
 
   return {
@@ -383,6 +516,7 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     title: t.slice(0, 90),
     source: 'template',
     resolvedTopic,
+    failureDetail: failureDetail || 'no AI provider returned a usable draft',
   }
 }
 
@@ -443,7 +577,7 @@ export async function writeEofProductionScript({ topic, format, context, scriptP
       adapted.source = draftResult.source
     }
   }
-  return { ...adapted, resolvedTopic }
+  return { ...adapted, resolvedTopic, failureDetail: draftResult.failureDetail || '' }
 }
 
 function buildDraftPrompt({ topic, format, context }) {
@@ -506,25 +640,31 @@ Return only the improved voiceover.`
 async function writeDraftPipeline({ provider, topic, format, context, headlinesText }) {
   let workingTopic = topic
   let researchCtx = context
-  try {
-    const research = await researchDeskBriefWithProvider({
-      provider,
-      topic: workingTopic,
-      format,
-      context,
-      headlinesText,
-    })
-    if (research) {
-      const built = deskBriefToContext(research)
-      if (built) {
-        researchCtx = [context, built].filter(Boolean).join('\n\n')
-        if (research.headline && String(research.headline).trim().length >= 12) {
-          workingTopic = String(research.headline).trim().slice(0, 100)
+  // Groq free tier: skip extra research call when we already have Guardian/RSS desk notes
+  const skipResearch = provider === 'groq' && String(headlinesText || '').trim().length >= 80
+  if (!skipResearch) {
+    try {
+      const research = await researchDeskBriefWithProvider({
+        provider,
+        topic: workingTopic,
+        format,
+        context,
+        headlinesText,
+      })
+      if (research) {
+        const built = deskBriefToContext(research)
+        if (built) {
+          researchCtx = [context, built].filter(Boolean).join('\n\n')
+          if (research.headline && String(research.headline).trim().length >= 12) {
+            workingTopic = String(research.headline).trim().slice(0, 100)
+          }
         }
       }
+    } catch (e) {
+      console.warn('[eof-script] research pass skipped', provider, e instanceof Error ? e.message : e)
     }
-  } catch (e) {
-    console.warn('[eof-script] research pass skipped', provider, e instanceof Error ? e.message : e)
+  } else if (headlinesText) {
+    researchCtx = [context, 'DESK HEADLINES:\n' + headlinesText].filter(Boolean).join('\n\n')
   }
 
   const draftResult = await writeDraftWithProvider({
@@ -578,22 +718,7 @@ async function researchDeskBriefWithProvider({ provider, topic, format, context,
     })
   }
   if (provider === 'groq') {
-    const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
-    const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
-    return chatJsonCompletion({
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      headers: { Authorization: `Bearer ${key}` },
-      body: {
-        model,
-        temperature: 0.25,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      },
-      timeoutMs: 45000,
-    })
+    return groqChatJson({ system, user, temperature: 0.25, timeoutMs: 40000 })
   }
   return null
 }
@@ -630,23 +755,7 @@ async function polishDraftWithProvider({ provider, topic, format, draft }) {
     )
   }
   if (provider === 'groq') {
-    const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
-    const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
-    return cleanDraftText(
-      await chatTextCompletion({
-        url: 'https://api.groq.com/openai/v1/chat/completions',
-        headers: { Authorization: `Bearer ${key}` },
-        body: {
-          model,
-          temperature: 0.25,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        },
-        timeoutMs: 45000,
-      }),
-    )
+    return cleanDraftText(await groqChatText({ system, user, temperature: 0.25, timeoutMs: 40000 }))
   }
   return draft
 }
@@ -809,23 +918,8 @@ async function writeDraftWithOpenAi({ topic, format, context }) {
 }
 
 async function writeDraftWithGroq({ topic, format, context }) {
-  const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
-  const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
   const { system, user } = buildDraftPrompt({ topic, format, context })
-  const text = cleanDraftText(
-    await chatTextCompletion({
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      headers: { Authorization: `Bearer ${key}` },
-      body: {
-        model,
-        temperature: 0.4,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      },
-    }),
-  )
+  const text = cleanDraftText(await groqChatText({ system, user, temperature: 0.4, timeoutMs: 45000 }))
   if (text.length < 40) throw new Error('draft too short')
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'groq' }
 }
@@ -857,21 +951,7 @@ async function adaptWithOpenAi({ draft, topic, format }) {
 }
 
 async function adaptWithGroq({ draft, topic, format }) {
-  const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
-  const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
   const { system, user } = buildAdaptPrompt({ draft, topic, format })
-  const parsed = await chatJsonCompletion({
-    url: 'https://api.groq.com/openai/v1/chat/completions',
-    headers: { Authorization: `Bearer ${key}` },
-    body: {
-      model,
-      temperature: 0.4,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    },
-  })
+  const parsed = await groqChatJson({ system, user, temperature: 0.4, timeoutMs: 50000 })
   return finalizeScript(parsed, topic, format, 'groq', draft)
 }

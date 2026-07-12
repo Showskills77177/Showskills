@@ -132,12 +132,14 @@ export async function createEofProductionJob({
   let script
   let scriptSource
   let status
+  let failureDetail = ''
 
   if (mode === 'full') {
     const written = await writeEofProductionScript({ topic: t, format, context, scriptProvider })
     script = written.script
     scriptSource = written.source || 'template'
     status = EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT
+    failureDetail = written.failureDetail || ''
     if (written.script?.topic) t = String(written.script.topic).trim() || t
   } else {
     const draft = await writeEofPlainTextDraft({ topic: t, format, context, scriptProvider })
@@ -152,6 +154,7 @@ export async function createEofProductionJob({
     })
     scriptSource = draft.source || 'template'
     status = EOF_PRODUCTION_JOB_STATUS.DRAFT
+    failureDetail = draft.failureDetail || ''
   }
 
   await query(
@@ -173,7 +176,8 @@ export async function createEofProductionJob({
     ],
   )
 
-  return getEofProductionJob(id)
+  const created = await getEofProductionJob(id)
+  return failureDetail ? { ...created, scriptFailureDetail: failureDetail } : created
 }
 
 /**
@@ -197,7 +201,7 @@ export async function regenerateEofProductionDraft(id, { format, context, script
     title: draft.title || resolvedTopic,
     source: draft.source,
   })
-  return updateEofProductionJob(id, {
+  const updated = await updateEofProductionJob(id, {
     script,
     title: script.title,
     topic: resolvedTopic,
@@ -210,6 +214,7 @@ export async function regenerateEofProductionDraft(id, { format, context, script
     voiceRegenerationCount: 0,
     voiceNarrationHash: null,
   })
+  return draft.failureDetail ? { ...updated, scriptFailureDetail: draft.failureDetail } : updated
 }
 
 /**

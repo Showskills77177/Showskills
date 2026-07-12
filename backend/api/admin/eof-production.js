@@ -90,14 +90,14 @@ export default async function handler(req, res) {
         scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
         scriptBillingNote: (() => {
           const s = eofScriptProviderStatus()
-          if (s.perplexity && s.groq) {
-            return 'Perplexity Sonar (live article sourcing) + Groq (Shorts writer) are ready.'
+          if (s.groq && s.guardian) {
+            return 'Free stack ready: Guardian articles + RSS sourcing, Groq writes the Short.'
           }
-          if (s.groq && !s.perplexity) {
-            return 'Groq is ready for writing. Add PERPLEXITY_API_KEY for live web article sourcing (recommended).'
+          if (s.groq && !s.guardian) {
+            return 'Groq is ready. Add free GUARDIAN_API_KEY (open-platform.theguardian.com) for article bodies; RSS still works without it.'
           }
-          if (s.perplexity && !s.groq && !s.openai && !s.xai) {
-            return 'Perplexity is set for research, but you still need GROQ_API_KEY (or OpenAI/xAI) to write the Short.'
+          if (s.guardian && !s.groq && !s.openai && !s.xai) {
+            return 'Guardian sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
           }
           if (s.xai && !s.openai && !s.groq) {
             return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'
