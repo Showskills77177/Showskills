@@ -100,6 +100,8 @@ async function addEofProductionJobColumns() {
     'voice_narration_hash',
     'script_source',
     'caption_style',
+    'caption_engine',
+    'zapcap_template_id',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {

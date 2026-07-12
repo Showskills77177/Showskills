@@ -27,7 +27,7 @@ export const EOF_CAPTION_STYLES = [
     vibe: 'Punchy hooks & hot takes',
     displayWords: 2,
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_POP',
-    zapcapTemplateDefault: '',
+    zapcapTemplateDefault: 'ca050348-e2d0-49a7-9c75-7a5e8335c67d',
   },
   {
     id: 'karaoke',
@@ -36,7 +36,7 @@ export const EOF_CAPTION_STYLES = [
     vibe: 'Story beats & news VO',
     displayWords: 4,
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_KARAOKE',
-    zapcapTemplateDefault: '',
+    zapcapTemplateDefault: '21327a45-df89-46bc-8d56-34b8d29d3a0e',
   },
   {
     id: 'beast',

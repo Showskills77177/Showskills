@@ -1119,7 +1119,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 .join(' · ')}
             </p>
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
-            <p>Captions: {captionEngine.zapcap ? 'ZapCap + local' : 'Local CapCut styles'}</p>
+            <p>
+              Captions:{' '}
+              {captionEngine.zapcap
+                ? 'ZapCap ready'
+                : captionEngine.engine === 'local'
+                  ? 'Local drawtext (escape hatch)'
+                  : 'Not configured'}
+            </p>
+            {captionEngine.note ? <p className="text-[#fbbf24]">{captionEngine.note}</p> : null}
             {scriptBillingNote ? <p className="text-[#fbbf24]">{scriptBillingNote}</p> : null}
           </div>
         </details>
@@ -1207,7 +1215,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           </div>
 
           <div>
-            <p className={PX.label}>Captions</p>
+            <p className={PX.label}>Captions (ZapCap templates)</p>
+            {!captionEngine.zapcap ? (
+              <p className="mt-1 text-xs text-[#fbbf24]">
+                Add ZAPCAP_API_KEY on Vercel for CapCut-class word-synced captions. Without it, Shorts render with no on-screen text.
+              </p>
+            ) : (
+              <p className={`mt-1 text-xs ${PX.muted}`}>Paid ZapCap burn (~$0.10/min) — Hormozi / Karaoke / Beast.</p>
+            )}
             <div className="mt-2 grid gap-2 sm:grid-cols-3">
               {(captionStyles.length
                 ? captionStyles
@@ -1477,14 +1492,21 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
             {/* Ready result first when available */}
             {selected.status === 'video_rendered' || videoPreviewUrl ? (
-              <div
-                ref={resultPanelRef}
-                className="${PX.surface} p-6"
-              >
+              <div ref={resultPanelRef} className={`${PX.surface} p-6`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-[#d4d4d4]">Short ready</p>
-                    <p className={`mt-0.5 text-xs ${PX.muted}`}>9:16 with voiceover, images, and captions.</p>
+                    <p className={`mt-0.5 text-xs ${PX.muted}`}>
+                      9:16 with voiceover and images
+                      {selected.captionEngine === 'zapcap'
+                        ? ` · ZapCap captions${selected.zapcapTemplateId ? ` (${String(selected.zapcapTemplateId).slice(0, 8)}…)` : ''}`
+                        : selected.captionEngine === 'local'
+                          ? ' · local drawtext captions'
+                          : selected.captionEngine === 'none'
+                            ? ' · no captions (add ZAPCAP_API_KEY)'
+                            : ''}
+                      .
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button

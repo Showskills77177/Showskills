@@ -79,12 +79,17 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       clearEofSceneImageCache(workDir)
     }
 
+    const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
     const rows = scriptScenes.map((s, i) => {
       const caption = String(s.caption || s.narration || '').trim()
+      const prior = priorManifest.find((m) => m.index === i) || priorManifest[i]
+      const durationSec =
+        Number(prior?.durationSec) || Number(s.durationSec) || estimateCaptionDurationSec(caption)
       return {
         index: i,
-        durationSec: Number(s.durationSec) || estimateCaptionDurationSec(caption),
+        durationSec,
         caption,
+        narration: String(s.narration || s.caption || caption).trim(),
         imageQuery: s.imageQuery,
       }
     })
@@ -121,6 +126,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         index: row.index,
         durationSec: row.durationSec,
         caption: row.caption,
+        narration: row.narration,
         imagePath: resolvedImagePath,
         imageSource: imageMeta.source,
         imageQueryUsed: imageMeta.imageQuery || row.imageQuery,
@@ -130,13 +136,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     scenesForVideo.sort((a, b) => a.index - b.index)
     await report('video', 0, { force: true })
 
-    const { relPath } = await renderEofProductionVideo({
+    const rendered = await renderEofProductionVideo({
       jobId,
       scenes: scenesForVideo,
       mixedAudioPath: mixedPath,
       captionStyle: job.captionStyle,
       onSceneProgress: async (done) => report('video', done),
     })
+    const { relPath } = rendered
 
     await report('mux', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)
@@ -173,6 +180,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       renderOutputPath: relPath,
       narrationManifest: updatedManifest,
       script: nextScript,
+      captionEngine: rendered.captionEngine || null,
+      zapcapTemplateId: rendered.zapcapTemplateId || null,
       errorMessage: null,
     })
   } catch (e) {

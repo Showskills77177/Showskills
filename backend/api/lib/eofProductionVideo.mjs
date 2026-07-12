@@ -149,12 +149,22 @@ export async function renderEofProductionVideo({
   const workDir = dirname(out)
   mkdirSync(workDir, { recursive: true })
   const style = resolveEofCaptionStyle(captionStyle)
-  const engine = resolveCaptionEngine()
-  // ZapCap needs a clean plate (no local burn) so Whisper can time words to TTS.
-  const burnCaptions = engine !== 'zapcap'
+  let engine
+  try {
+    engine = resolveCaptionEngine()
+  } catch (e) {
+    throw e
+  }
+  // Only burn local drawtext when explicitly requested — never as silent ZapCap fallback.
+  const burnCaptions = engine === 'local'
   const captionFont = burnCaptions ? resolveCaptionFont() : null
   if (burnCaptions && !captionFont) {
     console.warn('[eof-video] No caption font found — captions will be missing from the Short.')
+  }
+  if (engine === 'none') {
+    console.warn(
+      '[eof-video] No ZapCap key — rendering clean plate without captions. Set ZAPCAP_API_KEY for CapCut-class burn.',
+    )
   }
   console.info('[eof-video] caption style', style, 'engine', engine)
 
@@ -222,70 +232,20 @@ export async function renderEofProductionVideo({
 
   if (!existsSync(out)) throw new Error('Video render produced no output file.')
 
-  let captionEngine = burnCaptions ? 'local' : 'pending-zapcap'
+  let captionEngine = burnCaptions ? 'local' : engine === 'zapcap' ? 'pending-zapcap' : 'none'
+  let zapcapTemplateId = null
   if (engine === 'zapcap') {
-    try {
-      const z = await burnZapcapCaptions({ videoPath: out, style })
-      captionEngine = z.engine
-    } catch (e) {
-      console.warn('[eof-video] ZapCap failed — falling back to local CapCut captions', e instanceof Error ? e.message : e)
-      // Rebuild with local captions if ZapCap fails
-      const fallbackClips = await mapWithConcurrency(sorted, CLIP_CONCURRENCY, async (scene) => {
-        const font = resolveCaptionFont()
-        return encodeSceneClip({
-          scene,
-          workDir,
-          captionFont: font,
-          captionStyle: style,
-          burnCaptions: true,
-        })
-      })
-      const fbList = join(workDir, 'video-concat-fb.txt')
-      await writeFile(
-        fbList,
-        fallbackClips.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'),
-        'utf8',
-      )
-      const fbArgs = hasAudio
-        ? [
-            '-y',
-            '-f',
-            'concat',
-            '-safe',
-            '0',
-            '-i',
-            fbList,
-            '-i',
-            mixedAudioPath,
-            '-c:v',
-            'copy',
-            '-c:a',
-            'aac',
-            '-b:a',
-            '192k',
-            '-movflags',
-            '+faststart',
-            '-shortest',
-            out,
-          ]
-        : [
-            '-y',
-            '-f',
-            'concat',
-            '-safe',
-            '0',
-            '-i',
-            fbList,
-            '-c:v',
-            'copy',
-            '-an',
-            '-movflags',
-            '+faststart',
-            out,
-          ]
-      await runFfmpeg(fbArgs, { maxBuffer: 16 * 1024 * 1024 })
-      captionEngine = 'local-fallback'
-    }
+    const z = await burnZapcapCaptions({
+      videoPath: out,
+      style,
+      scenes: sorted.map((s) => ({
+        caption: s.caption,
+        narration: s.narration || s.caption,
+        durationSec: s.durationSec,
+      })),
+    })
+    captionEngine = z.engine
+    zapcapTemplateId = z.templateId || null
   }
 
   return {
@@ -294,5 +254,6 @@ export async function renderEofProductionVideo({
     hasAudio,
     captionStyle: style,
     captionEngine,
+    zapcapTemplateId,
   }
 }
