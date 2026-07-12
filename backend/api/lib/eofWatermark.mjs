@@ -1,15 +1,13 @@
 /**
- * Eyes Of Football overlays for Shorts:
- * - Brand mark: small top-left, free-roams in the final seconds
- * - Subscribe CTA: bottom-center, free-roams / scales in the final seconds
+ * Eyes Of Football overlays for Shorts (static — never animate / free-roam):
+ * - Brand wordmark: solid white, top-left (burned AFTER ZapCap so it sits above ZapCap’s mark)
+ * - Subscribe CTA: bottom-center
  *
  * Env:
  *   EOF_WATERMARK=1|0
- *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE / EOF_WATERMARK_END_SEC
- *   EOF_SUBSCRIBE=1|0                 (default 1)
- *   EOF_SUBSCRIBE_PATH=...
- *   EOF_SUBSCRIBE_WIDTH=320           resting width (px)
- *   EOF_SUBSCRIBE_END_SEC=2.8
+ *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE
+ *   EOF_SUBSCRIBE=1|0
+ *   EOF_SUBSCRIBE_PATH / EOF_SUBSCRIBE_WIDTH
  */
 import { existsSync } from 'node:fs'
 import { rename, unlink } from 'node:fs/promises'
@@ -81,6 +79,8 @@ async function probeDurationSec(videoPath) {
 
 /**
  * Burn brand watermark + subscribe CTA onto a finished Short MP4 (in place).
+ * Applied after ZapCap so EOF marks sit above any ZapCap free-tier watermark.
+ * Both overlays stay fixed for the full duration (no motion).
  * @param {{ videoPath: string, durationSec?: number }} opts
  */
 export async function applyEofWatermark({ videoPath, durationSec } = {}) {
@@ -96,18 +96,9 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  const endSec = Math.min(
-    Math.max(1.6, Number(process.env.EOF_WATERMARK_END_SEC) || Number(process.env.EOF_SUBSCRIBE_END_SEC) || 2.8),
-    Math.max(1.5, total * 0.35),
-  )
-  const t0 = Math.max(0.5, total - endSec)
-  const t0s = t0.toFixed(3)
-  const ends = endSec.toFixed(3)
-
-  const cornerW = Math.max(90, Math.min(220, Number(process.env.EOF_WATERMARK_SIZE) || 150))
-  const endW = Math.round(cornerW * 2.05)
-  const subW = Math.max(180, Math.min(480, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 320))
-  const subEndW = Math.round(subW * 1.35)
+  // Wordmark wide enough to read over ZapCap’s corner stamp
+  const cornerW = Math.max(160, Math.min(360, Number(process.env.EOF_WATERMARK_SIZE) || 240))
+  const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
 
   const inputs = ['-y', '-i', videoPath]
   const durArg = total.toFixed(3)
@@ -120,43 +111,21 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
     inputs.push('-loop', '1', '-t', durArg, '-i', mark)
     const i = inputIdx
     inputIdx += 1
-    filterParts.push(`[${i}:v]format=rgba,scale=${cornerW}:-1[wm_corner]`)
-    filterParts.push(
-      `[${i}:v]format=rgba,scale=${endW}:-1,rotate=a='0.14*sin(2*PI*t/2)':c=none:ow=rotw(iw):oh=roth(ih)[wm_roam]`,
-    )
-    filterParts.push(`[${lastLabel}][wm_corner]overlay=x=28:y=52:enable='lt(t\\,${t0s})'[v_wm1]`)
-    filterParts.push(
-      `[v_wm1][wm_roam]overlay=` +
-        `x='28+160*sin(2*PI*(t-${t0s})/${ends})':` +
-        `y='52+260*cos(2*PI*(t-${t0s})/2.3)':` +
-        `enable='gte(t\\,${t0s})'[v_wm2]`,
-    )
-    lastLabel = 'v_wm2'
+    // Opaque white wordmark — no fade / no roam
+    filterParts.push(`[${i}:v]format=rgba,scale=${cornerW}:-1[wm]`)
+    filterParts.push(`[${lastLabel}][wm]overlay=x=24:y=40:format=auto[v_wm]`)
+    lastLabel = 'v_wm'
   }
 
   if (sub) {
     inputs.push('-loop', '1', '-t', durArg, '-i', sub)
     const i = inputIdx
     inputIdx += 1
-    // Rest: bottom-center. End: grow + roam horizontally / bounce up a bit.
-    filterParts.push(`[${i}:v]format=rgba,scale=${subW}:-1[sub_rest]`)
-    filterParts.push(
-      `[${i}:v]format=rgba,scale=${subEndW}:-1,rotate=a='0.08*sin(2*PI*t/1.8)':c=none:ow=rotw(iw):oh=roth(ih)[sub_roam]`,
-    )
-    filterParts.push(
-      `[${lastLabel}][sub_rest]overlay=x=(W-w)/2:y=H-h-72:enable='lt(t\\,${t0s})'[v_sub1]`,
-    )
-    filterParts.push(
-      `[v_sub1][sub_roam]overlay=` +
-        `x='(W-w)/2+140*sin(2*PI*(t-${t0s})/${ends})':` +
-        `y='H-h-72-120*abs(sin(2*PI*(t-${t0s})/2.1))':` +
-        `enable='gte(t\\,${t0s})'[vout]`,
-    )
+    filterParts.push(`[${i}:v]format=rgba,scale=${subW}:-1[sub]`)
+    filterParts.push(`[${lastLabel}][sub]overlay=x=(W-w)/2:y=H-h-64:format=auto[vout]`)
     lastLabel = 'vout'
   } else {
-    // rename last to vout
     filterParts.push(`[${lastLabel}]null[vout]`)
-    lastLabel = 'vout'
   }
 
   const tmp = `${videoPath}.wm.tmp.mp4`
@@ -196,7 +165,7 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
       subscribePath: sub,
       cornerW,
       subW,
-      endSec,
+      static: true,
       total,
     }
   } catch (e) {
