@@ -147,6 +147,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [busy, setBusy] = useState(false)
   /** 'draft' | 'rewrite' | '' — so Regenerate button can show its own label */
   const [scriptBusy, setScriptBusy] = useState('')
+  const [scriptChat, setScriptChat] = useState('')
+  const [scriptChatLog, setScriptChatLog] = useState([])
   const [loading, setLoading] = useState(true)
   const [renderNote, setRenderNote] = useState('')
   const [videoPreviewUrl, setVideoPreviewUrl] = useState('')
@@ -823,18 +825,28 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     }
   }
 
-  async function regenerateDraft() {
+  async function regenerateDraft({ directorNote } = {}) {
     if (!selectedId) return
+    const note = String(directorNote ?? scriptChat).trim().slice(0, 1200)
     setBusy(true)
     setScriptBusy('draft')
     setErr('')
     setSuccess('')
     const previousPlain = String(draftScript?.plainTextDraft || selected?.script?.plainTextDraft || '').trim()
     try {
+      if (note) {
+        setScriptChatLog((prev) => [...prev.slice(-8), { role: 'you', text: note }])
+      }
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate-draft', jobId: selectedId, format, scriptProvider }),
+        body: JSON.stringify({
+          action: 'regenerate-draft',
+          jobId: selectedId,
+          format,
+          scriptProvider,
+          directorNote: note || undefined,
+        }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not regenerate draft')
@@ -856,20 +868,38 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         judge && !judge.skipped
           ? ` Judge ${judge.judgeProvider || ''} ${judge.pass ? 'pass' : 'soft'} ${judge.overall}/10 (merit ${judge.merit} · interest ${judge.interest} · value ${judge.value}).`
           : ''
+      if (note) {
+        setScriptChatLog((prev) => [
+          ...prev.slice(-10),
+          {
+            role: 'ai',
+            text: nextPlain
+              ? `Updated draft (${j.scriptProviderLabel || 'AI'})${judge && !judge.skipped ? ` · judge ${judge.overall}/10` : ''}.`
+              : 'Draft rewrite finished.',
+          },
+        ])
+        setScriptChat('')
+      }
       if (j.scriptWarning) {
         setErr(j.scriptWarning)
         setSuccess('Fallback draft loaded. Edit it, or fix AI billing and Regenerate again.')
       } else if (previousPlain && nextPlain && previousPlain === nextPlain) {
-        setSuccess('Regenerate returned a similar draft — click Regenerate script once more for another angle.')
+        setSuccess('Regenerate returned a similar draft — tweak your direction or click Regenerate again.')
       } else {
         setSuccess(
           j.scriptProviderLabel
-            ? `Fresh script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced}${judged} Edit, then Adapt to scenes.`
-            : `Fresh script loaded.${sourced}${judged} Edit if needed, then Adapt to scenes.`,
+            ? `${note ? 'Directed' : 'Fresh'} script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced}${judged} Edit, then Adapt to scenes.`
+            : `${note ? 'Directed' : 'Fresh'} script loaded.${sourced}${judged} Edit if needed, then Adapt to scenes.`,
         )
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
+      if (note) {
+        setScriptChatLog((prev) => [
+          ...prev.slice(-10),
+          { role: 'ai', text: e instanceof Error ? e.message : 'Could not rewrite from your direction.' },
+        ])
+      }
     } finally {
       setBusy(false)
       setScriptBusy('')
@@ -1100,7 +1130,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       }
     }
     if (!hasPlainDraft) {
-      return { label: regenerateScriptLabel, run: regenerateDraft, tone: 'primary', hint: 'Step 1 — write the voiceover' }
+      return {
+        label: regenerateScriptLabel,
+        run: () => regenerateDraft({ directorNote: '' }),
+        tone: 'primary',
+        hint: 'Step 1 — write the voiceover',
+      }
     }
     if (sceneCount < 1) {
       return { label: 'Adapt to scenes', run: adaptToScenes, tone: 'primary', hint: 'Step 2 — split into Short captions' }
@@ -1633,7 +1668,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 <button
                   type="button"
                   disabled={busy || isRendering}
-                  onClick={regenerateDraft}
+                  onClick={() => regenerateDraft()}
                   className={`mt-4 ${PX.btnGhost}`}
                 >
                   {scriptBusy === 'draft' ? '…' : 'Regenerate'}
@@ -1772,13 +1807,62 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   <button
                     type="button"
                     disabled={busy || isRendering}
-                    onClick={regenerateDraft}
+                    onClick={() => regenerateDraft({ directorNote: '' })}
                     className={PX.btnPrimary}
                   >
                     {regenerateScriptLabel}
                   </button>
                 </div>
               </div>
+
+              <div className="mt-3 rounded-xl border border-[#303030] bg-[#121212] p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#aaa]">
+                  Direct the AI · tell Groq how to write
+                </p>
+                {scriptChatLog.length ? (
+                  <div className="mt-2 max-h-28 space-y-1.5 overflow-y-auto">
+                    {scriptChatLog.map((row, i) => (
+                      <p
+                        key={`${row.role}-${i}`}
+                        className={`text-xs leading-snug ${row.role === 'you' ? 'text-[#e5e5e5]' : 'text-[#8ab4f8]'}`}
+                      >
+                        <span className="font-medium text-[#717171]">{row.role === 'you' ? 'You' : 'AI'}: </span>
+                        {row.text}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`mt-1 text-xs ${PX.muted}`}>
+                    e.g. “Open angry about Tuchel’s selection — name England XI debate — end asking who’s wrong”
+                  </p>
+                )}
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <textarea
+                    value={scriptChat}
+                    onChange={(e) => setScriptChat(e.target.value)}
+                    rows={2}
+                    disabled={busy || isRendering}
+                    placeholder="What script do you want? Tone, angle, names to stress, opening line…"
+                    className={`${inputCls} min-h-[56px] flex-1 text-sm`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !busy && !isRendering) {
+                        e.preventDefault()
+                        if (scriptChat.trim()) regenerateDraft({ directorNote: scriptChat })
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || isRendering || !scriptChat.trim()}
+                    onClick={() => regenerateDraft({ directorNote: scriptChat })}
+                    className={`${PX.btnSoft} shrink-0 sm:mb-0.5`}
+                  >
+                    {scriptBusy === 'draft' ? 'Writing…' : 'Send to AI'}
+                  </button>
+                </div>
+                <p className="mt-1 text-[10px] text-[#717171]">⌘/Ctrl + Enter to send · uses your Script AI (Groq / OpenAI / xAI)</p>
+              </div>
+
               <textarea
                 value={draftScript.plainTextDraft || ''}
                 onChange={(e) => {

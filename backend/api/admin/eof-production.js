@@ -252,13 +252,26 @@ export default async function handler(req, res) {
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const format = typeof body.format === 'string' ? body.format.trim() : null
         const scriptProvider = parseScriptProvider(body)
+        const directorNote =
+          typeof body.directorNote === 'string'
+            ? body.directorNote
+            : typeof body.chatPrompt === 'string'
+              ? body.chatPrompt
+              : typeof body.instruction === 'string'
+                ? body.instruction
+                : ''
         try {
-          const job = await regenerateEofProductionDraft(jobId, { format, scriptProvider })
+          const job = await regenerateEofProductionDraft(jobId, {
+            format,
+            scriptProvider,
+            directorNote,
+          })
           return json(res, 200, {
             ok: true,
             job,
             deskSources: job.deskSources || null,
             judge: job.judge || null,
+            directorNote: String(directorNote || '').trim().slice(0, 200) || null,
             scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
             scriptWarning: buildEofScriptWarning(job),
           })

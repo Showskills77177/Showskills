@@ -470,14 +470,16 @@ export async function writeEofPlainTextDraft({
   scriptProvider,
   regenerate = false,
   previousDraft = '',
+  directorNote = '',
 } = {}) {
   const rawTopic = String(topic || '').trim()
   if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
   const fmt = resolveFormat(format)
   const prev = String(previousDraft || '').trim()
-  // Regenerate: hotter than first pass, but not chaos — high temp caused invented scores
-  const draftTemperature = regenerate ? 0.72 : 0.42
-  const polishTemperature = regenerate ? 0.25 : 0.28
+  const note = String(directorNote || '').trim().slice(0, 1200)
+  // Regenerate / directed rewrite: hotter than first pass, but not chaos
+  const draftTemperature = regenerate || note ? 0.72 : 0.42
+  const polishTemperature = regenerate || note ? 0.25 : 0.28
 
   let t = rawTopic
   let ctx = String(context || '').trim()
@@ -573,7 +575,8 @@ export async function writeEofPlainTextDraft({
             temperature: draftTemperature,
             polishTemperature,
             previousDraft: prev,
-            regenerate,
+            regenerate: regenerate || Boolean(note),
+            directorNote: note,
           }),
       })
     }
@@ -768,7 +771,7 @@ export async function writeEofProductionScript({ topic, format, context, scriptP
   return { ...adapted, resolvedTopic, failureDetail: draftResult.failureDetail || '' }
 }
 
-function buildDraftPrompt({ topic, format, context, previousDraft = '', regenerate = false }) {
+function buildDraftPrompt({ topic, format, context, previousDraft = '', regenerate = false, directorNote = '' }) {
   const angles = [
     'lead with the result and what it means next',
     'lead with the quote or claim, then the pushback',
@@ -777,6 +780,7 @@ function buildDraftPrompt({ topic, format, context, previousDraft = '', regenera
     'lead with the timeline — what just changed today',
   ]
   const angle = angles[Math.floor(Date.now() / 1000) % angles.length]
+  const note = String(directorNote || '').trim().slice(0, 1200)
 
   const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT essays.
 
@@ -792,6 +796,7 @@ SHORTS VOICE (non-negotiable):
 - Always say football — never soccer. Never NFL / NBA / American sports.
 - FIRST SENTENCE must name the player/club/nation AND the event.
 - FACT LOCK: Use ONLY names, scores, clubs, and claims present in the DESK BRIEF. If the brief is thin, stay general — do NOT invent match scores, transfer fees, or fake quotes.
+- If PRODUCER DIRECTION is provided, follow it closely (tone, angle, names to stress, what to open with) while keeping Shorts length and fact lock.
 - Structure for format "${format}": ${draftFormatGuide(format)}
 - End with ONE sharp question for comments (Comment / Drop your take).
 
@@ -808,8 +813,12 @@ PREVIOUS DRAFT (avoid copying):\n"""\n${previousDraft.slice(0, 900)}\n"""\n`
         ? `\nREGENERATE — angle: ${angle}. New opening line required. Stay inside the DESK BRIEF facts.\n`
         : ''
 
+  const directionBlock = note
+    ? `\nPRODUCER DIRECTION (follow this — how to write / what to stress / what script they want):\n"""\n${note}\n"""\n`
+    : ''
+
   const user = `Topic / headline: ${topic}
-${context ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${context}\n` : '\nDESK BRIEF: (none returned — do not invent scores or quotes; keep it cautious.)\n'}${regenBlock}
+${context ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${context}\n` : '\nDESK BRIEF: (none returned — do not invent scores or quotes; keep it cautious.)\n'}${directionBlock}${regenBlock}
 Write the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
@@ -854,6 +863,7 @@ async function writeDraftPipeline({
   polishTemperature = 0.3,
   previousDraft = '',
   regenerate = false,
+  directorNote = '',
 }) {
   let workingTopic = topic
   let researchCtx = context
@@ -894,6 +904,7 @@ async function writeDraftPipeline({
     temperature,
     previousDraft,
     regenerate,
+    directorNote,
   })
   let text = draftResult.plainTextDraft
   // On regenerate, polish only lightly (already low temp) — skip if polish collapses uniqueness
@@ -961,15 +972,16 @@ async function writeDraftWithProvider({
   temperature = 0.45,
   previousDraft = '',
   regenerate = false,
+  directorNote = '',
 }) {
   if (provider === 'xai') {
-    return writeDraftWithXai({ topic, format, context, temperature, previousDraft, regenerate })
+    return writeDraftWithXai({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
   }
   if (provider === 'openai') {
-    return writeDraftWithOpenAi({ topic, format, context, temperature, previousDraft, regenerate })
+    return writeDraftWithOpenAi({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
   }
   if (provider === 'groq') {
-    return writeDraftWithGroq({ topic, format, context, temperature, previousDraft, regenerate })
+    return writeDraftWithGroq({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
   }
   throw new Error(`unknown provider ${provider}`)
 }
@@ -1132,8 +1144,23 @@ function titleFromDraft(topic, draft) {
   return String(topic || '').trim().slice(0, 90)
 }
 
-async function writeDraftWithXai({ topic, format, context, temperature = 0.45, previousDraft = '', regenerate = false }) {
-  const { system, user } = buildDraftPrompt({ topic, format, context, previousDraft, regenerate })
+async function writeDraftWithXai({
+  topic,
+  format,
+  context,
+  temperature = 0.45,
+  previousDraft = '',
+  regenerate = false,
+  directorNote = '',
+}) {
+  const { system, user } = buildDraftPrompt({
+    topic,
+    format,
+    context,
+    previousDraft,
+    regenerate,
+    directorNote,
+  })
   const text = cleanDraftText(await xaiTextCompletion({ system, user, temperature }))
   if (text.length < 40) throw new Error('draft too short')
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'xai' }
@@ -1146,10 +1173,18 @@ async function writeDraftWithOpenAi({
   temperature = 0.45,
   previousDraft = '',
   regenerate = false,
+  directorNote = '',
 }) {
   const key = envKey('OPENAI_API_KEY')
   const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
-  const { system, user } = buildDraftPrompt({ topic, format, context, previousDraft, regenerate })
+  const { system, user } = buildDraftPrompt({
+    topic,
+    format,
+    context,
+    previousDraft,
+    regenerate,
+    directorNote,
+  })
   const text = cleanDraftText(
     await chatTextCompletion({
       url: 'https://api.openai.com/v1/chat/completions',
@@ -1175,8 +1210,16 @@ async function writeDraftWithGroq({
   temperature = 0.45,
   previousDraft = '',
   regenerate = false,
+  directorNote = '',
 }) {
-  const { system, user } = buildDraftPrompt({ topic, format, context, previousDraft, regenerate })
+  const { system, user } = buildDraftPrompt({
+    topic,
+    format,
+    context,
+    previousDraft,
+    regenerate,
+    directorNote,
+  })
   const text = cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 45000 }))
   if (text.length < 40) throw new Error('draft too short')
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'groq' }

@@ -200,11 +200,15 @@ export async function createEofProductionJob({
 /**
  * Regenerate plain-text draft only (keeps job; clears scenes until Adapt).
  */
-export async function regenerateEofProductionDraft(id, { format, context, scriptProvider } = {}) {
+export async function regenerateEofProductionDraft(
+  id,
+  { format, context, scriptProvider, directorNote } = {},
+) {
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
   const fmt = format || job.script?.format || null
   const previousDraft = String(job.script?.plainTextDraft || '').trim()
+  const note = String(directorNote || '').trim().slice(0, 1200)
   const draft = await writeEofPlainTextDraft({
     topic: job.topic,
     format: fmt,
@@ -212,6 +216,7 @@ export async function regenerateEofProductionDraft(id, { format, context, script
     scriptProvider,
     regenerate: true,
     previousDraft,
+    directorNote: note,
   })
   const resolvedTopic = draft.resolvedTopic || job.topic
   const script = buildEofDraftShell({
