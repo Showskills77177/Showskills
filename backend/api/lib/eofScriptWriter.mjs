@@ -81,9 +81,10 @@ export function listEofScriptProviderOptions() {
   return [
     {
       id: 'auto',
-      label: 'Auto',
+      label: 'Auto (best quality)',
       configured: true,
-      detail: 'Groq (free) first when set, then OpenAI. A second model (OpenAI/xAI) judges merit + interest.',
+      detail:
+        'Tunes temps by format, judges merit/interest/value, then escalates Groq → OpenAI/xAI until the best script wins.',
     },
     {
       id: 'groq',
@@ -107,13 +108,58 @@ export function listEofScriptProviderOptions() {
 }
 
 function defaultAutoProviderOrder(status) {
+  // Fast free draft first; paid models used as Auto escalation for best quality.
   const order = []
   if (status.groq) order.push('groq')
   if (status.openai) order.push('openai')
-  // Skip xAI in Auto when a free/paid writer is already available — xAI without
-  // credits only wastes time and used to be mis-labelled as a Groq key error.
-  if (status.xai && !status.groq && !status.openai) order.push('xai')
+  if (status.xai) order.push('xai')
   return order
+}
+
+export function isAutoScriptMode(scriptProvider) {
+  const envPick = envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER').toLowerCase()
+  const pick = String(scriptProvider || envPick || 'auto').toLowerCase()
+  return pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)
+}
+
+/** Format-aware temps + excellence bar for Auto quality mode. */
+export function autoTuneDraftSettings({ format, regenerate = false, directorNote = '' } = {}) {
+  const fmt = resolveFormat(format)
+  const directed = Boolean(String(directorNote || '').trim())
+  let draftTemperature = 0.42
+  let polishTemperature = 0.28
+  // News/quotes: cooler = fewer invented facts. Debate/hooks: warmer punch.
+  if (fmt === 'news' || fmt === 'quote') {
+    draftTemperature = 0.36
+    polishTemperature = 0.22
+  } else if (fmt === 'debate' || fmt === 'hook_reveal') {
+    draftTemperature = 0.55
+    polishTemperature = 0.3
+  } else if (fmt === 'listicle' || fmt === 'timeline') {
+    draftTemperature = 0.46
+    polishTemperature = 0.26
+  }
+  if (regenerate || directed) {
+    draftTemperature = Math.min(0.78, draftTemperature + 0.2)
+    polishTemperature = 0.24
+  }
+  const excellentMin = Number(envKey('EOF_SCRIPT_AUTO_EXCELLENT') || 7.5)
+  return {
+    draftTemperature,
+    polishTemperature,
+    excellentMin: Number.isFinite(excellentMin) ? Math.min(9.5, Math.max(6, excellentMin)) : 7.5,
+  }
+}
+
+function judgeOverall(judge) {
+  if (!judge || judge.skipped) return 0
+  const n = Number(judge.overall)
+  return Number.isFinite(n) ? n : 0
+}
+
+function isExcellentJudge(judge, excellentMin) {
+  if (!judge || judge.skipped) return true // no judge → don't block
+  return Boolean(judge.pass) && judgeOverall(judge) >= excellentMin
 }
 
 /** Ordered provider ids to try for draft/adapt (respects UI pick + EOF_SCRIPT_PROVIDER env). */
@@ -123,7 +169,10 @@ export function resolveScriptProviderAttemptOrder(scriptProvider) {
   const envPick = envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER').toLowerCase()
   const pick = String(scriptProvider || envPick || 'auto').toLowerCase()
 
-  if (pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)) return configured
+  if (pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)) {
+    // Auto draft attempt: Groq first for speed; openai/xai kept for escalation in write loop
+    return configured.filter((id, i, arr) => arr.indexOf(id) === i)
+  }
 
   if (!status[pick]) return configured
   return [pick, ...configured.filter((id) => id !== pick)]
@@ -238,12 +287,18 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
     typeof jobOrSource === 'string'
       ? jobOrSource
       : jobOrSource?.scriptSource || jobOrSource?.script?.draftSource || null
-  if (source && source !== 'template') return null
-
   const detail =
     typeof jobOrSource === 'object' && jobOrSource
       ? String(jobOrSource.scriptFailureDetail || jobOrSource.failureDetail || '').trim()
       : ''
+
+  if (source === 'previous' || /kept your previous draft/i.test(detail)) {
+    return detail
+      ? `Could not apply that direction (${detail.slice(0, 140)}). Your previous draft was kept — try a clearer, shorter instruction.`
+      : 'Could not apply that direction. Your previous draft was kept — try a clearer, shorter instruction.'
+  }
+
+  if (source && source !== 'template') return null
 
   const blamed = classifyScriptFailureProvider(detail)
 
@@ -276,15 +331,21 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
       return `Groq model unavailable (${detail.slice(0, 140)}). Set GROQ_MODEL=llama-3.1-8b-instant on Vercel and Redeploy.`
     }
     if (/timed out|timeout|abort/i.test(detail)) {
-      return 'Groq timed out on the multi-pass write. Click Regenerate script once more (usually works on retry).'
+      return 'Groq timed out. Click Regenerate once more (usually works on retry).'
+    }
+    if (/empty\/too-short|draft too short/i.test(detail)) {
+      return `Groq returned a stub while following your direction (${detail.slice(0, 100)}). Try a shorter instruction and Regenerate again.`
+    }
+    if (/kept your previous draft/i.test(detail)) {
+      return `Could not apply that direction (${detail.slice(0, 120)}). Your previous draft was kept — try a clearer instruction.`
     }
     if (/weak|fluff|rejected/i.test(detail)) {
-      return 'Script AI fell back to a template. Pick Groq, then click Regenerate script — each pass writes a fresh draft (higher creativity).'
+      return 'Script AI fell back. Stay on Groq and click Regenerate — each pass writes a fresh draft.'
     }
     if (detail) {
-      return `Script AI failed (${detail.slice(0, 160)}). Using a built-in fallback — pick Groq and Regenerate.`
+      return `Script AI failed (${detail.slice(0, 160)}). Stay on Groq and click Regenerate.`
     }
-    return 'Script AI did not return a usable draft. Pick Groq in Script AI and Regenerate (or check GROQ_API_KEY).'
+    return 'Script AI did not return a usable draft. Stay on Groq and Regenerate (or check GROQ_API_KEY on Vercel).'
   }
 
   if (providers.xai) {
@@ -327,8 +388,7 @@ function isWeakDraft(text) {
 /** Accept almost any real AI draft over the canned template. */
 function isUsableAiDraft(text) {
   const t = String(text || '').trim()
-  const words = t.split(/\s+/).filter(Boolean).length
-  return words >= 40
+  return wordCount(t) >= 35
 }
 
 /** Token Jaccard similarity 0–1 — catch near-duplicate regenerations. */
@@ -378,30 +438,97 @@ function isRetryableGroqModelError(err) {
   return /404|400|decommissioned|model_not_found|does not exist|invalid.?model|unknown.?model|not.?currently.?supported/i.test(msg)
 }
 
+function isRetryableGroqRateError(err) {
+  const msg = String(err?.message || err || '')
+  return /429|rate.?limit|too many requests|tokens per (minute|day)|TPM|TPD/i.test(msg)
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function wordCount(text) {
+  return String(text || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
+/**
+ * Groq sometimes wraps the VO in JSON / markdown / "Here's the script:".
+ * Pull the spoken prose out so we don't treat wrappers as an empty draft.
+ */
+export function cleanDraftText(text) {
+  let t = String(text || '').trim()
+  if (!t) return ''
+  t = t.replace(/^```(?:\w+)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  t = t.replace(/^(?:script|narration|voiceover|draft)\s*:\s*/i, '').trim()
+
+  // Accidental JSON object from the writer
+  if (/^\s*\{/.test(t) && /"\s*:\s*"/.test(t)) {
+    try {
+      const parsed = parseJsonContent(t)
+      const picked =
+        parsed?.plainTextDraft ||
+        parsed?.script ||
+        parsed?.narration ||
+        parsed?.voiceover ||
+        parsed?.draft ||
+        parsed?.text ||
+        ''
+      if (String(picked).trim().length >= 40) t = String(picked).trim()
+    } catch {
+      /* keep raw */
+    }
+  }
+
+  // Strip common LLM preambles
+  t = t
+    .replace(
+      /^(?:sure[!.,]?\s*|here(?:'s| is)\s+(?:a|the|your)\s+(?:shorts?\s+)?(?:script|voiceover|narration|draft)[:\s]*)+/i,
+      '',
+    )
+    .trim()
+  return t
+}
+
 async function groqChatText({ system, user, temperature = 0.4, timeoutMs = 45000 }) {
   const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
   if (!key) throw new Error('GROQ_API_KEY is not set')
   let lastErr
   for (const model of groqModelCandidates()) {
-    try {
-      return await chatTextCompletion({
-        url: 'https://api.groq.com/openai/v1/chat/completions',
-        headers: { Authorization: `Bearer ${key}` },
-        body: {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await chatTextCompletion({
+          url: 'https://api.groq.com/openai/v1/chat/completions',
+          headers: { Authorization: `Bearer ${key}` },
+          body: {
+            model,
+            temperature,
+            max_tokens: 900,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+          },
+          timeoutMs,
+        })
+      } catch (e) {
+        lastErr = e
+        console.warn(
+          '[eof-script] groq text model failed',
           model,
-          temperature,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        },
-        timeoutMs,
-      })
-    } catch (e) {
-      lastErr = e
-      console.warn('[eof-script] groq text model failed', model, e instanceof Error ? e.message : e)
-      if (isRetryableGroqModelError(e)) continue
-      throw e
+          `try ${attempt + 1}`,
+          e instanceof Error ? e.message : e,
+        )
+        if (isRetryableGroqRateError(e) && attempt === 0) {
+          await sleep(1200)
+          continue
+        }
+        if (isRetryableGroqModelError(e)) break // next model
+        if (isRetryableGroqRateError(e)) break // next model
+        throw e
+      }
     }
   }
   throw lastErr || new Error('Groq text completion failed')
@@ -412,26 +539,38 @@ async function groqChatJson({ system, user, temperature = 0.25, timeoutMs = 4500
   if (!key) throw new Error('GROQ_API_KEY is not set')
   let lastErr
   for (const model of groqModelCandidates()) {
-    try {
-      return await chatJsonCompletion({
-        url: 'https://api.groq.com/openai/v1/chat/completions',
-        headers: { Authorization: `Bearer ${key}` },
-        body: {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await chatJsonCompletion({
+          url: 'https://api.groq.com/openai/v1/chat/completions',
+          headers: { Authorization: `Bearer ${key}` },
+          body: {
+            model,
+            temperature,
+            max_tokens: 1200,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user },
+            ],
+          },
+          timeoutMs,
+        })
+      } catch (e) {
+        lastErr = e
+        console.warn(
+          '[eof-script] groq json model failed',
           model,
-          temperature,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        },
-        timeoutMs,
-      })
-    } catch (e) {
-      lastErr = e
-      console.warn('[eof-script] groq json model failed', model, e instanceof Error ? e.message : e)
-      if (isRetryableGroqModelError(e)) continue
-      throw e
+          `try ${attempt + 1}`,
+          e instanceof Error ? e.message : e,
+        )
+        if (isRetryableGroqRateError(e) && attempt === 0) {
+          await sleep(1200)
+          continue
+        }
+        if (isRetryableGroqModelError(e) || isRetryableGroqRateError(e)) break
+        throw e
+      }
     }
   }
   throw lastErr || new Error('Groq JSON completion failed')
@@ -477,9 +616,21 @@ export async function writeEofPlainTextDraft({
   const fmt = resolveFormat(format)
   const prev = String(previousDraft || '').trim()
   const note = String(directorNote || '').trim().slice(0, 1200)
-  // Regenerate / directed rewrite: hotter than first pass, but not chaos
-  const draftTemperature = regenerate || note ? 0.72 : 0.42
-  const polishTemperature = regenerate || note ? 0.25 : 0.28
+  const autoMode = isAutoScriptMode(scriptProvider)
+  const tuned = autoTuneDraftSettings({ format: fmt, regenerate, directorNote: note })
+  const draftTemperature = tuned.draftTemperature
+  const polishTemperature = tuned.polishTemperature
+  const excellentMin = tuned.excellentMin
+  if (autoMode) {
+    console.info(
+      '[eof-script] auto tune',
+      fmt,
+      'temp',
+      draftTemperature,
+      'excellent≥',
+      excellentMin,
+    )
+  }
 
   let t = rawTopic
   let ctx = String(context || '').trim()
@@ -560,8 +711,12 @@ export async function writeEofPlainTextDraft({
   }
 
   const order = resolveScriptProviderAttemptOrder(scriptProvider)
+  // Auto: draft with first writer, escalate rewrites to remaining writers for best score
+  const primaryOrder = autoMode ? order.slice(0, 1) : order
+  const escalateOrder = autoMode ? order.slice(1) : []
+
   const attempts = []
-  for (const id of order) {
+  for (const id of primaryOrder) {
     if (id === 'xai' || id === 'openai' || id === 'groq') {
       attempts.push({
         id,
@@ -586,6 +741,68 @@ export async function writeEofPlainTextDraft({
   let softBest = null
   const deskBriefForJudge = [ctx, headlinesText].filter(Boolean).join('\n\n')
 
+  async function scoreAndMaybeKeep(ai, writerId) {
+    let judge = null
+    try {
+      judge = await withBudget(
+        judgeEofScriptDraft({
+          topic: t,
+          draft: ai.plainTextDraft,
+          format: fmt,
+          deskBrief: deskBriefForJudge,
+          writerProvider: writerId,
+        }),
+        45000,
+        `${writerId} judge`,
+      )
+    } catch (e) {
+      console.warn('[eof-script] judge failed', writerId, e instanceof Error ? e.message : e)
+      judge = { skipped: true, pass: true, reasons: ['Judge error — accepted draft'] }
+    }
+    const candidate = {
+      ...ai,
+      deskSources,
+      judge: judge?.skipped ? null : judge,
+      autoMode,
+      autoTuned: autoMode
+        ? { draftTemperature, polishTemperature, excellentMin, format: fmt }
+        : null,
+    }
+    if (
+      !softBest ||
+      judgeOverall(judge) > judgeOverall(softBest.judge) ||
+      (!softBest.judge && judge && !judge.skipped)
+    ) {
+      softBest = candidate
+    }
+    return { candidate, judge }
+  }
+
+  async function rewriteWithFeedback(writerId, baseDraft, judge, temperatureBoost = 0.12) {
+    const rewriteCtx = appendJudgeFeedbackToContext(ctx, judge)
+    const rewritten = await withBudget(
+      writeDraftPipeline({
+        provider: writerId,
+        topic: t,
+        format: fmt,
+        context: rewriteCtx,
+        headlinesText,
+        temperature: Math.min(0.85, draftTemperature + temperatureBoost),
+        polishTemperature,
+        previousDraft: baseDraft,
+        regenerate: true,
+        directorNote: note
+          ? `${note}\n\nAlso fix the editor judge feedback above.`
+          : autoMode
+            ? 'Auto quality pass: sharper hook, denser football facts, stronger CTA. Stay inside the desk brief.'
+            : '',
+      }),
+      90000,
+      `${writerId} quality-rewrite`,
+    )
+    return finalizeAiDraft(rewritten, t, resolvedTopic)
+  }
+
   for (const { id, run } of attempts) {
     try {
       const raw = await withBudget(run(), 90000, `${id} draft pipeline`)
@@ -593,103 +810,119 @@ export async function writeEofPlainTextDraft({
       if (!ai) {
         failures.push(`[${id}] empty/too-short draft`)
         console.warn('[eof-script] draft empty/short', id, raw?.plainTextDraft?.slice?.(0, 80))
+        // Keep near-misses so we don't fall all the way to the canned template
+        const almost = normalizeAiDraft(raw?.plainTextDraft, t)
+        if (wordCount(almost) >= 28) {
+          softBest =
+            softBest ||
+            {
+              plainTextDraft: almost,
+              title: titleFromDraft(t, almost),
+              source: id,
+              resolvedTopic,
+              deskSources,
+            }
+        }
         continue
       }
-      if (prev && draftSimilarity(prev, ai.plainTextDraft) >= 0.72) {
+      // Producer chat direction: accept the usable rewrite immediately (no judge / similarity gates)
+      if (note && wordCount(ai.plainTextDraft) >= 35) {
+        console.info('[eof-script] accepted directed draft', id, wordCount(ai.plainTextDraft), 'words')
+        return {
+          ...ai,
+          deskSources,
+          judge: null,
+          directed: true,
+          autoMode,
+          autoTuned: autoMode
+            ? { draftTemperature, polishTemperature, excellentMin, format: fmt }
+            : null,
+        }
+      }
+      if (prev && draftSimilarity(prev, ai.plainTextDraft) >= 0.72 && !note) {
         failures.push(`[${id}] too similar to previous draft`)
         console.warn('[eof-script] draft too similar to previous', id)
         softBest = softBest || { ...ai, deskSources }
         continue
       }
       if (isWeakDraft(ai.plainTextDraft)) {
-        softBest = { ...ai, deskSources }
+        softBest = softBest || { ...ai, deskSources }
         failures.push(`[${id}] soft-weak draft kept as candidate`)
         console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
         continue
       }
 
-      // Second model: merit / interest / truly valuable info
-      let judge = null
-      try {
-        judge = await withBudget(
-          judgeEofScriptDraft({
-            topic: t,
-            draft: ai.plainTextDraft,
-            format: fmt,
-            deskBrief: deskBriefForJudge,
-            writerProvider: id,
-          }),
-          45000,
-          `${id} judge`,
-        )
-      } catch (e) {
-        console.warn('[eof-script] judge failed', id, e instanceof Error ? e.message : e)
-        judge = { skipped: true, pass: true, reasons: ['Judge error — accepted draft'] }
-      }
+      let { candidate, judge } = await scoreAndMaybeKeep(ai, id)
 
+      // Same-writer rewrite if judge fails
       if (judge && !judge.skipped && !judge.pass) {
         failures.push(
           `[${id}] judge fail ${judge.overall}/10 (m${judge.merit} i${judge.interest} v${judge.value})`,
         )
-        // One rewrite pass with judge feedback
         try {
-          const rewriteCtx = appendJudgeFeedbackToContext(ctx, judge)
-          const rewritten = await withBudget(
-            writeDraftPipeline({
-              provider: id,
-              topic: t,
-              format: fmt,
-              context: rewriteCtx,
-              headlinesText,
-              temperature: Math.min(0.85, draftTemperature + 0.12),
-              polishTemperature,
-              previousDraft: ai.plainTextDraft,
-              regenerate: true,
-            }),
-            90000,
-            `${id} judge-rewrite`,
-          )
-          const rewrittenAi = finalizeAiDraft(rewritten, t, resolvedTopic)
+          const rewrittenAi = await rewriteWithFeedback(id, ai.plainTextDraft, judge, 0.12)
           if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft)) {
-            let judge2 = null
-            try {
-              judge2 = await withBudget(
-                judgeEofScriptDraft({
-                  topic: t,
-                  draft: rewrittenAi.plainTextDraft,
-                  format: fmt,
-                  deskBrief: deskBriefForJudge,
-                  writerProvider: id,
-                }),
-                45000,
-                `${id} re-judge`,
-              )
-            } catch {
-              judge2 = { skipped: true, pass: true }
+            ;({ candidate, judge } = await scoreAndMaybeKeep(rewrittenAi, id))
+            if (judge && !judge.skipped && judge.pass && (!autoMode || isExcellentJudge(judge, excellentMin))) {
+              return candidate
             }
-            if (!judge2 || judge2.skipped || judge2.pass) {
-              return {
-                ...rewrittenAi,
-                deskSources,
-                judge: judge2?.skipped ? judge : judge2,
-              }
-            }
-            softBest = {
-              ...rewrittenAi,
-              deskSources,
-              judge: judge2,
-            }
-            failures.push(`[${id}] re-judge still fail ${judge2.overall}/10`)
-            continue
           }
         } catch (e) {
           console.warn('[eof-script] judge rewrite failed', id, e instanceof Error ? e.message : e)
         }
-        softBest = softBest || { ...ai, deskSources, judge }
-        continue
+      } else if (!autoMode || isExcellentJudge(judge, excellentMin)) {
+        return candidate
+      } else if (autoMode && judge && !judge.skipped) {
+        failures.push(`[${id}] auto escalate — ${judge.overall}/10 < excellent ${excellentMin}`)
       }
 
-      return { ...ai, deskSources, judge: judge?.skipped ? null : judge }
+      // Auto: escalate to stronger writers until excellent or exhausted
+      if (autoMode && escalateOrder.length) {
+        let baseText = candidate?.plainTextDraft || ai.plainTextDraft
+        let baseJudge = judge
+        for (const nextId of escalateOrder) {
+          if (nextId === 'xai' || nextId === 'openai' || nextId === 'groq') {
+            try {
+              console.info('[eof-script] auto escalate writer', id, '→', nextId)
+              const escalated = await rewriteWithFeedback(
+                nextId,
+                baseText,
+                baseJudge || {
+                  pass: false,
+                  skipped: false,
+                  reasons: ['Auto quality: push for denser, more valuable football VO'],
+                  rewriteHints: [
+                    'Stronger first-line hook with names + event',
+                    'More concrete desk-brief facts',
+                    'Sharper CTA question',
+                  ],
+                  merit: 5,
+                  interest: 5,
+                  value: 5,
+                  overall: 5,
+                  threshold: excellentMin,
+                },
+                0.08,
+              )
+              if (!escalated || isWeakDraft(escalated.plainTextDraft)) continue
+              const scored = await scoreAndMaybeKeep(escalated, nextId)
+              baseText = scored.candidate.plainTextDraft
+              baseJudge = scored.judge
+              if (isExcellentJudge(scored.judge, excellentMin)) {
+                return scored.candidate
+              }
+            } catch (e) {
+              failures.push(`[${nextId}] escalate ${e instanceof Error ? e.message : e}`)
+              console.warn('[eof-script] escalate failed', nextId, e instanceof Error ? e.message : e)
+            }
+          }
+        }
+      }
+
+      if (candidate && (judge?.pass || judge?.skipped || !judge)) {
+        // Accept best pass even if not "excellent" after escalation
+        if (judge?.pass || judge?.skipped || !judge) return softBest || candidate
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       failures.push(`[${id}] ${msg}`)
@@ -697,8 +930,55 @@ export async function writeEofPlainTextDraft({
     }
   }
 
+  // Fall through: try remaining writers as full drafts (non-auto multi, or auto primary failed)
+  if (!autoMode) {
+    /* primaryOrder already covered all */
+  } else if (!softBest && order.length > 1) {
+    for (const id of order.slice(1)) {
+      try {
+        const raw = await withBudget(
+          writeDraftPipeline({
+            provider: id,
+            topic: t,
+            format: fmt,
+            context: ctx,
+            headlinesText,
+            temperature: draftTemperature,
+            polishTemperature,
+            previousDraft: prev,
+            regenerate: true,
+            directorNote: note,
+          }),
+          90000,
+          `${id} auto-fallback draft`,
+        )
+        const ai = finalizeAiDraft(raw, t, resolvedTopic)
+        if (!ai || isWeakDraft(ai.plainTextDraft)) continue
+        const { candidate, judge } = await scoreAndMaybeKeep(ai, id)
+        if (isExcellentJudge(judge, excellentMin) || judge?.pass || judge?.skipped) return candidate
+      } catch (e) {
+        failures.push(`[${id}] ${e instanceof Error ? e.message : e}`)
+      }
+    }
+  }
+
   if (softBest) {
     return { ...softBest, deskSources: softBest.deskSources || deskSources }
+  }
+
+  // Directed rewrite failed: keep the previous draft instead of wiping it with a canned template
+  if (prev && wordCount(prev) >= 40) {
+    return {
+      plainTextDraft: prev,
+      title: titleFromDraft(t, prev) || t.slice(0, 90),
+      source: 'previous',
+      resolvedTopic,
+      deskSources,
+      failureDetail: failures.length
+        ? `${failures.join(' · ')} — kept your previous draft`
+        : 'AI rewrite failed — kept your previous draft',
+      keptPrevious: true,
+    }
   }
 
   return {
@@ -781,6 +1061,8 @@ function buildDraftPrompt({ topic, format, context, previousDraft = '', regenera
   ]
   const angle = angles[Math.floor(Date.now() / 1000) % angles.length]
   const note = String(directorNote || '').trim().slice(0, 1200)
+  const prev = String(previousDraft || '').trim()
+  const desk = String(context || '').trim().slice(0, 1600)
 
   const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT essays.
 
@@ -795,30 +1077,41 @@ SHORTS VOICE (non-negotiable):
 - Sound like Sky Sports News / BBC Sport desk at 10pm: punchy, opinionated, common-sense.
 - Always say football — never soccer. Never NFL / NBA / American sports.
 - FIRST SENTENCE must name the player/club/nation AND the event.
-- FACT LOCK: Use ONLY names, scores, clubs, and claims present in the DESK BRIEF. If the brief is thin, stay general — do NOT invent match scores, transfer fees, or fake quotes.
+- FACT LOCK: Use ONLY names, scores, clubs, and claims present in the DESK BRIEF / current draft. If thin, stay general — do NOT invent match scores, transfer fees, or fake quotes.
 - If PRODUCER DIRECTION is provided, follow it closely (tone, angle, names to stress, what to open with) while keeping Shorts length and fact lock.
 - Structure for format "${format}": ${draftFormatGuide(format)}
 - End with ONE sharp question for comments (Comment / Drop your take).
 
 BANNED forever:
-"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", literary metaphors, long subordinate clauses.`
+"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", literary metaphors, long subordinate clauses.
+Never reply with meta chat ("Sure", "I'll rewrite", "Here is a plan"). Output the voiceover only.`
+
+  // Directed rewrite: keep the prompt lean so Groq free tier actually returns a full VO
+  if (note) {
+    const user = `Topic / headline: ${topic}
+
+PRODUCER DIRECTION (must follow — this is how they want the script written):
+"""
+${note}
+"""
+${prev ? `\nCURRENT DRAFT (rewrite this — do not copy sentence-by-sentence):\n"""\n${prev.slice(0, 700)}\n"""\n` : ''}
+${desk ? `\nDESK FACTS (do not invent beyond):\n${desk}\n` : ''}
+Write the FULL spoken Shorts voiceover now (90–130 words). Plain prose only. No preamble.`
+    return { system, user }
+  }
 
   const regenBlock =
-    regenerate && previousDraft
+    regenerate && prev
       ? `\nREGENERATE — angle: ${angle}.
 Write a DIFFERENT voiceover: new opening line, new structure, new CTA question.
 Keep the same verified facts from the DESK BRIEF. Do not paraphrase the previous draft sentence-by-sentence.
-PREVIOUS DRAFT (avoid copying):\n"""\n${previousDraft.slice(0, 900)}\n"""\n`
+PREVIOUS DRAFT (avoid copying):\n"""\n${prev.slice(0, 700)}\n"""\n`
       : regenerate
         ? `\nREGENERATE — angle: ${angle}. New opening line required. Stay inside the DESK BRIEF facts.\n`
         : ''
 
-  const directionBlock = note
-    ? `\nPRODUCER DIRECTION (follow this — how to write / what to stress / what script they want):\n"""\n${note}\n"""\n`
-    : ''
-
   const user = `Topic / headline: ${topic}
-${context ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${context}\n` : '\nDESK BRIEF: (none returned — do not invent scores or quotes; keep it cautious.)\n'}${directionBlock}${regenBlock}
+${desk ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${desk}\n` : '\nDESK BRIEF: (none returned — do not invent scores or quotes; keep it cautious.)\n'}${regenBlock}
 Write the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
@@ -852,6 +1145,8 @@ Return only the improved voiceover.`
 
 /**
  * Multi-pass: research → draft → polish on one provider.
+ * Groq free tier: one draft call only (desk headlines as brief) — research+polish burn rate limits
+ * and often return empty/too-short wrappers.
  */
 async function writeDraftPipeline({
   provider,
@@ -867,9 +1162,13 @@ async function writeDraftPipeline({
 }) {
   let workingTopic = topic
   let researchCtx = context
-  // Groq free tier: skip extra research call when we already have Guardian/RSS desk notes
-  const skipResearch = provider === 'groq' && String(headlinesText || '').trim().length >= 80
-  if (!skipResearch) {
+  const isGroq = provider === 'groq'
+  // Groq: never spend a JSON research call — use free desk pack / context only
+  if (isGroq) {
+    researchCtx = [context, headlinesText ? `DESK BRIEF / HEADLINES (SOURCE OF TRUTH):\n${headlinesText}` : '']
+      .filter(Boolean)
+      .join('\n\n')
+  } else {
     try {
       const research = await researchDeskBriefWithProvider({
         provider,
@@ -890,10 +1189,6 @@ async function writeDraftPipeline({
     } catch (e) {
       console.warn('[eof-script] research pass skipped', provider, e instanceof Error ? e.message : e)
     }
-  } else if (headlinesText) {
-    researchCtx = [context, 'DESK BRIEF / HEADLINES (SOURCE OF TRUTH):\n' + headlinesText]
-      .filter(Boolean)
-      .join('\n\n')
   }
 
   const draftResult = await writeDraftWithProvider({
@@ -907,24 +1202,34 @@ async function writeDraftPipeline({
     directorNote,
   })
   let text = draftResult.plainTextDraft
-  // On regenerate, polish only lightly (already low temp) — skip if polish collapses uniqueness
-  try {
-    const polished = await polishDraftWithProvider({
-      provider,
-      topic: workingTopic,
-      format,
-      draft: text,
-      temperature: polishTemperature,
-    })
-    if (polished && polished.length >= 80) {
-      if (regenerate && previousDraft && draftSimilarity(previousDraft, polished) >= 0.78) {
-        // keep pre-polish draft — polish drifted back toward the old script
-      } else {
+  const allowPolish =
+    !isGroq ||
+    String(process.env.EOF_GROQ_POLISH || '')
+      .trim()
+      .toLowerCase() === '1'
+  if (allowPolish) {
+    try {
+      const polished = await polishDraftWithProvider({
+        provider,
+        topic: workingTopic,
+        format,
+        draft: text,
+        temperature: polishTemperature,
+      })
+      const polishedWords = wordCount(polished)
+      const draftWords = wordCount(text)
+      // Only keep polish when it stays a real Shorts VO (not a short wrapper)
+      if (
+        polished &&
+        polishedWords >= 40 &&
+        polishedWords >= Math.floor(draftWords * 0.7) &&
+        !(regenerate && previousDraft && draftSimilarity(previousDraft, polished) >= 0.78)
+      ) {
         text = polished
       }
+    } catch (e) {
+      console.warn('[eof-script] polish pass skipped', provider, e instanceof Error ? e.message : e)
     }
-  } catch (e) {
-    console.warn('[eof-script] polish pass skipped', provider, e instanceof Error ? e.message : e)
   }
 
   return {
@@ -1070,8 +1375,12 @@ async function chatTextCompletion({ url, headers, body, timeoutMs = 55000 }) {
       throw new Error(`${res.status}: ${errText.slice(0, 240)}`)
     }
     const data = await res.json()
-    const content = data?.choices?.[0]?.message?.content
-    if (!content?.trim()) throw new Error('empty draft content')
+    const msg = data?.choices?.[0]?.message
+    const content =
+      msg?.content ||
+      msg?.reasoning ||
+      (Array.isArray(msg?.content) ? msg.content.map((c) => c?.text || c).join('\n') : '')
+    if (!String(content || '').trim()) throw new Error('empty draft content')
     return String(content).trim()
   } finally {
     clearTimeout(timer)
@@ -1125,14 +1434,6 @@ function finalizeScript(parsed, topic, format, source, plainTextDraft) {
   normalized.scenes = normalized.scenes.slice(0, EOF_MAX_SCENES)
   if (plainTextDraft) normalized.plainTextDraft = plainTextDraft
   return { script: normalized, source }
-}
-
-function cleanDraftText(text) {
-  let t = String(text || '').trim()
-  // Strip accidental markdown fences / "Script:" prefixes
-  t = t.replace(/^```(?:\w+)?\s*/i, '').replace(/\s*```$/i, '').trim()
-  t = t.replace(/^(?:script|narration|voiceover)\s*:\s*/i, '').trim()
-  return t
 }
 
 function titleFromDraft(topic, draft) {
@@ -1212,17 +1513,61 @@ async function writeDraftWithGroq({
   regenerate = false,
   directorNote = '',
 }) {
+  const note = String(directorNote || '').trim()
+  const prev = String(previousDraft || '').trim()
   const { system, user } = buildDraftPrompt({
     topic,
     format,
     context,
-    previousDraft,
+    previousDraft: prev,
     regenerate,
-    directorNote,
+    directorNote: note,
   })
-  const text = cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 45000 }))
-  if (text.length < 40) throw new Error('draft too short')
+
+  let text = cleanDraftText(
+    await groqChatText({
+      system,
+      user,
+      temperature: note ? Math.min(0.75, temperature + 0.12) : temperature,
+      timeoutMs: 50000,
+    }),
+  )
+
+  // Reject meta chat / stubs and retry with an ultra-lean directed prompt
+  if (wordCount(text) < 40 || isMetaDraftReply(text)) {
+    console.warn('[eof-script] groq draft weak, retrying', wordCount(text), text.slice(0, 80))
+    const leanUser = note
+      ? `Producer direction: ${note}
+
+Topic: ${topic}
+${prev ? `Draft to rewrite:\n${prev.slice(0, 500)}\n` : ''}
+Write a FULL 90–130 word football Shorts voiceover now. Plain prose only.`
+      : `${user}
+
+CRITICAL: Write a FULL spoken Shorts voiceover of 90–130 words. Plain prose only. No JSON. No preamble.`
+    text = cleanDraftText(
+      await groqChatText({
+        system,
+        user: leanUser,
+        temperature: Math.min(0.8, temperature + 0.2),
+        timeoutMs: 50000,
+      }),
+    )
+  }
+
+  if (wordCount(text) < 40 || isMetaDraftReply(text)) {
+    throw new Error(`draft too short (${wordCount(text)} words)`)
+  }
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'groq' }
+}
+
+/** Detect Groq chatty refusals / plans instead of an actual VO. */
+function isMetaDraftReply(text) {
+  const t = String(text || '').trim()
+  if (!t) return true
+  if (wordCount(t) >= 55) return false
+  return /^(sure|okay|ok|here'?s|i('ll| will)|let me|of course|absolutely)\b/i.test(t) ||
+    /\b(i will rewrite|here's (a |my )?plan|as an ai|i cannot|i can't write)\b/i.test(t)
 }
 
 async function adaptWithXai({ draft, topic, format }) {
