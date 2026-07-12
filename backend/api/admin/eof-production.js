@@ -24,6 +24,14 @@ import {
   normalizeZapcapTemplateId,
   isZapcapCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
+import {
+  EOF_DEFAULT_TRANSITION_STYLE,
+  EOF_DEFAULT_COLOR_GRADE,
+  listEofTransitionStyles,
+  listEofColorGrades,
+  resolveEofTransitionStyle,
+  resolveEofColorGrade,
+} from '../../../shared/eofVideoLook.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
 import {
   isEofOpenAiScriptConfigured,
@@ -106,6 +114,10 @@ export default async function handler(req, res) {
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
         captionStyles: listEofCaptionStyles(),
         defaultCaptionStyle: EOF_DEFAULT_CAPTION_STYLE,
+        transitionStyles: listEofTransitionStyles(),
+        defaultTransitionStyle: EOF_DEFAULT_TRANSITION_STYLE,
+        colorGrades: listEofColorGrades(),
+        defaultColorGrade: EOF_DEFAULT_COLOR_GRADE,
         captionEngine: eofCaptionEngineStatus(),
         zapcapTemplates: zapcapCatalog.templates,
         zapcapTemplatesError: zapcapCatalog.error,
@@ -271,6 +283,7 @@ export default async function handler(req, res) {
             job,
             deskSources: job.deskSources || null,
             judge: job.judge || null,
+            autoTuned: job.autoTuned || null,
             directorNote: String(directorNote || '').trim().slice(0, 200) || null,
             scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
             scriptWarning: buildEofScriptWarning(job),
@@ -341,6 +354,12 @@ export default async function handler(req, res) {
       const zapcapTemplateId = isZapcapCaptionStyle(captionStyle)
         ? normalizeZapcapTemplateId(body.zapcapTemplateId)
         : ''
+      const transitionStyle = resolveEofTransitionStyle(
+        typeof body.transitionStyle === 'string' ? body.transitionStyle : EOF_DEFAULT_TRANSITION_STYLE,
+      )
+      const colorGrade = resolveEofColorGrade(
+        typeof body.colorGrade === 'string' ? body.colorGrade : EOF_DEFAULT_COLOR_GRADE,
+      )
       try {
         const job = await createEofProductionJob({
           topic,
@@ -350,6 +369,8 @@ export default async function handler(req, res) {
           scriptProvider,
           captionStyle,
           zapcapTemplateId,
+          transitionStyle,
+          colorGrade,
         })
         return json(res, 201, {
           ok: true,
@@ -385,6 +406,11 @@ export default async function handler(req, res) {
             : body.captionStyle !== undefined && !isZapcapCaptionStyle(body.captionStyle)
               ? ''
               : undefined,
+        transitionStyle:
+          body.transitionStyle !== undefined
+            ? resolveEofTransitionStyle(body.transitionStyle)
+            : undefined,
+        colorGrade: body.colorGrade !== undefined ? resolveEofColorGrade(body.colorGrade) : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

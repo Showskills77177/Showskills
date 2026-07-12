@@ -142,6 +142,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       mixedAudioPath: mixedPath,
       captionStyle: job.captionStyle,
       zapcapTemplateId: job.zapcapTemplateId,
+      transitionStyle: job.transitionStyle,
+      colorGrade: job.colorGrade,
+      format: job.script?.format,
       onSceneProgress: async (done) => report('video', done),
     })
     const { relPath } = rendered

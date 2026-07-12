@@ -18,6 +18,12 @@ import {
   normalizeZapcapTemplateId,
   isZapcapCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
+import {
+  EOF_DEFAULT_TRANSITION_STYLE,
+  EOF_DEFAULT_COLOR_GRADE,
+  resolveEofTransitionStyle,
+  resolveEofColorGrade,
+} from '../../../shared/eofVideoLook.mjs'
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
@@ -34,7 +40,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 /** Job metadata only — never pull durable media base64 into list/detail payloads. */
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
-  caption_style, caption_engine, zapcap_template_id, narration_manifest_json, mixed_audio_path, render_output_path,
+  caption_style, caption_engine, zapcap_template_id, transition_style, color_grade,
+  narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
 function parseVoiceSettingsJson(raw) {
@@ -83,6 +90,8 @@ function rowToJob(row) {
     captionStyle: resolveEofCaptionStyle(row.caption_style || EOF_DEFAULT_CAPTION_STYLE),
     captionEngine: row.caption_engine || null,
     zapcapTemplateId: row.zapcap_template_id || null,
+    transitionStyle: resolveEofTransitionStyle(row.transition_style || EOF_DEFAULT_TRANSITION_STYLE),
+    colorGrade: resolveEofColorGrade(row.color_grade || EOF_DEFAULT_COLOR_GRADE),
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -126,6 +135,8 @@ export async function createEofProductionJob({
   scriptProvider = null,
   captionStyle = EOF_DEFAULT_CAPTION_STYLE,
   zapcapTemplateId = null,
+  transitionStyle = EOF_DEFAULT_TRANSITION_STYLE,
+  colorGrade = EOF_DEFAULT_COLOR_GRADE,
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
@@ -143,6 +154,8 @@ export async function createEofProductionJob({
   const templateId = isZapcapCaptionStyle(caption)
     ? normalizeZapcapTemplateId(zapcapTemplateId)
     : ''
+  const transition = resolveEofTransitionStyle(transitionStyle)
+  const color = resolveEofColorGrade(colorGrade)
 
   let script
   let scriptSource
@@ -174,8 +187,8 @@ export async function createEofProductionJob({
 
   await query(
     `INSERT INTO eof_production_jobs
-     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, zapcap_template_id, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, zapcap_template_id, transition_style, color_grade, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       id,
       t,
@@ -189,6 +202,8 @@ export async function createEofProductionJob({
       voiceSettings ? JSON.stringify(voiceSettings) : null,
       caption,
       templateId || null,
+      transition,
+      color,
       createdBy || null,
     ],
   )
@@ -239,14 +254,13 @@ export async function regenerateEofProductionDraft(
     voiceRegenerationCount: 0,
     voiceNarrationHash: null,
   })
-  return draft.failureDetail
-    ? {
-        ...updated,
-        scriptFailureDetail: draft.failureDetail,
-        deskSources: draft.deskSources || null,
-        judge: draft.judge || null,
-      }
-    : { ...updated, deskSources: draft.deskSources || null, judge: draft.judge || null }
+  return {
+    ...updated,
+    deskSources: draft.deskSources || null,
+    judge: draft.judge || null,
+    autoTuned: draft.autoTuned || null,
+    ...(draft.failureDetail ? { scriptFailureDetail: draft.failureDetail } : {}),
+  }
 }
 
 /**
@@ -355,6 +369,14 @@ export async function updateEofProductionJob(id, patch) {
       ? normalizeZapcapTemplateId(zapcapTemplateId)
       : ''
   }
+  const transitionStyle =
+    patch.transitionStyle !== undefined
+      ? resolveEofTransitionStyle(patch.transitionStyle)
+      : resolveEofTransitionStyle(job.transitionStyle)
+  const colorGrade =
+    patch.colorGrade !== undefined
+      ? resolveEofColorGrade(patch.colorGrade)
+      : resolveEofColorGrade(job.colorGrade)
 
   await query(
     `UPDATE eof_production_jobs
@@ -377,6 +399,8 @@ export async function updateEofProductionJob(id, patch) {
          caption_style = $18,
          caption_engine = $19,
          zapcap_template_id = $20,
+         transition_style = $21,
+         color_grade = $22,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -400,6 +424,8 @@ export async function updateEofProductionJob(id, patch) {
       captionStyle,
       captionEngine || null,
       zapcapTemplateId || null,
+      transitionStyle,
+      colorGrade,
     ],
   )
 

@@ -22,6 +22,10 @@ import {
 } from '../../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
 import { EOF_DEFAULT_CAPTION_STYLE } from '../../../../shared/eofCaptionStyles.mjs'
+import {
+  EOF_DEFAULT_TRANSITION_STYLE,
+  EOF_DEFAULT_COLOR_GRADE,
+} from '../../../../shared/eofVideoLook.mjs'
 
 /** Clean Production chrome — keep Studio gray panels so cards don’t blend into page black. */
 const PX = {
@@ -110,6 +114,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
   const [captionStyles, setCaptionStyles] = useState([])
   const [captionStyle, setCaptionStyle] = useState(EOF_DEFAULT_CAPTION_STYLE)
+  const [transitionStyles, setTransitionStyles] = useState([])
+  const [transitionStyle, setTransitionStyle] = useState(EOF_DEFAULT_TRANSITION_STYLE)
+  const [colorGrades, setColorGrades] = useState([])
+  const [colorGrade, setColorGrade] = useState(EOF_DEFAULT_COLOR_GRADE)
   const [zapcapTemplates, setZapcapTemplates] = useState([])
   const [zapcapTemplatesError, setZapcapTemplatesError] = useState('')
   const [zapcapTemplateId, setZapcapTemplateId] = useState('')
@@ -200,6 +208,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (j.defaultScriptFormat) setFormat((prev) => prev || j.defaultScriptFormat)
       setCaptionStyles(Array.isArray(j.captionStyles) ? j.captionStyles : [])
       if (j.defaultCaptionStyle) setCaptionStyle((prev) => prev || j.defaultCaptionStyle)
+      setTransitionStyles(Array.isArray(j.transitionStyles) ? j.transitionStyles : [])
+      if (j.defaultTransitionStyle) setTransitionStyle((prev) => prev || j.defaultTransitionStyle)
+      setColorGrades(Array.isArray(j.colorGrades) ? j.colorGrades : [])
+      if (j.defaultColorGrade) setColorGrade((prev) => prev || j.defaultColorGrade)
       if (j.captionEngine && typeof j.captionEngine === 'object') setCaptionEngine(j.captionEngine)
       setZapcapTemplates(Array.isArray(j.zapcapTemplates) ? j.zapcapTemplates : [])
       setZapcapTemplatesError(typeof j.zapcapTemplatesError === 'string' ? j.zapcapTemplatesError : '')
@@ -283,6 +295,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.script?.format) setFormat(job.script.format)
     if (job.voicePreset) setVoicePreset(job.voicePreset)
     if (job.captionStyle) setCaptionStyle(job.captionStyle)
+    if (job.transitionStyle) setTransitionStyle(job.transitionStyle)
+    if (job.colorGrade) setColorGrade(job.colorGrade)
     setZapcapTemplateId(job.zapcapTemplateId || '')
     if (job.voiceSettings) {
       setVoiceSettings(normalizeElevenLabsVoiceSettings(job.voiceSettings))
@@ -756,6 +770,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           scriptProvider,
           captionStyle,
           zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
+          transitionStyle,
+          colorGrade,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -802,6 +818,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           voicePreset,
           captionStyle,
           zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
+          transitionStyle,
+          colorGrade,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
         }),
       })
@@ -868,6 +886,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         judge && !judge.skipped
           ? ` Judge ${judge.judgeProvider || ''} ${judge.pass ? 'pass' : 'soft'} ${judge.overall}/10 (merit ${judge.merit} · interest ${judge.interest} · value ${judge.value}).`
           : ''
+      const tuned = j.autoTuned || j.job?.autoTuned
+      const autoNote =
+        tuned && typeof tuned === 'object'
+          ? ` Auto-tuned temp ${tuned.draftTemperature} · bar ≥${tuned.excellentMin}.`
+          : ''
       if (note) {
         setScriptChatLog((prev) => [
           ...prev.slice(-10),
@@ -888,8 +911,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       } else {
         setSuccess(
           j.scriptProviderLabel
-            ? `${note ? 'Directed' : 'Fresh'} script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced}${judged} Edit, then Adapt to scenes.`
-            : `${note ? 'Directed' : 'Fresh'} script loaded.${sourced}${judged} Edit if needed, then Adapt to scenes.`,
+            ? `${note ? 'Directed' : 'Fresh'} script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced}${judged}${autoNote} Edit, then Adapt to scenes.`
+            : `${note ? 'Directed' : 'Fresh'} script loaded.${sourced}${judged}${autoNote} Edit if needed, then Adapt to scenes.`,
         )
       }
     } catch (e) {
@@ -1276,7 +1299,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 {(scriptProviderOptions.length
                   ? scriptProviderOptions
                   : [
-                      { id: 'auto', label: 'Auto', configured: true },
+                      { id: 'auto', label: 'Auto (best quality)', configured: true },
                       { id: 'groq', label: 'Groq (free)', configured: false },
                       { id: 'xai', label: 'xAI Grok', configured: false },
                       { id: 'openai', label: 'OpenAI', configured: false },
@@ -1301,6 +1324,45 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   </option>
                 ))}
               </select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className={PX.label}>
+              Transitions
+              <select
+                value={transitionStyle}
+                onChange={(e) => setTransitionStyle(e.target.value)}
+                className={inputCls}
+              >
+                {(transitionStyles.length
+                  ? transitionStyles
+                  : [{ id: EOF_DEFAULT_TRANSITION_STYLE, label: 'Auto (CapCut pack)' }]
+                ).map((t) => (
+                  <option key={t.id} value={t.id} title={t.detail}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+              <span className={`mt-1 block text-xs font-normal ${PX.muted}`}>
+                Auto picks CapCut fades / slides / wipes from the format.
+              </span>
+            </label>
+            <label className={PX.label}>
+              Color match
+              <select value={colorGrade} onChange={(e) => setColorGrade(e.target.value)} className={inputCls}>
+                {(colorGrades.length
+                  ? colorGrades
+                  : [{ id: EOF_DEFAULT_COLOR_GRADE, label: 'Auto (color match)' }]
+                ).map((g) => (
+                  <option key={g.id} value={g.id} title={g.detail}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+              <span className={`mt-1 block text-xs font-normal ${PX.muted}`}>
+                Auto grades every scene so mixed stock stills look like one edit.
+              </span>
             </label>
           </div>
 

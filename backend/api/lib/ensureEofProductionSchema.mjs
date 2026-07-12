@@ -102,6 +102,8 @@ async function addEofProductionJobColumns() {
     'caption_style',
     'caption_engine',
     'zapcap_template_id',
+    'transition_style',
+    'color_grade',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {
