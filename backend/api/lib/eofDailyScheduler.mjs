@@ -5,7 +5,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { createEofProductionJob, getEofProductionJob, updateEofProductionJob } from './eofProductionJobs.mjs'
 import { renderEofProductionFullBuild } from './eofProductionRenderRunner.mjs'
-import { ensureEofVideoOnDisk, ensureEofSceneImageOnDisk } from './eofProductionArtifacts.mjs'
+import { ensureEofVideoOnDisk } from './eofProductionArtifacts.mjs'
 import { pickEofDailyNewsTopic } from './eofNewsTopics.mjs'
 import { pickEofDailyQuoteTopic } from './eofQuoteSourcing.mjs'
 import { composeEofStudioMeta } from './eofStudioMeta.mjs'
@@ -117,12 +117,15 @@ export async function runEofDailyShortPipeline(opts = {}) {
 
     let thumbnailBase64 = null
     try {
-      const still = await ensureEofSceneImageOnDisk(jobId, meta.thumbnailSceneIndex + 1)
-      if (still && existsSync(still)) {
-        thumbnailBase64 = readFileSync(still).toString('base64')
-      }
-    } catch {
-      /* optional */
+      const { buildEofShortThumbnailForJob } = await import('./eofShortThumbnail.mjs')
+      const thumb = await buildEofShortThumbnailForJob(jobId, {
+        sceneIndex: meta.thumbnailSceneIndex,
+        title: meta.title,
+      })
+      thumbnailBase64 = thumb.base64
+      console.info('[eof-scheduler] thumbnail scene', thumb.sceneIndex, 'bytes', thumb.bytes)
+    } catch (e) {
+      console.warn('[eof-scheduler] thumbnail skipped', e instanceof Error ? e.message : e)
     }
 
     const scheduledAt = new Date(

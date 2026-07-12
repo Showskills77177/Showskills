@@ -99,6 +99,7 @@ export default function EofUploadStudio({ canUse, isOwner, onDone, initialDraft,
   const [scheduledAt, setScheduledAt] = useState('')
   const [file, setFile] = useState(null)
   const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [draftThumbnailBase64, setDraftThumbnailBase64] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [meta, setMeta] = useState({ size: 0, duration: 0, width: 0, height: 0, aspectLabel: '', isShort: false })
   const [busy, setBusy] = useState(false)
@@ -117,10 +118,20 @@ export default function EofUploadStudio({ canUse, isOwner, onDone, initialDraft,
     if (initialDraft.title) setTitle(String(initialDraft.title).slice(0, 100))
     if (initialDraft.description) setDescription(String(initialDraft.description))
     if (initialDraft.tags) setTags(String(initialDraft.tags))
+    setDraftThumbnailBase64(
+      typeof initialDraft.thumbnailBase64 === 'string' && initialDraft.thumbnailBase64.length > 100
+        ? initialDraft.thumbnailBase64
+        : null,
+    )
+    setThumbnailFile(null)
     setVideoContentType('short')
     setAddShortsHashtag(true)
     setFormatManual(false)
-    setSuccessMessage('Loaded from Production — review details and upload to YouTube.')
+    setSuccessMessage(
+      initialDraft.thumbnailBase64
+        ? 'Loaded from Production with adapted Shorts thumbnail — review and upload.'
+        : 'Loaded from Production — review details and upload to YouTube.',
+    )
     setFormErr('')
     onInitialDraftConsumed?.()
   }, [initialDraft, onInitialDraftConsumed])
@@ -159,12 +170,15 @@ export default function EofUploadStudio({ canUse, isOwner, onDone, initialDraft,
   }
 
   async function readThumbnailBase64() {
-    if (!thumbnailFile || videoContentType !== 'long') return null
-    const buf = await thumbnailFile.arrayBuffer()
-    const bytes = new Uint8Array(buf)
-    let bin = ''
-    for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i])
-    return btoa(bin)
+    if (thumbnailFile) {
+      const buf = await thumbnailFile.arrayBuffer()
+      const bytes = new Uint8Array(buf)
+      let bin = ''
+      for (let i = 0; i < bytes.length; i += 1) bin += String.fromCharCode(bytes[i])
+      return btoa(bin)
+    }
+    if (draftThumbnailBase64) return draftThumbnailBase64
+    return null
   }
 
   async function handleSubmit(e) {
@@ -459,11 +473,56 @@ export default function EofUploadStudio({ canUse, isOwner, onDone, initialDraft,
                   <input
                     type="file"
                     accept="image/jpeg,image/png"
-                    onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      setThumbnailFile(e.target.files?.[0] || null)
+                      setDraftThumbnailBase64(null)
+                    }}
                     className="text-sm text-[#aaa] file:mr-2 file:rounded file:border-0 file:bg-[#272727] file:px-3 file:py-1.5 file:text-white"
                   />
                 </Field>
-              ) : null}
+              ) : (
+                <Field label="Shorts thumbnail (adapted 1280×720)">
+                  {draftThumbnailBase64 || thumbnailFile ? (
+                    <div className="space-y-2">
+                      <img
+                        src={
+                          thumbnailFile
+                            ? URL.createObjectURL(thumbnailFile)
+                            : `data:image/jpeg;base64,${draftThumbnailBase64}`
+                        }
+                        alt="Shorts thumbnail preview"
+                        className="max-h-36 rounded-lg border border-[#303030] object-cover"
+                      />
+                      <p className="text-xs text-[#aaa]">
+                        {thumbnailFile
+                          ? 'Custom file selected — will upload with the Short.'
+                          : 'Auto-adapted from Production scene still — will upload with the Short.'}
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        onChange={(e) => {
+                          setThumbnailFile(e.target.files?.[0] || null)
+                          if (e.target.files?.[0]) setDraftThumbnailBase64(null)
+                        }}
+                        className="text-sm text-[#aaa] file:mr-2 file:rounded file:border-0 file:bg-[#272727] file:px-3 file:py-1.5 file:text-white"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-[#aaa]">
+                        No adapted thumbnail yet — send from Production after Build Short, or pick a JPEG.
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+                        className="text-sm text-[#aaa] file:mr-2 file:rounded file:border-0 file:bg-[#272727] file:px-3 file:py-1.5 file:text-white"
+                      />
+                    </div>
+                  )}
+                </Field>
+              )}
           </div>
 
           <div hidden={tab !== 'visibility'} className="space-y-4">

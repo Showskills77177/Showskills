@@ -523,14 +523,36 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const file = new File([blob], `${title.replace(/[^\w\-]+/g, '-').slice(0, 60) || 'eof-short'}.mp4`, {
         type: 'video/mp4',
       })
+
+      let thumbnailBase64 = null
+      let thumbnailSceneIndex = null
+      try {
+        const thumbRes = await apiFetch(
+          `/api/admin/eof-production-scene-image?jobId=${encodeURIComponent(selectedId)}&thumbnail=1&format=base64`,
+        )
+        const thumbJson = await thumbRes.json().catch(() => ({}))
+        if (thumbRes.ok && thumbJson.thumbnailBase64) {
+          thumbnailBase64 = thumbJson.thumbnailBase64
+          thumbnailSceneIndex = thumbJson.sceneIndex
+        }
+      } catch (e) {
+        console.warn('[eof-production] thumbnail adapt skipped', e)
+      }
+
       onSendToStudio({
         file,
         title,
         description: String(draftScript?.description || '').trim(),
         tags: Array.isArray(draftScript?.tags) ? draftScript.tags.join(', ') : '',
         productionJobId: selectedId,
+        thumbnailBase64,
+        thumbnailSceneIndex,
       })
-      setSuccess('Opened YouTube Studio with this Short — review and upload.')
+      setSuccess(
+        thumbnailBase64
+          ? 'Opened Studio with this Short + adapted thumbnail — review and upload.'
+          : 'Opened YouTube Studio with this Short — review and upload.',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not send to Studio')
     } finally {
