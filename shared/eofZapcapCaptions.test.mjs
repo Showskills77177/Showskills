@@ -4,6 +4,7 @@ import {
   buildZapcapTranscriptFromScenes,
   resolveCaptionEngine,
   isZapcapConfigured,
+  normalizeZapcapTemplateList,
 } from '../backend/api/lib/eofZapcapCaptions.mjs'
 
 describe('eofZapcapCaptions', () => {
@@ -20,6 +21,26 @@ describe('eofZapcapCaptions', () => {
     for (let i = 1; i < cues.length; i += 1) {
       assert.ok(cues[i].start_time >= cues[i - 1].start_time - 0.001)
     }
+  })
+
+  it('keeps ZapCap preview URLs for the catalog UI', () => {
+    const rows = normalizeZapcapTemplateList({
+      templates: [
+        {
+          id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          name: 'Hormozi Pop',
+          thumbnail: 'https://cdn.example.com/pop.gif',
+          category: 'social',
+        },
+        {
+          id: '11111111-2222-3333-4444-555555555555',
+          name: 'Nested',
+          assets: { preview: { url: 'https://cdn.example.com/nested.webp' } },
+        },
+      ],
+    })
+    assert.equal(rows[0].previewUrl, 'https://cdn.example.com/pop.gif')
+    assert.equal(rows[1].previewUrl, 'https://cdn.example.com/nested.webp')
   })
 
   it('auto engine is none without ZapCap key', () => {
