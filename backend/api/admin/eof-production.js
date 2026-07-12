@@ -90,13 +90,19 @@ export default async function handler(req, res) {
         scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
         scriptBillingNote: (() => {
           const s = eofScriptProviderStatus()
-          if (s.groq) {
-            return 'Groq (free) is ready — pick “Groq” in Script AI or leave Auto (Groq first).'
+          if (s.perplexity && s.groq) {
+            return 'Perplexity Sonar (live article sourcing) + Groq (Shorts writer) are ready.'
           }
-          if (s.xai && !s.openai) {
+          if (s.groq && !s.perplexity) {
+            return 'Groq is ready for writing. Add PERPLEXITY_API_KEY for live web article sourcing (recommended).'
+          }
+          if (s.perplexity && !s.groq && !s.openai && !s.xai) {
+            return 'Perplexity is set for research, but you still need GROQ_API_KEY (or OpenAI/xAI) to write the Short.'
+          }
+          if (s.xai && !s.openai && !s.groq) {
             return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'
           }
-          if (!s.openai && !s.xai) {
+          if (!s.openai && !s.xai && !s.groq) {
             return 'No script AI configured. Add free GROQ_API_KEY at console.groq.com → Vercel env → redeploy.'
           }
           return null

@@ -29,6 +29,11 @@ import {
   buildDeskResearchUserPrompt,
   deskBriefToContext,
 } from './eofFootballDeskResearch.mjs'
+import {
+  isPerplexityConfigured,
+  researchFootballTopicWithPerplexity,
+  formatPerplexityResearchForPrompt,
+} from './eofPerplexityClient.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -50,6 +55,7 @@ export function eofScriptProviderStatus() {
     xai: isXaiConfigured(),
     openai: Boolean(envKey('OPENAI_API_KEY')),
     groq: Boolean(envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')),
+    perplexity: isPerplexityConfigured(),
   }
 }
 
@@ -283,7 +289,7 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     console.warn('[eof-script] topic resolve skipped', e instanceof Error ? e.message : e)
   }
 
-  // Live desk headlines (BBC / Guardian / Sky RSS) — free sourcing, no API key
+  // Live desk headlines (BBC / Guardian / Sky RSS) + optional Perplexity Sonar sourcing
   let headlinesText = ''
   try {
     const headlines = await withBudget(fetchFootballDeskHeadlines({ topic: t, limit: 8 }), 12000, 'desk RSS')
@@ -293,6 +299,23 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     }
   } catch (e) {
     console.warn('[eof-script] desk RSS skipped', e instanceof Error ? e.message : e)
+  }
+
+  if (isPerplexityConfigured()) {
+    try {
+      const px = await withBudget(
+        researchFootballTopicWithPerplexity({ topic: t, format: fmt }),
+        45000,
+        'perplexity research',
+      )
+      const pxText = formatPerplexityResearchForPrompt(px)
+      if (pxText) {
+        headlinesText = [pxText, headlinesText].filter(Boolean).join('\n\n')
+        console.info('[eof-script] perplexity citations', px?.citations?.length || 0)
+      }
+    } catch (e) {
+      console.warn('[eof-script] perplexity research skipped', e instanceof Error ? e.message : e)
+    }
   }
 
   const order = resolveScriptProviderAttemptOrder(scriptProvider)

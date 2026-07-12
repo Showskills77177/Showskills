@@ -101,7 +101,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   )
   const [voiceSettings, setVoiceSettings] = useState(() => normalizeElevenLabsVoiceSettings(null))
   const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
-  const [scriptProviders, setScriptProviders] = useState({ xai: false, openai: false, groq: false })
+  const [scriptProviders, setScriptProviders] = useState({
+    xai: false,
+    openai: false,
+    groq: false,
+    perplexity: false,
+  })
   const [scriptProviderOptions, setScriptProviderOptions] = useState([])
   const [scriptProvider, setScriptProvider] = useState(readStoredScriptProvider)
   const [preferredScriptProvider, setPreferredScriptProvider] = useState('template')
@@ -172,7 +177,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setScriptProviders(
         j.scriptProviders && typeof j.scriptProviders === 'object'
           ? j.scriptProviders
-          : { xai: false, openai: false, groq: false },
+          : { xai: false, openai: false, groq: false, perplexity: false },
       )
       setScriptProviderOptions(Array.isArray(j.scriptProviderOptions) ? j.scriptProviderOptions : [])
       if (j.preferredScriptProvider) setPreferredScriptProvider(j.preferredScriptProvider)
@@ -1054,14 +1059,26 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           Scripts:{' '}
           {openAiScriptEnabled
             ? scriptProviders.groq
-              ? `Groq Llama 3.3 70B (free) preferred in Auto${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.xai ? ' · xAI fallback' : ''}`
+              ? `Groq Llama 3.3 70B (free) preferred in Auto${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.xai ? ' · xAI fallback' : ''}${scriptProviders.perplexity ? ' · Perplexity sourcing' : ''}`
               : scriptProviders.xai
-                ? `xAI Grok 4.5${scriptProviders.openai ? ' · OpenAI fallback' : ''}`
+                ? `xAI Grok 4.5${scriptProviders.openai ? ' · OpenAI fallback' : ''}${scriptProviders.perplexity ? ' · Perplexity sourcing' : ''}`
                 : [scriptProviders.openai && 'OpenAI', scriptProviders.groq && 'Groq (free)']
                     .filter(Boolean)
                     .join(' → ') + ' (templates if all fail)'
             : 'Built-in templates — add free GROQ_API_KEY (console.groq.com) on Vercel'}
         </p>
+        {!scriptProviders.perplexity ? (
+          <p className="mt-1 text-[11px] text-[#9ecbff]">
+            Live article sourcing: add{' '}
+            <code className="text-[#9ecbff]">PERPLEXITY_API_KEY</code> from{' '}
+            <a href="https://www.perplexity.ai/account/api/keys" target="_blank" rel="noreferrer" className="underline">
+              perplexity.ai/account/api/keys
+            </a>{' '}
+            on Vercel → Redeploy. Sonar researches; Groq still writes the Short.
+          </p>
+        ) : (
+          <p className="mt-1 text-[11px] text-[#6ee07d]">Perplexity Sonar connected — live web sourcing on Generate.</p>
+        )}
         {!scriptProviders.groq ? (
           <p className="mt-1 text-[11px] text-[#9ecbff]">
             Free scripts: create a key at{' '}

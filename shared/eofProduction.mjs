@@ -106,7 +106,7 @@ export const EOF_RENDER_STACK = {
     id: 'ai-or-template',
     label: 'Script writer (draft text → adapt to scenes)',
     detail:
-      'Multi-pass: desk RSS + research brief → Shorts voiceover → polish → Adapt to scenes. Set GROQ_API_KEY (free), or OPENAI / XAI. Scripts are spoken Shorts copy — not essays.',
+      'Multi-pass: Perplexity Sonar (live articles) + RSS → desk brief → Shorts voiceover → polish → Adapt to scenes. Set PERPLEXITY_API_KEY + GROQ_API_KEY.',
   },
   host: {
     id: 'vercel',
