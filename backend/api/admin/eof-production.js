@@ -258,6 +258,7 @@ export default async function handler(req, res) {
             ok: true,
             job,
             deskSources: job.deskSources || null,
+            judge: job.judge || null,
             scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
             scriptWarning: buildEofScriptWarning(job),
           })

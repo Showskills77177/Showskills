@@ -40,6 +40,11 @@ import {
   quoteHitToContext,
   quoteHitToHeadline,
 } from './eofQuoteSourcing.mjs'
+import {
+  judgeEofScriptDraft,
+  appendJudgeFeedbackToContext,
+  eofScriptJudgeStatus,
+} from './eofScriptJudge.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -64,6 +69,7 @@ export function eofScriptProviderStatus() {
     newsdata: isNewsdataConfigured(),
     guardian: isGuardianConfigured(),
     perplexity: shouldUsePerplexity(),
+    judge: eofScriptJudgeStatus(),
   }
 }
 
@@ -77,25 +83,25 @@ export function listEofScriptProviderOptions() {
       id: 'auto',
       label: 'Auto',
       configured: true,
-      detail: 'Groq (free) first when set, then OpenAI. xAI only if no Groq/OpenAI (needs credits).',
+      detail: 'Groq (free) first when set, then OpenAI. A second model (OpenAI/xAI) judges merit + interest.',
     },
     {
       id: 'groq',
       label: 'Groq — Llama 3.3 70B (free)',
       configured: status.groq,
-      detail: 'Free at console.groq.com — set GROQ_API_KEY on Vercel.',
+      detail: 'Free writer at console.groq.com — set GROQ_API_KEY on Vercel.',
     },
     {
       id: 'xai',
       label: 'xAI Grok 4.5',
       configured: status.xai,
-      detail: 'Needs paid xAI team credits at console.x.ai.',
+      detail: 'Writer or judge — needs paid xAI credits at console.x.ai.',
     },
     {
       id: 'openai',
       label: 'OpenAI',
       configured: status.openai,
-      detail: 'Set OPENAI_API_KEY (optional OPENAI_MODEL=gpt-4.1).',
+      detail: 'Writer or judge — set OPENAI_API_KEY (best second-model judge for Groq drafts).',
     },
   ]
 }
@@ -472,7 +478,6 @@ export async function writeEofPlainTextDraft({
   // Regenerate: hotter than first pass, but not chaos — high temp caused invented scores
   const draftTemperature = regenerate ? 0.72 : 0.42
   const polishTemperature = regenerate ? 0.25 : 0.28
-  const forceAcceptAi = Boolean(regenerate)
 
   let t = rawTopic
   let ctx = String(context || '').trim()
@@ -576,10 +581,12 @@ export async function writeEofPlainTextDraft({
 
   const failures = []
   let softBest = null
+  const deskBriefForJudge = [ctx, headlinesText].filter(Boolean).join('\n\n')
+
   for (const { id, run } of attempts) {
     try {
       const raw = await withBudget(run(), 90000, `${id} draft pipeline`)
-      const ai = finalizeAiDraft(raw, t, resolvedTopic)
+      let ai = finalizeAiDraft(raw, t, resolvedTopic)
       if (!ai) {
         failures.push(`[${id}] empty/too-short draft`)
         console.warn('[eof-script] draft empty/short', id, raw?.plainTextDraft?.slice?.(0, 80))
@@ -595,11 +602,91 @@ export async function writeEofPlainTextDraft({
         softBest = { ...ai, deskSources }
         failures.push(`[${id}] soft-weak draft kept as candidate`)
         console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
-        // On regenerate, still try next provider if any — don't force-accept fluff/NFL
-        if (!forceAcceptAi) continue
         continue
       }
-      return { ...ai, deskSources }
+
+      // Second model: merit / interest / truly valuable info
+      let judge = null
+      try {
+        judge = await withBudget(
+          judgeEofScriptDraft({
+            topic: t,
+            draft: ai.plainTextDraft,
+            format: fmt,
+            deskBrief: deskBriefForJudge,
+            writerProvider: id,
+          }),
+          45000,
+          `${id} judge`,
+        )
+      } catch (e) {
+        console.warn('[eof-script] judge failed', id, e instanceof Error ? e.message : e)
+        judge = { skipped: true, pass: true, reasons: ['Judge error — accepted draft'] }
+      }
+
+      if (judge && !judge.skipped && !judge.pass) {
+        failures.push(
+          `[${id}] judge fail ${judge.overall}/10 (m${judge.merit} i${judge.interest} v${judge.value})`,
+        )
+        // One rewrite pass with judge feedback
+        try {
+          const rewriteCtx = appendJudgeFeedbackToContext(ctx, judge)
+          const rewritten = await withBudget(
+            writeDraftPipeline({
+              provider: id,
+              topic: t,
+              format: fmt,
+              context: rewriteCtx,
+              headlinesText,
+              temperature: Math.min(0.85, draftTemperature + 0.12),
+              polishTemperature,
+              previousDraft: ai.plainTextDraft,
+              regenerate: true,
+            }),
+            90000,
+            `${id} judge-rewrite`,
+          )
+          const rewrittenAi = finalizeAiDraft(rewritten, t, resolvedTopic)
+          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft)) {
+            let judge2 = null
+            try {
+              judge2 = await withBudget(
+                judgeEofScriptDraft({
+                  topic: t,
+                  draft: rewrittenAi.plainTextDraft,
+                  format: fmt,
+                  deskBrief: deskBriefForJudge,
+                  writerProvider: id,
+                }),
+                45000,
+                `${id} re-judge`,
+              )
+            } catch {
+              judge2 = { skipped: true, pass: true }
+            }
+            if (!judge2 || judge2.skipped || judge2.pass) {
+              return {
+                ...rewrittenAi,
+                deskSources,
+                judge: judge2?.skipped ? judge : judge2,
+              }
+            }
+            softBest = {
+              ...rewrittenAi,
+              deskSources,
+              judge: judge2,
+            }
+            failures.push(`[${id}] re-judge still fail ${judge2.overall}/10`)
+            continue
+          }
+        } catch (e) {
+          console.warn('[eof-script] judge rewrite failed', id, e instanceof Error ? e.message : e)
+        }
+        softBest = softBest || { ...ai, deskSources, judge }
+        continue
+      }
+
+      return { ...ai, deskSources, judge: judge?.skipped ? null : judge }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       failures.push(`[${id}] ${msg}`)

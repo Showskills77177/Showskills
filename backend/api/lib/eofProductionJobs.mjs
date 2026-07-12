@@ -235,8 +235,13 @@ export async function regenerateEofProductionDraft(id, { format, context, script
     voiceNarrationHash: null,
   })
   return draft.failureDetail
-    ? { ...updated, scriptFailureDetail: draft.failureDetail, deskSources: draft.deskSources || null }
-    : { ...updated, deskSources: draft.deskSources || null }
+    ? {
+        ...updated,
+        scriptFailureDetail: draft.failureDetail,
+        deskSources: draft.deskSources || null,
+        judge: draft.judge || null,
+      }
+    : { ...updated, deskSources: draft.deskSources || null, judge: draft.judge || null }
 }
 
 /**

@@ -130,6 +130,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     newsdata: false,
     guardian: false,
     perplexity: false,
+    judge: { enabled: false },
   })
   const [scriptProviderOptions, setScriptProviderOptions] = useState([])
   const [scriptProvider, setScriptProvider] = useState(readStoredScriptProvider)
@@ -850,6 +851,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         ds && typeof ds === 'object'
           ? ` NewsData ${ds.newsdata || 0} · Guardian ${ds.guardian || 0} · RSS ${ds.rss || 0}.`
           : ''
+      const judge = j.judge || j.job?.judge
+      const judged =
+        judge && !judge.skipped
+          ? ` Judge ${judge.judgeProvider || ''} ${judge.pass ? 'pass' : 'soft'} ${judge.overall}/10 (merit ${judge.merit} · interest ${judge.interest} · value ${judge.value}).`
+          : ''
       if (j.scriptWarning) {
         setErr(j.scriptWarning)
         setSuccess('Fallback draft loaded. Edit it, or fix AI billing and Regenerate again.')
@@ -858,8 +864,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       } else {
         setSuccess(
           j.scriptProviderLabel
-            ? `Fresh script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced} Edit, then Adapt to scenes.`
-            : `Fresh script loaded.${sourced} Edit if needed, then Adapt to scenes.`,
+            ? `Fresh script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced}${judged} Edit, then Adapt to scenes.`
+            : `Fresh script loaded.${sourced}${judged} Edit if needed, then Adapt to scenes.`,
         )
       }
     } catch (e) {
@@ -1137,6 +1143,17 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               {scriptProviders.openai ? ' · OpenAI' : ''}
               {scriptProviders.xai ? ' · xAI' : ''}
             </p>
+            <p>
+              Script judge:{' '}
+              {scriptProviders.judge?.enabled
+                ? scriptProviders.judge.openai || scriptProviders.judge.xai
+                  ? 'Second model (merit · interest · value)'
+                  : 'Groq-only fallback'
+                : 'Off / not keyed'}
+            </p>
+            {scriptProviders.judge?.note ? (
+              <p className="text-[#fbbf24]">{scriptProviders.judge.note}</p>
+            ) : null}
             <p>
               Articles:{' '}
               {scriptProviders.newsdata
