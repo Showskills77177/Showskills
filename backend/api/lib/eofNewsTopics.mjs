@@ -128,13 +128,11 @@ export async function resolveEofScriptBrief({ topic, format, scriptProvider } = 
   }
 
   const wantsWorldCup = /\bworld\s*cup\b|\bwc26\b|\bwc\s*2026\b/i.test(raw)
-  const skipXai = String(scriptProvider || '').toLowerCase() === 'groq'
+  const pick = String(scriptProvider || '').toLowerCase()
+  const skipXai = pick === 'groq'
+  const groqKey = (process.env.GROQ_API_KEY || process.env.EOF_GROQ_API_KEY || '').trim()
 
-  if (isXaiConfigured() && !skipXai) {
-    try {
-      const parsed = await xaiJsonCompletion({
-        temperature: 0.3,
-        system: `You are a football news editor for Eyes Of Football YouTube Shorts.
+  const resolveSystem = `You are a football news editor for Eyes Of Football YouTube Shorts.
 
 ${EOF_FOOTBALL_SCOPE}
 
@@ -145,8 +143,9 @@ Rules:
 - Name real teams / players / competitions when you are reasonably sure.
 - Do NOT invent exact scores you are unsure about — say "narrow win", "statement result", "late drama" instead.
 - Never American football / NFL.
-- Write like Sky Sports / ESPN FC / BBC Sport.`,
-        user: `Vague topic: "${raw}"
+- Write like Sky Sports / ESPN FC / BBC Sport.`
+
+  const resolveUser = `Vague topic: "${raw}"
 Format hint: ${format || 'news'}
 
 Return JSON only:
@@ -154,20 +153,61 @@ Return JSON only:
   "headline": "specific YouTube-ready headline with teams/players (max 90 chars)",
   "angle": "2-3 sentences of desk facts / stakes the narrator can use",
   "whyNow": "why this is timely"
-}`,
-      })
+}`
 
-      const headline = String(parsed?.headline || '').trim()
-      const angle = String(parsed?.angle || '').trim()
-      const whyNow = String(parsed?.whyNow || '').trim()
-      if (headline.length >= 12) {
-        return {
-          topic: headline.slice(0, 100),
-          context: [angle, whyNow].filter(Boolean).join('\n'),
-          resolved: true,
-          source: 'xai',
-        }
+  async function finishResolve(parsed, source) {
+    const headline = String(parsed?.headline || '').trim()
+    const angle = String(parsed?.angle || '').trim()
+    const whyNow = String(parsed?.whyNow || '').trim()
+    if (headline.length < 12) return null
+    return {
+      topic: headline.slice(0, 100),
+      context: [angle, whyNow].filter(Boolean).join('\n'),
+      resolved: true,
+      source,
+    }
+  }
+
+  if (groqKey && (pick === 'groq' || pick === 'auto' || !pick)) {
+    try {
+      const model = (process.env.GROQ_MODEL || process.env.EOF_GROQ_MODEL || 'llama-3.3-70b-versatile').trim()
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: resolveSystem },
+            { role: 'user', content: resolveUser },
+          ],
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const rawContent = data?.choices?.[0]?.message?.content || ''
+        const parsed = JSON.parse(rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''))
+        const done = await finishResolve(parsed, 'groq')
+        if (done) return done
       }
+    } catch (e) {
+      console.warn('[eof-news] Groq resolve failed', e instanceof Error ? e.message : e)
+    }
+  }
+
+  if (isXaiConfigured() && !skipXai) {
+    try {
+      const parsed = await xaiJsonCompletion({
+        temperature: 0.3,
+        system: resolveSystem,
+        user: resolveUser,
+      })
+      const done = await finishResolve(parsed, 'xai')
+      if (done) return done
     } catch (e) {
       console.warn('[eof-news] resolve brief failed', e instanceof Error ? e.message : e)
     }
@@ -176,10 +216,10 @@ Return JSON only:
   const pool = wantsWorldCup
     ? fallbackNewsTopics().filter((t) => /world cup/i.test(t.headline))
     : fallbackNewsTopics()
-  const pick = pool[0] || fallbackNewsTopics()[0]
+  const fallback = pool[0] || fallbackNewsTopics()[0]
   return {
-    topic: pick.headline,
-    context: [pick.angle, pick.whyNow].filter(Boolean).join('\n'),
+    topic: fallback.headline,
+    context: [fallback.angle, fallback.whyNow].filter(Boolean).join('\n'),
     resolved: true,
     source: 'template',
   }

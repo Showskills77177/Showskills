@@ -1,7 +1,9 @@
 /**
- * Script writer for EOF image Shorts — two-step flow:
- *   1) Plain-text desk draft (continuous narration)
- *   2) Adapt draft → Short scenes (captions + image queries)
+ * Script writer for EOF image Shorts — multi-pass flow:
+ *   0) Desk research (RSS headlines + editor brief)
+ *   1) Shorts voiceover draft (spoken, not a book chapter)
+ *   2) Polish pass (cut fluff, tighten hook/CTA)
+ *   3) Adapt draft → Short scenes (captions + image queries)
  *
  * Auto provider order when configured: Groq (free) → OpenAI → xAI Grok.
  * UI can force a provider via scriptProvider (groq | xai | openai | auto).
@@ -20,6 +22,13 @@ import {
 } from '../../../shared/eofScriptTemplates.mjs'
 import { isXaiConfigured, xaiJsonCompletion, xaiTextCompletion } from './eofXaiClient.mjs'
 import { resolveEofScriptBrief } from './eofNewsTopics.mjs'
+import {
+  fetchFootballDeskHeadlines,
+  formatDeskHeadlinesForPrompt,
+  buildDeskResearchSystemPrompt,
+  buildDeskResearchUserPrompt,
+  deskBriefToContext,
+} from './eofFootballDeskResearch.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -138,15 +147,15 @@ function formatGuide(format) {
 function draftFormatGuide(format) {
   return {
     listicle:
-      'Write like a sharp football column: open with the surprising angle, then 3 concrete football beats, end with a question for comments.',
+      'Structure: hook → 3 punchy football beats → CTA. Each beat = one concrete club/nation/era fact. No essay padding.',
     hook_reveal:
-      'Build tension: bold claim, context, turning point, payoff. Sound like a narrator who knows the clubs, nations, and eras.',
+      'Structure: bold claim → one origin beat → turning point → payoff → CTA. Tension, then pay it off. Spoken, not literary.',
     debate:
-      'Present a hot take, the critic case, the fan case, then a fair verdict. End with a side to pick.',
+      'Structure: hot take → critic case (1 beat) → fan case (1 beat) → verdict → pick-a-side CTA. Fair but punchy.',
     timeline:
-      'Tell the career in eras — start, breakthrough, peak, legacy — with real clubs/nations/tournaments, not empty praise.',
+      'Structure: start → breakthrough → peak → legacy → CTA. One era per beat. Real clubs/nations only.',
     news:
-      'Write like Sky Sports / BBC Sport / ESPN FC desk copy for a 30–45s Short. Lead with the result or event (teams, competition, what happened). World Cup 2026 and global football welcome. Then context, stakes, and what comes next. Always say football — never soccer.',
+      'Structure: BREAKING lead (who/what) → what happened → why it matters now → what happens next → CTA. Desk TV copy, not longform journalism.',
   }[format]
 }
 
@@ -210,15 +219,22 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
 }
 
 const DRAFT_FLUFF_RE =
-  /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss/i
+  /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
 function isWeakDraft(text, topic) {
   const t = String(text || '').trim()
-  if (t.length < 120) return true
+  const words = t.split(/\s+/).filter(Boolean).length
+  if (words < 70 || words > 200) return true
   if (DRAFT_FLUFF_RE.test(t)) return true
+  // Book-like: too many long sentences / commas
+  const sentences = t.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean)
+  if (sentences.length < 4) return true
+  const longSentences = sentences.filter((s) => s.split(/\s+/).length > 28).length
+  if (longSentences >= 2) return true
+  if (!t.includes('?')) return true
   // Must mention at least one capitalised proper-looking token beyond filler
   const proper = (t.match(/\b[A-Z][a-z]{2,}\b/g) || []).filter(
-    (w) => !/^(The|This|That|Then|When|What|With|From|After|Before|For|And|But|Are|Was|Were|Who|How|Why|Not|One|Another)$/.test(w),
+    (w) => !/^(The|This|That|Then|When|What|With|From|After|Before|For|And|But|Are|Was|Were|Who|How|Why|Not|One|Another|Today|Still)$/.test(w),
   )
   if (proper.length < 2) return true
   // If topic names teams, draft should not ignore football specificity entirely
@@ -267,17 +283,35 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     console.warn('[eof-script] topic resolve skipped', e instanceof Error ? e.message : e)
   }
 
+  // Live desk headlines (BBC / Guardian / Sky RSS) — free sourcing, no API key
+  let headlinesText = ''
+  try {
+    const headlines = await withBudget(fetchFootballDeskHeadlines({ topic: t, limit: 8 }), 12000, 'desk RSS')
+    headlinesText = formatDeskHeadlinesForPrompt(headlines)
+    if (headlinesText) {
+      console.info('[eof-script] desk headlines', headlines.length)
+    }
+  } catch (e) {
+    console.warn('[eof-script] desk RSS skipped', e instanceof Error ? e.message : e)
+  }
+
   const order = resolveScriptProviderAttemptOrder(scriptProvider)
   const attempts = []
   for (const id of order) {
-    if (id === 'xai') attempts.push(() => writeDraftWithXai({ topic: t, format: fmt, context: ctx }))
-    if (id === 'openai') attempts.push(() => writeDraftWithOpenAi({ topic: t, format: fmt, context: ctx }))
-    if (id === 'groq') attempts.push(() => writeDraftWithGroq({ topic: t, format: fmt, context: ctx }))
+    if (id === 'xai') {
+      attempts.push(() => writeDraftPipeline({ provider: 'xai', topic: t, format: fmt, context: ctx, headlinesText }))
+    }
+    if (id === 'openai') {
+      attempts.push(() => writeDraftPipeline({ provider: 'openai', topic: t, format: fmt, context: ctx, headlinesText }))
+    }
+    if (id === 'groq') {
+      attempts.push(() => writeDraftPipeline({ provider: 'groq', topic: t, format: fmt, context: ctx, headlinesText }))
+    }
   }
 
   for (const run of attempts) {
     try {
-      const ai = await withBudget(run(), 70000, 'draft provider')
+      const ai = await withBudget(run(), 110000, 'draft pipeline')
       if (ai?.plainTextDraft && !isWeakDraft(ai.plainTextDraft, t)) {
         return {
           ...ai,
@@ -285,7 +319,7 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
           resolvedTopic,
         }
       }
-      console.warn('[eof-script] draft rejected as weak/fluff', ai?.source)
+      console.warn('[eof-script] draft rejected as weak/fluff', ai?.source, ai?.plainTextDraft?.slice?.(0, 80))
     } catch (e) {
       console.warn('[eof-script] draft provider failed', e instanceof Error ? e.message : e)
     }
@@ -360,30 +394,208 @@ export async function writeEofProductionScript({ topic, format, context, scriptP
 }
 
 function buildDraftPrompt({ topic, format, context }) {
-  const system = `You are a senior football writer for Eyes Of Football (YouTube Shorts).
+  const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT essays.
 
 HARD SCOPE:
 ${EOF_FOOTBALL_SCOPE}
 
-Write ONE continuous voiceover script as plain prose — NOT JSON, NOT bullet points, NOT scene labels, NOT hashtags.
+OUTPUT = ONE continuous spoken script. Plain prose only. No JSON, bullets, scene labels, hashtags, or titles.
 
-MANDATORY QUALITY BAR:
-- 110–170 words. Spoken aloud in ~40–55 seconds.
-- Sound like Sky Sports News / BBC Sport / ESPN FC at 10pm — specific, opinionated, common-sense.
+SHORTS VOICE (non-negotiable):
+- 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
+- Short sentences. Average under 16 words. Max one clause per beat.
+- Sound like Sky Sports News / BBC Sport desk at 10pm: punchy, opinionated, common-sense.
 - Always say football — never soccer.
-- FIRST SENTENCE must name the teams / player / club and the event (e.g. "Spain beat Belgium…", "Salah's contract…").
-- Include at least TWO concrete football references (nations, clubs, competitions, managers, or roles).
-- For World Cup / news: lead with the result or decisive moment, then stakes, then what happens next. World Cup 2026 and global football are in scope.
-- Prefer known, defensible facts. If a score is uncertain, say "narrow win" / "statement result" — never invent fake 3-1 lines.
-- Ban these phrases forever: "here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss".
-- End with ONE sharp question for comments.
-- Format intent: ${format}. ${draftFormatGuide(format)}`
+- FIRST SENTENCE must name the player/club/nation AND the event.
+- Use the DESK BRIEF facts. Do not ignore them. Do not invent fake scores or quotes.
+- Structure for format "${format}": ${draftFormatGuide(format)}
+- End with ONE sharp question for comments (Comment / Drop your take).
+
+BANNED forever:
+"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", literary metaphors, long subordinate clauses.`
 
   const user = `Topic / headline: ${topic}
-${context ? `\nDesk brief (use these facts; do not ignore them):\n${context}\n` : ''}
-Write the plain-text Short script only. No preamble.`
+${context ? `\nDESK BRIEF (source this script from these notes — do not invent beyond them):\n${context}\n` : ''}
+Write the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
+}
+
+function buildPolishPrompt({ topic, format, draft }) {
+  const system = `You are a ruthless YouTube Shorts editor for Eyes Of Football.
+
+Rewrite the draft into a TIGHTER spoken voiceover. Keep the same facts and meaning.
+
+Rules:
+- 90–130 words. Cut every soft phrase.
+- First line must hook with names + event.
+- Short spoken sentences. No book language.
+- Always football, never soccer.
+- Keep one CTA question at the end.
+- Format intent: ${format}. ${draftFormatGuide(format)}
+- Output plain prose only.`
+
+  const user = `Topic: ${topic}
+
+Draft to tighten:
+"""
+${draft}
+"""
+
+Return only the improved voiceover.`
+
+  return { system, user }
+}
+
+/**
+ * Multi-pass: research → draft → polish on one provider.
+ */
+async function writeDraftPipeline({ provider, topic, format, context, headlinesText }) {
+  let workingTopic = topic
+  let researchCtx = context
+  try {
+    const research = await researchDeskBriefWithProvider({
+      provider,
+      topic: workingTopic,
+      format,
+      context,
+      headlinesText,
+    })
+    if (research) {
+      const built = deskBriefToContext(research)
+      if (built) {
+        researchCtx = [context, built].filter(Boolean).join('\n\n')
+        if (research.headline && String(research.headline).trim().length >= 12) {
+          workingTopic = String(research.headline).trim().slice(0, 100)
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[eof-script] research pass skipped', provider, e instanceof Error ? e.message : e)
+  }
+
+  const draftResult = await writeDraftWithProvider({
+    provider,
+    topic: workingTopic,
+    format,
+    context: researchCtx,
+  })
+  let text = draftResult.plainTextDraft
+  try {
+    const polished = await polishDraftWithProvider({
+      provider,
+      topic: workingTopic,
+      format,
+      draft: text,
+    })
+    if (polished && polished.length >= 80) text = polished
+  } catch (e) {
+    console.warn('[eof-script] polish pass skipped', provider, e instanceof Error ? e.message : e)
+  }
+
+  return {
+    plainTextDraft: text,
+    title: titleFromDraft(workingTopic, text),
+    source: provider,
+  }
+}
+
+async function researchDeskBriefWithProvider({ provider, topic, format, context, headlinesText }) {
+  const system = buildDeskResearchSystemPrompt()
+  const user = buildDeskResearchUserPrompt({ topic, format, context, headlinesText })
+  if (provider === 'xai') {
+    return xaiJsonCompletion({ system, user, temperature: 0.25 })
+  }
+  if (provider === 'openai') {
+    const key = envKey('OPENAI_API_KEY')
+    const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
+    return chatJsonCompletion({
+      url: 'https://api.openai.com/v1/chat/completions',
+      headers: { Authorization: `Bearer ${key}` },
+      body: {
+        model,
+        temperature: 0.25,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      },
+      timeoutMs: 45000,
+    })
+  }
+  if (provider === 'groq') {
+    const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
+    const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
+    return chatJsonCompletion({
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      headers: { Authorization: `Bearer ${key}` },
+      body: {
+        model,
+        temperature: 0.25,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      },
+      timeoutMs: 45000,
+    })
+  }
+  return null
+}
+
+async function writeDraftWithProvider({ provider, topic, format, context }) {
+  if (provider === 'xai') return writeDraftWithXai({ topic, format, context })
+  if (provider === 'openai') return writeDraftWithOpenAi({ topic, format, context })
+  if (provider === 'groq') return writeDraftWithGroq({ topic, format, context })
+  throw new Error(`unknown provider ${provider}`)
+}
+
+async function polishDraftWithProvider({ provider, topic, format, draft }) {
+  const { system, user } = buildPolishPrompt({ topic, format, draft })
+  if (provider === 'xai') {
+    return cleanDraftText(await xaiTextCompletion({ system, user, temperature: 0.25 }))
+  }
+  if (provider === 'openai') {
+    const key = envKey('OPENAI_API_KEY')
+    const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
+    return cleanDraftText(
+      await chatTextCompletion({
+        url: 'https://api.openai.com/v1/chat/completions',
+        headers: { Authorization: `Bearer ${key}` },
+        body: {
+          model,
+          temperature: 0.25,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        },
+        timeoutMs: 45000,
+      }),
+    )
+  }
+  if (provider === 'groq') {
+    const key = envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')
+    const model = envKey('GROQ_MODEL', 'EOF_GROQ_MODEL') || 'llama-3.3-70b-versatile'
+    return cleanDraftText(
+      await chatTextCompletion({
+        url: 'https://api.groq.com/openai/v1/chat/completions',
+        headers: { Authorization: `Bearer ${key}` },
+        body: {
+          model,
+          temperature: 0.25,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        },
+        timeoutMs: 45000,
+      }),
+    )
+  }
+  return draft
 }
 
 function buildAdaptPrompt({ draft, topic, format }) {
@@ -394,7 +606,7 @@ ${EOF_FOOTBALL_SCOPE}
 
 Hard rules:
 - Exactly 5 scenes (4–6 only if the draft truly needs it; never more than ${EOF_MAX_SCENES}).
-- Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 14 words. Punchy. Mobile-first. No hashtags in captions.
+- Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 12 words. Punchy. Mobile-first. No hashtags in captions.
 - Always say football — never soccer.
 - PRESERVE the draft's facts, teams, and meaning — compress, do not replace with generic filler.
 - Hook (scene 1) from the draft's lead. CTA (last scene) from the draft's question.

@@ -106,7 +106,7 @@ export const EOF_RENDER_STACK = {
     id: 'ai-or-template',
     label: 'Script writer (draft text → adapt to scenes)',
     detail:
-      'Step 1: Groq (free) / OpenAI / Grok writes a plain news-desk narration. Step 2: Adapt to scenes compresses it into Short captions. Set GROQ_API_KEY (free at console.groq.com), or OPENAI_MODEL=gpt-4.1 / XAI_API_KEY.',
+      'Multi-pass: desk RSS + research brief → Shorts voiceover → polish → Adapt to scenes. Set GROQ_API_KEY (free), or OPENAI / XAI. Scripts are spoken Shorts copy — not essays.',
   },
   host: {
     id: 'vercel',

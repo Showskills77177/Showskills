@@ -1000,7 +1000,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
         <h2 className="text-base font-semibold text-white">Production Shorts</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          Football worldwide (World Cup 2026 included) — write a plain news-desk script first, adapt it into scenes, then Build Short. Always call it football, never soccer. Grok 4.5 by default (or set OPENAI_MODEL=gpt-4.1).
+          Football worldwide — multi-pass scripts: desk headlines → research brief → Shorts voiceover → polish → Adapt to scenes. Always call it football, never soccer. Pick Groq (free) in Script AI.
         </p>
         <ol className="mt-3 flex flex-wrap gap-2 text-[11px]">
           {[
