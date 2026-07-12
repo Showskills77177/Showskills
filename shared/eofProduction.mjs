@@ -106,7 +106,7 @@ export const EOF_RENDER_STACK = {
     id: 'ai-or-template',
     label: 'Script writer (draft text → adapt to scenes)',
     detail:
-      'Multi-pass: free Guardian API + BBC/Sky RSS → desk brief → Shorts voiceover → polish → Adapt to scenes. Set GUARDIAN_API_KEY + GROQ_API_KEY (both free).',
+      'Multi-pass: NewsData + Guardian + BBC/Sky RSS → desk brief → Shorts voiceover → polish → Adapt to scenes. Set NEWSDATA_API_KEY + GROQ_API_KEY.',
   },
   host: {
     id: 'vercel',

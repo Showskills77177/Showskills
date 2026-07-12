@@ -99,14 +99,14 @@ export default async function handler(req, res) {
         scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
         scriptBillingNote: (() => {
           const s = eofScriptProviderStatus()
-          if (s.groq && s.guardian) {
-            return 'Free stack ready: Guardian articles + RSS sourcing, Groq writes the Short.'
+          if (s.groq && (s.newsdata || s.guardian)) {
+            return 'Free stack ready: NewsData/Guardian + RSS sourcing, Groq writes the Short.'
           }
-          if (s.groq && !s.guardian) {
-            return 'Groq is ready. Add free GUARDIAN_API_KEY (open-platform.theguardian.com) for article bodies; RSS still works without it.'
+          if (s.groq && !s.newsdata && !s.guardian) {
+            return 'Groq is ready. Add NEWSDATA_API_KEY (newsdata.io) or GUARDIAN_API_KEY for richer article sourcing; RSS still works without them.'
           }
-          if (s.guardian && !s.groq && !s.openai && !s.xai) {
-            return 'Guardian sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
+          if ((s.newsdata || s.guardian) && !s.groq && !s.openai && !s.xai) {
+            return 'Article sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
           }
           if (s.xai && !s.openai && !s.groq) {
             return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'

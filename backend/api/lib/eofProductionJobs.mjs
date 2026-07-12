@@ -195,11 +195,14 @@ export async function regenerateEofProductionDraft(id, { format, context, script
   const job = await getEofProductionJob(id)
   if (!job) throw new Error('Production job not found.')
   const fmt = format || job.script?.format || null
+  const previousDraft = String(job.script?.plainTextDraft || '').trim()
   const draft = await writeEofPlainTextDraft({
     topic: job.topic,
     format: fmt,
     context,
     scriptProvider,
+    regenerate: true,
+    previousDraft,
   })
   const resolvedTopic = draft.resolvedTopic || job.topic
   const script = buildEofDraftShell({

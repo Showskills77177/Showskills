@@ -12,6 +12,11 @@ import {
 } from './eofPinterestImages.mjs'
 import { isEofGoogleCseConfigured, searchGoogleCseImages } from './eofGoogleImages.mjs'
 import { searchWikimediaCommonsImages } from './eofWikimediaImages.mjs'
+import {
+  isEofApImagesConfigured,
+  searchApMediaPicture,
+  downloadApRenditionToFile,
+} from './eofApImages.mjs'
 
 const PALETTES = ['0x1e3a5f', '0x1a4d3e', '0x3d2a1a', '0x2a1f4d', '0x4a1f2a']
 
@@ -21,6 +26,7 @@ export function isEofPexelsConfigured() {
 
 export function eofImageSourceStatus() {
   return {
+    ap: isEofApImagesConfigured(),
     google: isEofGoogleCseConfigured(),
     pexels: isEofPexelsConfigured(),
     pinterestApi: isEofPinterestApiConfigured(),
@@ -30,9 +36,12 @@ export function eofImageSourceStatus() {
 }
 
 export function eofImagesConfigurationNote() {
-  const { google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (google || pexels || pinterestApi) return null
-  return 'Using free Wikimedia Commons images. Add PEXELS_API_KEY and/or GOOGLE_CSE_* for better football stock photos.'
+  const { ap, google, pexels, pinterestApi } = eofImageSourceStatus()
+  if (ap) return null
+  if (google || pexels || pinterestApi) {
+    return 'AP Images not configured — using stock/fallback sources. Add AP_MEDIA_API_KEY for Associated Press editorial photos.'
+  }
+  return 'Using free Wikimedia Commons images. Add AP_MEDIA_API_KEY (AP Images) for editorial football photos, or PEXELS_API_KEY / GOOGLE_CSE_* as fallbacks.'
 }
 
 function paletteForQuery(query, index) {
@@ -152,6 +161,25 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
+    // Preferred: Associated Press editorial images (AP Media API)
+    if (isEofApImagesConfigured()) {
+      try {
+        const hit = await searchApMediaPicture(query, index)
+        if (hit && (await downloadApRenditionToFile(hit, outPath))) {
+          return {
+            path: outPath,
+            source: 'ap',
+            imageQuery: query,
+            imageTitle: hit.title,
+            apItemId: hit.apItemId,
+            apRole: hit.role,
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] AP Images fetch failed', query, e instanceof Error ? e.message : e)
+      }
+    }
+
     if (pexelsKey) {
       try {
         const hit = await searchPexelsPhoto(query, index, pexelsKey)
@@ -228,7 +256,7 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
   })
   if (!existsSync(outPath)) throw new Error(`Could not create image for “${fallbackQuery}”.`)
 
-  const hasAnyKey = pexelsKey || pinterestToken || isEofGoogleCseConfigured()
+  const hasAnyKey = isEofApImagesConfigured() || pexelsKey || pinterestToken || isEofGoogleCseConfigured()
   return {
     path: outPath,
     source: hasAnyKey ? 'placeholder' : 'placeholder-no-image-keys',

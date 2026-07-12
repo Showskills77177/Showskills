@@ -18,7 +18,7 @@
  */
 import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
 import { shouldUsePerplexity, getPerplexityApiKey, perplexityModel } from './eofPerplexityClient.mjs'
-import { fetchFreeFootballDeskPack, isGuardianConfigured } from './eofFreeNewsSourcing.mjs'
+import { fetchFreeFootballDeskPack, isGuardianConfigured, isNewsdataConfigured } from './eofFreeNewsSourcing.mjs'
 
 /** Default public quote / football-talk sources the researcher should prefer. */
 export const EOF_DEFAULT_QUOTE_PAGES = [
@@ -248,7 +248,13 @@ export async function sourceEofFootballQuote({ topic = '', format = 'quote' } = 
 
   // 1) Free articles (Guardian + RSS)
   let articlesText = ''
-  let packSources = { guardian: 0, rss: 0, guardianConfigured: isGuardianConfigured() }
+  let packSources = {
+    newsdata: 0,
+    guardian: 0,
+    rss: 0,
+    newsdataConfigured: isNewsdataConfigured(),
+    guardianConfigured: isGuardianConfigured(),
+  }
   try {
     const pack = await fetchFreeFootballDeskPack({
       topic: topic || 'football quote press conference manager said',
@@ -269,7 +275,11 @@ export async function sourceEofFootballQuote({ topic = '', format = 'quote' } = 
       if (hit) {
         return {
           quote: hit,
-          source: packSources.guardian ? 'guardian+groq' : 'rss+groq',
+          source: packSources.newsdata
+            ? 'newsdata+groq'
+            : packSources.guardian
+              ? 'guardian+groq'
+              : 'rss+groq',
           pages,
           packSources,
         }

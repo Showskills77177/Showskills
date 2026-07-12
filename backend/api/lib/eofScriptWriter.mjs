@@ -34,7 +34,7 @@ import {
   researchFootballTopicWithPerplexity,
   formatPerplexityResearchForPrompt,
 } from './eofPerplexityClient.mjs'
-import { fetchFreeFootballDeskPack, isGuardianConfigured } from './eofFreeNewsSourcing.mjs'
+import { fetchFreeFootballDeskPack, isGuardianConfigured, isNewsdataConfigured } from './eofFreeNewsSourcing.mjs'
 import {
   sourceEofFootballQuote,
   quoteHitToContext,
@@ -61,6 +61,7 @@ export function eofScriptProviderStatus() {
     xai: isXaiConfigured(),
     openai: Boolean(envKey('OPENAI_API_KEY')),
     groq: Boolean(envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')),
+    newsdata: isNewsdataConfigured(),
     guardian: isGuardianConfigured(),
     perplexity: shouldUsePerplexity(),
   }
@@ -272,7 +273,7 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
       return 'Groq timed out on the multi-pass write. Click Regenerate script once more (usually works on retry).'
     }
     if (/weak|fluff|rejected/i.test(detail)) {
-      return 'Groq returned a draft we rejected as too weak/generic. Click Regenerate script for another pass.'
+      return 'Script AI fell back to a template. Pick Groq, then click Regenerate script — each pass writes a fresh draft (higher creativity).'
     }
     if (detail) {
       return `Script AI failed (${detail.slice(0, 160)}). Using a built-in fallback — pick Groq and Regenerate.`
@@ -305,34 +306,37 @@ function classifyScriptFailureProvider(detail) {
 const DRAFT_FLUFF_RE =
   /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
-/** Strict quality gate — prefers punchy Shorts VO. */
-function isWeakDraft(text, topic) {
+/** Prefer punchy Shorts VO — only reject obvious fluff / tiny stubs. */
+function isWeakDraft(text) {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
-  if (words < 70 || words > 220) return true
+  if (words < 45) return true
+  if (words > 280) return true
   if (DRAFT_FLUFF_RE.test(t)) return true
-  const sentences = t.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean)
-  if (sentences.length < 4) return true
-  const longSentences = sentences.filter((s) => s.split(/\s+/).length > 28).length
-  if (longSentences >= 2) return true
-  if (!t.includes('?')) return true
-  const proper = (t.match(/\b[A-Z][a-z]{2,}\b/g) || []).filter(
-    (w) => !/^(The|This|That|Then|When|What|With|From|After|Before|For|And|But|Are|Was|Were|Who|How|Why|Not|One|Another|Today|Still)$/.test(w),
-  )
-  if (proper.length < 2) return true
-  if (/\b(world cup|ucl|premier|liga|serie|bundesliga)\b/i.test(topic) && !/\b(world cup|fifa|spain|england|france|germany|brazil|argentina|portugal|belgium|netherlands|italy|croatia|mexico|usa|japan|korea|match|group|knockout|final|tournament)\b/i.test(t)) {
-    return true
-  }
   return false
 }
 
-/** Looser gate — still better than the canned template. */
+/** Accept almost any real AI draft over the canned template. */
 function isUsableAiDraft(text) {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
-  if (words < 55 || words > 320) return false
-  if (DRAFT_FLUFF_RE.test(t) && words < 100) return false
-  return true
+  return words >= 40
+}
+
+/** Fix common Shorts draft gaps instead of throwing the draft away. */
+function normalizeAiDraft(text, topic) {
+  let t = cleanDraftText(text)
+  if (!t) return t
+  // Ensure a comment CTA — missing "?" used to falsely fail the quality gate
+  if (!/[?]/.test(t)) {
+    const hook = String(topic || 'this')
+      .replace(/[“”"]/g, '')
+      .split(/\s+/)
+      .slice(0, 6)
+      .join(' ')
+    t = `${t.replace(/[.!\s]+$/, '')}. Agree or disagree on ${hook || 'this'}? Comment.`
+  }
+  return t.trim()
 }
 
 function groqModelCandidates() {
@@ -409,7 +413,7 @@ async function groqChatJson({ system, user, temperature = 0.25, timeoutMs = 4500
 /**
  * Step 1 — continuous plain-text narration (editable in the UI).
  * Vague topics like "world cup news" are resolved into a concrete headline first.
- * @param {{ topic: string, format?: string, context?: string }} input
+ * @param {{ topic: string, format?: string, context?: string, scriptProvider?: string, regenerate?: boolean, previousDraft?: string }} input
  */
 function withBudget(promise, ms, label) {
   let timer
@@ -421,10 +425,32 @@ function withBudget(promise, ms, label) {
   ])
 }
 
-export async function writeEofPlainTextDraft({ topic, format, context, scriptProvider }) {
+function finalizeAiDraft(ai, topic, resolvedTopic) {
+  const plainTextDraft = normalizeAiDraft(ai?.plainTextDraft, topic)
+  if (!plainTextDraft || !isUsableAiDraft(plainTextDraft)) return null
+  return {
+    ...ai,
+    plainTextDraft,
+    title: ai.title || titleFromDraft(topic, plainTextDraft) || topic.slice(0, 90),
+    resolvedTopic,
+  }
+}
+
+export async function writeEofPlainTextDraft({
+  topic,
+  format,
+  context,
+  scriptProvider,
+  regenerate = false,
+  previousDraft = '',
+} = {}) {
   const rawTopic = String(topic || '').trim()
   if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
   const fmt = resolveFormat(format)
+  const prev = String(previousDraft || '').trim()
+  const draftTemperature = regenerate ? 0.95 : 0.45
+  const polishTemperature = regenerate ? 0.7 : 0.3
+  const forceAcceptAi = Boolean(regenerate)
 
   let t = rawTopic
   let ctx = String(context || '').trim()
@@ -502,22 +528,21 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
   const order = resolveScriptProviderAttemptOrder(scriptProvider)
   const attempts = []
   for (const id of order) {
-    if (id === 'xai') {
+    if (id === 'xai' || id === 'openai' || id === 'groq') {
       attempts.push({
         id,
-        run: () => writeDraftPipeline({ provider: 'xai', topic: t, format: fmt, context: ctx, headlinesText }),
-      })
-    }
-    if (id === 'openai') {
-      attempts.push({
-        id,
-        run: () => writeDraftPipeline({ provider: 'openai', topic: t, format: fmt, context: ctx, headlinesText }),
-      })
-    }
-    if (id === 'groq') {
-      attempts.push({
-        id,
-        run: () => writeDraftPipeline({ provider: 'groq', topic: t, format: fmt, context: ctx, headlinesText }),
+        run: () =>
+          writeDraftPipeline({
+            provider: id,
+            topic: t,
+            format: fmt,
+            context: ctx,
+            headlinesText,
+            temperature: draftTemperature,
+            polishTemperature,
+            previousDraft: prev,
+            regenerate,
+          }),
       })
     }
   }
@@ -526,26 +551,20 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
   let softBest = null
   for (const { id, run } of attempts) {
     try {
-      const ai = await withBudget(run(), 90000, `${id} draft pipeline`)
-      if (ai?.plainTextDraft && !isWeakDraft(ai.plainTextDraft, t)) {
-        return {
-          ...ai,
-          title: ai.title || t.slice(0, 90),
-          resolvedTopic,
-        }
+      const raw = await withBudget(run(), 90000, `${id} draft pipeline`)
+      const ai = finalizeAiDraft(raw, t, resolvedTopic)
+      if (!ai) {
+        failures.push(`[${id}] empty/too-short draft`)
+        console.warn('[eof-script] draft empty/short', id, raw?.plainTextDraft?.slice?.(0, 80))
+        continue
       }
-      if (ai?.plainTextDraft && isUsableAiDraft(ai.plainTextDraft)) {
-        softBest = {
-          ...ai,
-          title: ai.title || t.slice(0, 90),
-          resolvedTopic,
-        }
-        failures.push(`[${id}] weak draft kept as soft candidate`)
-        console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai?.plainTextDraft?.slice?.(0, 80))
-      } else {
-        failures.push(`[${id}] weak/fluff draft rejected`)
-        console.warn('[eof-script] draft rejected as weak/fluff', id, ai?.plainTextDraft?.slice?.(0, 80))
+      // On regenerate, never discard a usable AI draft for the canned template
+      if (forceAcceptAi || !isWeakDraft(ai.plainTextDraft)) {
+        return ai
       }
+      softBest = ai
+      failures.push(`[${id}] soft-weak draft kept as candidate`)
+      console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       failures.push(`[${id}] ${msg}`)
@@ -626,7 +645,7 @@ export async function writeEofProductionScript({ topic, format, context, scriptP
   return { ...adapted, resolvedTopic, failureDetail: draftResult.failureDetail || '' }
 }
 
-function buildDraftPrompt({ topic, format, context }) {
+function buildDraftPrompt({ topic, format, context, previousDraft = '', regenerate = false }) {
   const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT essays.
 
 HARD SCOPE:
@@ -647,8 +666,15 @@ SHORTS VOICE (non-negotiable):
 BANNED forever:
 "here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", literary metaphors, long subordinate clauses.`
 
+  const regenBlock =
+    regenerate && previousDraft
+      ? `\nPREVIOUS DRAFT WAS TOO GENERIC — write a DIFFERENT, sharper voiceover. New angle, new opening line, new CTA. Do not paraphrase the previous draft:\n"""\n${previousDraft.slice(0, 900)}\n"""\n`
+      : regenerate
+        ? `\nThis is a REGENERATE pass (variation seed ${Date.now() % 9973}). Pick a sharper angle than a generic desk summary. New opening line required.\n`
+        : ''
+
   const user = `Topic / headline: ${topic}
-${context ? `\nDESK BRIEF (source this script from these notes — do not invent beyond them):\n${context}\n` : ''}
+${context ? `\nDESK BRIEF (source this script from these notes — do not invent beyond them):\n${context}\n` : ''}${regenBlock}
 Write the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
@@ -683,7 +709,17 @@ Return only the improved voiceover.`
 /**
  * Multi-pass: research → draft → polish on one provider.
  */
-async function writeDraftPipeline({ provider, topic, format, context, headlinesText }) {
+async function writeDraftPipeline({
+  provider,
+  topic,
+  format,
+  context,
+  headlinesText,
+  temperature = 0.45,
+  polishTemperature = 0.3,
+  previousDraft = '',
+  regenerate = false,
+}) {
   let workingTopic = topic
   let researchCtx = context
   // Groq free tier: skip extra research call when we already have Guardian/RSS desk notes
@@ -718,6 +754,9 @@ async function writeDraftPipeline({ provider, topic, format, context, headlinesT
     topic: workingTopic,
     format,
     context: researchCtx,
+    temperature,
+    previousDraft,
+    regenerate,
   })
   let text = draftResult.plainTextDraft
   try {
@@ -726,6 +765,7 @@ async function writeDraftPipeline({ provider, topic, format, context, headlinesT
       topic: workingTopic,
       format,
       draft: text,
+      temperature: polishTemperature,
     })
     if (polished && polished.length >= 80) text = polished
   } catch (e) {
@@ -769,17 +809,31 @@ async function researchDeskBriefWithProvider({ provider, topic, format, context,
   return null
 }
 
-async function writeDraftWithProvider({ provider, topic, format, context }) {
-  if (provider === 'xai') return writeDraftWithXai({ topic, format, context })
-  if (provider === 'openai') return writeDraftWithOpenAi({ topic, format, context })
-  if (provider === 'groq') return writeDraftWithGroq({ topic, format, context })
+async function writeDraftWithProvider({
+  provider,
+  topic,
+  format,
+  context,
+  temperature = 0.45,
+  previousDraft = '',
+  regenerate = false,
+}) {
+  if (provider === 'xai') {
+    return writeDraftWithXai({ topic, format, context, temperature, previousDraft, regenerate })
+  }
+  if (provider === 'openai') {
+    return writeDraftWithOpenAi({ topic, format, context, temperature, previousDraft, regenerate })
+  }
+  if (provider === 'groq') {
+    return writeDraftWithGroq({ topic, format, context, temperature, previousDraft, regenerate })
+  }
   throw new Error(`unknown provider ${provider}`)
 }
 
-async function polishDraftWithProvider({ provider, topic, format, draft }) {
+async function polishDraftWithProvider({ provider, topic, format, draft, temperature = 0.3 }) {
   const { system, user } = buildPolishPrompt({ topic, format, draft })
   if (provider === 'xai') {
-    return cleanDraftText(await xaiTextCompletion({ system, user, temperature: 0.25 }))
+    return cleanDraftText(await xaiTextCompletion({ system, user, temperature }))
   }
   if (provider === 'openai') {
     const key = envKey('OPENAI_API_KEY')
@@ -790,7 +844,7 @@ async function polishDraftWithProvider({ provider, topic, format, draft }) {
         headers: { Authorization: `Bearer ${key}` },
         body: {
           model,
-          temperature: 0.25,
+          temperature,
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },
@@ -801,7 +855,7 @@ async function polishDraftWithProvider({ provider, topic, format, draft }) {
     )
   }
   if (provider === 'groq') {
-    return cleanDraftText(await groqChatText({ system, user, temperature: 0.25, timeoutMs: 40000 }))
+    return cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 40000 }))
   }
   return draft
 }
@@ -934,24 +988,31 @@ function titleFromDraft(topic, draft) {
   return String(topic || '').trim().slice(0, 90)
 }
 
-async function writeDraftWithXai({ topic, format, context }) {
-  const { system, user } = buildDraftPrompt({ topic, format, context })
-  const text = cleanDraftText(await xaiTextCompletion({ system, user, temperature: 0.35 }))
+async function writeDraftWithXai({ topic, format, context, temperature = 0.45, previousDraft = '', regenerate = false }) {
+  const { system, user } = buildDraftPrompt({ topic, format, context, previousDraft, regenerate })
+  const text = cleanDraftText(await xaiTextCompletion({ system, user, temperature }))
   if (text.length < 40) throw new Error('draft too short')
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'xai' }
 }
 
-async function writeDraftWithOpenAi({ topic, format, context }) {
+async function writeDraftWithOpenAi({
+  topic,
+  format,
+  context,
+  temperature = 0.45,
+  previousDraft = '',
+  regenerate = false,
+}) {
   const key = envKey('OPENAI_API_KEY')
   const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
-  const { system, user } = buildDraftPrompt({ topic, format, context })
+  const { system, user } = buildDraftPrompt({ topic, format, context, previousDraft, regenerate })
   const text = cleanDraftText(
     await chatTextCompletion({
       url: 'https://api.openai.com/v1/chat/completions',
       headers: { Authorization: `Bearer ${key}` },
       body: {
         model,
-        temperature: 0.4,
+        temperature,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
@@ -963,9 +1024,16 @@ async function writeDraftWithOpenAi({ topic, format, context }) {
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'openai' }
 }
 
-async function writeDraftWithGroq({ topic, format, context }) {
-  const { system, user } = buildDraftPrompt({ topic, format, context })
-  const text = cleanDraftText(await groqChatText({ system, user, temperature: 0.4, timeoutMs: 45000 }))
+async function writeDraftWithGroq({
+  topic,
+  format,
+  context,
+  temperature = 0.45,
+  previousDraft = '',
+  regenerate = false,
+}) {
+  const { system, user } = buildDraftPrompt({ topic, format, context, previousDraft, regenerate })
+  const text = cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 45000 }))
   if (text.length < 40) throw new Error('draft too short')
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'groq' }
 }
