@@ -21,10 +21,29 @@ import {
   normalizeElevenLabsVoiceSettings,
 } from '../../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
-import { EOF } from './eofStudioTheme'
 import { EOF_DEFAULT_CAPTION_STYLE } from '../../../../shared/eofCaptionStyles.mjs'
 
-const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
+/** OpenAI / xAI–inspired chrome for Production (clean, minimal, dark). */
+const PX = {
+  surface: 'rounded-2xl border border-[#1f1f1f] bg-[#111]',
+  surfaceInset: 'rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d]',
+  title: 'text-[22px] font-medium tracking-tight text-[#f4f4f4]',
+  subtitle: 'text-sm text-[#8e8e8e]',
+  label: 'text-[13px] font-medium text-[#a3a3a3]',
+  muted: 'text-[#8e8e8e]',
+  hairline: 'border-[#1f1f1f]',
+  btnPrimary:
+    'rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#e8e8e8] disabled:opacity-40',
+  btnGhost:
+    'rounded-xl border border-[#1f1f1f] bg-transparent px-3.5 py-2 text-sm text-[#d4d4d4] transition hover:bg-[#1a1a1a] disabled:opacity-40',
+  btnSoft:
+    'rounded-xl bg-[#1a1a1a] px-3.5 py-2 text-sm text-[#e5e5e5] transition hover:bg-[#222] disabled:opacity-40',
+  btnDanger:
+    'rounded-xl border border-[#1f1f1f] px-3.5 py-2 text-sm text-[#f87171] transition hover:bg-[#1a1010] disabled:opacity-40',
+}
+
+const inputCls =
+  'mt-1.5 w-full rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] px-3.5 py-2.5 text-sm text-[#f4f4f4] placeholder:text-[#525252] outline-none transition focus:border-[#525252]'
 const SELECTED_JOB_KEY = 'eof_production_selected_job'
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 
@@ -58,30 +77,25 @@ function EofRenderProgressBar({ progress, stuck, onCancel, cancelBusy }) {
   const percent = Math.min(100, Math.max(0, Math.round(progress.percent || 0)))
 
   return (
-    <div className="rounded-lg border border-[#3ea6ff]/30 bg-[#172033] p-4" role="status" aria-live="polite">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9ecbff]">
+    <div className={`${PX.surfaceInset} p-4`} role="status" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[#d4d4d4]">
         <span>{progress.message || 'Building…'}</span>
-        <span className="font-semibold tabular-nums">{percent}%</span>
+        <span className="tabular-nums text-[#8e8e8e]">{percent}%</span>
       </div>
-      <div className="mt-2 h-3 overflow-hidden rounded-full bg-[#0d1520]">
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-[#1f1f1f]">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#2563eb] to-[#3ea6ff] transition-[width] duration-700 ease-out"
+          className="h-full rounded-full bg-white transition-[width] duration-700 ease-out"
           style={{ width: `${percent}%` }}
         />
       </div>
-      <p className="mt-2 text-[10px] text-[#717171]">
+      <p className="mt-2 text-xs text-[#737373]">
         Elapsed {formatDuration(progress.elapsedSeconds)}
         {progress.etaLabel ? ` · ${progress.etaLabel}` : ''}
       </p>
       {stuck ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <p className="text-xs text-amber-400">This build may have timed out. Reset, then try again.</p>
-          <button
-            type="button"
-            disabled={cancelBusy}
-            onClick={onCancel}
-            className="rounded-full border border-amber-500/50 px-3 py-1 text-xs text-amber-200 disabled:opacity-50"
-          >
+          <p className="text-xs text-[#fbbf24]">This build may have timed out. Reset, then try again.</p>
+          <button type="button" disabled={cancelBusy} onClick={onCancel} className={PX.btnGhost}>
             Reset & retry
           </button>
         </div>
@@ -1043,100 +1057,79 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   })()
 
   const statusPill = (status) => {
-    if (status === 'video_rendered') return 'bg-[#1a2e1f] text-[#6ee07d] border-[#2ba640]/40'
-    if (status === 'failed') return 'bg-[#2a1515] text-[#ff9b95] border-[#ff4e45]/40'
-    if (status === 'rendering' || status === 'rendering_video') return 'bg-[#172033] text-[#9ecbff] border-[#3ea6ff]/40'
-    if (status === 'ready_script') return 'bg-[#1a1a1a] text-[#f0c674] border-[#f0c674]/30'
-    return 'bg-[#1a1a1a] text-[#aaa] border-[#303030]'
+    if (status === 'video_rendered') return 'border-[#1f1f1f] bg-[#141414] text-[#d4d4d4]'
+    if (status === 'failed') return 'border-[#3f1d1d] bg-[#140f0f] text-[#f87171]'
+    if (status === 'rendering' || status === 'rendering_video') return 'border-[#1f1f1f] bg-[#141414] text-white'
+    if (status === 'ready_script') return 'border-[#1f1f1f] bg-[#141414] text-[#a3a3a3]'
+    return 'border-[#1f1f1f] bg-transparent text-[#737373]'
   }
 
   if (!isOwner) {
-    return <p className={`text-sm ${EOF.muted}`}>Production automation is available to the channel owner.</p>
+    return <p className={`text-sm ${PX.muted}`}>Production automation is available to the channel owner.</p>
   }
 
   return (
-    <div className="space-y-5">
-      {loading ? <p className={`text-sm ${EOF.muted}`}>Loading production…</p> : null}
+    <div className="mx-auto max-w-6xl space-y-8">
+      {loading ? <p className={`text-sm ${PX.muted}`}>Loading…</p> : null}
 
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Make a Short</h2>
-          <p className={`mt-0.5 text-sm ${EOF.muted}`}>
-            Topic → script → scenes → video. Football only — never soccer.
-          </p>
+          <h2 className={PX.title}>Production</h2>
+          <p className={`mt-1 ${PX.subtitle}`}>Write a Short, adapt scenes, then build.</p>
         </div>
-        <details className="text-xs text-[#aaa]">
-          <summary className="cursor-pointer select-none rounded-full border border-[#303030] bg-[#1a1a1a] px-3 py-1.5 hover:border-[#3ea6ff]/40 hover:text-[#9ecbff]">
-            Setup status
+        <details className="relative text-sm text-[#a3a3a3]">
+          <summary className="cursor-pointer list-none rounded-xl border border-[#1f1f1f] px-3 py-1.5 hover:bg-[#151515]">
+            Setup
           </summary>
-          <div className={`mt-2 w-[min(100vw-2rem,28rem)] space-y-2 rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-3 shadow-xl`}>
-            <p className={scriptProviders.groq || openAiScriptEnabled ? 'text-[#6ee07d]' : 'text-amber-300'}>
+          <div className={`absolute right-0 z-20 mt-2 w-[min(100vw-2rem,20rem)] space-y-2 ${PX.surface} p-4 text-xs shadow-2xl`}>
+            <p>
               Script AI:{' '}
-              {scriptProviders.groq
-                ? 'Groq ready'
-                : openAiScriptEnabled
-                  ? 'AI key ready'
-                  : 'Add GROQ_API_KEY on Vercel'}
+              {scriptProviders.groq ? 'Groq' : openAiScriptEnabled ? 'Configured' : 'Add GROQ_API_KEY'}
               {scriptProviders.openai ? ' · OpenAI' : ''}
               {scriptProviders.xai ? ' · xAI' : ''}
             </p>
-            <p className={scriptProviders.guardian ? 'text-[#6ee07d]' : 'text-[#aaa]'}>
-              Articles: {scriptProviders.guardian ? 'Guardian + RSS' : 'RSS only (optional GUARDIAN_API_KEY)'}
-            </p>
-            <p className={ffmpegAvailable ? 'text-[#6ee07d]' : 'text-amber-300'}>
-              Video: {ffmpegAvailable ? 'ffmpeg ready' : renderNote || 'ffmpeg missing'}
-            </p>
-            <p className="text-[#aaa]">
+            <p>Articles: {scriptProviders.guardian ? 'Guardian + RSS' : 'RSS'}</p>
+            <p>Video: {ffmpegAvailable ? 'Ready' : renderNote || 'ffmpeg missing'}</p>
+            <p>
               Images:{' '}
               {[
                 imageSources.google && 'Google',
                 imageSources.pexels && 'Pexels',
                 imageSources.pinterestApi && 'Pinterest',
-                imageSources.wikimedia && 'Wikimedia',
-                'Pin URLs',
+                'Wikimedia',
               ]
                 .filter(Boolean)
-                .join(' · ') || imagesNote}
+                .join(' · ')}
             </p>
-            <p className={elevenLabsConfigured ? 'text-[#6ee07d]' : 'text-[#aaa]'}>
-              Voice: {elevenLabsConfigured ? 'ElevenLabs Brian ready' : 'Edge British (free) · Brian needs ELEVENLABS_API_KEY'}
-            </p>
-            {scriptBillingNote ? <p className="text-amber-200">{scriptBillingNote}</p> : null}
-            {renderStack ? (
-              <ul className="list-disc space-y-1 pl-4 text-[#717171]">
-                {renderStack.script ? <li>{renderStack.script.label}</li> : null}
-                {renderStack.video ? <li>{renderStack.video.label}</li> : null}
-              </ul>
-            ) : null}
+            <p>Captions: {captionEngine.zapcap ? 'ZapCap + local' : 'Local CapCut styles'}</p>
+            {scriptBillingNote ? <p className="text-[#fbbf24]">{scriptBillingNote}</p> : null}
           </div>
         </details>
-      </div>
+      </header>
 
-      {/* New Short composer */}
-      <section className={`rounded-2xl border ${EOF.panelBorder} bg-gradient-to-b from-[#252525] to-[#1a1a1a] p-5`}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#717171]">New Short</p>
-        <form onSubmit={createJob} className="mt-3 space-y-3">
-          <label className="block text-sm text-white">
-            What’s the story?
+      <section className={`${PX.surface} p-6 sm:p-8`}>
+        <form onSubmit={createJob} className="space-y-5">
+          <label className={`block ${PX.label}`}>
+            Topic
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className={`${inputCls} mt-1.5 py-3 text-base`}
+              className={`${inputCls} text-base`}
               placeholder={
                 format === 'quote'
-                  ? 'e.g. Rooney on Ronaldo — or keep short and we’ll source a quote'
+                  ? 'e.g. Rooney on Ronaldo'
                   : format === 'news'
                     ? 'e.g. Spain beat Belgium at the World Cup'
-                    : 'e.g. Cristiano Ronaldo / World Cup news'
+                    : 'e.g. Cristiano Ronaldo'
               }
               minLength={2}
               required
               autoComplete="off"
             />
           </label>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="text-xs text-[#aaa]">
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className={PX.label}>
               Format
               <select value={format} onChange={(e) => setFormat(e.target.value)} className={inputCls}>
                 {(scriptFormats.length
@@ -1149,7 +1142,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ))}
               </select>
             </label>
-            <label className="text-xs text-[#aaa]">
+            <label className={PX.label}>
               Script AI
               <select
                 value={scriptProvider}
@@ -1180,7 +1173,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ))}
               </select>
             </label>
-            <label className="text-xs text-[#aaa]">
+            <label className={PX.label}>
               Voice
               <select value={voicePreset} onChange={(e) => setVoicePreset(e.target.value)} className={inputCls}>
                 {(voicePresets.length
@@ -1196,14 +1189,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           </div>
 
           <div>
-            <p className="text-xs text-[#aaa]">Captions (CapCut-class)</p>
-            <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+            <p className={PX.label}>Captions</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
               {(captionStyles.length
                 ? captionStyles
                 : [
-                    { id: 'pop', label: 'Pop (Hormozi)', detail: 'Yellow flash word pops', vibe: 'Hooks' },
-                    { id: 'karaoke', label: 'Karaoke fill', detail: 'Active word highlight', vibe: 'News VO' },
-                    { id: 'beast', label: 'Beast bounce', detail: 'Huge neon single words', vibe: 'Hype' },
+                    { id: 'pop', label: 'Pop', detail: 'Hormozi word pops', vibe: 'Hooks' },
+                    { id: 'karaoke', label: 'Karaoke', detail: 'Active word highlight', vibe: 'News' },
+                    { id: 'beast', label: 'Beast', detail: 'Neon single words', vibe: 'Hype' },
                   ]
               ).map((s) => {
                 const active = captionStyle === s.id
@@ -1212,59 +1205,44 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     key={s.id}
                     type="button"
                     onClick={() => setCaptionStyle(s.id)}
-                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                    className={`rounded-xl border px-4 py-3 text-left transition ${
                       active
-                        ? 'border-[#3ea6ff]/60 bg-[#122033] ring-1 ring-[#3ea6ff]/30'
-                        : 'border-[#303030] bg-[#121212] hover:border-[#3ea6ff]/30'
+                        ? 'border-[#404040] bg-[#1a1a1a]'
+                        : 'border-[#1f1f1f] bg-transparent hover:border-[#1f1f1f] hover:bg-[#141414]'
                     }`}
                   >
-                    <span className={`block text-sm font-semibold ${active ? 'text-[#9ecbff]' : 'text-white'}`}>
+                    <span className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#d4d4d4]'}`}>
                       {s.label}
                     </span>
-                    <span className="mt-0.5 block text-[10px] text-[#717171]">{s.vibe || s.detail}</span>
+                    <span className="mt-0.5 block text-xs text-[#737373]">{s.vibe || s.detail}</span>
                   </button>
                 )
               })}
             </div>
-            <p className={`mt-1.5 text-[10px] ${EOF.muted}`}>
-              Engine:{' '}
-              {captionEngine.zapcap
-                ? 'ZapCap (word-synced) when building — or local CapCut burn-in'
-                : 'Local CapCut burn-in · add ZAPCAP_API_KEY for premium word-sync'}
-            </p>
           </div>
+
           {!loading && voicePreset === 'brian' && !elevenLabsConfigured ? (
-            <p className="text-xs text-amber-400">
-              Brian needs <code className="text-amber-200">ELEVENLABS_API_KEY</code> — or pick Edge British (free).
-            </p>
+            <p className="text-xs text-[#fbbf24]">Brian needs ELEVENLABS_API_KEY — or pick Edge British.</p>
           ) : null}
+
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={busy || loading}
-              className={`rounded-full px-6 py-2.5 text-sm font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
-            >
-              {busy ? 'Starting…' : 'Start Short'}
+            <button type="submit" disabled={busy || loading} className={PX.btnPrimary}>
+              {busy ? 'Starting…' : 'Create'}
             </button>
-            <p className={`text-xs ${EOF.muted}`}>Creates a draft job and writes the first script.</p>
+            <span className={`text-xs ${PX.muted}`}>Draft script is generated automatically.</span>
           </div>
         </form>
 
         {success ? (
-          <p
-            className="mt-4 rounded-xl border border-[#2ba640]/40 bg-[#1a2e1f] px-3 py-2 text-sm text-[#6ee07d]"
-            role="status"
-          >
+          <p className="mt-5 rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] px-4 py-3 text-sm text-[#d4d4d4]" role="status">
             {success}
           </p>
         ) : null}
         {err ? (
-          <p className="mt-4 rounded-xl border border-[#ff4e45]/40 bg-[#2a1515] px-3 py-2 text-sm text-[#ff9b95]">
-            {err}
-          </p>
+          <p className="mt-5 rounded-xl border border-[#3f1d1d] bg-[#140f0f] px-4 py-3 text-sm text-[#f87171]">{err}</p>
         ) : null}
         {displayProgress && !selected ? (
-          <div className="mt-4">
+          <div className="mt-5">
             <EofRenderProgressBar
               progress={displayProgress}
               stuck={isRenderStuck}
@@ -1275,16 +1253,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         ) : null}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-        {/* Job list */}
-        <aside className={`rounded-2xl border ${EOF.panelBorder} ${EOF.panel} p-3`}>
-          <div className="mb-2 flex items-center justify-between px-1">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#717171]">Your Shorts</h3>
-            <span className="tabular-nums text-[10px] text-[#555]">{jobs.length}</span>
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className={`${PX.surfaceInset} p-3`}>
+          <div className="mb-3 flex items-center justify-between px-2">
+            <h3 className="text-xs font-medium text-[#737373]">Shorts</h3>
+            <span className="tabular-nums text-xs text-[#525252]">{jobs.length}</span>
           </div>
-          <ul className="max-h-[min(70vh,640px)] space-y-1 overflow-y-auto pr-0.5">
+          <ul className="max-h-[min(70vh,640px)] space-y-0.5 overflow-y-auto">
             {jobs.length === 0 ? (
-              <li className={`px-2 py-6 text-center text-sm ${EOF.muted}`}>No Shorts yet — start one above.</li>
+              <li className={`px-2 py-8 text-center text-sm ${PX.muted}`}>No Shorts yet</li>
             ) : (
               jobs.map((j) => (
                 <li key={j.id} className="group flex items-stretch gap-0.5">
@@ -1292,14 +1269,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     type="button"
                     onClick={() => selectJob(j.id)}
                     className={`min-w-0 flex-1 rounded-xl px-3 py-2.5 text-left transition ${
-                      selectedId === j.id
-                        ? 'bg-[#2a2a2a] ring-1 ring-[#3ea6ff]/40'
-                        : 'hover:bg-[#1a1a1a]'
+                      selectedId === j.id ? 'bg-[#1a1a1a]' : 'hover:bg-[#141414]'
                     }`}
                   >
-                    <div className="truncate text-sm font-medium text-white">{j.title || j.topic}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-medium ${statusPill(j.status)}`}>
+                    <div className="truncate text-sm text-[#ececec]">{j.title || j.topic}</div>
+                    <div className="mt-1">
+                      <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] ${statusPill(j.status)}`}>
                         {(j.status === 'rendering' || j.status === 'rendering_video') &&
                         j.renderProgress?.percent != null
                           ? `${Math.round(j.renderProgress.percent)}%`
@@ -1313,7 +1288,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     disabled={deletingId === j.id}
                     title={`Delete ${j.title || j.topic}`}
                     aria-label={`Delete ${j.title || j.topic}`}
-                    className="rounded-lg px-2 text-[#555] opacity-0 transition hover:bg-[#2a1515] hover:text-[#ff9b95] group-hover:opacity-100 disabled:opacity-50"
+                    className="rounded-lg px-2 text-[#525252] opacity-0 transition hover:text-[#f87171] group-hover:opacity-100 disabled:opacity-50"
                   >
                     ×
                   </button>
@@ -1326,19 +1301,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         {selected && draftScript ? (
           <div className="space-y-4">
             {/* Workspace header + primary CTA */}
-            <div className={`rounded-2xl border ${EOF.panelBorder} ${EOF.panel} p-4 sm:p-5`}>
+            <div className={`${PX.surface} p-5 sm:p-6`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-base font-semibold text-white sm:text-lg">
                     {draftScript.title || selected.topic}
                   </h3>
-                  <p className={`mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs ${EOF.muted}`}>
+                  <p className={`mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs ${PX.muted}`}>
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusPill(selected.status)}`}>
                       {productionJobStatusLabel(selected.status)}
                     </span>
                     {draftScript.format ? <span>{draftScript.format}</span> : null}
                     {scriptSourceLabel ? <span>AI: {scriptSourceLabel}</span> : null}
-                    {draftDirty ? <span className="text-amber-400">Unsaved edits</span> : null}
+                    {draftDirty ? <span className="text-[#fbbf24]">Unsaved edits</span> : null}
                   </p>
                 </div>
                 {primaryAction ? (
@@ -1347,13 +1322,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       type="button"
                       disabled={Boolean(primaryAction.disabled) || busy}
                       onClick={() => primaryAction.run?.()}
-                      className={`rounded-full px-5 py-2.5 text-sm font-semibold disabled:opacity-50 ${
-                        primaryAction.tone === 'success'
-                          ? 'border border-[#2ba640]/50 bg-[#1a2e1f] text-[#6ee07d]'
-                          : primaryAction.tone === 'busy'
-                            ? 'border border-[#303030] bg-[#1a1a1a] text-[#aaa]'
-                            : EOF.btnPrimary
-                      }`}
+                      className={`${
+                        primaryAction.tone === 'busy' ? PX.btnSoft : PX.btnPrimary
+                      } disabled:opacity-40`}
                     >
                       {primaryAction.label}
                     </button>
@@ -1374,12 +1345,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   const state = workflowStepState(Number(n))
                   const cls =
                     state === 'done'
-                      ? 'border-[#2ba640]/40 bg-[#142018] text-[#6ee07d]'
+                      ? 'border-[#2a2a2a] bg-[#1a1a1a] text-[#d4d4d4]'
                       : state === 'current'
-                        ? 'border-[#3ea6ff]/50 bg-[#122033] text-[#9ecbff]'
+                        ? 'border-[#404040] bg-[#161616] text-white'
                         : state === 'failed'
-                          ? 'border-[#ff4e45]/40 bg-[#2a1515] text-[#ff9b95]'
-                          : 'border-[#2a2a2a] text-[#555]'
+                          ? 'border-[#3f1d1d] bg-[#140f0f] text-[#f87171]'
+                          : 'border-[#1f1f1f] text-[#555]'
                   return (
                     <li key={n} className={`rounded-xl border px-3 py-2 text-center text-xs font-medium ${cls}`}>
                       <span className="block text-[10px] opacity-70">Step {n}</span>
@@ -1389,7 +1360,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 })}
               </ol>
 
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-[#2a2a2a] pt-3">
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-[#1f1f1f] pt-3">
                 <label className="text-[10px] text-[#aaa]">
                   Voice
                   <select
@@ -1446,7 +1417,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   type="button"
                   disabled={busy}
                   onClick={() => saveJob()}
-                  className={`mt-4 rounded-full px-3 py-1.5 text-xs ${EOF.btnSecondary} disabled:opacity-50`}
+                  className={`mt-4 ${PX.btnGhost}`}
                 >
                   Save
                 </button>
@@ -1454,7 +1425,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   type="button"
                   disabled={busy || isRendering || sceneCount < 1}
                   onClick={buildShort}
-                  className="mt-4 rounded-full border border-[#2ba640]/40 px-3 py-1.5 text-xs text-[#6ee07d] disabled:opacity-50"
+                  className={`mt-4 ${PX.btnSoft}`}
                 >
                   {selected.status === 'video_rendered' ? 'Rebuild' : 'Build'}
                 </button>
@@ -1462,7 +1433,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   type="button"
                   disabled={busy || isRendering}
                   onClick={regenerateDraft}
-                  className="mt-4 rounded-full border border-[#3ea6ff]/30 px-3 py-1.5 text-xs text-[#9ecbff] disabled:opacity-50"
+                  className={`mt-4 ${PX.btnGhost}`}
                 >
                   {scriptBusy === 'draft' ? '…' : 'Regenerate'}
                 </button>
@@ -1471,7 +1442,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   disabled={busy || isRendering}
                   onClick={regenerateScript}
                   title="New draft + scenes"
-                  className="mt-4 rounded-full border border-[#303030] px-3 py-1.5 text-xs text-[#aaa] disabled:opacity-50"
+                  className={`mt-4 ${PX.btnGhost}`}
                 >
                   {scriptBusy === 'rewrite' ? '…' : 'Full rewrite'}
                 </button>
@@ -1479,7 +1450,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   type="button"
                   disabled={deletingId === selected.id}
                   onClick={() => deleteJob(selected.id)}
-                  className="mt-4 rounded-full border border-[#ff4e45]/30 px-3 py-1.5 text-xs text-[#ff9b95] disabled:opacity-50"
+                  className={`mt-4 ${PX.btnDanger}`}
                 >
                   {deletingId === selected.id ? 'Deleting…' : 'Delete'}
                 </button>
@@ -1490,19 +1461,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             {selected.status === 'video_rendered' || videoPreviewUrl ? (
               <div
                 ref={resultPanelRef}
-                className="rounded-2xl border-2 border-[#2ba640]/40 bg-[#101a14] p-5"
+                className="${PX.surface} p-6"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-[#6ee07d]">Short ready</p>
-                    <p className={`mt-0.5 text-xs ${EOF.muted}`}>9:16 with voiceover, images, and captions.</p>
+                    <p className="text-sm font-semibold text-[#d4d4d4]">Short ready</p>
+                    <p className={`mt-0.5 text-xs ${PX.muted}`}>9:16 with voiceover, images, and captions.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       disabled={busy}
                       onClick={downloadShort}
-                      className="rounded-full border border-[#3ea6ff]/40 px-4 py-2 text-sm text-[#9ecbff] disabled:opacity-50"
+                      className={PX.btnGhost}
                     >
                       Download MP4
                     </button>
@@ -1511,7 +1482,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         type="button"
                         disabled={busy}
                         onClick={sendToYoutubeStudio}
-                        className={`rounded-full px-4 py-2 text-sm ${EOF.btnPrimary} disabled:opacity-50`}
+                        className={PX.btnPrimary}
                       >
                         YouTube Studio
                       </button>
@@ -1531,7 +1502,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   <button
                     type="button"
                     onClick={loadVideoPreview}
-                    className={`mt-4 rounded-full px-5 py-2 text-sm ${EOF.btnPrimary}`}
+                    className={`mt-4 ${PX.btnPrimary}`}
                   >
                     Load preview
                   </button>
@@ -1541,7 +1512,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     {selected.narrationManifest.map((scene, i) => (
                       <div
                         key={scene.sceneId || i}
-                        className="overflow-hidden rounded-lg border border-[#2a3a2a] bg-[#0d0d0d]"
+                        className="overflow-hidden rounded-lg border border-[#1f1f1f] bg-[#0d0d0d]"
                       >
                         <img
                           alt=""
@@ -1575,11 +1546,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             ) : null}
 
             {/* Step 1 — Script */}
-            <section className={`rounded-2xl border border-[#3ea6ff]/20 bg-[#0f1520] p-4 sm:p-5`}>
+            <section className={`${PX.surfaceInset} p-5 sm:p-6`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9ecbff]">Step 1 · Script</p>
-                  <p className={`mt-0.5 text-xs ${EOF.muted}`}>Spoken voiceover — edit freely, then go to scenes.</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">Step 1 · Script</p>
+                  <p className={`mt-0.5 text-xs ${PX.muted}`}>Spoken voiceover — edit freely, then go to scenes.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="tabular-nums text-[11px] text-[#717171]">{wordCount} words</span>
@@ -1587,7 +1558,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     type="button"
                     disabled={busy || isRendering}
                     onClick={regenerateDraft}
-                    className={`rounded-full px-4 py-1.5 text-xs font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
+                    className={PX.btnPrimary}
                   >
                     {regenerateScriptLabel}
                   </button>
@@ -1601,7 +1572,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   markDraftDirty()
                 }}
                 rows={7}
-                className={`${inputCls} mt-3 font-serif text-[15px] leading-relaxed text-[#f1f1f1]`}
+                className={`${inputCls} mt-3 text-[15px] leading-relaxed text-[#ececec]`}
                 placeholder="Write or regenerate a punchy Shorts voiceover here…"
               />
               {hasPlainDraft ? (
@@ -1610,7 +1581,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     type="button"
                     disabled={busy || isRendering}
                     onClick={adaptToScenes}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${EOF.btnPrimary} disabled:opacity-50`}
+                    className={PX.btnPrimary}
                   >
                     Next: Adapt to scenes →
                   </button>
@@ -1618,21 +1589,21 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     type="button"
                     disabled={busy || isRendering}
                     onClick={regenerateScript}
-                    className="rounded-full border border-[#303030] px-3 py-2 text-xs text-[#aaa] disabled:opacity-50"
+                    className={PX.btnGhost}
                   >
                     Full rewrite (script + scenes)
                   </button>
                 </div>
               ) : (
-                <p className={`mt-2 text-xs ${EOF.muted}`}>
-                  Click <span className="text-[#9ecbff]">Generate script</span> to pull desk notes and write the VO.
+                <p className={`mt-2 text-xs ${PX.muted}`}>
+                  Click <span className="text-[#d4d4d4]">Generate script</span> to pull desk notes and write the VO.
                 </p>
               )}
             </section>
 
             {/* Voice tuning (Brian only) */}
             {voicePreset === 'brian' ? (
-              <details className={`rounded-2xl border ${EOF.panelBorder} ${EOF.panel} p-4`}>
+              <details className={`${PX.surface} p-4`}>
                 <summary className="cursor-pointer text-xs font-semibold text-[#aaa]">
                   Brian voice tuning (optional)
                 </summary>
@@ -1640,7 +1611,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   <button
                     type="button"
                     onClick={resetBrianVoiceSettings}
-                    className="text-[10px] text-[#3ea6ff] hover:underline"
+                    className="text-[10px] text-[#a3a3a3] hover:text-white hover:underline"
                   >
                     Reset to defaults
                   </button>
@@ -1653,7 +1624,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       <label key={field.key} className="block text-xs text-[#aaa]">
                         <span className="flex items-center justify-between gap-2">
                           <span>{field.label}</span>
-                          <span className="tabular-nums text-[#9ecbff]">{Number(val).toFixed(2)}</span>
+                          <span className="tabular-nums text-[#d4d4d4]">{Number(val).toFixed(2)}</span>
                         </span>
                         <input
                           type="range"
@@ -1662,7 +1633,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           step={limits.step}
                           value={val}
                           onChange={(e) => updateVoiceSetting(field.key, e.target.value)}
-                          className="mt-1 w-full accent-[#3ea6ff]"
+                          className="mt-1 w-full accent-white"
                         />
                         <span className="mt-0.5 block text-[10px] text-[#717171]">{field.hint}</span>
                       </label>
@@ -1673,20 +1644,20 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   selected.status === 'rendered' ||
                   selected.mixedAudioPath) &&
                 sceneCount ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#2a2a2a] pt-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#1f1f1f] pt-3">
                     <button
                       type="button"
                       disabled={busy || isRendering || !voiceRegen.canRegenerate}
                       onClick={regenerateVoiceover}
                       title={voiceRegen.blockedReason || undefined}
-                      className="rounded-full border border-[#3ea6ff]/50 px-4 py-2 text-xs font-semibold text-[#9ecbff] disabled:opacity-50"
+                      className={PX.btnGhost}
                     >
                       {busy || isRendering
                         ? 'Regenerating…'
                         : `Regenerate voiceover (${voiceRegen.remaining}/${voiceRegen.limit})`}
                     </button>
                     {voiceRegen.blockedReason ? (
-                      <span className="text-[10px] text-amber-400">{voiceRegen.blockedReason}</span>
+                      <span className="text-[10px] text-[#fbbf24]">{voiceRegen.blockedReason}</span>
                     ) : (
                       <span className="text-[10px] text-[#717171]">Same captions & photos — new Brian mix only.</span>
                     )}
@@ -1696,20 +1667,20 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             ) : null}
 
             {/* Step 2 — Scenes */}
-            <section className={`rounded-2xl border ${EOF.panelBorder} ${EOF.panel} p-4 sm:p-5`}>
+            <section className={`${PX.surface} p-5 sm:p-6`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#717171]">
+                  <p className="text-xs font-medium text-[#737373]">
                     Step 2 · Scenes ({sceneCount}/{EOF_MAX_SCENES})
                   </p>
-                  <p className={`mt-0.5 text-xs ${EOF.muted}`}>On-screen captions + image search for each beat.</p>
+                  <p className={`mt-0.5 text-xs ${PX.muted}`}>On-screen captions + image search for each beat.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     disabled={busy || isRendering || !hasPlainDraft}
                     onClick={adaptToScenes}
-                    className="rounded-full border border-[#3ea6ff]/40 px-3 py-1.5 text-xs font-semibold text-[#9ecbff] disabled:opacity-50"
+                    className={PX.btnGhost}
                   >
                     Adapt from script
                   </button>
@@ -1717,7 +1688,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     type="button"
                     disabled={busy || sceneCount >= EOF_MAX_SCENES}
                     onClick={() => addScene()}
-                    className="rounded-full border border-[#303030] px-3 py-1.5 text-[11px] text-[#aaa] disabled:opacity-50"
+                    className={PX.btnGhost}
                   >
                     + Add
                   </button>
@@ -1725,19 +1696,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               </div>
 
               {!sceneCount ? (
-                <p className={`mt-4 rounded-xl border border-dashed border-[#303030] px-4 py-8 text-center text-sm ${EOF.muted}`}>
-                  No scenes yet — finish the script, then tap <span className="text-[#9ecbff]">Adapt to scenes</span>.
+                <p className={`mt-4 rounded-xl border border-dashed border-[#303030] px-4 py-8 text-center text-sm ${PX.muted}`}>
+                  No scenes yet — finish the script, then tap <span className="text-[#d4d4d4]">Adapt to scenes</span>.
                 </p>
               ) : (
                 <div className="mt-4 space-y-3">
                   {draftScript.scenes.map((scene, i) => (
-                    <div key={scene.id || i} className="rounded-xl border border-[#2a2a2a] bg-[#171717] p-3">
+                    <div key={scene.id || i} className="rounded-xl border border-[#1f1f1f] bg-[#0d0d0d] p-3">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[10px] font-bold uppercase text-[#717171]">
                           Scene {i + 1}
                           {scene.role ? ` · ${scene.role}` : ''}
                           {scene.durationSec ? (
-                            <span className="ml-2 font-normal normal-case text-[#3ea6ff]">
+                            <span className="ml-2 font-normal normal-case text-[#a3a3a3]">
                               ~{Number(scene.durationSec).toFixed(1)}s
                             </span>
                           ) : null}
@@ -1765,7 +1736,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                             type="button"
                             disabled={busy || sceneCount <= EOF_MIN_SCENES}
                             onClick={() => removeScene(i)}
-                            className="text-[10px] text-[#ff9b95] hover:underline disabled:opacity-30"
+                            className="text-[10px] text-[#f87171] hover:underline disabled:opacity-30"
                           >
                             Remove
                           </button>
@@ -1816,7 +1787,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   type="button"
                   disabled={busy || (isRendering && !isRenderStuck)}
                   onClick={buildShort}
-                  className="mt-4 w-full rounded-full border border-[#2ba640]/50 bg-[#1a2e1f] px-4 py-3 text-sm font-semibold text-[#6ee07d] disabled:opacity-50 sm:w-auto"
+                  className={`mt-4 w-full ${PX.btnPrimary} sm:w-auto`}
                 >
                   {busy || isRendering
                     ? 'Building…'
@@ -1828,7 +1799,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             </section>
 
             {/* YouTube metadata */}
-            <details className={`rounded-2xl border ${EOF.panelBorder} ${EOF.panel} p-4`}>
+            <details className={`${PX.surface} p-4`}>
               <summary className="cursor-pointer text-xs font-semibold text-[#aaa]">
                 YouTube title, description & tags
               </summary>
@@ -1877,14 +1848,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             </details>
 
             {selected.status === 'failed' && selected.errorMessage ? (
-              <p className="rounded-xl border border-[#ff4e45]/40 bg-[#2a1515] px-3 py-2 text-sm text-[#ff9b95]">
+              <p className="rounded-xl border border-[#3f1d1d] bg-[#140f0f] px-4 py-3 text-sm text-[#f87171]">
                 Build failed: {selected.errorMessage}
               </p>
             ) : null}
           </div>
         ) : (
-          <div className={`flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed ${EOF.panelBorder} ${EOF.panel} p-8`}>
-            <p className={`max-w-sm text-center text-sm ${EOF.muted}`}>
+          <div className={`flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-[#1f1f1f] bg-[#0d0d0d] p-8`}>
+            <p className={`max-w-sm text-center text-sm ${PX.muted}`}>
               Pick a Short from the list, or start a new one above.
             </p>
           </div>
