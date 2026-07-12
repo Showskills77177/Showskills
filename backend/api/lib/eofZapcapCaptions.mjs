@@ -82,16 +82,30 @@ export function normalizeZapcapTemplateList(data) {
       if (!id) return null
       const name = String(t?.name || t?.title || t?.label || `Template ${id.slice(0, 8)}`).trim()
       const description = String(t?.description || t?.detail || t?.subtitle || '').trim()
+      const previewRaw =
+        t?.previewUrl ||
+        t?.preview ||
+        t?.preview_url ||
+        t?.thumbnailUrl ||
+        t?.thumbnail_url ||
+        t?.thumbnail ||
+        t?.imageUrl ||
+        t?.image_url ||
+        t?.gifUrl ||
+        t?.gif_url ||
+        t?.previewGif ||
+        t?.previewImage ||
+        t?.assets?.preview ||
+        t?.assets?.thumbnail ||
+        t?.media?.preview ||
+        t?.media?.thumbnail ||
+        null
       const previewUrl =
-        String(
-          t?.previewUrl ||
-            t?.preview ||
-            t?.thumbnailUrl ||
-            t?.thumbnail ||
-            t?.imageUrl ||
-            t?.gifUrl ||
-            '',
-        ).trim() || null
+        typeof previewRaw === 'string'
+          ? previewRaw.trim() || null
+          : previewRaw && typeof previewRaw === 'object'
+            ? String(previewRaw.url || previewRaw.href || previewRaw.src || '').trim() || null
+            : null
       const category = String(t?.category || t?.type || t?.group || '').trim()
       return { id, name, description, previewUrl, category }
     })

@@ -1380,14 +1380,24 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               </p>
             ) : (
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                Pick any ZapCap template below (~$0.10/min). Free ZapCap credits stamp a ZapCap watermark —
-                Pro removes it. Live / Off stay free.
+                Preview how captions look, then pick one (~$0.10/min for ZapCap). Free ZapCap credits stamp a
+                watermark — Pro removes it.
               </p>
             )}
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {[
-                { id: 'live', label: 'Live subs (free)', vibe: 'Bottom TV-style' },
-                { id: 'off', label: 'Off', vibe: 'Voiceover only' },
+                {
+                  id: 'live',
+                  label: 'Live subs (free)',
+                  vibe: 'Bottom TV bar',
+                  preview: 'live',
+                },
+                {
+                  id: 'off',
+                  label: 'Off',
+                  vibe: 'No captions',
+                  preview: 'off',
+                },
               ].map((s) => {
                 const active = captionStyle === s.id
                 return (
@@ -1398,16 +1408,32 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       setCaptionStyle(s.id)
                       setZapcapTemplateId('')
                     }}
-                    className={`rounded-xl border px-4 py-3 text-left transition ${
+                    className={`overflow-hidden rounded-xl border text-left transition ${
                       active
-                        ? 'border-white/30 bg-[#272727]'
-                        : 'border-[#303030] bg-[#121212] hover:border-[#555] hover:bg-[#272727]'
+                        ? 'border-white/35 bg-[#272727]'
+                        : 'border-[#303030] bg-[#121212] hover:border-[#555] hover:bg-[#1c1c1c]'
                     }`}
                   >
-                    <span className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}>
-                      {s.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-[#aaaaaa]">{s.vibe}</span>
+                    <div className="relative aspect-[9/16] max-h-40 w-full bg-[#1a153d]">
+                      {s.preview === 'live' ? (
+                        <>
+                          <div className="absolute inset-x-[18%] top-[28%] h-[38%] rounded-full bg-[#2a2460]/ />
+                          <div className="absolute inset-x-0 bottom-[14%] bg-black/50 px-2 py-1.5 text-center">
+                            <span className="text-[11px] font-semibold leading-tight text-white drop-shadow">
+                              Tuchel: we go again
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="absolute inset-x-[18%] top-[28%] h-[38%] rounded-full bg-[#2a2460]" />
+                      )}
+                    </div>
+                    <div className="px-3 py-2">
+                      <span className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}>
+                        {s.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-[#aaaaaa]">{s.vibe}</span>
+                    </div>
                   </button>
                 )
               })}
@@ -1417,7 +1443,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               <div className="mt-4 space-y-2">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <p className={PX.label}>
-                    ZapCap templates{zapcapTemplates.length ? ` (${zapcapTemplates.length})` : ''}
+                    ZapCap templates{zapcapTemplates.length ? ` (${zapcapTemplates.length})` : ''} — click a
+                    preview
                   </p>
                   <input
                     value={zapcapTemplateFilter}
@@ -1430,8 +1457,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   <p className="text-xs text-[#fbbf24]">{zapcapTemplatesError}</p>
                 ) : null}
                 {zapcapTemplates.length ? (
-                  <div className="max-h-64 overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
-                    <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()
@@ -1457,21 +1484,59 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                                 setCaptionStyle('zapcap')
                                 setZapcapTemplateId(t.id)
                               }}
-                              className={`rounded-lg border px-3 py-2 text-left transition ${
+                              className={`overflow-hidden rounded-lg border text-left transition ${
                                 active
-                                  ? 'border-white/35 bg-[#272727]'
-                                  : 'border-transparent hover:border-[#444] hover:bg-[#1c1c1c]'
+                                  ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                                  : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
                               }`}
-                              title={t.description || t.id}
+                              title={t.description || t.name || t.id}
                             >
-                              <span
-                                className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}
-                              >
-                                {t.name}
-                              </span>
-                              {t.category ? (
-                                <span className="mt-0.5 block text-[11px] text-[#888]">{t.category}</span>
-                              ) : null}
+                              <div className="relative aspect-[9/16] max-h-44 w-full bg-[#0d0d12]">
+                                {t.previewUrl ? (
+                                  <img
+                                    src={t.previewUrl}
+                                    alt=""
+                                    loading="lazy"
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none'
+                                      const fallback = e.currentTarget.nextElementSibling
+                                      if (fallback) fallback.classList.remove('hidden')
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 ${
+                                    t.previewUrl ? 'hidden' : ''
+                                  }`}
+                                >
+                                  <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-black shadow">
+                                    {String(t.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
+                                  </span>
+                                  <span className="text-center text-[11px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                                    SAMPLE LOOK
+                                  </span>
+                                </div>
+                                {active ? (
+                                  <span className="absolute right-1.5 top-1.5 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-black">
+                                    Selected
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="px-2.5 py-2">
+                                <span
+                                  className={`block truncate text-sm font-medium ${
+                                    active ? 'text-white' : 'text-[#e5e5e5]'
+                                  }`}
+                                >
+                                  {t.name}
+                                </span>
+                                {t.category ? (
+                                  <span className="mt-0.5 block truncate text-[11px] text-[#888]">
+                                    {t.category}
+                                  </span>
+                                ) : null}
+                              </div>
                             </button>
                           )
                         })}
@@ -1483,12 +1548,30 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   </p>
                 )}
                 {zapcapTemplateId ? (
-                  <p className={`text-xs ${PX.muted}`}>
-                    Selected template{' '}
-                    <span className="text-[#d4d4d4]">
-                      {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.name || zapcapTemplateId}
-                    </span>
-                  </p>
+                  <div className="flex items-start gap-3 rounded-xl border border-[#303030] bg-[#1a1a1a] p-3">
+                    {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.previewUrl ? (
+                      <img
+                        src={zapcapTemplates.find((t) => t.id === zapcapTemplateId).previewUrl}
+                        alt=""
+                        className="h-28 w-16 shrink-0 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-28 w-16 shrink-0 items-center justify-center rounded-md bg-[#0d0d12] text-[10px] text-[#888]">
+                        CapCut
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs text-[#aaaaaa]">Selected look</p>
+                      <p className="truncate text-sm font-medium text-white">
+                        {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.name || zapcapTemplateId}
+                      </p>
+                      {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.description ? (
+                        <p className="mt-1 line-clamp-3 text-xs text-[#888]">
+                          {zapcapTemplates.find((t) => t.id === zapcapTemplateId).description}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
                 ) : captionStyle === 'zapcap' ? (
                   <p className="text-xs text-[#fbbf24]">Choose a ZapCap template above before rendering.</p>
                 ) : null}
