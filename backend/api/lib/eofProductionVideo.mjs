@@ -415,18 +415,27 @@ export async function renderEofProductionVideo({
   let captionEngine = burnCaptions ? 'local' : engine === 'zapcap' ? 'pending-zapcap' : 'none'
   let zapcapTemplateId = null
   if (engine === 'zapcap') {
-    const z = await burnZapcapCaptions({
-      videoPath: out,
-      style,
-      templateId: preferredZapcapTemplateId,
-      scenes: sorted.map((s) => ({
-        caption: s.caption,
-        narration: s.narration || s.caption,
-        durationSec: s.durationSec,
-      })),
-    })
-    captionEngine = z.engine
-    zapcapTemplateId = z.templateId || null
+    try {
+      const z = await burnZapcapCaptions({
+        videoPath: out,
+        style,
+        templateId: preferredZapcapTemplateId,
+        scenes: sorted.map((s) => ({
+          caption: s.caption,
+          narration: s.narration || s.caption,
+          durationSec: s.durationSec,
+        })),
+      })
+      captionEngine = z.engine
+      zapcapTemplateId = z.templateId || null
+    } catch (e) {
+      console.warn(
+        '[eof-video] ZapCap failed — Short will export without animated captions',
+        e instanceof Error ? e.message : e,
+      )
+      captionEngine = 'zapcap-failed'
+      zapcapTemplateId = preferredZapcapTemplateId || null
+    }
   } else if (engine === 'local' || style === 'live') {
     zapcapTemplateId = null
   } else {

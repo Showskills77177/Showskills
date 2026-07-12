@@ -90,4 +90,16 @@ describe('caption drawtext builders', () => {
     })
     assert.ok(filters.some((f) => f.includes('y=h*0.78')))
   })
+
+  it('escapes commas and apostrophes in live captions', () => {
+    const filters = buildCaptionDrawtextFilters({
+      caption: "At 38, he's still running the show — dictating tempo, finding space, and making",
+      durationSec: 7,
+      captionFont: '/tmp/font.ttf',
+      style: 'live',
+    })
+    assert.ok(filters.length >= 1)
+    assert.ok(filters.some((f) => f.includes('\\,')), 'commas in caption text must be escaped')
+    assert.ok(filters.some((f) => f.includes("\\'")), 'apostrophes must be escaped')
+  })
 })

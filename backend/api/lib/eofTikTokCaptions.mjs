@@ -9,10 +9,12 @@ import {
   resolveEofCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
 
-/** Escape text for ffmpeg drawtext `text=` values. */
+/** Escape text for ffmpeg drawtext `text=` values (commas split filter chains). */
 export function escapeDrawtext(value) {
   return String(value || '')
     .replace(/\\/g, '\\\\')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
     .replace(/:/g, '\\:')
     .replace(/'/g, "\\'")
     .replace(/%/g, '\\%')
