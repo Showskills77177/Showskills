@@ -1215,21 +1215,24 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           </div>
 
           <div>
-            <p className={PX.label}>Captions (ZapCap templates)</p>
-            {!captionEngine.zapcap ? (
+            <p className={PX.label}>Captions</p>
+            {captionStyle === 'off' ? (
+              <p className={`mt-1 text-xs ${PX.muted}`}>Captions off — clean plate, voiceover only.</p>
+            ) : !captionEngine.zapcap ? (
               <p className="mt-1 text-xs text-[#fbbf24]">
-                Add ZAPCAP_API_KEY on Vercel for CapCut-class word-synced captions. Without it, Shorts render with no on-screen text.
+                Add ZAPCAP_API_KEY on Vercel for CapCut-class word-synced captions. Without it (and not Off), Shorts render with no on-screen text.
               </p>
             ) : (
-              <p className={`mt-1 text-xs ${PX.muted}`}>Paid ZapCap burn (~$0.10/min) — Hormozi / Karaoke / Beast.</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>ZapCap burn (~$0.10/min) — or pick Off for no captions.</p>
             )}
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {(captionStyles.length
                 ? captionStyles
                 : [
                     { id: 'pop', label: 'Pop', detail: 'Hormozi word pops', vibe: 'Hooks' },
                     { id: 'karaoke', label: 'Karaoke', detail: 'Active word highlight', vibe: 'News' },
                     { id: 'beast', label: 'Beast', detail: 'Neon single words', vibe: 'Hype' },
+                    { id: 'off', label: 'Off', detail: 'No captions', vibe: 'Voiceover only' },
                   ]
               ).map((s) => {
                 const active = captionStyle === s.id
@@ -1438,6 +1441,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           { id: 'pop', label: 'Pop (Hormozi)' },
                           { id: 'karaoke', label: 'Karaoke fill' },
                           { id: 'beast', label: 'Beast bounce' },
+                          { id: 'off', label: 'Off' },
                         ]
                     ).map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1498,12 +1502,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     <p className="text-sm font-semibold text-[#d4d4d4]">Short ready</p>
                     <p className={`mt-0.5 text-xs ${PX.muted}`}>
                       9:16 with voiceover and images
-                      {selected.captionEngine === 'zapcap'
-                        ? ` · ZapCap captions${selected.zapcapTemplateId ? ` (${String(selected.zapcapTemplateId).slice(0, 8)}…)` : ''}`
-                        : selected.captionEngine === 'local'
-                          ? ' · local drawtext captions'
-                          : selected.captionEngine === 'none'
-                            ? ' · no captions (add ZAPCAP_API_KEY)'
+                      {selected.captionStyle === 'off' || selected.captionEngine === 'none'
+                        ? ' · captions off'
+                        : selected.captionEngine === 'zapcap'
+                          ? ` · ZapCap captions${selected.zapcapTemplateId ? ` (${String(selected.zapcapTemplateId).slice(0, 8)}…)` : ''}`
+                          : selected.captionEngine === 'local'
+                            ? ' · local drawtext captions'
                             : ''}
                       .
                     </p>

@@ -145,6 +145,7 @@ export async function searchApMediaPicture(query, index = 0) {
   url.searchParams.set('page_size', String(pageSize))
   url.searchParams.set('page', String(page))
   url.searchParams.set('include', '*')
+  url.searchParams.set('sort', 'versioncreated:desc')
   if (inMyPlan) url.searchParams.set('in_my_plan', 'true')
 
   const res = await fetch(url.toString(), {

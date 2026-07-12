@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
-import { buildSceneImageSearchQueries } from '../../../shared/eofSceneImageQueries.mjs'
+import { buildSceneImageSearchQueries, scoreImageRelevance } from '../../../shared/eofSceneImageQueries.mjs'
 import {
   isPinterestPinUrl,
   fetchPinterestPinImage,
@@ -37,11 +37,8 @@ export function eofImageSourceStatus() {
 
 export function eofImagesConfigurationNote() {
   const { ap, google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (ap) return null
-  if (google || pexels || pinterestApi) {
-    return 'AP Images not configured — using stock/fallback sources. Add AP_MEDIA_API_KEY for Associated Press editorial photos.'
-  }
-  return 'Using free Wikimedia Commons images. Add AP_MEDIA_API_KEY (AP Images) for editorial football photos, or PEXELS_API_KEY / GOOGLE_CSE_* as fallbacks.'
+  if (pinterestApi || ap || google || pexels) return null
+  return 'Using free Wikimedia Commons images. Add PINTEREST_ACCESS_TOKEN (or AP_MEDIA_API_KEY / PEXELS / Google CSE) for better topic photos.'
 }
 
 function paletteForQuery(query, index) {
@@ -161,22 +158,65 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
-    // Preferred: Associated Press editorial images (AP Media API)
+    // Prefer Pinterest when keyed — topic-ranked + newer pins first
+    if (pinterestToken) {
+      try {
+        const hit = await searchPinterestPartnerPins(query, index, pinterestToken, { topic })
+        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
+          return {
+            path: outPath,
+            source: 'pinterest',
+            imageQuery: query,
+            pinId: hit.pinId,
+            pinTitle: hit.title,
+            relevance: hit.relevance,
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] Pinterest search failed', query, e)
+      }
+    }
+
+    // Associated Press editorial images
     if (isEofApImagesConfigured()) {
       try {
         const hit = await searchApMediaPicture(query, index)
-        if (hit && (await downloadApRenditionToFile(hit, outPath))) {
-          return {
-            path: outPath,
-            source: 'ap',
-            imageQuery: query,
-            imageTitle: hit.title,
-            apItemId: hit.apItemId,
-            apRole: hit.role,
+        if (hit) {
+          const okTitle = !hit.title || scoreImageRelevance(topic || query, hit.title) >= 0
+          if (okTitle && (await downloadApRenditionToFile(hit, outPath))) {
+            return {
+              path: outPath,
+              source: 'ap',
+              imageQuery: query,
+              imageTitle: hit.title,
+              apItemId: hit.apItemId,
+              apRole: hit.role,
+            }
           }
         }
       } catch (e) {
         console.warn('[eof-scene-images] AP Images fetch failed', query, e instanceof Error ? e.message : e)
+      }
+    }
+
+    if (isEofGoogleCseConfigured()) {
+      try {
+        const hit = await searchGoogleCseImages(query, index)
+        if (hit) {
+          const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`)
+          if (score < 0) continue
+          if (await downloadImageToFile(hit.imgUrl, outPath)) {
+            return {
+              path: outPath,
+              source: 'google',
+              imageQuery: query,
+              imageTitle: hit.title,
+              sourcePage: hit.sourcePage,
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] Google image search failed', query, e)
       }
     }
 
@@ -197,49 +237,19 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
       }
     }
 
-    if (isEofGoogleCseConfigured()) {
-      try {
-        const hit = await searchGoogleCseImages(query, index)
-        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
-          return {
-            path: outPath,
-            source: 'google',
-            imageQuery: query,
-            imageTitle: hit.title,
-            sourcePage: hit.sourcePage,
-          }
-        }
-      } catch (e) {
-        console.warn('[eof-scene-images] Google image search failed', query, e)
-      }
-    }
-
-    if (pinterestToken) {
-      try {
-        const hit = await searchPinterestPartnerPins(query, index, pinterestToken)
-        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
-          return {
-            path: outPath,
-            source: 'pinterest',
-            imageQuery: query,
-            pinId: hit.pinId,
-            pinTitle: hit.title,
-          }
-        }
-      } catch (e) {
-        console.warn('[eof-scene-images] Pinterest search failed', query, e)
-      }
-    }
-
     // Free keyless fallback — real photos from Wikimedia Commons
     try {
       const hit = await searchWikimediaCommonsImages(query, index)
-      if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
-        return {
-          path: outPath,
-          source: 'wikimedia',
-          imageQuery: query,
-          imageTitle: hit.title,
+      if (hit) {
+        const score = scoreImageRelevance(topic || query, hit.title || '')
+        if (score < 0) continue
+        if (await downloadImageToFile(hit.imgUrl, outPath)) {
+          return {
+            path: outPath,
+            source: 'wikimedia',
+            imageQuery: query,
+            imageTitle: hit.title,
+          }
         }
       }
     } catch (e) {

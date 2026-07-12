@@ -51,6 +51,7 @@ export function resolveCaptionEngine() {
 }
 
 function zapcapTemplateId(styleId) {
+  if (styleId === 'off') return ''
   const meta = getEofCaptionStyle(styleId)
   return envKey(meta.zapcapTemplateEnv, `EOF_${meta.zapcapTemplateEnv}`) || meta.zapcapTemplateDefault
 }

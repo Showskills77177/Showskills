@@ -12,13 +12,15 @@ import {
 } from '../backend/api/lib/eofTikTokCaptions.mjs'
 
 describe('eofCaptionStyles', () => {
-  it('exposes exactly three CapCut-class styles', () => {
-    assert.equal(EOF_CAPTION_STYLES.length, 3)
+  it('exposes CapCut styles plus Off', () => {
+    assert.ok(EOF_CAPTION_STYLES.length >= 3)
     assert.deepEqual(
       EOF_CAPTION_STYLES.map((s) => s.id).sort(),
-      ['beast', 'karaoke', 'pop'],
+      ['beast', 'karaoke', 'off', 'pop'],
     )
     assert.equal(EOF_DEFAULT_CAPTION_STYLE, 'pop')
+    assert.equal(resolveEofCaptionStyle('off'), 'off')
+    assert.equal(resolveEofCaptionStyle('none'), 'off')
   })
 
   it('resolves unknown styles to default', () => {

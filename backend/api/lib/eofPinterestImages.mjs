@@ -1,3 +1,5 @@
+import { scoreImageRelevance } from '../../../shared/eofSceneImageQueries.mjs'
+
 const PIN_URL_RE =
   /(?:https?:\/\/)?(?:www\.)?(?:[a-z]{2,}\.)?pinterest\.(?:com|co\.uk|fr|de|it|es|ca|com\.au)\/pin\/[\w-]+|(?:https?:\/\/)?pin\.it\/[\w]+/i
 
@@ -48,18 +50,49 @@ export async function fetchPinterestPinImage(pinUrl) {
   }
 }
 
+function pinCreatedMs(pin) {
+  const raw =
+    pin?.created_at ||
+    pin?.createdAt ||
+    pin?.board?.created_at ||
+    pin?.pin_metrics?.impression ||
+    null
+  if (!raw) return 0
+  const ms = Date.parse(String(raw))
+  return Number.isFinite(ms) ? ms : 0
+}
+
+function rankPinterestPins(items, topic, query) {
+  const hayTopic = `${topic || ''} ${query || ''}`.trim()
+  return [...items]
+    .map((pin, idx) => {
+      const title = String(pin?.title || pin?.description || pin?.alt_text || '')
+      const relevance = scoreImageRelevance(hayTopic, title)
+      const created = pinCreatedMs(pin)
+      return { pin, idx, relevance, created }
+    })
+    .sort((a, b) => {
+      if (b.relevance !== a.relevance) return b.relevance - a.relevance
+      if (b.created !== a.created) return b.created - a.created
+      return a.idx - b.idx
+    })
+    .map((row) => row.pin)
+}
+
 /**
  * Search Pinterest partner API (requires approved app + access token).
+ * Prefers pins whose title/description match the topic, then newest.
  * @param {string} query
  * @param {number} index
  * @param {string} token
+ * @param {{ topic?: string }} [opts]
  */
-export async function searchPinterestPartnerPins(query, index, token) {
+export async function searchPinterestPartnerPins(query, index, token, opts = {}) {
   const country = (process.env.EOF_PINTEREST_COUNTRY || process.env.PINTEREST_COUNTRY || 'GB').trim()
   const searchUrl = new URL('https://api.pinterest.com/v5/search/partner/pins')
   searchUrl.searchParams.set('term', query)
   searchUrl.searchParams.set('country_code', country)
-  searchUrl.searchParams.set('page_size', '15')
+  searchUrl.searchParams.set('page_size', '25')
 
   const res = await fetch(searchUrl, {
     headers: {
@@ -73,7 +106,15 @@ export async function searchPinterestPartnerPins(query, index, token) {
   const items = data.items || []
   if (!items.length) return null
 
-  const pin = items[index % items.length]
+  const ranked = rankPinterestPins(items, opts.topic || query, query)
+  // Require a minimum relevance when topic tokens exist; otherwise take top ranked
+  const minScore = scoreImageRelevance(opts.topic || query, opts.topic || query) > 0 ? 3 : 0
+  const relevant = ranked.filter((pin) => {
+    const title = String(pin?.title || pin?.description || pin?.alt_text || '')
+    return scoreImageRelevance(opts.topic || query, title) >= minScore
+  })
+  const pool = relevant.length ? relevant : ranked
+  const pin = pool[Math.max(0, index) % pool.length]
   const images = pin?.media?.images || pin?.images || {}
   const imgUrl = pickLargestPinterestImage(images) || pin?.image_url || pin?.media?.image_url
   if (!imgUrl) return null
@@ -83,6 +124,7 @@ export async function searchPinterestPartnerPins(query, index, token) {
     pinId: pin.id || pin.pin_id || null,
     title: pin.title || pin.description || null,
     queryUsed: query,
+    relevance: scoreImageRelevance(opts.topic || query, pin.title || pin.description || ''),
   }
 }
 

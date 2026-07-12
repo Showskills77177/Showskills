@@ -6,7 +6,7 @@ import { runFfmpeg } from './eofFfmpeg.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { mapWithConcurrency } from './eofAsyncPool.mjs'
 import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
-import { resolveEofCaptionStyle } from '../../../shared/eofCaptionStyles.mjs'
+import { resolveEofCaptionStyle, captionsEnabledForStyle } from '../../../shared/eofCaptionStyles.mjs'
 import { resolveCaptionEngine, burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 
 const BUNDLED_CAPTION_FONT = join(
@@ -150,10 +150,14 @@ export async function renderEofProductionVideo({
   mkdirSync(workDir, { recursive: true })
   const style = resolveEofCaptionStyle(captionStyle)
   let engine
-  try {
-    engine = resolveCaptionEngine()
-  } catch (e) {
-    throw e
+  if (!captionsEnabledForStyle(style)) {
+    engine = 'none'
+  } else {
+    try {
+      engine = resolveCaptionEngine()
+    } catch (e) {
+      throw e
+    }
   }
   // Only burn local drawtext when explicitly requested — never as silent ZapCap fallback.
   const burnCaptions = engine === 'local'
@@ -161,7 +165,9 @@ export async function renderEofProductionVideo({
   if (burnCaptions && !captionFont) {
     console.warn('[eof-video] No caption font found — captions will be missing from the Short.')
   }
-  if (engine === 'none') {
+  if (style === 'off') {
+    console.info('[eof-video] captions off — clean plate')
+  } else if (engine === 'none') {
     console.warn(
       '[eof-video] No ZapCap key — rendering clean plate without captions. Set ZAPCAP_API_KEY for CapCut-class burn.',
     )

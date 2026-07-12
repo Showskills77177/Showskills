@@ -1,12 +1,11 @@
 /**
  * CapCut-class caption styles for Eyes Of Football Shorts.
- * Three production looks — local ffmpeg drawtext always works;
- * optional ZapCap templates when ZAPCAP_API_KEY is set.
+ * ZapCap templates when keyed; `off` skips burn entirely (user choice).
  */
 
 export const EOF_DEFAULT_CAPTION_STYLE = 'pop'
 
-/** @typedef {'pop' | 'karaoke' | 'beast'} EofCaptionStyleId */
+/** @typedef {'pop' | 'karaoke' | 'beast' | 'off'} EofCaptionStyleId */
 
 /**
  * @type {Array<{
@@ -47,13 +46,27 @@ export const EOF_CAPTION_STYLES = [
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_BEAST',
     zapcapTemplateDefault: '46d20d67-255c-4c6a-b971-31fddcfea7f0',
   },
+  {
+    id: 'off',
+    label: 'Off',
+    detail: 'No on-screen captions — clean plate only.',
+    vibe: 'Voiceover only',
+    displayWords: 0,
+    zapcapTemplateEnv: '',
+    zapcapTemplateDefault: '',
+  },
 ]
 
 const STYLE_IDS = new Set(EOF_CAPTION_STYLES.map((s) => s.id))
 
 export function resolveEofCaptionStyle(style) {
   const id = String(style || EOF_DEFAULT_CAPTION_STYLE).trim().toLowerCase()
+  if (id === 'none' || id === 'disabled' || id === 'off') return 'off'
   return STYLE_IDS.has(id) ? id : EOF_DEFAULT_CAPTION_STYLE
+}
+
+export function captionsEnabledForStyle(style) {
+  return resolveEofCaptionStyle(style) !== 'off'
 }
 
 export function getEofCaptionStyle(style) {

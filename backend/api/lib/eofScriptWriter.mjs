@@ -872,7 +872,7 @@ Hard rules:
 - Always say football — never soccer.
 - PRESERVE the draft's facts, teams, and meaning — compress, do not replace with generic filler.
 - Hook (scene 1) from the draft's lead. CTA (last scene) from the draft's question.
-- Each scene needs imageQuery: short English stock-photo search (teams/players + action/stadium/celebration) using the word football, not soccer.
+- Each scene needs imageQuery: short English photo search naming the SAME player/club/nation as the caption (plus action like celebrating, presser, training). Prefer recent match photos. Always say football, never soccer. Never use generic queries like "stadium crowd" alone.
 - tags must include "shortsfeed" and football keywords (never NFL / American football).
 - Return JSON only.
 - Format: ${format}. ${formatGuide(format)}`
