@@ -107,12 +107,14 @@ export async function searchPinterestPartnerPins(query, index, token, opts = {})
   if (!items.length) return null
 
   const ranked = rankPinterestPins(items, opts.topic || query, query)
-  // Require a minimum relevance when topic tokens exist; otherwise take top ranked
-  const minScore = scoreImageRelevance(opts.topic || query, opts.topic || query) > 0 ? 3 : 0
+  // Require a stronger name match — Pinterest is full of old/meme pins
+  const minScore = scoreImageRelevance(opts.topic || query, opts.topic || query) > 0 ? 6 : 0
   const relevant = ranked.filter((pin) => {
     const title = String(pin?.title || pin?.description || pin?.alt_text || '')
     return scoreImageRelevance(opts.topic || query, title) >= minScore
   })
+  // Never fall back to irrelevant pins when we have a person/topic name
+  if (!relevant.length && minScore > 0) return null
   const pool = relevant.length ? relevant : ranked
   const pin = pool[Math.max(0, index) % pool.length]
   const images = pin?.media?.images || pin?.images || {}

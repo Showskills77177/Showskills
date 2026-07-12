@@ -15,6 +15,8 @@ import {
 import {
   EOF_DEFAULT_CAPTION_STYLE,
   resolveEofCaptionStyle,
+  normalizeZapcapTemplateId,
+  isZapcapCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
@@ -123,6 +125,7 @@ export async function createEofProductionJob({
   format = null,
   scriptProvider = null,
   captionStyle = EOF_DEFAULT_CAPTION_STYLE,
+  zapcapTemplateId = null,
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
@@ -137,6 +140,9 @@ export async function createEofProductionJob({
   const voiceSettings =
     preset?.engine === 'elevenlabs' ? resolveElevenLabsVoiceSettings(preset, null) : null
   const caption = resolveEofCaptionStyle(captionStyle)
+  const templateId = isZapcapCaptionStyle(caption)
+    ? normalizeZapcapTemplateId(zapcapTemplateId)
+    : ''
 
   let script
   let scriptSource
@@ -168,8 +174,8 @@ export async function createEofProductionJob({
 
   await query(
     `INSERT INTO eof_production_jobs
-     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, zapcap_template_id, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       id,
       t,
@@ -182,6 +188,7 @@ export async function createEofProductionJob({
       voicePreset,
       voiceSettings ? JSON.stringify(voiceSettings) : null,
       caption,
+      templateId || null,
       createdBy || null,
     ],
   )
@@ -329,8 +336,13 @@ export async function updateEofProductionJob(id, patch) {
       : resolveEofCaptionStyle(job.captionStyle)
   const captionEngine =
     patch.captionEngine !== undefined ? patch.captionEngine : job.captionEngine
-  const zapcapTemplateId =
+  let zapcapTemplateId =
     patch.zapcapTemplateId !== undefined ? patch.zapcapTemplateId : job.zapcapTemplateId
+  if (patch.zapcapTemplateId !== undefined || patch.captionStyle !== undefined) {
+    zapcapTemplateId = isZapcapCaptionStyle(captionStyle)
+      ? normalizeZapcapTemplateId(zapcapTemplateId)
+      : ''
+  }
 
   await query(
     `UPDATE eof_production_jobs

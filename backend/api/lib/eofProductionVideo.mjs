@@ -6,7 +6,11 @@ import { runFfmpeg } from './eofFfmpeg.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { mapWithConcurrency } from './eofAsyncPool.mjs'
 import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
-import { resolveEofCaptionStyle, captionsEnabledForStyle } from '../../../shared/eofCaptionStyles.mjs'
+import {
+  resolveEofCaptionStyle,
+  captionsEnabledForStyle,
+  isLocalCaptionStyle,
+} from '../../../shared/eofCaptionStyles.mjs'
 import { resolveCaptionEngine, burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 
@@ -46,7 +50,7 @@ export function eofProductionVideoAbsPath(jobId) {
 }
 
 /**
- * CapCut-class captions via drawtext (or clean plate when ZapCap will burn later).
+ * Local caption burn: live = bottom bar; CapCut styles = mid vignette (escape hatch only).
  */
 function buildSceneVideoFilter({ frames, caption, durationSec, captionFont, captionStyle, burnCaptions }) {
   const base = [
@@ -61,8 +65,14 @@ function buildSceneVideoFilter({ frames, caption, durationSec, captionFont, capt
   }
 
   if (burnCaptions) {
-    // Soft mid vignette — captions sit mid-frame like CapCut / TikTok
-    base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
+    const live = isLocalCaptionStyle(captionStyle)
+    if (live) {
+      // Soft bottom plate for live TV-style subs (above Subscribe CTA)
+      base.push('drawbox=x=0:y=ih*0.74:w=iw:h=ih*0.14:color=black@0.45:t=fill')
+    } else {
+      // Soft mid vignette — CapCut / TikTok mid-frame
+      base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
+    }
     if (captionFont) {
       base.push(
         ...buildCaptionDrawtextFilters({
@@ -132,6 +142,7 @@ async function encodeSceneClip({ scene, workDir, captionFont, captionStyle, burn
  *   mixedAudioPath?: string | null,
  *   outputPath?: string,
  *   captionStyle?: string,
+ *   zapcapTemplateId?: string | null,
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
  * }} opts
  */
@@ -141,6 +152,7 @@ export async function renderEofProductionVideo({
   mixedAudioPath = null,
   outputPath,
   captionStyle,
+  zapcapTemplateId: preferredZapcapTemplateId,
   onSceneProgress,
 }) {
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
@@ -153,6 +165,9 @@ export async function renderEofProductionVideo({
   let engine
   if (!captionsEnabledForStyle(style)) {
     engine = 'none'
+  } else if (isLocalCaptionStyle(style)) {
+    // Free live subs — always burn locally, never ZapCap
+    engine = 'local'
   } else {
     try {
       engine = resolveCaptionEngine()
@@ -160,7 +175,7 @@ export async function renderEofProductionVideo({
       throw e
     }
   }
-  // Only burn local drawtext when explicitly requested — never as silent ZapCap fallback.
+  // Local burn for live subs; CapCut styles only when EOF_CAPTION_ENGINE=local escape hatch
   const burnCaptions = engine === 'local'
   const captionFont = burnCaptions ? resolveCaptionFont() : null
   if (burnCaptions && !captionFont) {
@@ -168,9 +183,11 @@ export async function renderEofProductionVideo({
   }
   if (style === 'off') {
     console.info('[eof-video] captions off — clean plate')
+  } else if (style === 'live') {
+    console.info('[eof-video] live bottom subtitles (free)')
   } else if (engine === 'none') {
     console.warn(
-      '[eof-video] No ZapCap key — rendering clean plate without captions. Set ZAPCAP_API_KEY for CapCut-class burn.',
+      '[eof-video] No ZapCap key — pick Live subs (free) or set ZAPCAP_API_KEY for CapCut-class burn.',
     )
   }
   console.info('[eof-video] caption style', style, 'engine', engine)
@@ -245,6 +262,7 @@ export async function renderEofProductionVideo({
     const z = await burnZapcapCaptions({
       videoPath: out,
       style,
+      templateId: preferredZapcapTemplateId,
       scenes: sorted.map((s) => ({
         caption: s.caption,
         narration: s.narration || s.caption,
@@ -253,6 +271,10 @@ export async function renderEofProductionVideo({
     })
     captionEngine = z.engine
     zapcapTemplateId = z.templateId || null
+  } else if (engine === 'local' || style === 'live') {
+    zapcapTemplateId = null
+  } else {
+    zapcapTemplateId = preferredZapcapTemplateId || null
   }
 
   const totalDurationSec = sorted.reduce((sum, s) => sum + Math.max(2, Number(s.durationSec) || 3), 0)

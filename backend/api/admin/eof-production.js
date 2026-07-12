@@ -16,15 +16,24 @@ import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBac
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
+import { eofCaptionEngineStatus, listZapcapTemplates } from '../lib/eofZapcapCaptions.mjs'
 import {
   EOF_DEFAULT_CAPTION_STYLE,
   listEofCaptionStyles,
   resolveEofCaptionStyle,
+  normalizeZapcapTemplateId,
+  isZapcapCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
-import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel, buildEofScriptWarning, listEofScriptProviderOptions } from '../lib/eofScriptWriter.mjs'
+import {
+  isEofOpenAiScriptConfigured,
+  eofScriptProviderStatus,
+  preferredEofScriptProvider,
+  eofScriptProviderLabel,
+  buildEofScriptWarning,
+  listEofScriptProviderOptions,
+} from '../lib/eofScriptWriter.mjs'
 import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
-import { eofCaptionEngineStatus } from '../lib/eofZapcapCaptions.mjs'
 import {
   EOF_ELEVENLABS_VOICE_FIELDS,
   EOF_ELEVENLABS_VOICE_LIMITS,
@@ -77,6 +86,12 @@ export default async function handler(req, res) {
         ffmpeg = false
       }
 
+      const zapcapCatalog = await listZapcapTemplates().catch((e) => ({
+        templates: [],
+        error: e instanceof Error ? e.message : String(e),
+        configured: false,
+      }))
+
       return json(res, 200, {
         ok: true,
         jobs,
@@ -92,6 +107,8 @@ export default async function handler(req, res) {
         captionStyles: listEofCaptionStyles(),
         defaultCaptionStyle: EOF_DEFAULT_CAPTION_STYLE,
         captionEngine: eofCaptionEngineStatus(),
+        zapcapTemplates: zapcapCatalog.templates,
+        zapcapTemplatesError: zapcapCatalog.error,
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
         scriptProviders: eofScriptProviderStatus(),
         scriptProviderOptions: listEofScriptProviderOptions(),
@@ -303,6 +320,9 @@ export default async function handler(req, res) {
       const captionStyle = resolveEofCaptionStyle(
         typeof body.captionStyle === 'string' ? body.captionStyle : EOF_DEFAULT_CAPTION_STYLE,
       )
+      const zapcapTemplateId = isZapcapCaptionStyle(captionStyle)
+        ? normalizeZapcapTemplateId(body.zapcapTemplateId)
+        : ''
       try {
         const job = await createEofProductionJob({
           topic,
@@ -311,6 +331,7 @@ export default async function handler(req, res) {
           voicePreset,
           scriptProvider,
           captionStyle,
+          zapcapTemplateId,
         })
         return json(res, 201, {
           ok: true,
@@ -340,6 +361,12 @@ export default async function handler(req, res) {
         musicVolume: body.musicVolume,
         voicePreset: body.voicePreset,
         captionStyle: body.captionStyle !== undefined ? resolveEofCaptionStyle(body.captionStyle) : undefined,
+        zapcapTemplateId:
+          body.zapcapTemplateId !== undefined
+            ? normalizeZapcapTemplateId(body.zapcapTemplateId)
+            : body.captionStyle !== undefined && !isZapcapCaptionStyle(body.captionStyle)
+              ? ''
+              : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

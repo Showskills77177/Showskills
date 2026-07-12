@@ -1,6 +1,7 @@
 /**
- * CapCut-class caption burn-in for EOF Shorts (ffmpeg drawtext).
- * Three looks: pop (Hormozi), karaoke fill, beast bounce.
+ * Caption burn-in for EOF Shorts (ffmpeg drawtext).
+ * - live: free bottom subtitles
+ * - pop / karaoke / beast: CapCut mid-frame looks (local fallback only)
  * Works with ffmpeg-static (no libass required).
  */
 import {
@@ -209,6 +210,29 @@ function buildBeastFilters({ beats, captionFont }) {
 }
 
 /**
+ * Free live-style subtitles: short phrases along the bottom safe zone
+ * (above Subscribe watermark), white on dark bar — like TV / YouTube CC.
+ */
+export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 6 }) {
+  if (!captionFont || !beats?.length) return []
+  const escapedFont = escapeDrawtext(captionFont)
+  const chunk = Math.max(3, Math.min(8, Number(displayWords) || 6))
+  const filters = []
+  for (let i = 0; i < beats.length; i += chunk) {
+    const group = beats.slice(i, i + chunk)
+    const text = escapeDrawtext(group.map((b) => b.text).join(' '))
+    if (!text) continue
+    const start = group[0].start
+    const end = group[group.length - 1].end
+    // Bottom third, leave room for Subscribe CTA (~bottom 12%)
+    filters.push(
+      `drawtext=${fontExpr(escapedFont)}:text='${text}':fontsize=46:fontcolor=white:borderw=5:bordercolor=black@0.92:shadowcolor=black@0.55:shadowx=0:shadowy=3:x=(w-text_w)/2:y=h*0.78:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+    )
+  }
+  return filters
+}
+
+/**
  * Build drawtext filters for a caption style.
  * @param {{ caption: string, durationSec: number, captionFont: string, style?: string }} opts
  */
@@ -219,6 +243,13 @@ export function buildCaptionDrawtextFilters({ caption, durationSec, captionFont,
   const beats = buildWordBeats(caption, durationSec)
   if (!beats.length) return []
 
+  if (styleId === 'live') {
+    return buildLiveSubtitleFilters({
+      beats,
+      captionFont,
+      displayWords: meta.displayWords,
+    })
+  }
   if (styleId === 'karaoke') {
     return buildKaraokeFilters({ beats, captionFont, displayWords: meta.displayWords })
   }

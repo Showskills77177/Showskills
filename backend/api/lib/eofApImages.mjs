@@ -9,6 +9,7 @@
  *   EOF_AP_IN_MY_PLAN=1     (default) only return items already in your AP plan
  *   EOF_AP_PREFER_PREVIEW=1 (default) prefer preview JPG over full main when available
  */
+import { scoreImageRelevance } from '../../../shared/eofSceneImageQueries.mjs'
 
 function envKey(...names) {
   for (const n of names) {
@@ -128,9 +129,10 @@ function itemMeta(entry) {
 
 /**
  * Search AP Media for a picture matching the scene query.
- * @returns {Promise<null | { href: string, pricetag?: string, title?: string, apItemId?: string, role?: string, queryUsed: string }>}
+ * Newest first (versioncreated:desc), then topic-relevance ranked.
+ * @returns {Promise<null | { href: string, pricetag?: string, title?: string, apItemId?: string, role?: string, queryUsed: string, relevance?: number }>}
  */
-export async function searchApMediaPicture(query, index = 0) {
+export async function searchApMediaPicture(query, index = 0, opts = {}) {
   const key = getApMediaApiKey()
   if (!key) return null
 
@@ -139,6 +141,7 @@ export async function searchApMediaPicture(query, index = 0) {
   const preferPreview = String(process.env.EOF_AP_PREFER_PREVIEW || '1').trim() !== '0'
   const pageSize = 15
   const page = Math.floor(Math.max(0, index) / pageSize) + 1
+  const topic = String(opts.topic || query || '').trim()
 
   const url = new URL('https://api.ap.org/media/v/content/search')
   url.searchParams.set('q', q)
@@ -160,8 +163,24 @@ export async function searchApMediaPicture(query, index = 0) {
   const items = extractItems(data)
   if (!items.length) return null
 
-  const pick = items[Math.max(0, index) % items.length]
-  const { item, title, id } = itemMeta(pick)
+  const ranked = items
+    .map((entry, idx) => {
+      const meta = itemMeta(entry)
+      const relevance = scoreImageRelevance(topic, meta.title || '')
+      return { entry, idx, relevance, ...meta }
+    })
+    .sort((a, b) => {
+      if (b.relevance !== a.relevance) return b.relevance - a.relevance
+      return a.idx - b.idx
+    })
+
+  const minScore = scoreImageRelevance(topic, topic) > 0 ? 4 : 0
+  const pool = ranked.filter((r) => r.relevance >= minScore)
+  const use = pool.length ? pool : ranked
+  const pickRow = use[Math.max(0, index) % use.length]
+  if (!pickRow) return null
+
+  const { item, title, id, relevance } = pickRow
   const rendition = pickRendition(collectRenditions(item), { preferPreview })
   if (!rendition?.href) return null
 
@@ -173,6 +192,7 @@ export async function searchApMediaPicture(query, index = 0) {
     title,
     apItemId: id,
     queryUsed: query,
+    relevance,
   }
 }
 

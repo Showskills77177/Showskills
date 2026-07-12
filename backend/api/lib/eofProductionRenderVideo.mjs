@@ -141,6 +141,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       scenes: scenesForVideo,
       mixedAudioPath: mixedPath,
       captionStyle: job.captionStyle,
+      zapcapTemplateId: job.zapcapTemplateId,
       onSceneProgress: async (done) => report('video', done),
     })
     const { relPath } = rendered
@@ -181,7 +182,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       narrationManifest: updatedManifest,
       script: nextScript,
       captionEngine: rendered.captionEngine || null,
-      zapcapTemplateId: rendered.zapcapTemplateId || null,
+      // Keep the chosen template when ZapCap ran; clear for live/off
+      zapcapTemplateId:
+        rendered.zapcapTemplateId !== undefined
+          ? rendered.zapcapTemplateId
+          : job.zapcapTemplateId || null,
       errorMessage: null,
     })
   } catch (e) {

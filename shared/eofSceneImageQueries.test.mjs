@@ -30,6 +30,24 @@ describe('eofSceneImageQueries', () => {
     assert.ok(scoreImageRelevance('Ronaldo', 'NFL american football draft') < 0)
   })
 
+  it('treats Tuchel as a coach, not a player', () => {
+    const qs = buildSceneImageSearchQueries({ topic: 'Thomas Tuchel', sceneIndex: 0 })
+    assert.ok(qs.some((q) => /manager|coach/i.test(q)))
+    assert.ok(!qs.some((q) => /football player/i.test(q)))
+    const angle = defaultSceneImageQuery('Thomas Tuchel', 0)
+    assert.match(angle, /manager|coach|sideline|press|training/i)
+  })
+
+  it('boosts current-year + name hits for coaches', () => {
+    const year = new Date().getFullYear()
+    const good = scoreImageRelevance(
+      'Thomas Tuchel',
+      `Thomas Tuchel England manager press conference ${year}`,
+    )
+    const old = scoreImageRelevance('Thomas Tuchel', 'Dortmund throwback 2013 archive')
+    assert.ok(good > old)
+  })
+
   it('defaultSceneImageQuery stays on-topic', () => {
     const q = defaultSceneImageQuery('Erling Haaland', 0)
     assert.match(q, /Haaland/i)

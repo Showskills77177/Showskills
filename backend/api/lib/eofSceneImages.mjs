@@ -158,32 +158,16 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
-    // Prefer Pinterest when keyed — topic-ranked + newer pins first
-    if (pinterestToken) {
-      try {
-        const hit = await searchPinterestPartnerPins(query, index, pinterestToken, { topic })
-        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
-          return {
-            path: outPath,
-            source: 'pinterest',
-            imageQuery: query,
-            pinId: hit.pinId,
-            pinTitle: hit.title,
-            relevance: hit.relevance,
-          }
-        }
-      } catch (e) {
-        console.warn('[eof-scene-images] Pinterest search failed', query, e)
-      }
-    }
-
-    // Associated Press editorial images
+    // AP editorial first — newest-first + topic-ranked (best for “latest Tuchel” etc.)
     if (isEofApImagesConfigured()) {
       try {
-        const hit = await searchApMediaPicture(query, index)
+        const hit = await searchApMediaPicture(query, index, { topic })
         if (hit) {
-          const okTitle = !hit.title || scoreImageRelevance(topic || query, hit.title) >= 0
-          if (okTitle && (await downloadApRenditionToFile(hit, outPath))) {
+          const score =
+            typeof hit.relevance === 'number'
+              ? hit.relevance
+              : scoreImageRelevance(topic || query, hit.title || '')
+          if (score >= 0 && (await downloadApRenditionToFile(hit, outPath))) {
             return {
               path: outPath,
               source: 'ap',
@@ -191,6 +175,7 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
               imageTitle: hit.title,
               apItemId: hit.apItemId,
               apRole: hit.role,
+              relevance: score,
             }
           }
         }
@@ -204,19 +189,38 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
         const hit = await searchGoogleCseImages(query, index)
         if (hit) {
           const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`)
-          if (score < 0) continue
-          if (await downloadImageToFile(hit.imgUrl, outPath)) {
+          if (score >= 4 && (await downloadImageToFile(hit.imgUrl, outPath))) {
             return {
               path: outPath,
               source: 'google',
               imageQuery: query,
               imageTitle: hit.title,
               sourcePage: hit.sourcePage,
+              relevance: score,
             }
           }
         }
       } catch (e) {
         console.warn('[eof-scene-images] Google image search failed', query, e)
+      }
+    }
+
+    // Pinterest after editorial sources — often old fan pins / memes
+    if (pinterestToken) {
+      try {
+        const hit = await searchPinterestPartnerPins(query, index, pinterestToken, { topic })
+        if (hit && (hit.relevance ?? 0) >= 4 && (await downloadImageToFile(hit.imgUrl, outPath))) {
+          return {
+            path: outPath,
+            source: 'pinterest',
+            imageQuery: query,
+            pinId: hit.pinId,
+            pinTitle: hit.title,
+            relevance: hit.relevance,
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] Pinterest search failed', query, e)
       }
     }
 
@@ -242,13 +246,13 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
       const hit = await searchWikimediaCommonsImages(query, index)
       if (hit) {
         const score = scoreImageRelevance(topic || query, hit.title || '')
-        if (score < 0) continue
-        if (await downloadImageToFile(hit.imgUrl, outPath)) {
+        if (score >= 4 && (await downloadImageToFile(hit.imgUrl, outPath))) {
           return {
             path: outPath,
             source: 'wikimedia',
             imageQuery: query,
             imageTitle: hit.title,
+            relevance: score,
           }
         }
       }

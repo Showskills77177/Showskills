@@ -1,6 +1,7 @@
 /**
  * Scene image search queries for EOF Shorts.
- * Prefer topic-specific football photos (player/club/event) over generic stadium stock.
+ * Prefer topic-specific football photos (player/club/event/manager) over generic stadium stock.
+ * Bias toward current year / “latest” and never treat coaches as “football player”.
  */
 
 const STOP = new Set([
@@ -50,6 +51,20 @@ const STOP = new Set([
   'said',
 ])
 
+/** Well-known managers/coaches — avoid “football player” image queries. */
+const KNOWN_COACH_RE =
+  /\b(tuchel|guardiola|klopp|mourinho|ancelotti|arteta|slot|postecoglou|ten\s*hag|conte|sarri|flick|nagelsmann|spalletti|deschamps|scaloni|southgate|xabi\s*alonso|alonso|de\s*zerbi|emery|roger[s]?|kompany|inzaghi|pirez|pirlo|lampard|gerrard|neville)\b/i
+
+const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
+
+/**
+ * @param {string} topic
+ */
+export function topicLooksLikeCoach(topic) {
+  const t = String(topic || '')
+  return COACH_ROLE_RE.test(t) || KNOWN_COACH_RE.test(t)
+}
+
 /**
  * Pull searchable topic tokens (names, clubs, competitions).
  * @param {string} topic
@@ -88,12 +103,20 @@ export function extractTopicImageTokens(topic) {
   )
 }
 
-const SCENE_ANGLES = [
+const PLAYER_ANGLES = [
   (core) => `${core} football`,
   (core) => `${core} match`,
   (core) => `${core} celebrating`,
   (core) => `${core} press conference`,
   (core) => `${core} training`,
+]
+
+const COACH_ANGLES = [
+  (core) => `${core} manager`,
+  (core) => `${core} coach press conference`,
+  (core) => `${core} sideline`,
+  (core) => `${core} training ground`,
+  (core) => `${core} England manager`,
 ]
 
 /**
@@ -106,16 +129,20 @@ export function buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex = 0
   const tokens = extractTopicImageTokens(name)
   const core = tokens.slice(0, 3).join(' ') || name || 'football'
   const year = new Date().getFullYear()
-  const angle = SCENE_ANGLES[sceneIndex % SCENE_ANGLES.length](core)
+  const coach = topicLooksLikeCoach(`${name} ${custom}`)
+  const angles = coach ? COACH_ANGLES : PLAYER_ANGLES
+  const angle = angles[sceneIndex % angles.length](core)
+  const roleTag = coach ? 'manager' : 'football'
 
   const queries = [
     custom,
-    // Force recency bias in the query text for Pinterest / Google / AP
+    // Force recency bias in the query text for AP / Google / Pinterest
     `${core} ${year}`,
-    `${core} latest`,
+    `${core} latest ${year}`,
     angle,
-    name && name !== core ? `${name} football ${year}` : '',
-    tokens[0] ? `${tokens[0]} football player` : '',
+    coach ? `${core} football manager ${year}` : '',
+    name && name !== core ? `${name} ${roleTag} ${year}` : '',
+    tokens[0] ? `${tokens[0]} ${coach ? 'football manager' : 'football'}` : '',
     // Weak generics only as last resorts
     name ? `${name} football` : '',
   ]
@@ -125,6 +152,7 @@ export function buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex = 0
 
 /**
  * Score a candidate image title/description against the topic (higher = better).
+ * Requires a real name/token hit — random stadiums and throwbacks score low.
  * @param {string} topic
  * @param {string} haystack
  */
@@ -133,14 +161,27 @@ export function scoreImageRelevance(topic, haystack) {
   const hay = String(haystack || '').toLowerCase()
   if (!hay || !tokens.length) return 0
   let score = 0
+  let strongHit = false
   for (const t of tokens) {
-    if (hay.includes(t.toLowerCase())) score += Math.min(8, t.length)
+    if (!hay.includes(t)) continue
+    score += Math.min(10, Math.max(4, t.length))
+    if (t.length >= 5 || t.includes(' ')) strongHit = true
   }
   // Soft boost for football context; soft penalty for off-sport noise
-  if (/\b(football|soccer|premier|liga|serie|bundesliga|champions|world cup|fifa)\b/i.test(hay)) {
+  if (/\b(football|soccer|premier|liga|serie|bundesliga|champions|world cup|fifa|england|manager|coach)\b/i.test(hay)) {
     score += 3
   }
+  if (topicLooksLikeCoach(topic) && /\b(manager|coach|sideline|press conference|england)\b/i.test(hay)) {
+    score += 4
+  }
+  const year = new Date().getFullYear()
+  if (hay.includes(String(year))) score += 6
+  else if (hay.includes(String(year - 1))) score += 3
+  // Throwback / archival noise
+  if (/\b(throwback|archive|young|childhood|retro|199\d|200\d|201[0-8])\b/i.test(hay)) score -= 8
   if (/\b(nfl|nba|mlb|nhl|rugby|cricket|american football)\b/i.test(hay)) score -= 12
+  // Person topics without a surname/name hit are useless stock
+  if (!strongHit && tokens.some((t) => t.length >= 5 || t.includes(' '))) score -= 6
   return score
 }
 
@@ -153,5 +194,6 @@ export function defaultSceneImageQuery(topic, sceneIndex) {
   const name = String(topic || '').trim() || 'football'
   const tokens = extractTopicImageTokens(name)
   const core = tokens.slice(0, 2).join(' ') || name
-  return SCENE_ANGLES[sceneIndex % SCENE_ANGLES.length](core)
+  const angles = topicLooksLikeCoach(name) ? COACH_ANGLES : PLAYER_ANGLES
+  return angles[sceneIndex % angles.length](core)
 }

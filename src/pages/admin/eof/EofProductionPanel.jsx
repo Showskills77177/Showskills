@@ -110,6 +110,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
   const [captionStyles, setCaptionStyles] = useState([])
   const [captionStyle, setCaptionStyle] = useState(EOF_DEFAULT_CAPTION_STYLE)
+  const [zapcapTemplates, setZapcapTemplates] = useState([])
+  const [zapcapTemplatesError, setZapcapTemplatesError] = useState('')
+  const [zapcapTemplateId, setZapcapTemplateId] = useState('')
+  const [zapcapTemplateFilter, setZapcapTemplateFilter] = useState('')
   const [captionEngine, setCaptionEngine] = useState({ engine: 'local', zapcap: false, local: true })
   const [voicePresets, setVoicePresets] = useState([])
   const [voicePreset, setVoicePreset] = useState(EOF_DEFAULT_VOICE_PRESET)
@@ -194,6 +198,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setCaptionStyles(Array.isArray(j.captionStyles) ? j.captionStyles : [])
       if (j.defaultCaptionStyle) setCaptionStyle((prev) => prev || j.defaultCaptionStyle)
       if (j.captionEngine && typeof j.captionEngine === 'object') setCaptionEngine(j.captionEngine)
+      setZapcapTemplates(Array.isArray(j.zapcapTemplates) ? j.zapcapTemplates : [])
+      setZapcapTemplatesError(typeof j.zapcapTemplatesError === 'string' ? j.zapcapTemplatesError : '')
       setVoicePresets(Array.isArray(j.voicePresets) ? j.voicePresets : [])
       if (j.defaultVoicePreset) setVoicePreset((prev) => prev || j.defaultVoicePreset)
       setElevenLabsConfigured(Boolean(j.elevenLabsConfigured))
@@ -274,6 +280,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.script?.format) setFormat(job.script.format)
     if (job.voicePreset) setVoicePreset(job.voicePreset)
     if (job.captionStyle) setCaptionStyle(job.captionStyle)
+    setZapcapTemplateId(job.zapcapTemplateId || '')
     if (job.voiceSettings) {
       setVoiceSettings(normalizeElevenLabsVoiceSettings(job.voiceSettings))
     } else if (job.voicePreset === 'brian') {
@@ -717,7 +724,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, format, voicePreset, scriptProvider, captionStyle }),
+        body: JSON.stringify({
+          topic,
+          format,
+          voicePreset,
+          scriptProvider,
+          captionStyle,
+          zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
+        }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not create script')
@@ -762,6 +776,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           script: draftScript,
           voicePreset,
           captionStyle,
+          zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
         }),
       })
@@ -1109,10 +1124,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <p>
               Images:{' '}
               {[
-                imageSources.ap && 'AP Images',
+                imageSources.ap && 'AP (latest first)',
                 imageSources.google && 'Google',
-                imageSources.pexels && 'Pexels',
                 imageSources.pinterestApi && 'Pinterest',
+                imageSources.pexels && 'Pexels',
                 'Wikimedia',
               ]
                 .filter(Boolean)
@@ -1122,10 +1137,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <p>
               Captions:{' '}
               {captionEngine.zapcap
-                ? 'ZapCap ready'
-                : captionEngine.engine === 'local'
-                  ? 'Local drawtext (escape hatch)'
-                  : 'Not configured'}
+                ? 'ZapCap ready · Live subs free'
+                : 'Live subs free (ZapCap optional)'}
             </p>
             {captionEngine.note ? <p className="text-[#fbbf24]">{captionEngine.note}</p> : null}
             {scriptBillingNote ? <p className="text-[#fbbf24]">{scriptBillingNote}</p> : null}
@@ -1218,29 +1231,34 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <p className={PX.label}>Captions</p>
             {captionStyle === 'off' ? (
               <p className={`mt-1 text-xs ${PX.muted}`}>Captions off — clean plate, voiceover only.</p>
+            ) : captionStyle === 'live' ? (
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                Free live subtitles along the bottom — no ZapCap cost or ZapCap watermark.
+              </p>
             ) : !captionEngine.zapcap ? (
               <p className="mt-1 text-xs text-[#fbbf24]">
-                Add ZAPCAP_API_KEY on Vercel for CapCut-class word-synced captions. Without it (and not Off), Shorts render with no on-screen text.
+                CapCut templates need ZAPCAP_API_KEY. Use Live subs (free) for bottom captions without it.
               </p>
             ) : (
-              <p className={`mt-1 text-xs ${PX.muted}`}>ZapCap burn (~$0.10/min) — or pick Off for no captions.</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                Pick any ZapCap template below (~$0.10/min). Free ZapCap credits stamp a ZapCap watermark —
+                Pro removes it. Live / Off stay free.
+              </p>
             )}
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {(captionStyles.length
-                ? captionStyles
-                : [
-                    { id: 'pop', label: 'Pop', detail: 'Hormozi word pops', vibe: 'Hooks' },
-                    { id: 'karaoke', label: 'Karaoke', detail: 'Active word highlight', vibe: 'News' },
-                    { id: 'beast', label: 'Beast', detail: 'Neon single words', vibe: 'Hype' },
-                    { id: 'off', label: 'Off', detail: 'No captions', vibe: 'Voiceover only' },
-                  ]
-              ).map((s) => {
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                { id: 'live', label: 'Live subs (free)', vibe: 'Bottom TV-style' },
+                { id: 'off', label: 'Off', vibe: 'Voiceover only' },
+              ].map((s) => {
                 const active = captionStyle === s.id
                 return (
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => setCaptionStyle(s.id)}
+                    onClick={() => {
+                      setCaptionStyle(s.id)
+                      setZapcapTemplateId('')
+                    }}
                     className={`rounded-xl border px-4 py-3 text-left transition ${
                       active
                         ? 'border-white/30 bg-[#272727]'
@@ -1250,11 +1268,93 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     <span className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}>
                       {s.label}
                     </span>
-                    <span className="mt-0.5 block text-xs text-[#aaaaaa]">{s.vibe || s.detail}</span>
+                    <span className="mt-0.5 block text-xs text-[#aaaaaa]">{s.vibe}</span>
                   </button>
                 )
               })}
             </div>
+
+            {captionEngine.zapcap ? (
+              <div className="mt-4 space-y-2">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <p className={PX.label}>
+                    ZapCap templates{zapcapTemplates.length ? ` (${zapcapTemplates.length})` : ''}
+                  </p>
+                  <input
+                    value={zapcapTemplateFilter}
+                    onChange={(e) => setZapcapTemplateFilter(e.target.value)}
+                    placeholder="Filter templates…"
+                    className={`${inputCls} max-w-xs py-1.5 text-xs`}
+                  />
+                </div>
+                {zapcapTemplatesError ? (
+                  <p className="text-xs text-[#fbbf24]">{zapcapTemplatesError}</p>
+                ) : null}
+                {zapcapTemplates.length ? (
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
+                    <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                      {zapcapTemplates
+                        .filter((t) => {
+                          const q = zapcapTemplateFilter.trim().toLowerCase()
+                          if (!q) return true
+                          return (
+                            String(t.name || '').toLowerCase().includes(q) ||
+                            String(t.description || '').toLowerCase().includes(q) ||
+                            String(t.category || '').toLowerCase().includes(q)
+                          )
+                        })
+                        .map((t) => {
+                          const active =
+                            (captionStyle === 'zapcap' ||
+                              captionStyle === 'pop' ||
+                              captionStyle === 'karaoke' ||
+                              captionStyle === 'beast') &&
+                            zapcapTemplateId === t.id
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                setCaptionStyle('zapcap')
+                                setZapcapTemplateId(t.id)
+                              }}
+                              className={`rounded-lg border px-3 py-2 text-left transition ${
+                                active
+                                  ? 'border-white/35 bg-[#272727]'
+                                  : 'border-transparent hover:border-[#444] hover:bg-[#1c1c1c]'
+                              }`}
+                              title={t.description || t.id}
+                            >
+                              <span
+                                className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}
+                              >
+                                {t.name}
+                              </span>
+                              {t.category ? (
+                                <span className="mt-0.5 block text-[11px] text-[#888]">{t.category}</span>
+                              ) : null}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className={`text-xs ${PX.muted}`}>
+                    No ZapCap templates returned yet — check the API key, or use Live / Off.
+                  </p>
+                )}
+                {zapcapTemplateId ? (
+                  <p className={`text-xs ${PX.muted}`}>
+                    Selected template{' '}
+                    <span className="text-[#d4d4d4]">
+                      {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.name || zapcapTemplateId}
+                    </span>
+                  </p>
+                ) : captionStyle === 'zapcap' ? (
+                  <p className="text-xs text-[#fbbf24]">Choose a ZapCap template above before rendering.</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {!loading && voicePreset === 'brian' && !elevenLabsConfigured ? (
@@ -1428,26 +1528,48 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 <label className="text-[10px] text-[#aaa]">
                   Captions
                   <select
-                    value={captionStyle}
+                    value={
+                      captionStyle === 'zapcap' && zapcapTemplateId
+                        ? `zapcap:${zapcapTemplateId}`
+                        : captionStyle
+                    }
                     onChange={(e) => {
-                      setCaptionStyle(e.target.value)
+                      const v = e.target.value
+                      if (v.startsWith('zapcap:')) {
+                        setCaptionStyle('zapcap')
+                        setZapcapTemplateId(v.slice('zapcap:'.length))
+                      } else {
+                        setCaptionStyle(v)
+                        if (v === 'live' || v === 'off') setZapcapTemplateId('')
+                      }
                       markDraftDirty()
                     }}
-                    className={`${inputCls} mt-0.5 min-w-[150px] py-1.5 text-xs`}
+                    className={`${inputCls} mt-0.5 min-w-[180px] py-1.5 text-xs`}
                   >
-                    {(captionStyles.length
-                      ? captionStyles
-                      : [
-                          { id: 'pop', label: 'Pop (Hormozi)' },
-                          { id: 'karaoke', label: 'Karaoke fill' },
-                          { id: 'beast', label: 'Beast bounce' },
-                          { id: 'off', label: 'Off' },
-                        ]
-                    ).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
+                    <option value="live">Live subs (free)</option>
+                    <option value="off">Off</option>
+                    {zapcapTemplates.length ? (
+                      <optgroup label="ZapCap templates">
+                        {zapcapTemplates.map((t) => (
+                          <option key={t.id} value={`zapcap:${t.id}`}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : (
+                      (captionStyles.length
+                        ? captionStyles.filter((s) => s.engine === 'zapcap')
+                        : [
+                            { id: 'pop', label: 'Pop (Hormozi)' },
+                            { id: 'karaoke', label: 'Karaoke fill' },
+                            { id: 'beast', label: 'Beast bounce' },
+                          ]
+                      ).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </label>
                 <button
@@ -1504,10 +1626,17 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       9:16 with voiceover and images
                       {selected.captionStyle === 'off' || selected.captionEngine === 'none'
                         ? ' · captions off'
-                        : selected.captionEngine === 'zapcap'
-                          ? ` · ZapCap captions${selected.zapcapTemplateId ? ` (${String(selected.zapcapTemplateId).slice(0, 8)}…)` : ''}`
-                          : selected.captionEngine === 'local'
-                            ? ' · local drawtext captions'
+                        : selected.captionStyle === 'live' || selected.captionEngine === 'local'
+                          ? ' · live bottom subtitles'
+                          : selected.captionEngine === 'zapcap' || selected.zapcapTemplateId
+                            ? ` · ZapCap${
+                                selected.zapcapTemplateId
+                                  ? ` · ${
+                                      zapcapTemplates.find((t) => t.id === selected.zapcapTemplateId)?.name ||
+                                      `${String(selected.zapcapTemplateId).slice(0, 8)}…`
+                                    }`
+                                  : ''
+                              }`
                             : ''}
                       .
                     </p>
