@@ -1094,7 +1094,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           </p>
         ) : null}
         <p className={`mt-1 text-[11px] ${EOF.muted}`}>
-          Scope: football worldwide — World Cup, club, and international. Always say <span className="text-[#9ecbff]">football</span>, never soccer. Default format is Breaking news. Example: “Spain beat Belgium World Cup”.
+          Scope: football worldwide — World Cup, club, and international. Always say{' '}
+          <span className="text-[#9ecbff]">football</span>, never soccer. Use{' '}
+          <span className="text-[#9ecbff]">Quote Short</span> for attributed lines (Rooney / coaches / studio) —
+          Generate sources the quote, then writes the Short. Scheduler can run Quote Shorts automatically.
         </p>
 
         {renderStack ? (
@@ -1136,7 +1139,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               className={inputCls}
-              placeholder={format === 'news' ? 'e.g. Spain beat Belgium at the World Cup' : 'e.g. Cristiano Ronaldo'}
+              placeholder={
+                format === 'quote'
+                  ? 'e.g. Rooney on Ronaldo — or leave short and Generate will source a quote'
+                  : format === 'news'
+                    ? 'e.g. Spain beat Belgium at the World Cup'
+                    : 'e.g. Cristiano Ronaldo'
+              }
               minLength={2}
               required
             />

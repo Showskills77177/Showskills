@@ -107,6 +107,27 @@ export default async function handler(req, res) {
         return json(res, 200, { ok: true, ...topics })
       }
 
+      if (action === 'quote-topics') {
+        const { sourceEofFootballQuote, quoteHitToHeadline } = await import('../lib/eofQuoteSourcing.mjs')
+        const count = Math.min(5, Math.max(1, Number(body.count) || 3))
+        const topics = []
+        for (let i = 0; i < count; i++) {
+          const { quote, source } = await sourceEofFootballQuote({
+            topic: typeof body.topic === 'string' ? body.topic : '',
+            format: 'quote',
+          })
+          topics.push({
+            headline: quoteHitToHeadline(quote),
+            angle: `${quote.speaker}${quote.role ? ` (${quote.role})` : ''}: "${quote.quote}"`,
+            desks: quote.sources?.length ? quote.sources : [quote.outlet].filter(Boolean),
+            whyNow: quote.whyItBites || quote.context || '',
+            quote,
+            source,
+          })
+        }
+        return json(res, 200, { ok: true, topics, source: topics[0]?.source || 'template' })
+      }
+
       const settings = await updateEofSchedulerSettings({
         enabled: body.enabled,
         hourUtc: body.hourUtc,

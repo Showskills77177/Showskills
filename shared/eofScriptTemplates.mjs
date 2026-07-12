@@ -11,6 +11,12 @@ function newSceneId() {
 /** Football Short formats — association football worldwide; never American football / NFL. */
 export const EOF_SCRIPT_FORMATS = [
   {
+    id: 'quote',
+    label: 'Quote Short',
+    detail:
+      'Attributed quote from BBC/Sky/presser (or your quote pages) → reaction Short. Best for bite-worthy lines people argue about.',
+  },
+  {
     id: 'listicle',
     label: '5 facts listicle',
     detail: 'Hook → 3 football angles → closer. Best default for player topics.',
@@ -220,6 +226,46 @@ function newsScript(topic) {
   }
 }
 
+/** Quote-driven Short — attributed line → context → stakes → CTA. */
+function quoteScript(topic) {
+  const headline = String(topic || '').trim() || 'Football quote'
+  const lines = [
+    {
+      role: 'hook',
+      caption: headline.slice(0, 90),
+      imageQuery: defaultSceneImageQuery(headline, 0),
+    },
+    {
+      role: 'body',
+      caption: `Where it was said — studio, presser, or desk`,
+      imageQuery: defaultSceneImageQuery(headline, 1),
+    },
+    {
+      role: 'body',
+      caption: `Who it hits — player, coach, nation, or system`,
+      imageQuery: defaultSceneImageQuery(headline, 2),
+    },
+    {
+      role: 'body',
+      caption: `Why fans are arguing about it right now`,
+      imageQuery: defaultSceneImageQuery(headline, 3),
+    },
+    {
+      role: 'cta',
+      caption: `Agree or disagree? Drop your take`,
+      imageQuery: defaultSceneImageQuery(headline, 4),
+    },
+  ]
+  return {
+    topic: headline,
+    title: headline.slice(0, 90),
+    description: `${headline}. Eyes Of Football quote Short. #Shorts #shortsfeed #football`,
+    tags: [...tagify(headline), 'quotes', 'footballnews'].slice(0, 12),
+    format: 'quote',
+    scenes: lines.map((l) => createEofScene(l)),
+  }
+}
+
 /**
  * Build a Short script optimised for on-screen captions + stock images.
  * @param {string} topic
@@ -230,6 +276,8 @@ export function buildFactsShortScript(topic, opts = {}) {
   const format = String(opts.format || EOF_DEFAULT_SCRIPT_FORMAT).trim() || EOF_DEFAULT_SCRIPT_FORMAT
 
   switch (format) {
+    case 'quote':
+      return quoteScript(name)
     case 'hook_reveal':
       return hookRevealScript(name)
     case 'debate':

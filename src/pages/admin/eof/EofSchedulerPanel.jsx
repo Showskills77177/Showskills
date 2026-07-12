@@ -122,6 +122,26 @@ export default function EofSchedulerPanel({ isOwner, onOpenJob }) {
     }
   }
 
+  async function loadQuoteTopics() {
+    setBusy(true)
+    setErr('')
+    try {
+      const res = await apiFetch('/api/admin/eof-scheduler', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'quote-topics', count: 3 }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not load quote topics')
+      setNewsTopics(j.topics || [])
+      setNewsSource(j.source || 'quote')
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : 'Error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!isOwner) {
     return <p className={`text-sm ${EOF.muted}`}>Daily Short scheduler is available to the channel owner.</p>
   }
@@ -136,7 +156,7 @@ export default function EofSchedulerPanel({ isOwner, onOpenJob }) {
         <h2 className="text-base font-semibold text-white">Daily Short scheduler</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           {note ||
-            'Automatically composes a football news Short (World Cup + worldwide) with Grok 4.5, builds it, writes title/hashtags (#shortsfeed), picks a thumbnail, and sends it to YouTube Studio.'}
+            'Automatically composes a football Short (news or Quote Short), builds it, writes title/hashtags (#shortsfeed), picks a thumbnail, and sends it to YouTube Studio. Set Script format to Quote Short for attributed BBC/Sky/presser quotes.'}
         </p>
 
         {success ? (
@@ -235,7 +255,15 @@ export default function EofSchedulerPanel({ isOwner, onOpenJob }) {
                 onClick={loadNewsTopics}
                 className="rounded-full border border-[#303030] px-4 py-2 text-sm text-white disabled:opacity-50"
               >
-                Preview news topics (Grok)
+                Preview news topics
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={loadQuoteTopics}
+                className="rounded-full border border-[#3ea6ff]/40 px-4 py-2 text-sm text-[#9ecbff] disabled:opacity-50"
+              >
+                Preview quote topics
               </button>
             </div>
           </form>

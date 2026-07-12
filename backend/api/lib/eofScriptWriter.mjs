@@ -34,6 +34,11 @@ import {
   researchFootballTopicWithPerplexity,
   formatPerplexityResearchForPrompt,
 } from './eofPerplexityClient.mjs'
+import {
+  sourceEofFootballQuote,
+  quoteHitToContext,
+  quoteHitToHeadline,
+} from './eofQuoteSourcing.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -137,6 +142,8 @@ export function isEofOpenAiScriptConfigured() {
 
 function formatGuide(format) {
   return {
+    quote:
+      '5 scenes: QUOTE hook (speaker + line) → where it was said → who it targets → why fans bite → agree/disagree CTA.',
     listicle:
       '5 scenes: cold-open hook that creates a curiosity gap, then 3 specific football angles (club/nation/era/rivalry/style/pressure), then a comment CTA.',
     hook_reveal:
@@ -152,6 +159,8 @@ function formatGuide(format) {
 
 function draftFormatGuide(format) {
   return {
+    quote:
+      'QUOTE SHORT: Open with the speaker + the quote (or a tight paraphrase). Then where it was said (BBC studio / Sky / presser / newspaper). Then who it hits and why fans argue. End with agree/disagree CTA. Do not write an essay — punchy spoken VO.',
     listicle:
       'Structure: hook → 3 punchy football beats → CTA. Each beat = one concrete club/nation/era fact. No essay padding.',
     hook_reveal:
@@ -187,6 +196,9 @@ export function buildEofDraftShell({ topic, format, plainTextDraft, title, sourc
 function templatePlainTextDraft(topic, format) {
   const name = String(topic || '').trim() || 'This football story'
   const clean = name.replace(/\s+/g, ' ')
+  if (format === 'quote' || /["“].+["”]|:\s*"/.test(clean)) {
+    return `${clean} — and that line is already splitting football fans. It was said in public, not in a group chat, so the stakes are real: reputation, selection, and who gets the blame. Strip the noise and you still have a clear football argument. Agree or disagree with that quote? Comment.`
+  }
   if (format === 'news' || /\bworld cup|transfer|injury|manager|final|derby\b/i.test(clean)) {
     if (/spain/i.test(clean) && /belgium/i.test(clean)) {
       return `Spain just sent a World Cup message — they beat Belgium with control, not chaos. For Belgium, another tournament night ends with the same question: talent without a ruthless edge. Spain now look like a side that can manage big games, not just dominate possession. Are Spain genuine contenders from here, or was this one good night? Comment.`
@@ -274,19 +286,37 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
   let ctx = String(context || '').trim()
   let resolvedTopic = null
 
-  try {
-    const brief = await withBudget(
-      resolveEofScriptBrief({ topic: rawTopic, format: fmt, scriptProvider }),
-      25000,
-      'topic resolve',
-    )
-    if (brief?.resolved && brief.topic) {
-      t = brief.topic
-      resolvedTopic = brief.topic
-      ctx = [ctx, brief.context].filter(Boolean).join('\n')
+  // Quote Shorts: source an attributed quote first (BBC/Sky/presser/desks)
+  if (fmt === 'quote') {
+    try {
+      const sourced = await withBudget(sourceEofFootballQuote({ topic: rawTopic, format: fmt }), 55000, 'quote source')
+      if (sourced?.quote) {
+        const headline = quoteHitToHeadline(sourced.quote)
+        if (headline) {
+          t = headline
+          resolvedTopic = headline
+        }
+        ctx = [ctx, quoteHitToContext(sourced.quote)].filter(Boolean).join('\n\n')
+        console.info('[eof-script] quote sourced via', sourced.source, sourced.quote.speaker)
+      }
+    } catch (e) {
+      console.warn('[eof-script] quote source skipped', e instanceof Error ? e.message : e)
     }
-  } catch (e) {
-    console.warn('[eof-script] topic resolve skipped', e instanceof Error ? e.message : e)
+  } else {
+    try {
+      const brief = await withBudget(
+        resolveEofScriptBrief({ topic: rawTopic, format: fmt, scriptProvider }),
+        25000,
+        'topic resolve',
+      )
+      if (brief?.resolved && brief.topic) {
+        t = brief.topic
+        resolvedTopic = brief.topic
+        ctx = [ctx, brief.context].filter(Boolean).join('\n')
+      }
+    } catch (e) {
+      console.warn('[eof-script] topic resolve skipped', e instanceof Error ? e.message : e)
+    }
   }
 
   // Live desk headlines (BBC / Guardian / Sky RSS) + optional Perplexity Sonar sourcing

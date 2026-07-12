@@ -1,12 +1,13 @@
 /**
  * Daily EOF Short automation:
- * pick football news (worldwide / World Cup) → Grok 4.5 script → Build Short → Studio meta (#shortsfeed) → YouTube.
+ * pick topic (news or quote) → script pipeline → Build Short → Studio meta (#shortsfeed) → YouTube.
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { createEofProductionJob, getEofProductionJob, updateEofProductionJob } from './eofProductionJobs.mjs'
 import { renderEofProductionFullBuild } from './eofProductionRenderRunner.mjs'
 import { ensureEofVideoOnDisk, ensureEofSceneImageOnDisk } from './eofProductionArtifacts.mjs'
 import { pickEofDailyNewsTopic } from './eofNewsTopics.mjs'
+import { pickEofDailyQuoteTopic } from './eofQuoteSourcing.mjs'
 import { composeEofStudioMeta } from './eofStudioMeta.mjs'
 import {
   getEofSchedulerSettings,
@@ -61,9 +62,10 @@ export async function runEofDailyShortPipeline(opts = {}) {
   let projectId = null
 
   try {
-    const news = await pickEofDailyNewsTopic()
     const format = settings.format || 'news'
     const voicePreset = settings.voicePreset || 'british'
+    const news =
+      format === 'quote' ? await pickEofDailyQuoteTopic() : await pickEofDailyNewsTopic()
 
     const job = await createEofProductionJob({
       topic: news.topic,
@@ -76,7 +78,7 @@ export async function runEofDailyShortPipeline(opts = {}) {
     })
     jobId = job.id
 
-    // Prefer news format even if create used another default
+    // Keep selected format even if create used another default
     if (job.script && job.script.format !== format) {
       await updateEofProductionJob(jobId, {
         script: { ...job.script, format },
