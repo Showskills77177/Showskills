@@ -20,6 +20,7 @@ import {
   EOF_FOOTBALL_SCOPE,
   EOF_MAX_SCENES,
 } from '../../../shared/eofScriptTemplates.mjs'
+import { adaptPlainTextDraftToScenesLocally, unwrapAdaptJson } from '../../../shared/eofSceneAdapt.mjs'
 import { isXaiConfigured, xaiJsonCompletion, xaiTextCompletion } from './eofXaiClient.mjs'
 import { resolveEofScriptBrief } from './eofNewsTopics.mjs'
 import {
@@ -187,6 +188,7 @@ export function preferredEofScriptProvider() {
 export function eofScriptProviderLabel(provider) {
   if (provider === 'xai') return 'xAI Grok 4.5'
   if (provider === 'openai') return 'OpenAI'
+  if (provider === 'local-split') return 'Draft split (local)'
   if (provider === 'groq') {
     const model = groqModelCandidates()[0]
     return model.includes('llama-3.3')
@@ -1021,6 +1023,12 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
     }
   }
 
+  // Split the approved draft locally — keeps facts + Messi/player image queries (no generic template filler)
+  const local = adaptPlainTextDraftToScenesLocally({ plainTextDraft: draft, topic: t, format: fmt })
+  if (local?.scenes?.length >= 3) {
+    return { script: local, source: 'local-split' }
+  }
+
   // Last resort: template scenes, but keep the human/AI draft attached
   const script = buildFactsShortScript(t, { format: fmt })
   script.plainTextDraft = draft
@@ -1424,8 +1432,9 @@ function parseJsonContent(content) {
 }
 
 function finalizeScript(parsed, topic, format, source, plainTextDraft) {
+  const unwrapped = unwrapAdaptJson(parsed)
   const normalized = normalizeEofScript(
-    { ...parsed, format, plainTextDraft: plainTextDraft || parsed?.plainTextDraft },
+    { ...unwrapped, format, plainTextDraft: plainTextDraft || unwrapped?.plainTextDraft },
     topic,
   )
   if (!normalized || normalized.scenes.length < 3) {
@@ -1598,6 +1607,21 @@ async function adaptWithOpenAi({ draft, topic, format }) {
 
 async function adaptWithGroq({ draft, topic, format }) {
   const { system, user } = buildAdaptPrompt({ draft, topic, format })
-  const parsed = await groqChatJson({ system, user, temperature: 0.4, timeoutMs: 50000 })
-  return finalizeScript(parsed, topic, format, 'groq', draft)
+  try {
+    const parsed = await groqChatJson({ system, user, temperature: 0.4, timeoutMs: 50000 })
+    return finalizeScript(parsed, topic, format, 'groq', draft)
+  } catch (firstErr) {
+    console.warn(
+      '[eof-script] groq json adapt failed, trying text fallback',
+      firstErr instanceof Error ? firstErr.message : firstErr,
+    )
+    const text = await groqChatText({
+      system: `${system}\nReturn ONLY one valid JSON object. No markdown fences or commentary.`,
+      user,
+      temperature: 0.35,
+      timeoutMs: 50000,
+    })
+    const parsed = parseJsonContent(cleanDraftText(text))
+    return finalizeScript(parsed, topic, format, 'groq', draft)
+  }
 }
