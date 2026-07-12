@@ -84,15 +84,23 @@ async function searchPexelsPhoto(query, index, key) {
   const data = await res.json()
   const photos = data.photos || []
   if (!photos.length) return null
-  const photo = photos[index % photos.length]
+  // Prefer photos whose alt text matches the query/topic
+  const ranked = [...photos].sort((a, b) => {
+    const sa = scoreImageRelevance(query, `${a.alt || ''} ${a.photographer || ''}`)
+    const sb = scoreImageRelevance(query, `${b.alt || ''} ${b.photographer || ''}`)
+    return sb - sa
+  })
+  const photo = ranked[0] || photos[index % photos.length]
   const imgUrl =
     photo?.src?.large2x || photo?.src?.large || photo?.src?.portrait || photo?.src?.medium || photo?.src?.original
   if (!imgUrl) return null
   return {
     imgUrl,
     photographer: photo.photographer || null,
+    alt: photo.alt || '',
     pexelsId: photo.id,
     queryUsed: query,
+    relevance: scoreImageRelevance(query, `${photo.alt || ''} ${photo.photographer || ''}`),
   }
 }
 
@@ -166,8 +174,9 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
           const score =
             typeof hit.relevance === 'number'
               ? hit.relevance
-              : scoreImageRelevance(topic || query, hit.title || '')
-          if (score >= 0 && (await downloadApRenditionToFile(hit, outPath))) {
+              : scoreImageRelevance(topic || query, hit.title || '', query)
+          // Require a real topic/entity hit — never accept random AP stock
+          if (score >= 4 && (await downloadApRenditionToFile(hit, outPath))) {
             return {
               path: outPath,
               source: 'ap',
@@ -188,8 +197,8 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
       try {
         const hit = await searchGoogleCseImages(query, index)
         if (hit) {
-          const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`)
-          if (score >= 4 && (await downloadImageToFile(hit.imgUrl, outPath))) {
+          const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`, query)
+          if (score >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
             return {
               path: outPath,
               source: 'google',
@@ -209,7 +218,7 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
     if (pinterestToken) {
       try {
         const hit = await searchPinterestPartnerPins(query, index, pinterestToken, { topic })
-        if (hit && (hit.relevance ?? 0) >= 4 && (await downloadImageToFile(hit.imgUrl, outPath))) {
+        if (hit && (hit.relevance ?? 0) >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
           return {
             path: outPath,
             source: 'pinterest',
@@ -227,13 +236,18 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
     if (pexelsKey) {
       try {
         const hit = await searchPexelsPhoto(query, index, pexelsKey)
-        if (hit && (await downloadImageToFile(hit.imgUrl, outPath))) {
+        const score =
+          typeof hit?.relevance === 'number'
+            ? hit.relevance
+            : scoreImageRelevance(topic || query, hit?.alt || '', query)
+        if (hit && score >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
           return {
             path: outPath,
             source: 'pexels',
             imageQuery: query,
             photographer: hit.photographer,
             pexelsId: hit.pexelsId,
+            relevance: score,
           }
         }
       } catch (e) {
@@ -245,8 +259,8 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
     try {
       const hit = await searchWikimediaCommonsImages(query, index)
       if (hit) {
-        const score = scoreImageRelevance(topic || query, hit.title || '')
-        if (score >= 4 && (await downloadImageToFile(hit.imgUrl, outPath))) {
+        const score = scoreImageRelevance(topic || query, hit.title || '', query)
+        if (score >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
           return {
             path: outPath,
             source: 'wikimedia',

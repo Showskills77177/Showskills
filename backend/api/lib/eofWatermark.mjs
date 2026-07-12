@@ -1,12 +1,12 @@
 /**
  * Eyes Of Football overlays for Shorts (static — never animate / free-roam):
- * - Brand wordmark: solid white, top-left (burned AFTER ZapCap so it sits above ZapCap’s mark)
- * - Subscribe CTA: bottom-center
+ * - Brand logo: circular World Cup badge, top-left, sized to cover ZapCap’s free corner stamp
+ * - Subscribe CTA: OFF by default (was cluttering the Short)
  *
  * Env:
  *   EOF_WATERMARK=1|0
- *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE
- *   EOF_SUBSCRIBE=1|0
+ *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE / EOF_WATERMARK_X / EOF_WATERMARK_Y
+ *   EOF_SUBSCRIBE=1|0  (default off)
  *   EOF_SUBSCRIBE_PATH / EOF_SUBSCRIBE_WIDTH
  */
 import { existsSync } from 'node:fs'
@@ -41,8 +41,9 @@ export function isEofWatermarkEnabled() {
   return envEnabled('EOF_WATERMARK', true)
 }
 
+/** Subscribe CTA is off unless EOF_SUBSCRIBE=1 — it cluttered the Short. */
 export function isEofSubscribeEnabled() {
-  return envEnabled('EOF_SUBSCRIBE', true)
+  return envEnabled('EOF_SUBSCRIBE', false)
 }
 
 export function resolveEofWatermarkPath() {
@@ -78,9 +79,8 @@ async function probeDurationSec(videoPath) {
 }
 
 /**
- * Burn brand watermark + subscribe CTA onto a finished Short MP4 (in place).
- * Applied after ZapCap so EOF marks sit above any ZapCap free-tier watermark.
- * Both overlays stay fixed for the full duration (no motion).
+ * Burn brand watermark (+ optional subscribe) onto a finished Short MP4 (in place).
+ * Applied AFTER ZapCap so the circular EOF badge sits on top of ZapCap’s free stamp.
  * @param {{ videoPath: string, durationSec?: number }} opts
  */
 export async function applyEofWatermark({ videoPath, durationSec } = {}) {
@@ -96,8 +96,10 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  // Wordmark wide enough to read over ZapCap’s corner stamp
-  const cornerW = Math.max(160, Math.min(360, Number(process.env.EOF_WATERMARK_SIZE) || 240))
+  // Large top-left badge — covers ZapCap’s free corner stamp (no white wordmark, no roam)
+  const cornerW = Math.max(280, Math.min(520, Number(process.env.EOF_WATERMARK_SIZE) || 440))
+  const markX = Math.max(4, Math.min(80, Number(process.env.EOF_WATERMARK_X) || 16))
+  const markY = Math.max(8, Math.min(120, Number(process.env.EOF_WATERMARK_Y) || 24))
   const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
 
   const inputs = ['-y', '-i', videoPath]
@@ -111,9 +113,8 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
     inputs.push('-loop', '1', '-t', durArg, '-i', mark)
     const i = inputIdx
     inputIdx += 1
-    // Opaque white wordmark — no fade / no roam
-    filterParts.push(`[${i}:v]format=rgba,scale=${cornerW}:-1[wm]`)
-    filterParts.push(`[${lastLabel}][wm]overlay=x=24:y=40:format=auto[v_wm]`)
+    filterParts.push(`[${i}:v]format=rgba,scale=${cornerW}:${cornerW}[wm]`)
+    filterParts.push(`[${lastLabel}][wm]overlay=x=${markX}:y=${markY}:format=auto[v_wm]`)
     lastLabel = 'v_wm'
   }
 
@@ -164,6 +165,8 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
       watermarkPath: mark,
       subscribePath: sub,
       cornerW,
+      markX,
+      markY,
       subW,
       static: true,
       total,

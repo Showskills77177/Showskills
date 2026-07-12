@@ -53,4 +53,17 @@ describe('eofSceneImageQueries', () => {
     assert.match(q, /Haaland/i)
     assert.match(q, /football|match|celebrating|press|training/i)
   })
+
+  it('Messi World Cup topics search Messi first, not generic World Cup stock', () => {
+    const topic = 'Messi shines at World Cup 2026'
+    const tokens = extractTopicImageTokens(topic)
+    assert.ok(tokens[0] && /messi/i.test(tokens[0]), `expected Messi-first tokens, got ${tokens}`)
+    const qs = buildSceneImageSearchQueries({ topic, sceneIndex: 0 })
+    assert.ok(qs[0] && /messi/i.test(qs[0]), `first query should include Messi: ${qs[0]}`)
+    assert.ok(!/^world cup/i.test(qs[0]))
+    const good = scoreImageRelevance(topic, 'Lionel Messi Argentina World Cup celebration')
+    const bad = scoreImageRelevance(topic, 'World Cup stadium crowd Mexico 2026')
+    assert.ok(good > 5)
+    assert.ok(bad < 0, `generic World Cup stock must be rejected, got ${bad}`)
+  })
 })
