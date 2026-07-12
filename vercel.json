@@ -4,7 +4,7 @@
   "functions": {
     "api/[[...slug]].js": {
       "maxDuration": 300,
-      "includeFiles": "assets/fonts/**"
+      "includeFiles": "assets/fonts/**;assets/eof/**"
     }
   },
   "headers": [

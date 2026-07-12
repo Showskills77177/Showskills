@@ -8,6 +8,7 @@ import { mapWithConcurrency } from './eofAsyncPool.mjs'
 import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
 import { resolveEofCaptionStyle, captionsEnabledForStyle } from '../../../shared/eofCaptionStyles.mjs'
 import { resolveCaptionEngine, burnZapcapCaptions } from './eofZapcapCaptions.mjs'
+import { applyEofWatermark } from './eofWatermark.mjs'
 
 const BUNDLED_CAPTION_FONT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -254,6 +255,15 @@ export async function renderEofProductionVideo({
     zapcapTemplateId = z.templateId || null
   }
 
+  const totalDurationSec = sorted.reduce((sum, s) => sum + Math.max(2, Number(s.durationSec) || 3), 0)
+  let watermark = null
+  try {
+    watermark = await applyEofWatermark({ videoPath: out, durationSec: totalDurationSec })
+  } catch (e) {
+    console.warn('[eof-video] watermark skipped', e instanceof Error ? e.message : e)
+    watermark = { applied: false, reason: e instanceof Error ? e.message : String(e) }
+  }
+
   return {
     outputPath: out,
     relPath: eofProductionVideoRelPath(jobId),
@@ -261,5 +271,6 @@ export async function renderEofProductionVideo({
     captionStyle: style,
     captionEngine,
     zapcapTemplateId,
+    watermark,
   }
 }
