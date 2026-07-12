@@ -1,6 +1,11 @@
 import { join } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
-import { EOF_PRODUCTION_JOB_STATUS, buildEofRenderProgress, estimateEofRenderDurationSec } from '../../../shared/eofProduction.mjs'
+import {
+  EOF_PRODUCTION_JOB_STATUS,
+  EOF_VOICE_PRESETS,
+  buildEofRenderProgress,
+  estimateEofRenderDurationSec,
+} from '../../../shared/eofProduction.mjs'
 import {
   getEofProductionJob,
   updateEofProductionJob,
@@ -25,8 +30,15 @@ import {
   clearEofVideoOnlyArtifact,
   clearEofMixedAudioArtifact,
 } from './eofProductionArtifacts.mjs'
+import { getElevenLabsMaxConcurrency } from './eofElevenLabsTts.mjs'
 
-const TTS_CONCURRENCY = Number(process.env.EOF_TTS_CONCURRENCY) || 3
+/** Edge can fan out; ElevenLabs free/starter is hard-capped at 2 concurrent. */
+function resolveTtsConcurrency(voicePreset) {
+  const preset = EOF_VOICE_PRESETS[voicePreset] || {}
+  if (preset.engine === 'elevenlabs') return getElevenLabsMaxConcurrency()
+  const n = Number(process.env.EOF_TTS_CONCURRENCY) || 3
+  return Math.max(1, Math.min(4, Number.isFinite(n) ? Math.floor(n) : 3))
+}
 
 const MAX_INLINE_AUDIO_BYTES = 3_500_000
 
@@ -109,7 +121,8 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
     const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
 
     let scenesDone = 0
-    const sceneManifest = await mapWithConcurrency(job.script.scenes, TTS_CONCURRENCY, async (scene, i) => {
+    const ttsConcurrency = resolveTtsConcurrency(job.voicePreset)
+    const sceneManifest = await mapWithConcurrency(job.script.scenes, ttsConcurrency, async (scene, i) => {
       const outPath = join(workDir, `scene-${i + 1}.mp3`)
       const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]
       const ttsResult = await synthesizeEofSceneNarration({

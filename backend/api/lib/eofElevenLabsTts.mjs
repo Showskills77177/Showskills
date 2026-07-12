@@ -1,6 +1,9 @@
 /**
  * ElevenLabs TTS for EOF production (Brian voice).
  * Docs: POST https://api.elevenlabs.io/v1/text-to-speech/{voice_id}
+ *
+ * Free/Starter plans allow only ~2 concurrent requests — we serialize through a
+ * process-wide slot limiter and back off hard on 429 concurrent_limit_exceeded.
  */
 import { writeFile } from 'node:fs/promises'
 import { mkdirSync } from 'node:fs'
@@ -21,6 +24,13 @@ export function isEofElevenLabsConfigured() {
   return Boolean(getElevenLabsApiKey())
 }
 
+/** Starter/free tier = 2 concurrent; override with EOF_ELEVENLABS_CONCURRENCY. */
+export function getElevenLabsMaxConcurrency() {
+  const n = Number(process.env.EOF_ELEVENLABS_CONCURRENCY || process.env.EOF_TTS_CONCURRENCY || 2)
+  if (!Number.isFinite(n) || n < 1) return 2
+  return Math.min(2, Math.floor(n)) // hard-cap at 2 for typical ElevenLabs plans
+}
+
 function readElevenLabsRequestId(res) {
   return (
     res.headers.get('request-id') ||
@@ -28,6 +38,33 @@ function readElevenLabsRequestId(res) {
     res.headers.get('history-item-id') ||
     null
   )
+}
+
+function isConcurrentLimitError(err) {
+  const msg = String(err?.message || err || '')
+  return /429|concurrent_limit|rate_limit|too many concurrent/i.test(msg)
+}
+
+/** Process-wide gate so parallel Short builds can't exceed ElevenLabs' 2-slot limit. */
+let elevenLabsActive = 0
+const elevenLabsWaiters = []
+
+async function withElevenLabsSlot(fn) {
+  const max = getElevenLabsMaxConcurrency()
+  for (;;) {
+    if (elevenLabsActive < max) {
+      elevenLabsActive += 1
+      break
+    }
+    await new Promise((resolve) => elevenLabsWaiters.push(resolve))
+  }
+  try {
+    return await fn()
+  } finally {
+    elevenLabsActive -= 1
+    const next = elevenLabsWaiters.shift()
+    if (next) next()
+  }
 }
 
 /**
@@ -66,8 +103,12 @@ export async function synthesizeElevenLabsSpeech({
     ? normalizeElevenLabsVoiceSettings(voiceSettings)
     : normalizeElevenLabsVoiceSettings({ stability, similarityBoost, style, speed })
 
-  const model =
-    (modelId || process.env.ELEVENLABS_MODEL || process.env.EOF_ELEVENLABS_MODEL || 'eleven_multilingual_v2').trim()
+  const model = (
+    modelId ||
+    process.env.ELEVENLABS_MODEL ||
+    process.env.EOF_ELEVENLABS_MODEL ||
+    'eleven_multilingual_v2'
+  ).trim()
   const vid = String(voiceId || ELEVENLABS_BRIAN_VOICE_ID).trim() || ELEVENLABS_BRIAN_VOICE_ID
   const outputFormat = (process.env.ELEVENLABS_OUTPUT_FORMAT || 'mp3_44100_128').trim()
 
@@ -89,43 +130,48 @@ export async function synthesizeElevenLabsSpeech({
     payload.previous_request_ids = [priorId]
   }
 
-  const maxAttempts = 3
+  const maxAttempts = 5
   let lastError = null
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': key,
-          Accept: 'audio/mpeg',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      })
+  return withElevenLabsSlot(async () => {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': key,
+            Accept: 'audio/mpeg',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '')
-        throw new Error(`ElevenLabs ${res.status}: ${errText.slice(0, 240) || res.statusText}`)
-      }
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '')
+          throw new Error(`ElevenLabs ${res.status}: ${errText.slice(0, 240) || res.statusText}`)
+        }
 
-      const requestId = readElevenLabsRequestId(res)
-      const buf = Buffer.from(await res.arrayBuffer())
-      if (buf.length < 500) throw new Error('ElevenLabs returned empty audio.')
+        const requestId = readElevenLabsRequestId(res)
+        const buf = Buffer.from(await res.arrayBuffer())
+        if (buf.length < 500) throw new Error('ElevenLabs returned empty audio.')
 
-      mkdirSync(dirname(outPath), { recursive: true })
-      await writeFile(outPath, buf)
-      return { outPath, voiceSettings: settings, requestId, regeneratedFromRequestId: priorId || null }
-    } catch (e) {
-      lastError = e
-      if (attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 500 * attempt))
+        mkdirSync(dirname(outPath), { recursive: true })
+        await writeFile(outPath, buf)
+        return { outPath, voiceSettings: settings, requestId, regeneratedFromRequestId: priorId || null }
+      } catch (e) {
+        lastError = e
+        if (attempt >= maxAttempts) break
+        // Concurrent-limit 429s need a longer cool-down than generic retries
+        const delayMs = isConcurrentLimitError(e)
+          ? 1200 * attempt + Math.floor(Math.random() * 400)
+          : 400 * attempt
+        await new Promise((r) => setTimeout(r, delayMs))
       }
     }
-  }
 
-  const msg = lastError instanceof Error ? lastError.message : String(lastError || 'TTS failed')
-  throw new Error(`ElevenLabs TTS failed after ${maxAttempts} attempts: ${msg}`)
+    const msg = lastError instanceof Error ? lastError.message : String(lastError || 'TTS failed')
+    throw new Error(`ElevenLabs TTS failed after ${maxAttempts} attempts: ${msg}`)
+  })
 }
 
 export { resolveElevenLabsVoiceSettings, normalizeElevenLabsVoiceSettings }
