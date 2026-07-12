@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { mapWithConcurrency } from './eofAsyncPool.mjs'
-import { buildTikTokCaptionBeats, buildTikTokDrawtextFilters } from './eofTikTokCaptions.mjs'
+import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
+import { resolveEofCaptionStyle } from '../../../shared/eofCaptionStyles.mjs'
+import { resolveCaptionEngine, burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 
 const BUNDLED_CAPTION_FONT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -43,9 +45,9 @@ export function eofProductionVideoAbsPath(jobId) {
 }
 
 /**
- * TikTok-style popping captions (chunk beats + bounce), not a static subtitle bar.
+ * CapCut-class captions via drawtext (or clean plate when ZapCap will burn later).
  */
-function buildSceneVideoFilter({ frames, caption, durationSec, captionFont }) {
+function buildSceneVideoFilter({ frames, caption, durationSec, captionFont, captionStyle, burnCaptions }) {
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
     'crop=1080:1920',
@@ -57,18 +59,25 @@ function buildSceneVideoFilter({ frames, caption, durationSec, captionFont }) {
     base.push(`fps=${VIDEO_FPS}`)
   }
 
-  // Soft mid vignette only — captions sit mid-frame like TikTok, not in a subtitle box
-  base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
-
-  if (captionFont) {
-    const beats = buildTikTokCaptionBeats(caption, durationSec)
-    base.push(...buildTikTokDrawtextFilters({ beats, captionFont }))
+  if (burnCaptions) {
+    // Soft mid vignette — captions sit mid-frame like CapCut / TikTok
+    base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
+    if (captionFont) {
+      base.push(
+        ...buildCaptionDrawtextFilters({
+          caption,
+          durationSec,
+          captionFont,
+          style: captionStyle,
+        }),
+      )
+    }
   }
 
   return base.join(',')
 }
 
-async function encodeSceneClip({ scene, workDir, captionFont }) {
+async function encodeSceneClip({ scene, workDir, captionFont, captionStyle, burnCaptions }) {
   const dur = Math.max(2, Number(scene.durationSec) || 3)
   const frames = Math.max(1, Math.ceil(dur * VIDEO_FPS))
   const clipPath = join(workDir, `clip-${scene.index + 1}.mp4`)
@@ -79,6 +88,8 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
     caption,
     durationSec: dur,
     captionFont,
+    captionStyle,
+    burnCaptions,
   })
 
   await runFfmpeg(
@@ -119,6 +130,7 @@ async function encodeSceneClip({ scene, workDir, captionFont }) {
  *   scenes: Array<{ index: number, durationSec: number, caption?: string, imagePath: string }>,
  *   mixedAudioPath?: string | null,
  *   outputPath?: string,
+ *   captionStyle?: string,
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
  * }} opts
  */
@@ -127,6 +139,7 @@ export async function renderEofProductionVideo({
   scenes,
   mixedAudioPath = null,
   outputPath,
+  captionStyle,
   onSceneProgress,
 }) {
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
@@ -135,17 +148,28 @@ export async function renderEofProductionVideo({
   const out = outputPath || eofProductionVideoAbsPath(jobId)
   const workDir = dirname(out)
   mkdirSync(workDir, { recursive: true })
-  const captionFont = resolveCaptionFont()
-  if (!captionFont) {
+  const style = resolveEofCaptionStyle(captionStyle)
+  const engine = resolveCaptionEngine()
+  // ZapCap needs a clean plate (no local burn) so Whisper can time words to TTS.
+  const burnCaptions = engine !== 'zapcap'
+  const captionFont = burnCaptions ? resolveCaptionFont() : null
+  if (burnCaptions && !captionFont) {
     console.warn('[eof-video] No caption font found — captions will be missing from the Short.')
   }
+  console.info('[eof-video] caption style', style, 'engine', engine)
 
   let clipsDone = 0
   const clipPaths = await mapWithConcurrency(sorted, CLIP_CONCURRENCY, async (scene) => {
     if (!scene.imagePath || !existsSync(scene.imagePath)) {
       throw new Error(`Scene ${scene.index + 1} image is missing.`)
     }
-    const clipPath = await encodeSceneClip({ scene, workDir, captionFont })
+    const clipPath = await encodeSceneClip({
+      scene,
+      workDir,
+      captionFont,
+      captionStyle: style,
+      burnCaptions,
+    })
     clipsDone += 1
     if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
     return clipPath
@@ -197,5 +221,78 @@ export async function renderEofProductionVideo({
   await runFfmpeg(args, { maxBuffer: 16 * 1024 * 1024 })
 
   if (!existsSync(out)) throw new Error('Video render produced no output file.')
-  return { outputPath: out, relPath: eofProductionVideoRelPath(jobId), hasAudio }
+
+  let captionEngine = burnCaptions ? 'local' : 'pending-zapcap'
+  if (engine === 'zapcap') {
+    try {
+      const z = await burnZapcapCaptions({ videoPath: out, style })
+      captionEngine = z.engine
+    } catch (e) {
+      console.warn('[eof-video] ZapCap failed — falling back to local CapCut captions', e instanceof Error ? e.message : e)
+      // Rebuild with local captions if ZapCap fails
+      const fallbackClips = await mapWithConcurrency(sorted, CLIP_CONCURRENCY, async (scene) => {
+        const font = resolveCaptionFont()
+        return encodeSceneClip({
+          scene,
+          workDir,
+          captionFont: font,
+          captionStyle: style,
+          burnCaptions: true,
+        })
+      })
+      const fbList = join(workDir, 'video-concat-fb.txt')
+      await writeFile(
+        fbList,
+        fallbackClips.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n'),
+        'utf8',
+      )
+      const fbArgs = hasAudio
+        ? [
+            '-y',
+            '-f',
+            'concat',
+            '-safe',
+            '0',
+            '-i',
+            fbList,
+            '-i',
+            mixedAudioPath,
+            '-c:v',
+            'copy',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '192k',
+            '-movflags',
+            '+faststart',
+            '-shortest',
+            out,
+          ]
+        : [
+            '-y',
+            '-f',
+            'concat',
+            '-safe',
+            '0',
+            '-i',
+            fbList,
+            '-c:v',
+            'copy',
+            '-an',
+            '-movflags',
+            '+faststart',
+            out,
+          ]
+      await runFfmpeg(fbArgs, { maxBuffer: 16 * 1024 * 1024 })
+      captionEngine = 'local-fallback'
+    }
+  }
+
+  return {
+    outputPath: out,
+    relPath: eofProductionVideoRelPath(jobId),
+    hasAudio,
+    captionStyle: style,
+    captionEngine,
+  }
 }

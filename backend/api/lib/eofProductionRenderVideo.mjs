@@ -134,6 +134,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       jobId,
       scenes: scenesForVideo,
       mixedAudioPath: mixedPath,
+      captionStyle: job.captionStyle,
       onSceneProgress: async (done) => report('video', done),
     })
 

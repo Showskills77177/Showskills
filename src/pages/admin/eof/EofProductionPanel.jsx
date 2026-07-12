@@ -22,6 +22,7 @@ import {
 } from '../../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
 import { EOF } from './eofStudioTheme'
+import { EOF_DEFAULT_CAPTION_STYLE } from '../../../../shared/eofCaptionStyles.mjs'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
 const SELECTED_JOB_KEY = 'eof_production_selected_job'
@@ -93,6 +94,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [jobs, setJobs] = useState([])
   const [scriptFormats, setScriptFormats] = useState([])
   const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
+  const [captionStyles, setCaptionStyles] = useState([])
+  const [captionStyle, setCaptionStyle] = useState(EOF_DEFAULT_CAPTION_STYLE)
+  const [captionEngine, setCaptionEngine] = useState({ engine: 'local', zapcap: false, local: true })
   const [voicePresets, setVoicePresets] = useState([])
   const [voicePreset, setVoicePreset] = useState(EOF_DEFAULT_VOICE_PRESET)
   const [elevenLabsConfigured, setElevenLabsConfigured] = useState(false)
@@ -170,6 +174,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setJobs(j.jobs || [])
       setScriptFormats(Array.isArray(j.scriptFormats) ? j.scriptFormats : [])
       if (j.defaultScriptFormat) setFormat((prev) => prev || j.defaultScriptFormat)
+      setCaptionStyles(Array.isArray(j.captionStyles) ? j.captionStyles : [])
+      if (j.defaultCaptionStyle) setCaptionStyle((prev) => prev || j.defaultCaptionStyle)
+      if (j.captionEngine && typeof j.captionEngine === 'object') setCaptionEngine(j.captionEngine)
       setVoicePresets(Array.isArray(j.voicePresets) ? j.voicePresets : [])
       if (j.defaultVoicePreset) setVoicePreset((prev) => prev || j.defaultVoicePreset)
       setElevenLabsConfigured(Boolean(j.elevenLabsConfigured))
@@ -249,6 +256,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     setDraftScript(job.script ? JSON.parse(JSON.stringify(job.script)) : null)
     if (job.script?.format) setFormat(job.script.format)
     if (job.voicePreset) setVoicePreset(job.voicePreset)
+    if (job.captionStyle) setCaptionStyle(job.captionStyle)
     if (job.voiceSettings) {
       setVoiceSettings(normalizeElevenLabsVoiceSettings(job.voiceSettings))
     } else if (job.voicePreset === 'brian') {
@@ -692,7 +700,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, format, voicePreset, scriptProvider }),
+        body: JSON.stringify({ topic, format, voicePreset, scriptProvider, captionStyle }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not create script')
@@ -736,6 +744,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           jobId: selectedId,
           script: draftScript,
           voicePreset,
+          captionStyle,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
         }),
       })
@@ -1185,6 +1194,45 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               </select>
             </label>
           </div>
+
+          <div>
+            <p className="text-xs text-[#aaa]">Captions (CapCut-class)</p>
+            <div className="mt-1.5 grid gap-2 sm:grid-cols-3">
+              {(captionStyles.length
+                ? captionStyles
+                : [
+                    { id: 'pop', label: 'Pop (Hormozi)', detail: 'Yellow flash word pops', vibe: 'Hooks' },
+                    { id: 'karaoke', label: 'Karaoke fill', detail: 'Active word highlight', vibe: 'News VO' },
+                    { id: 'beast', label: 'Beast bounce', detail: 'Huge neon single words', vibe: 'Hype' },
+                  ]
+              ).map((s) => {
+                const active = captionStyle === s.id
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setCaptionStyle(s.id)}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                      active
+                        ? 'border-[#3ea6ff]/60 bg-[#122033] ring-1 ring-[#3ea6ff]/30'
+                        : 'border-[#303030] bg-[#121212] hover:border-[#3ea6ff]/30'
+                    }`}
+                  >
+                    <span className={`block text-sm font-semibold ${active ? 'text-[#9ecbff]' : 'text-white'}`}>
+                      {s.label}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-[#717171]">{s.vibe || s.detail}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className={`mt-1.5 text-[10px] ${EOF.muted}`}>
+              Engine:{' '}
+              {captionEngine.zapcap
+                ? 'ZapCap (word-synced) when building — or local CapCut burn-in'
+                : 'Local CapCut burn-in · add ZAPCAP_API_KEY for premium word-sync'}
+            </p>
+          </div>
           {!loading && voicePreset === 'brian' && !elevenLabsConfigured ? (
             <p className="text-xs text-amber-400">
               Brian needs <code className="text-amber-200">ELEVENLABS_API_KEY</code> — or pick Edge British (free).
@@ -1366,6 +1414,30 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     ).map((v) => (
                       <option key={v.id} value={v.id}>
                         {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-[10px] text-[#aaa]">
+                  Captions
+                  <select
+                    value={captionStyle}
+                    onChange={(e) => {
+                      setCaptionStyle(e.target.value)
+                      markDraftDirty()
+                    }}
+                    className={`${inputCls} mt-0.5 min-w-[150px] py-1.5 text-xs`}
+                  >
+                    {(captionStyles.length
+                      ? captionStyles
+                      : [
+                          { id: 'pop', label: 'Pop (Hormozi)' },
+                          { id: 'karaoke', label: 'Karaoke fill' },
+                          { id: 'beast', label: 'Beast bounce' },
+                        ]
+                    ).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
                       </option>
                     ))}
                   </select>

@@ -12,6 +12,10 @@ import {
   parseProductionScript,
   parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
+import {
+  EOF_DEFAULT_CAPTION_STYLE,
+  resolveEofCaptionStyle,
+} from '../../../shared/eofCaptionStyles.mjs'
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
@@ -28,7 +32,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 /** Job metadata only — never pull durable media base64 into list/detail payloads. */
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
-  narration_manifest_json, mixed_audio_path, render_output_path,
+  caption_style, narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
 function parseVoiceSettingsJson(raw) {
@@ -74,6 +78,7 @@ function rowToJob(row) {
     voiceRegenerationCount: Number(row.voice_regeneration_count) || 0,
     voiceNarrationHash: row.voice_narration_hash || null,
     scriptSource: row.script_source || null,
+    captionStyle: resolveEofCaptionStyle(row.caption_style || EOF_DEFAULT_CAPTION_STYLE),
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -115,6 +120,7 @@ export async function createEofProductionJob({
   musicTrackId = null,
   format = null,
   scriptProvider = null,
+  captionStyle = EOF_DEFAULT_CAPTION_STYLE,
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
@@ -128,6 +134,7 @@ export async function createEofProductionJob({
   const preset = EOF_VOICE_PRESETS[voicePreset] || EOF_VOICE_PRESETS[EOF_DEFAULT_VOICE_PRESET]
   const voiceSettings =
     preset?.engine === 'elevenlabs' ? resolveElevenLabsVoiceSettings(preset, null) : null
+  const caption = resolveEofCaptionStyle(captionStyle)
 
   let script
   let scriptSource
@@ -159,8 +166,8 @@ export async function createEofProductionJob({
 
   await query(
     `INSERT INTO eof_production_jobs
-     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       id,
       t,
@@ -172,6 +179,7 @@ export async function createEofProductionJob({
       EOF_DEFAULT_MUSIC_VOLUME,
       voicePreset,
       voiceSettings ? JSON.stringify(voiceSettings) : null,
+      caption,
       createdBy || null,
     ],
   )
@@ -310,6 +318,10 @@ export async function updateEofProductionJob(id, patch) {
     patch.voiceNarrationHash !== undefined ? patch.voiceNarrationHash : job.voiceNarrationHash
   const youtubeProjectId =
     patch.youtubeProjectId !== undefined ? patch.youtubeProjectId : job.youtubeProjectId
+  const captionStyle =
+    patch.captionStyle !== undefined
+      ? resolveEofCaptionStyle(patch.captionStyle)
+      : resolveEofCaptionStyle(job.captionStyle)
 
   await query(
     `UPDATE eof_production_jobs
@@ -329,6 +341,7 @@ export async function updateEofProductionJob(id, patch) {
          voice_regeneration_count = $15,
          voice_narration_hash = $16,
          youtube_project_id = $17,
+         caption_style = $18,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -349,6 +362,7 @@ export async function updateEofProductionJob(id, patch) {
       voiceRegenerationCount,
       voiceNarrationHash,
       youtubeProjectId,
+      captionStyle,
     ],
   )
 

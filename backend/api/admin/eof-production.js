@@ -16,9 +16,15 @@ import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBac
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
+import {
+  EOF_DEFAULT_CAPTION_STYLE,
+  listEofCaptionStyles,
+  resolveEofCaptionStyle,
+} from '../../../shared/eofCaptionStyles.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
 import { isEofOpenAiScriptConfigured, eofScriptProviderStatus, preferredEofScriptProvider, eofScriptProviderLabel, buildEofScriptWarning, listEofScriptProviderOptions } from '../lib/eofScriptWriter.mjs'
 import { isEofElevenLabsConfigured } from '../lib/eofElevenLabsTts.mjs'
+import { eofCaptionEngineStatus } from '../lib/eofZapcapCaptions.mjs'
 import {
   EOF_ELEVENLABS_VOICE_FIELDS,
   EOF_ELEVENLABS_VOICE_LIMITS,
@@ -83,6 +89,9 @@ export default async function handler(req, res) {
         elevenLabsVoiceDefaults: resolveElevenLabsVoiceSettings(EOF_VOICE_PRESETS.brian, null),
         scriptFormats: EOF_SCRIPT_FORMATS,
         defaultScriptFormat: EOF_DEFAULT_SCRIPT_FORMAT,
+        captionStyles: listEofCaptionStyles(),
+        defaultCaptionStyle: EOF_DEFAULT_CAPTION_STYLE,
+        captionEngine: eofCaptionEngineStatus(),
         openAiScriptEnabled: isEofOpenAiScriptConfigured(),
         scriptProviders: eofScriptProviderStatus(),
         scriptProviderOptions: listEofScriptProviderOptions(),
@@ -291,6 +300,9 @@ export default async function handler(req, res) {
           ? body.voicePreset.trim()
           : EOF_DEFAULT_VOICE_PRESET
       const scriptProvider = parseScriptProvider(body)
+      const captionStyle = resolveEofCaptionStyle(
+        typeof body.captionStyle === 'string' ? body.captionStyle : EOF_DEFAULT_CAPTION_STYLE,
+      )
       try {
         const job = await createEofProductionJob({
           topic,
@@ -298,6 +310,7 @@ export default async function handler(req, res) {
           format,
           voicePreset,
           scriptProvider,
+          captionStyle,
         })
         return json(res, 201, {
           ok: true,
@@ -326,6 +339,7 @@ export default async function handler(req, res) {
         musicTrackId: body.musicTrackId,
         musicVolume: body.musicVolume,
         voicePreset: body.voicePreset,
+        captionStyle: body.captionStyle !== undefined ? resolveEofCaptionStyle(body.captionStyle) : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

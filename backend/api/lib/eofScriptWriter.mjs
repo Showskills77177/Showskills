@@ -76,7 +76,7 @@ export function listEofScriptProviderOptions() {
       id: 'auto',
       label: 'Auto',
       configured: true,
-      detail: 'Groq (free) first when set, then OpenAI, then xAI Grok.',
+      detail: 'Groq (free) first when set, then OpenAI. xAI only if no Groq/OpenAI (needs credits).',
     },
     {
       id: 'groq',
@@ -103,7 +103,9 @@ function defaultAutoProviderOrder(status) {
   const order = []
   if (status.groq) order.push('groq')
   if (status.openai) order.push('openai')
-  if (status.xai) order.push('xai')
+  // Skip xAI in Auto when a free/paid writer is already available — xAI without
+  // credits only wastes time and used to be mis-labelled as a Groq key error.
+  if (status.xai && !status.groq && !status.openai) order.push('xai')
   return order
 }
 
@@ -236,9 +238,29 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
       ? String(jobOrSource.scriptFailureDetail || jobOrSource.failureDetail || '').trim()
       : ''
 
-  if (providers.groq) {
-    if (/401|403|invalid.?api.?key|incorrect.?api.?key/i.test(detail)) {
+  const blamed = classifyScriptFailureProvider(detail)
+
+  // xAI 403/no-credits is the most common false alarm — never label it as Groq
+  if (
+    blamed === 'xai' ||
+    /xai|console\.x\.ai|team doesn't have any credits|permission-denied/i.test(detail)
+  ) {
+    if (providers.groq) {
+      return 'xAI has no team credits (console.x.ai) — that is not a Groq problem. Pick Groq in Script AI and click Regenerate script.'
+    }
+    return 'xAI Grok has no team credits (console.x.ai). Add free GROQ_API_KEY at console.groq.com → Vercel → Redeploy, then pick Groq.'
+  }
+
+  if (blamed === 'openai') {
+    return `OpenAI failed (${detail.slice(0, 140)}). Pick Groq (free) in Script AI, or check OPENAI_API_KEY.`
+  }
+
+  if (blamed === 'groq' || providers.groq) {
+    if (/401|invalid.?api.?key|incorrect.?api.?key|wrong.?api.?key/i.test(detail)) {
       return `Groq rejected the API key (${detail.slice(0, 120)}). Fix GROQ_API_KEY on Vercel at console.groq.com, then Redeploy.`
+    }
+    if (/403/.test(detail) && /groq/i.test(detail)) {
+      return `Groq returned 403 (${detail.slice(0, 120)}). Check GROQ_API_KEY / plan at console.groq.com, then Redeploy.`
     }
     if (/429|rate.?limit|quota|tpm|rpm/i.test(detail)) {
       return `Groq rate-limited this request (${detail.slice(0, 120)}). Wait ~1 minute and Regenerate script.`
@@ -253,10 +275,11 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
       return 'Groq returned a draft we rejected as too weak/generic. Click Regenerate script for another pass.'
     }
     if (detail) {
-      return `Groq failed (${detail.slice(0, 160)}). Using a built-in fallback draft — Regenerate after fixing.`
+      return `Script AI failed (${detail.slice(0, 160)}). Using a built-in fallback — pick Groq and Regenerate.`
     }
-    return 'Groq did not return a usable script. Click Regenerate script (or check GROQ_API_KEY on Vercel).'
+    return 'Script AI did not return a usable draft. Pick Groq in Script AI and Regenerate (or check GROQ_API_KEY).'
   }
+
   if (providers.xai) {
     return 'xAI Grok failed — usually no credits on your xAI team (console.x.ai). Add free GROQ_API_KEY on Vercel, pick Groq in Script AI, and Generate again.'
   }
@@ -264,6 +287,19 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
     return 'No working AI script provider. Set free GROQ_API_KEY at console.groq.com → Vercel env → Redeploy.'
   }
   return 'AI script providers failed — using a built-in fallback draft. Check API keys and billing.'
+}
+
+/** Infer which provider owned the last failure (from tagged or raw error text). */
+function classifyScriptFailureProvider(detail) {
+  const d = String(detail || '')
+  if (!d) return null
+  // Prefer explicit [provider] tags from the draft loop
+  const tagged = /\[(groq|openai|xai)\]/gi.exec(d)
+  if (tagged) return tagged[1].toLowerCase()
+  if (/xai|grok-|\bGrok\b|console\.x\.ai|team doesn't have any credits/i.test(d)) return 'xai'
+  if (/groq|api\.groq|llama-3|gpt-oss-20b/i.test(d)) return 'groq'
+  if (/openai|api\.openai|gpt-4/i.test(d)) return 'openai'
+  return null
 }
 
 const DRAFT_FLUFF_RE =
@@ -467,21 +503,30 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
   const attempts = []
   for (const id of order) {
     if (id === 'xai') {
-      attempts.push(() => writeDraftPipeline({ provider: 'xai', topic: t, format: fmt, context: ctx, headlinesText }))
+      attempts.push({
+        id,
+        run: () => writeDraftPipeline({ provider: 'xai', topic: t, format: fmt, context: ctx, headlinesText }),
+      })
     }
     if (id === 'openai') {
-      attempts.push(() => writeDraftPipeline({ provider: 'openai', topic: t, format: fmt, context: ctx, headlinesText }))
+      attempts.push({
+        id,
+        run: () => writeDraftPipeline({ provider: 'openai', topic: t, format: fmt, context: ctx, headlinesText }),
+      })
     }
     if (id === 'groq') {
-      attempts.push(() => writeDraftPipeline({ provider: 'groq', topic: t, format: fmt, context: ctx, headlinesText }))
+      attempts.push({
+        id,
+        run: () => writeDraftPipeline({ provider: 'groq', topic: t, format: fmt, context: ctx, headlinesText }),
+      })
     }
   }
 
-  let failureDetail = ''
+  const failures = []
   let softBest = null
-  for (const run of attempts) {
+  for (const { id, run } of attempts) {
     try {
-      const ai = await withBudget(run(), 90000, 'draft pipeline')
+      const ai = await withBudget(run(), 90000, `${id} draft pipeline`)
       if (ai?.plainTextDraft && !isWeakDraft(ai.plainTextDraft, t)) {
         return {
           ...ai,
@@ -495,15 +540,16 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
           title: ai.title || t.slice(0, 90),
           resolvedTopic,
         }
-        failureDetail = `weak draft rejected then soft-accepted candidate from ${ai.source}`
-        console.warn('[eof-script] draft soft-weak, keeping as candidate', ai?.source, ai?.plainTextDraft?.slice?.(0, 80))
+        failures.push(`[${id}] weak draft kept as soft candidate`)
+        console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai?.plainTextDraft?.slice?.(0, 80))
       } else {
-        failureDetail = `weak/fluff draft rejected from ${ai?.source || 'ai'}`
-        console.warn('[eof-script] draft rejected as weak/fluff', ai?.source, ai?.plainTextDraft?.slice?.(0, 80))
+        failures.push(`[${id}] weak/fluff draft rejected`)
+        console.warn('[eof-script] draft rejected as weak/fluff', id, ai?.plainTextDraft?.slice?.(0, 80))
       }
     } catch (e) {
-      failureDetail = e instanceof Error ? e.message : String(e)
-      console.warn('[eof-script] draft provider failed', failureDetail)
+      const msg = e instanceof Error ? e.message : String(e)
+      failures.push(`[${id}] ${msg}`)
+      console.warn('[eof-script] draft provider failed', id, msg)
     }
   }
 
@@ -516,7 +562,7 @@ export async function writeEofPlainTextDraft({ topic, format, context, scriptPro
     title: t.slice(0, 90),
     source: 'template',
     resolvedTopic,
-    failureDetail: failureDetail || 'no AI provider returned a usable draft',
+    failureDetail: failures.length ? failures.join(' · ') : 'no AI provider returned a usable draft',
   }
 }
 

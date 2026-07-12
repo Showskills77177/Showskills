@@ -115,10 +115,10 @@ export const EOF_RENDER_STACK = {
       'TTS + image fetch + ffmpeg run in the background (waitUntil). Finished MP4 and scene stills are stored in the database so previews work across instances.',
   },
   video: {
-    id: 'ffmpeg-images-audio',
-    label: 'Voiceover + images + pop-in captions → 9:16 Short',
+    id: 'ffmpeg-capcut-captions',
+    label: 'Voiceover + images + CapCut-class captions → 9:16 Short',
     detail:
-      'ElevenLabs Brian narration (or Edge fallback), Wikimedia/Pexels/Google images, TikTok-style popping captions, then mux into short.mp4.',
+      'Three caption looks (Pop / Karaoke / Beast). Local ffmpeg burn-in by default; optional ZapCap (ZAPCAP_API_KEY) for word-synced Hormozi/Beast templates.',
   },
 }
 

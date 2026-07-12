@@ -99,6 +99,7 @@ async function addEofProductionJobColumns() {
     'voice_regeneration_count',
     'voice_narration_hash',
     'script_source',
+    'caption_style',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {
