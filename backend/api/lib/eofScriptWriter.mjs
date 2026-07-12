@@ -313,6 +313,8 @@ function isWeakDraft(text) {
   if (words < 45) return true
   if (words > 280) return true
   if (DRAFT_FLUFF_RE.test(t)) return true
+  if (/\bsoccer\b/i.test(t)) return true
+  if (/\b(NFL|NBA|MLB|NHL)\b/.test(t)) return true
   return false
 }
 
@@ -323,10 +325,29 @@ function isUsableAiDraft(text) {
   return words >= 40
 }
 
+/** Token Jaccard similarity 0–1 — catch near-duplicate regenerations. */
+export function draftSimilarity(a, b) {
+  const tok = (s) =>
+    new Set(
+      String(s || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 2),
+    )
+  const A = tok(a)
+  const B = tok(b)
+  if (!A.size || !B.size) return 0
+  let inter = 0
+  for (const w of A) if (B.has(w)) inter += 1
+  return inter / (A.size + B.size - inter)
+}
+
 /** Fix common Shorts draft gaps instead of throwing the draft away. */
 function normalizeAiDraft(text, topic) {
   let t = cleanDraftText(text)
   if (!t) return t
+  t = t.replace(/\bsoccer\b/gi, 'football')
   // Ensure a comment CTA — missing "?" used to falsely fail the quality gate
   if (!/[?]/.test(t)) {
     const hook = String(topic || 'this')
@@ -448,13 +469,15 @@ export async function writeEofPlainTextDraft({
   if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
   const fmt = resolveFormat(format)
   const prev = String(previousDraft || '').trim()
-  const draftTemperature = regenerate ? 0.95 : 0.45
-  const polishTemperature = regenerate ? 0.7 : 0.3
+  // Regenerate: hotter than first pass, but not chaos — high temp caused invented scores
+  const draftTemperature = regenerate ? 0.72 : 0.42
+  const polishTemperature = regenerate ? 0.25 : 0.28
   const forceAcceptAi = Boolean(regenerate)
 
   let t = rawTopic
   let ctx = String(context || '').trim()
   let resolvedTopic = null
+  let deskSources = null
 
   // Quote Shorts: source an attributed quote first (BBC/Sky/presser/desks)
   if (fmt === 'quote') {
@@ -489,19 +512,23 @@ export async function writeEofPlainTextDraft({
     }
   }
 
-  // Free live sourcing: Guardian Open Platform + BBC/Sky/Guardian RSS (no Perplexity)
+  // Free live sourcing: NewsData.io + Guardian + BBC/Sky/Guardian RSS
   let headlinesText = ''
   try {
     const pack = await withBudget(fetchFreeFootballDeskPack({ topic: t, limit: 8 }), 15000, 'free desk pack')
     headlinesText = pack.text || ''
+    deskSources = pack.sources || null
     if (headlinesText) {
       console.info('[eof-script] free desk pack', pack.sources)
+    } else if (pack.sources?.newsdataConfigured && pack.sources.newsdata === 0) {
+      console.warn('[eof-script] NewsData keyed but returned 0 articles for', t.slice(0, 60))
     }
   } catch (e) {
     console.warn('[eof-script] free desk pack skipped', e instanceof Error ? e.message : e)
     try {
       const headlines = await withBudget(fetchFootballDeskHeadlines({ topic: t, limit: 8 }), 12000, 'desk RSS')
       headlinesText = formatDeskHeadlinesForPrompt(headlines)
+      deskSources = { newsdata: 0, guardian: 0, rss: headlines?.length || 0, newsdataConfigured: isNewsdataConfigured(), guardianConfigured: isGuardianConfigured() }
     } catch (e2) {
       console.warn('[eof-script] desk RSS skipped', e2 instanceof Error ? e2.message : e2)
     }
@@ -558,13 +585,21 @@ export async function writeEofPlainTextDraft({
         console.warn('[eof-script] draft empty/short', id, raw?.plainTextDraft?.slice?.(0, 80))
         continue
       }
-      // On regenerate, never discard a usable AI draft for the canned template
-      if (forceAcceptAi || !isWeakDraft(ai.plainTextDraft)) {
-        return ai
+      if (prev && draftSimilarity(prev, ai.plainTextDraft) >= 0.72) {
+        failures.push(`[${id}] too similar to previous draft`)
+        console.warn('[eof-script] draft too similar to previous', id)
+        softBest = softBest || { ...ai, deskSources }
+        continue
       }
-      softBest = ai
-      failures.push(`[${id}] soft-weak draft kept as candidate`)
-      console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
+      if (isWeakDraft(ai.plainTextDraft)) {
+        softBest = { ...ai, deskSources }
+        failures.push(`[${id}] soft-weak draft kept as candidate`)
+        console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
+        // On regenerate, still try next provider if any — don't force-accept fluff/NFL
+        if (!forceAcceptAi) continue
+        continue
+      }
+      return { ...ai, deskSources }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       failures.push(`[${id}] ${msg}`)
@@ -573,7 +608,7 @@ export async function writeEofPlainTextDraft({
   }
 
   if (softBest) {
-    return softBest
+    return { ...softBest, deskSources: softBest.deskSources || deskSources }
   }
 
   return {
@@ -581,6 +616,7 @@ export async function writeEofPlainTextDraft({
     title: t.slice(0, 90),
     source: 'template',
     resolvedTopic,
+    deskSources,
     failureDetail: failures.length ? failures.join(' · ') : 'no AI provider returned a usable draft',
   }
 }
@@ -646,6 +682,15 @@ export async function writeEofProductionScript({ topic, format, context, scriptP
 }
 
 function buildDraftPrompt({ topic, format, context, previousDraft = '', regenerate = false }) {
+  const angles = [
+    'lead with the result and what it means next',
+    'lead with the quote or claim, then the pushback',
+    'lead with the tactical / selection angle',
+    'lead with the fan / dressing-room reaction',
+    'lead with the timeline — what just changed today',
+  ]
+  const angle = angles[Math.floor(Date.now() / 1000) % angles.length]
+
   const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT essays.
 
 HARD SCOPE:
@@ -657,9 +702,9 @@ SHORTS VOICE (non-negotiable):
 - 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
 - Short sentences. Average under 16 words. Max one clause per beat.
 - Sound like Sky Sports News / BBC Sport desk at 10pm: punchy, opinionated, common-sense.
-- Always say football — never soccer.
+- Always say football — never soccer. Never NFL / NBA / American sports.
 - FIRST SENTENCE must name the player/club/nation AND the event.
-- Use the DESK BRIEF facts. Do not ignore them. Do not invent fake scores or quotes.
+- FACT LOCK: Use ONLY names, scores, clubs, and claims present in the DESK BRIEF. If the brief is thin, stay general — do NOT invent match scores, transfer fees, or fake quotes.
 - Structure for format "${format}": ${draftFormatGuide(format)}
 - End with ONE sharp question for comments (Comment / Drop your take).
 
@@ -668,13 +713,16 @@ BANNED forever:
 
   const regenBlock =
     regenerate && previousDraft
-      ? `\nPREVIOUS DRAFT WAS TOO GENERIC — write a DIFFERENT, sharper voiceover. New angle, new opening line, new CTA. Do not paraphrase the previous draft:\n"""\n${previousDraft.slice(0, 900)}\n"""\n`
+      ? `\nREGENERATE — angle: ${angle}.
+Write a DIFFERENT voiceover: new opening line, new structure, new CTA question.
+Keep the same verified facts from the DESK BRIEF. Do not paraphrase the previous draft sentence-by-sentence.
+PREVIOUS DRAFT (avoid copying):\n"""\n${previousDraft.slice(0, 900)}\n"""\n`
       : regenerate
-        ? `\nThis is a REGENERATE pass (variation seed ${Date.now() % 9973}). Pick a sharper angle than a generic desk summary. New opening line required.\n`
+        ? `\nREGENERATE — angle: ${angle}. New opening line required. Stay inside the DESK BRIEF facts.\n`
         : ''
 
   const user = `Topic / headline: ${topic}
-${context ? `\nDESK BRIEF (source this script from these notes — do not invent beyond them):\n${context}\n` : ''}${regenBlock}
+${context ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${context}\n` : '\nDESK BRIEF: (none returned — do not invent scores or quotes; keep it cautious.)\n'}${regenBlock}
 Write the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
@@ -683,13 +731,13 @@ Write the spoken Shorts voiceover only. No preamble.`
 function buildPolishPrompt({ topic, format, draft }) {
   const system = `You are a ruthless YouTube Shorts editor for Eyes Of Football.
 
-Rewrite the draft into a TIGHTER spoken voiceover. Keep the same facts and meaning.
+Rewrite the draft into a TIGHTER spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
 
 Rules:
 - 90–130 words. Cut every soft phrase.
 - First line must hook with names + event.
 - Short spoken sentences. No book language.
-- Always football, never soccer.
+- Always football, never soccer. Never NFL.
 - Keep one CTA question at the end.
 - Format intent: ${format}. ${draftFormatGuide(format)}
 - Output plain prose only.`
@@ -746,7 +794,9 @@ async function writeDraftPipeline({
       console.warn('[eof-script] research pass skipped', provider, e instanceof Error ? e.message : e)
     }
   } else if (headlinesText) {
-    researchCtx = [context, 'DESK HEADLINES:\n' + headlinesText].filter(Boolean).join('\n\n')
+    researchCtx = [context, 'DESK BRIEF / HEADLINES (SOURCE OF TRUTH):\n' + headlinesText]
+      .filter(Boolean)
+      .join('\n\n')
   }
 
   const draftResult = await writeDraftWithProvider({
@@ -759,6 +809,7 @@ async function writeDraftPipeline({
     regenerate,
   })
   let text = draftResult.plainTextDraft
+  // On regenerate, polish only lightly (already low temp) — skip if polish collapses uniqueness
   try {
     const polished = await polishDraftWithProvider({
       provider,
@@ -767,7 +818,13 @@ async function writeDraftPipeline({
       draft: text,
       temperature: polishTemperature,
     })
-    if (polished && polished.length >= 80) text = polished
+    if (polished && polished.length >= 80) {
+      if (regenerate && previousDraft && draftSimilarity(previousDraft, polished) >= 0.78) {
+        // keep pre-polish draft — polish drifted back toward the old script
+      } else {
+        text = polished
+      }
+    }
   } catch (e) {
     console.warn('[eof-script] polish pass skipped', provider, e instanceof Error ? e.message : e)
   }

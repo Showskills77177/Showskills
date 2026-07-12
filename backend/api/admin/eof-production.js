@@ -122,6 +122,9 @@ export default async function handler(req, res) {
           if (s.groq && !s.newsdata && !s.guardian) {
             return 'Groq is ready. Add NEWSDATA_API_KEY (newsdata.io) or GUARDIAN_API_KEY for richer article sourcing; RSS still works without them.'
           }
+          if (s.newsdata && !s.groq) {
+            return 'NewsData key is set, but scripts still need GROQ_API_KEY (or OpenAI/xAI) to write the voiceover.'
+          }
           if ((s.newsdata || s.guardian) && !s.groq && !s.openai && !s.xai) {
             return 'Article sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
           }
@@ -254,6 +257,7 @@ export default async function handler(req, res) {
           return json(res, 200, {
             ok: true,
             job,
+            deskSources: job.deskSources || null,
             scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
             scriptWarning: buildEofScriptWarning(job),
           })

@@ -36,19 +36,50 @@ export function isGuardianConfigured() {
 
 /**
  * Latest football/sports articles from NewsData.io.
+ * Tries topic+football / sports category first, then looser retries (free tier often
+ * returns [] when category+q is too tight).
  * @returns {Promise<Array<{ desk: string, title: string, description: string, link: string, body: string }>>}
  */
 export async function fetchNewsdataFootballArticles({ topic = '', limit = 8 } = {}) {
   const key = getNewsdataApiKey()
   if (!key) return []
 
-  const q = String(topic || 'football').trim() || 'football'
+  const raw = String(topic || '').trim() || 'football'
+  const attempts = [
+    { q: `${raw} football`.slice(0, 100), category: 'sports' },
+    { q: raw.slice(0, 100), category: 'sports' },
+    { q: raw.slice(0, 100), category: '' },
+  ]
+
+  let lastErr = null
+  for (const attempt of attempts) {
+    try {
+      const rows = await fetchNewsdataOnce({ key, q: attempt.q, category: attempt.category, limit })
+      if (rows.length) return rows
+    } catch (e) {
+      lastErr = e
+      console.warn(
+        '[eof-free-news] NewsData attempt failed',
+        attempt.q.slice(0, 40),
+        e instanceof Error ? e.message : e,
+      )
+    }
+  }
+  if (lastErr) throw lastErr
+  return []
+}
+
+async function fetchNewsdataOnce({ key, q, category, limit }) {
   const url = new URL('https://newsdata.io/api/1/latest')
   url.searchParams.set('apikey', key)
-  url.searchParams.set('q', q.slice(0, 100))
+  url.searchParams.set('q', q)
   url.searchParams.set('language', envKey('NEWSDATA_LANGUAGE', 'EOF_NEWSDATA_LANGUAGE') || 'en')
-  url.searchParams.set('category', envKey('NEWSDATA_CATEGORY', 'EOF_NEWSDATA_CATEGORY') || 'sports')
-  // Free tier often caps size; request modestly
+  if (category) {
+    url.searchParams.set('category', category)
+  } else {
+    const cat = envKey('NEWSDATA_CATEGORY', 'EOF_NEWSDATA_CATEGORY')
+    if (cat) url.searchParams.set('category', cat)
+  }
   url.searchParams.set('size', String(Math.min(10, Math.max(3, limit))))
 
   const controller = new AbortController()
@@ -196,6 +227,7 @@ export async function fetchFreeFootballDeskPack({ topic = '', limit = 8 } = {}) 
 
   const seen = new Set()
   const merged = []
+  // Prefer NewsData editorial hits first, then Guardian, then RSS
   for (const item of [...newsdata, ...guardian, ...rss]) {
     const key = String(item.title || '')
       .toLowerCase()
@@ -206,9 +238,26 @@ export async function fetchFreeFootballDeskPack({ topic = '', limit = 8 } = {}) 
     if (merged.length >= limit) break
   }
 
+  const textParts = []
+  if (newsdata.length) {
+    textParts.push('NEWSDATA.IO (prefer these facts):\n' + formatArticlesForPrompt(newsdata))
+  }
+  if (guardian.length) {
+    textParts.push('THE GUARDIAN:\n' + formatArticlesForPrompt(guardian))
+  }
+  const rssOnly = rss.filter((r) => {
+    const k = String(r.title || '')
+      .toLowerCase()
+      .slice(0, 80)
+    return !newsdata.some((n) => String(n.title || '').toLowerCase().slice(0, 80) === k)
+  })
+  if (rssOnly.length) {
+    textParts.push('DESK RSS:\n' + formatArticlesForPrompt(rssOnly.slice(0, limit)))
+  }
+
   return {
     articles: merged,
-    text: formatArticlesForPrompt(merged),
+    text: textParts.join('\n\n') || formatArticlesForPrompt(merged),
     sources: {
       newsdata: newsdata.length,
       guardian: guardian.length,

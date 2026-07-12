@@ -823,6 +823,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         hydrateDraftFromJob(j.job)
       }
       const nextPlain = String(j.job?.script?.plainTextDraft || '').trim()
+      const ds = j.deskSources || j.job?.deskSources
+      const sourced =
+        ds && typeof ds === 'object'
+          ? ` NewsData ${ds.newsdata || 0} · Guardian ${ds.guardian || 0} · RSS ${ds.rss || 0}.`
+          : ''
       if (j.scriptWarning) {
         setErr(j.scriptWarning)
         setSuccess('Fallback draft loaded. Edit it, or fix AI billing and Regenerate again.')
@@ -831,8 +836,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       } else {
         setSuccess(
           j.scriptProviderLabel
-            ? `Fresh script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}. Edit, then Adapt to scenes.`
-            : 'Fresh script loaded. Edit if needed, then Adapt to scenes.',
+            ? `Fresh script from ${j.scriptProviderLabel}${j.job?.topic ? ` — “${j.job.topic}”` : ''}.${sourced} Edit, then Adapt to scenes.`
+            : `Fresh script loaded.${sourced} Edit if needed, then Adapt to scenes.`,
         )
       }
     } catch (e) {
@@ -1112,13 +1117,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             </p>
             <p>
               Articles:{' '}
-              {[
-                scriptProviders.newsdata && 'NewsData',
-                scriptProviders.guardian && 'Guardian',
-                'RSS',
-              ]
-                .filter(Boolean)
-                .join(' + ')}
+              {scriptProviders.newsdata
+                ? 'NewsData.io keyed (used on each draft/regenerate)'
+                : 'NewsData.io not set'}
+              {scriptProviders.guardian ? ' · Guardian' : ''}
+              {' · RSS'}
             </p>
             <p>Video: {ffmpegAvailable ? 'Ready' : renderNote || 'ffmpeg missing'}</p>
             <p>
