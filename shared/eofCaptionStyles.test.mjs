@@ -59,6 +59,30 @@ describe('zapcap template catalog normalize', () => {
     assert.ok(list.some((t) => t.name === 'Hormozi'))
     assert.ok(list.some((t) => t.name === 'Tracy'))
   })
+
+  it('detects animated (video/gif) vs still previews for CapCut-style thumbnails', () => {
+    const [video] = normalizeZapcapTemplateList([
+      {
+        id: 'ca050348-e2d0-49a7-9c75-7a5e8335c67d',
+        name: 'Pop',
+        previewUrl: 'https://cdn.zapcap.ai/templates/pop.mp4',
+        thumbnailUrl: 'https://cdn.zapcap.ai/templates/pop.jpg',
+      },
+    ])
+    assert.equal(video.previewType, 'video')
+    assert.equal(video.previewUrl, 'https://cdn.zapcap.ai/templates/pop.mp4')
+    assert.equal(video.posterUrl, 'https://cdn.zapcap.ai/templates/pop.jpg')
+
+    const [gif] = normalizeZapcapTemplateList([
+      { id: '21327a45-df89-46bc-8d56-34b8d29d3a0e', name: 'Karaoke', gifUrl: 'https://cdn.zapcap.ai/k.gif' },
+    ])
+    assert.equal(gif.previewType, 'image')
+
+    const [extless] = normalizeZapcapTemplateList([
+      { id: '31327a45-df89-46bc-8d56-34b8d29d3a0e', name: 'Beast', previewUrl: 'https://cdn.zapcap.ai/preview/beast' },
+    ])
+    assert.equal(extless.previewType, 'video') // ZapCap preview clips default to video
+  })
 })
 
 describe('caption drawtext builders', () => {

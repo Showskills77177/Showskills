@@ -63,10 +63,29 @@ async function sleep(ms) {
 let templatesCache = { at: 0, list: null, error: null }
 const TEMPLATES_TTL_MS = 5 * 60 * 1000
 
+/** Pull a usable URL string out of a raw preview field (string or object). */
+function coercePreviewUrl(raw) {
+  if (typeof raw === 'string') return raw.trim() || null
+  if (raw && typeof raw === 'object') {
+    return String(raw.url || raw.href || raw.src || '').trim() || null
+  }
+  return null
+}
+
+/** Classify a preview URL so the UI knows whether to <video> or <img> it. */
+export function classifyPreviewType(url) {
+  const u = String(url || '').toLowerCase().split('?')[0]
+  if (!u) return null
+  if (/\.(mp4|webm|mov|m4v)$/.test(u)) return 'video'
+  if (/\.(gif|webp|png|jpe?g|avif)$/.test(u)) return 'image'
+  return null
+}
+
 /**
  * Normalize ZapCap GET /templates payload into UI-friendly rows.
+ * Separates the animated preview (mp4/gif — the CapCut-style moving demo) from a still poster,
+ * so the panel can autoplay a looping video like CapCut instead of a dead thumbnail.
  * @param {unknown} data
- * @returns {Array<{ id: string, name: string, description: string, previewUrl: string | null, category: string }>}
  */
 export function normalizeZapcapTemplateList(data) {
   const list = Array.isArray(data)
@@ -82,32 +101,69 @@ export function normalizeZapcapTemplateList(data) {
       if (!id) return null
       const name = String(t?.name || t?.title || t?.label || `Template ${id.slice(0, 8)}`).trim()
       const description = String(t?.description || t?.detail || t?.subtitle || '').trim()
-      const previewRaw =
+
+      // Animated demo candidates (video / gif) — this is what CapCut shows
+      const videoRaw =
         t?.previewUrl ||
         t?.preview ||
         t?.preview_url ||
+        t?.videoUrl ||
+        t?.video_url ||
+        t?.gifUrl ||
+        t?.gif_url ||
+        t?.previewGif ||
+        t?.assets?.preview ||
+        t?.assets?.video ||
+        t?.media?.preview ||
+        t?.media?.video ||
+        null
+      // Still poster candidates (shown before the video loads / as fallback)
+      const posterRaw =
         t?.thumbnailUrl ||
         t?.thumbnail_url ||
         t?.thumbnail ||
         t?.imageUrl ||
         t?.image_url ||
-        t?.gifUrl ||
-        t?.gif_url ||
-        t?.previewGif ||
         t?.previewImage ||
-        t?.assets?.preview ||
+        t?.posterUrl ||
+        t?.poster ||
         t?.assets?.thumbnail ||
-        t?.media?.preview ||
         t?.media?.thumbnail ||
         null
-      const previewUrl =
-        typeof previewRaw === 'string'
-          ? previewRaw.trim() || null
-          : previewRaw && typeof previewRaw === 'object'
-            ? String(previewRaw.url || previewRaw.href || previewRaw.src || '').trim() || null
-            : null
+
+      const videoUrl = coercePreviewUrl(videoRaw)
+      const posterUrl = coercePreviewUrl(posterRaw)
+
+      const vType = classifyPreviewType(videoUrl)
+      const pType = classifyPreviewType(posterUrl)
+
+      // previewUrl = the moving demo when available; previewType tells the UI how to render it
+      let previewUrl = null
+      let previewType = null
+      if (vType === 'video' || vType === 'image') {
+        previewUrl = videoUrl
+        previewType = vType
+      } else if (pType) {
+        previewUrl = posterUrl
+        previewType = pType
+      } else if (videoUrl) {
+        previewUrl = videoUrl
+        previewType = 'video' // ZapCap preview clips are usually mp4 even without an extension
+      } else if (posterUrl) {
+        previewUrl = posterUrl
+        previewType = 'image'
+      }
+
       const category = String(t?.category || t?.type || t?.group || '').trim()
-      return { id, name, description, previewUrl, category }
+      return {
+        id,
+        name,
+        description,
+        previewUrl,
+        previewType,
+        posterUrl: posterUrl && posterUrl !== previewUrl ? posterUrl : null,
+        category,
+      }
     })
     .filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name))

@@ -49,6 +49,49 @@ const PX = {
 const inputCls =
   'mt-1.5 w-full rounded-xl border border-[#303030] bg-[#121212] px-3.5 py-2.5 text-sm text-white placeholder:text-[#717171] outline-none transition focus:border-[#555]'
 const SELECTED_JOB_KEY = 'eof_production_selected_job'
+
+/**
+ * Animated caption-style preview (CapCut-like). Plays ZapCap's looping mp4/webm demo,
+ * shows a gif/image when that's what's provided, and falls back to a labelled tile.
+ */
+function CaptionTemplatePreview({ template, className = '', muted = 'text-[#888]' }) {
+  const url = template?.previewUrl || ''
+  const type =
+    template?.previewType ||
+    (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(url)
+      ? 'video'
+      : /\.(gif|webp|png|jpe?g|avif)(\?|$)/i.test(url)
+        ? 'image'
+        : url
+          ? 'video'
+          : null)
+
+  if (url && type === 'video') {
+    return (
+      <video
+        src={url}
+        poster={template?.posterUrl || undefined}
+        className={className}
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="metadata"
+      />
+    )
+  }
+  if (url && type === 'image') {
+    return <img src={url} alt="" loading="lazy" className={className} />
+  }
+  return (
+    <div className={`flex flex-col items-center justify-center gap-1.5 bg-[#0d0d12] px-2 ${className}`}>
+      <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-black shadow">
+        {String(template?.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
+      </span>
+      <span className={`text-center text-[11px] font-bold ${muted}`}>Preview soon</span>
+    </div>
+  )
+}
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 
 function readStoredScriptProvider() {
@@ -1518,32 +1561,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                               }`}
                               title={t.description || t.name || t.id}
                             >
-                              <div className="relative aspect-[9/16] max-h-44 w-full bg-[#0d0d12]">
-                                {t.previewUrl ? (
-                                  <img
-                                    src={t.previewUrl}
-                                    alt=""
-                                    loading="lazy"
-                                    className="h-full w-full object-cover"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none'
-                                      const fallback = e.currentTarget.nextElementSibling
-                                      if (fallback) fallback.classList.remove('hidden')
-                                    }}
-                                  />
-                                ) : null}
-                                <div
-                                  className={`absolute inset-0 flex flex-col items-center justify-center gap-2 px-2 ${
-                                    t.previewUrl ? 'hidden' : ''
-                                  }`}
-                                >
-                                  <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-black shadow">
-                                    {String(t.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
-                                  </span>
-                                  <span className="text-center text-[11px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                                    SAMPLE LOOK
-                                  </span>
-                                </div>
+                              <div className="relative aspect-[9/16] max-h-44 w-full overflow-hidden bg-[#0d0d12]">
+                                <CaptionTemplatePreview
+                                  template={t}
+                                  className="h-full w-full object-cover"
+                                />
                                 {active ? (
                                   <span className="absolute right-1.5 top-1.5 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-black">
                                     Selected
@@ -1576,17 +1598,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 )}
                 {zapcapTemplateId ? (
                   <div className="flex items-start gap-3 rounded-xl border border-[#303030] bg-[#1a1a1a] p-3">
-                    {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.previewUrl ? (
-                      <img
-                        src={zapcapTemplates.find((t) => t.id === zapcapTemplateId).previewUrl}
-                        alt=""
-                        className="h-28 w-16 shrink-0 rounded-md object-cover"
+                    <div className="h-28 w-16 shrink-0 overflow-hidden rounded-md bg-[#0d0d12]">
+                      <CaptionTemplatePreview
+                        template={zapcapTemplates.find((t) => t.id === zapcapTemplateId)}
+                        className="h-full w-full object-cover"
                       />
-                    ) : (
-                      <div className="flex h-28 w-16 shrink-0 items-center justify-center rounded-md bg-[#0d0d12] text-[10px] text-[#888]">
-                        CapCut
-                      </div>
-                    )}
+                    </div>
                     <div className="min-w-0">
                       <p className="text-xs text-[#aaaaaa]">Selected look</p>
                       <p className="truncate text-sm font-medium text-white">
