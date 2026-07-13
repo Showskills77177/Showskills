@@ -1,6 +1,6 @@
 /**
  * Eyes Of Football overlays for Shorts (static — never animate / free-roam):
- * - Brand logo: circular World Cup badge, top-left, sized to cover ZapCap’s free corner stamp
+ * - Brand logo: circular World Cup badge, top-left, sized to JUST cover ZapCap’s free top-left watermark
  * - Subscribe CTA: OFF by default (was cluttering the Short)
  *
  * Env:
@@ -96,11 +96,12 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  // Large top-left badge — covers ZapCap’s free corner stamp (no white wordmark, no roam).
-  // Bigger + corner-hugging by default so it fully sits over the ZapCap mark; tune via env.
-  const cornerW = Math.max(280, Math.min(680, Number(process.env.EOF_WATERMARK_SIZE) || 520))
-  const markX = Math.max(0, Math.min(120, Number(process.env.EOF_WATERMARK_X ?? 0)))
-  const markY = Math.max(0, Math.min(160, Number(process.env.EOF_WATERMARK_Y ?? 0)))
+  // Small top-left badge sized to JUST cover ZapCap’s free top-left watermark (a modest logo,
+  // not a giant badge). ~220px on a 1080-wide Short ≈ the ZapCap mark + a small margin.
+  // Tune with EOF_WATERMARK_SIZE (px, square) and nudge with EOF_WATERMARK_X / EOF_WATERMARK_Y.
+  const cornerW = Math.max(120, Math.min(360, Number(process.env.EOF_WATERMARK_SIZE) || 220))
+  const markX = Math.max(0, Math.min(300, Number(process.env.EOF_WATERMARK_X ?? 0)))
+  const markY = Math.max(0, Math.min(300, Number(process.env.EOF_WATERMARK_Y ?? 0)))
   const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
 
   const inputs = ['-y', '-i', videoPath]
