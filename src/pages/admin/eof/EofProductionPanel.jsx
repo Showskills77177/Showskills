@@ -25,6 +25,8 @@ import { EOF_DEFAULT_CAPTION_STYLE } from '../../../../shared/eofCaptionStyles.m
 import {
   EOF_DEFAULT_TRANSITION_STYLE,
   EOF_DEFAULT_COLOR_GRADE,
+  EOF_TRANSITION_STYLES,
+  EOF_COLOR_GRADES,
 } from '../../../../shared/eofVideoLook.mjs'
 
 /** Clean Production chrome — keep Studio gray panels so cards don’t blend into page black. */
@@ -145,6 +147,156 @@ function CaptionTemplatePreview({
     </div>
   )
 }
+
+/* ── Video-look previews (transitions + color grades) ───────────────────────
+ * Pure CSS/JS mini-previews so the picker stays lightweight (no looping media —
+ * we learned autoplaying many <video>s crashes the tab on memory). Transitions
+ * loop a cheap CSS animation between two sample frames; grades apply a CSS
+ * filter/overlay to a sample frame to approximate the ffmpeg look. */
+
+const EOF_LOOK_CSS = `
+.eoftx-stage{position:relative;overflow:hidden;background:#000}
+.eoftx-frame{position:absolute;inset:0}
+.eoftx-a{z-index:1;opacity:1}
+.eoftx-b{z-index:2;opacity:0;will-change:transform,opacity,clip-path}
+@media (prefers-reduced-motion: no-preference){
+ .eoftx-a-dip{animation:eoftx-dip 3s ease-in-out infinite}
+ .eoftx-b-fade{animation:eoftx-fade 3s ease-in-out infinite}
+ .eoftx-b-dissolve{animation:eoftx-dissolve 3s ease-in-out infinite}
+ .eoftx-b-fadeblack{animation:eoftx-fadeblack 3s ease-in-out infinite}
+ .eoftx-b-slideleft{animation:eoftx-slideleft 3s cubic-bezier(.4,0,.2,1) infinite}
+ .eoftx-b-slideright{animation:eoftx-slideright 3s cubic-bezier(.4,0,.2,1) infinite}
+ .eoftx-b-slideup{animation:eoftx-slideup 3s cubic-bezier(.4,0,.2,1) infinite}
+ .eoftx-b-wipeleft{animation:eoftx-wipeleft 3s ease-in-out infinite}
+ .eoftx-b-circle{animation:eoftx-circle 3s ease-in-out infinite}
+ .eoftx-b-zoom{animation:eoftx-zoom 3s ease-in-out infinite}
+ .eoftx-b-pixel{animation:eoftx-pixel 3s steps(6,end) infinite}
+ .eoftx-b-cut{animation:eoftx-cut 2s steps(1,end) infinite}
+}
+@keyframes eoftx-fade{0%,15%{opacity:0}45%,80%{opacity:1}100%{opacity:0}}
+@keyframes eoftx-dissolve{0%,15%{opacity:0;filter:blur(4px)}45%,80%{opacity:1;filter:blur(0)}100%{opacity:0;filter:blur(4px)}}
+@keyframes eoftx-fadeblack{0%,18%{opacity:0}40%{opacity:0}60%,80%{opacity:1}100%{opacity:0}}
+@keyframes eoftx-dip{0%,12%{opacity:1}30%,58%{opacity:0}82%,100%{opacity:1}}
+@keyframes eoftx-slideleft{0%,15%{transform:translateX(100%);opacity:1}45%,80%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
+@keyframes eoftx-slideright{0%,15%{transform:translateX(-100%);opacity:1}45%,80%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
+@keyframes eoftx-slideup{0%,15%{transform:translateY(100%);opacity:1}45%,80%{transform:translateY(0);opacity:1}100%{transform:translateY(0);opacity:0}}
+@keyframes eoftx-wipeleft{0%,15%{clip-path:inset(0 0 0 100%);opacity:1}45%,80%{clip-path:inset(0 0 0 0);opacity:1}100%{clip-path:inset(0 0 0 0);opacity:0}}
+@keyframes eoftx-circle{0%,15%{clip-path:circle(0% at 50% 50%);opacity:1}45%,80%{clip-path:circle(75% at 50% 50%);opacity:1}100%{clip-path:circle(75% at 50% 50%);opacity:0}}
+@keyframes eoftx-zoom{0%,15%{transform:scale(.2);opacity:0}45%,80%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}
+@keyframes eoftx-pixel{0%,15%{opacity:0;filter:blur(5px) contrast(1.5)}45%,80%{opacity:1;filter:blur(0) contrast(1)}100%{opacity:0;filter:blur(5px)}}
+@keyframes eoftx-cut{0%,49%{opacity:0}50%,100%{opacity:1}}
+`
+
+let eofLookStylesInjected = false
+function useEofLookStyles() {
+  useEffect(() => {
+    if (eofLookStylesInjected || typeof document === 'undefined') return
+    if (document.getElementById('eof-look-preview-styles')) {
+      eofLookStylesInjected = true
+      return
+    }
+    const el = document.createElement('style')
+    el.id = 'eof-look-preview-styles'
+    el.textContent = EOF_LOOK_CSS
+    document.head.appendChild(el)
+    eofLookStylesInjected = true
+  }, [])
+}
+
+/** Cheap gradient "stadium" frame used by transition + grade previews (no image asset). */
+function SampleMiniFrame({ variant = 'a' }) {
+  const bg =
+    variant === 'b'
+      ? 'linear-gradient(180deg,#0b2a4a 0%,#123a63 42%,#0f5132 42%,#0a3d27 100%)'
+      : 'linear-gradient(180deg,#2b6cb0 0%,#5aa9e6 40%,#2f9e5f 40%,#26794a 100%)'
+  return (
+    <div className="relative h-full w-full" style={{ background: bg }}>
+      <div className="absolute left-0 top-[42%] h-px w-full bg-white/40" />
+      <div className="absolute left-1/2 top-[46%] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-white/90" />
+      <div className="absolute bottom-1 left-1/2 h-4 w-6 -translate-x-1/2 rounded-t-md bg-white/10" />
+    </div>
+  )
+}
+
+const TRANSITION_EFFECTS = {
+  auto: 'fade',
+  cut: 'cut',
+  fade: 'fade',
+  fadeblack: 'fadeblack',
+  dissolve: 'dissolve',
+  slideleft: 'slideleft',
+  slideright: 'slideright',
+  slideup: 'slideup',
+  wipeleft: 'wipeleft',
+  circleopen: 'circle',
+  radial: 'zoom',
+  pixelize: 'pixel',
+}
+
+/** Looping CSS preview of a scene-to-scene transition between two sample frames. */
+function TransitionPreview({ styleId, className = '' }) {
+  useEofLookStyles()
+  const effect = TRANSITION_EFFECTS[styleId] || 'fade'
+  return (
+    <div className={`eoftx-stage ${className}`}>
+      <div className={`eoftx-frame eoftx-a ${effect === 'fadeblack' ? 'eoftx-a-dip' : ''}`}>
+        <SampleMiniFrame variant="a" />
+      </div>
+      <div className={`eoftx-frame eoftx-b eoftx-b-${effect}`}>
+        <SampleMiniFrame variant="b" />
+      </div>
+      {styleId === 'auto' ? (
+        <span className="absolute bottom-0.5 left-1/2 z-10 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold uppercase tracking-wide text-white">
+          Auto
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+/** CSS approximation of each ffmpeg color grade, applied to a sample frame. */
+const COLOR_GRADE_PREVIEW = {
+  auto: { filter: 'contrast(1.05) saturate(1.1)', overlay: null, badge: 'Auto' },
+  off: { filter: 'none', overlay: null },
+  match: { filter: 'contrast(1.06) saturate(1.1) brightness(1.02)', overlay: null },
+  punchy: { filter: 'contrast(1.14) saturate(1.4) brightness(1.03)', overlay: null },
+  cinematic: {
+    filter: 'contrast(1.18) saturate(1.02) brightness(0.95)',
+    overlay: 'linear-gradient(180deg, rgba(0,45,70,.30), rgba(70,35,0,.28))',
+  },
+  warm: {
+    filter: 'contrast(1.08) saturate(1.2) brightness(1.03)',
+    overlay: 'linear-gradient(180deg, rgba(255,150,40,.30), rgba(255,90,0,.16))',
+  },
+  cool: {
+    filter: 'contrast(1.09) saturate(1.15)',
+    overlay: 'linear-gradient(180deg, rgba(40,120,255,.30), rgba(0,60,180,.18))',
+  },
+}
+
+/** Still sample frame with the grade's CSS filter + tint overlay so the mood is visible. */
+function ColorGradePreview({ gradeId, className = '' }) {
+  const g = COLOR_GRADE_PREVIEW[gradeId] || COLOR_GRADE_PREVIEW.off
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      <div className="h-full w-full" style={{ filter: g.filter }}>
+        <SampleMiniFrame variant="a" />
+      </div>
+      {g.overlay ? (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: g.overlay, mixBlendMode: 'soft-light' }}
+        />
+      ) : null}
+      {g.badge ? (
+        <span className="absolute bottom-0.5 left-1/2 z-10 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold uppercase tracking-wide text-white">
+          {g.badge}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 
 function readStoredScriptProvider() {
@@ -1423,43 +1575,99 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             </label>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className={PX.label}>
-              Transitions
-              <select
-                value={transitionStyle}
-                onChange={(e) => setTransitionStyle(e.target.value)}
-                className={inputCls}
-              >
-                {(transitionStyles.length
-                  ? transitionStyles
-                  : [{ id: EOF_DEFAULT_TRANSITION_STYLE, label: 'Auto (CapCut pack)' }]
-                ).map((t) => (
-                  <option key={t.id} value={t.id} title={t.detail}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              <span className={`mt-1 block text-xs font-normal ${PX.muted}`}>
-                Auto picks CapCut fades / slides / wipes from the format.
-              </span>
-            </label>
-            <label className={PX.label}>
-              Color match
-              <select value={colorGrade} onChange={(e) => setColorGrade(e.target.value)} className={inputCls}>
-                {(colorGrades.length
-                  ? colorGrades
-                  : [{ id: EOF_DEFAULT_COLOR_GRADE, label: 'Auto (color match)' }]
-                ).map((g) => (
-                  <option key={g.id} value={g.id} title={g.detail}>
-                    {g.label}
-                  </option>
-                ))}
-              </select>
-              <span className={`mt-1 block text-xs font-normal ${PX.muted}`}>
-                Auto grades every scene so mixed stock stills look like one edit.
-              </span>
-            </label>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div>
+              <p className={PX.label}>Transitions</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                See the motion between scenes, then pick one. Auto picks CapCut fades / slides / wipes from
+                the format.
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+                {(transitionStyles.length ? transitionStyles : EOF_TRANSITION_STYLES).map((t) => {
+                  const active = transitionStyle === t.id
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTransitionStyle(t.id)}
+                      className={`overflow-hidden rounded-lg border text-left transition ${
+                        active
+                          ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                          : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+                      }`}
+                      title={t.detail || t.label}
+                    >
+                      <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                        <TransitionPreview styleId={t.id} className="h-full w-full" />
+                        {active ? (
+                          <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                            ✓
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="px-1.5 py-1">
+                        <span
+                          className={`block truncate text-[11px] font-medium leading-tight ${
+                            active ? 'text-white' : 'text-[#e5e5e5]'
+                          }`}
+                        >
+                          {t.label}
+                        </span>
+                        {t.vibe ? (
+                          <span className="mt-0.5 block truncate text-[10px] text-[#888]">{t.vibe}</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div>
+              <p className={PX.label}>Color match</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                Preview the grade, then pick one. Auto grades every scene so mixed stock stills look like one
+                edit.
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+                {(colorGrades.length ? colorGrades : EOF_COLOR_GRADES).map((g) => {
+                  const active = colorGrade === g.id
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setColorGrade(g.id)}
+                      className={`overflow-hidden rounded-lg border text-left transition ${
+                        active
+                          ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                          : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+                      }`}
+                      title={g.detail || g.label}
+                    >
+                      <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                        <ColorGradePreview gradeId={g.id} className="h-full w-full" />
+                        {active ? (
+                          <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                            ✓
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="px-1.5 py-1">
+                        <span
+                          className={`block truncate text-[11px] font-medium leading-tight ${
+                            active ? 'text-white' : 'text-[#e5e5e5]'
+                          }`}
+                        >
+                          {g.label}
+                        </span>
+                        {g.vibe ? (
+                          <span className="mt-0.5 block truncate text-[10px] text-[#888]">{g.vibe}</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           <div>
