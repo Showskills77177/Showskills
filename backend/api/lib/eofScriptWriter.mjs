@@ -1003,6 +1003,14 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
 
+  // Faithful, deterministic split FIRST — keeps the approved script's exact words and
+  // ties every scene image to the named player/club. AI paraphrase tends to butcher a
+  // good draft, so we only fall back to it when the draft can't be split cleanly.
+  const local = adaptPlainTextDraftToScenesLocally({ plainTextDraft: draft, topic: t, format: fmt })
+  if (local?.scenes?.length >= 3) {
+    return { script: local, source: 'local-split' }
+  }
+
   const order = resolveScriptProviderAttemptOrder(scriptProvider)
   const attempts = []
   for (const id of order) {
@@ -1021,12 +1029,6 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
     } catch (e) {
       console.warn('[eof-script] adapt provider failed', e instanceof Error ? e.message : e)
     }
-  }
-
-  // Split the approved draft locally — keeps facts + Messi/player image queries (no generic template filler)
-  const local = adaptPlainTextDraftToScenesLocally({ plainTextDraft: draft, topic: t, format: fmt })
-  if (local?.scenes?.length >= 3) {
-    return { script: local, source: 'local-split' }
   }
 
   // Last resort: template scenes, but keep the human/AI draft attached

@@ -78,6 +78,79 @@ const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
 const KNOWN_PLAYER_RE =
   /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|lewa(ndowski)?|ney(mar)?|benzema|modric|de\s*bruyne|rodri|yamal|pedri|gavi|osimhen|lookman|palmer|rice|son|heung|lavelle|putellas)\b/i
 
+/** Common football mononyms → full name (helps Wikimedia / Pexels / Google find the player). */
+const PLAYER_FULL_NAMES = [
+  [/^messi$/i, 'Lionel Messi'],
+  [/^ronaldo$/i, 'Cristiano Ronaldo'],
+  [/^mbapp/i, 'Kylian Mbappe'],
+  [/^haaland$/i, 'Erling Haaland'],
+  [/^bellingham$/i, 'Jude Bellingham'],
+  [/^saka$/i, 'Bukayo Saka'],
+  [/^foden$/i, 'Phil Foden'],
+  [/^kane$/i, 'Harry Kane'],
+  [/^salah$/i, 'Mohamed Salah'],
+  [/^vinicius$/i, 'Vinicius Junior'],
+  [/^yamal$/i, 'Lamine Yamal'],
+  [/^pedri$/i, 'Pedri Gonzalez'],
+  [/^gavi$/i, 'Gavi Barcelona'],
+  [/^rodri$/i, 'Rodri Manchester City'],
+  [/^rice$/i, 'Declan Rice'],
+  [/^palmer$/i, 'Cole Palmer'],
+  [/^modric$/i, 'Luka Modric'],
+  [/^benzema$/i, 'Karim Benzema'],
+  [/^neymar$/i, 'Neymar Jr'],
+  [/^lewandowski$/i, 'Robert Lewandowski'],
+  [/^osimhen$/i, 'Victor Osimhen'],
+  [/^lookman$/i, 'Ademola Lookman'],
+  [/^son$/i, 'Son Heung-min'],
+]
+
+/**
+ * @param {string} lead
+ * @returns {string}
+ */
+export function expandPlayerFullName(lead) {
+  const l = String(lead || '').trim()
+  for (const [re, full] of PLAYER_FULL_NAMES) {
+    if (re.test(l)) return full
+  }
+  return ''
+}
+
+const COMP_WORD_RE =
+  /^(world|cup|champions|league|premier|liga|serie|bundesliga|ligue|euro|euros|copa|america|américa|nations|fifa|uefa|afcon|final|finals|qualifier|qualifiers|group|match|game|news|latest|breaking|update)$/i
+
+/**
+ * The single best image subject for a topic — a known player/coach full name when possible,
+ * with competition noise (World Cup, Champions League, …) stripped so photo search stays on the person.
+ * @param {string} topic
+ * @returns {string}
+ */
+export function resolveImageSubject(topic) {
+  const entities = primaryImageEntities(topic)
+  for (const e of entities) {
+    for (const w of e.split(/\s+/)) {
+      const full = expandPlayerFullName(w)
+      if (full) return full
+    }
+    if (KNOWN_PLAYER_RE.test(e) || KNOWN_COACH_RE.test(e)) {
+      const cleaned = e
+        .split(/\s+/)
+        .filter((w) => !COMP_WORD_RE.test(w))
+        .join(' ')
+        .trim()
+      if (cleaned) return cleaned
+    }
+  }
+  const first = entities[0] || String(topic || '').trim()
+  const cleaned = first
+    .split(/\s+/)
+    .filter((w) => !COMP_WORD_RE.test(w))
+    .join(' ')
+    .trim()
+  return cleaned || first || 'football'
+}
+
 /**
  * @param {string} topic
  */
@@ -185,16 +258,7 @@ export function buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex = 0
   const lead = entities[0] || core
 
   /** Expand mononyms that stock APIs understand better as full names. */
-  const fullName =
-    /^messi$/i.test(lead)
-      ? 'Lionel Messi'
-      : /^ronaldo$/i.test(lead)
-        ? 'Cristiano Ronaldo'
-        : /^mbapp/i.test(lead)
-          ? 'Kylian Mbappe'
-          : /^haaland$/i.test(lead)
-            ? 'Erling Haaland'
-            : ''
+  const fullName = expandPlayerFullName(lead)
 
   const queries = [
     // Prefer the scene’s own imageQuery when it already names the person/club
@@ -269,8 +333,8 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '') {
  */
 export function defaultSceneImageQuery(topic, sceneIndex) {
   const name = String(topic || '').trim() || 'football'
-  const entities = primaryImageEntities(name)
-  const core = entities.slice(0, 2).join(' ') || name
+  // Anchor every scene to the topic's player/club (expanded full name), never caption noise
+  const core = resolveImageSubject(name) || name
   const angles = topicLooksLikeCoach(name) ? COACH_ANGLES : PLAYER_ANGLES
   return angles[sceneIndex % angles.length](core)
 }

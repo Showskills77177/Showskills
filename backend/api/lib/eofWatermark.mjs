@@ -96,10 +96,11 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  // Large top-left badge — covers ZapCap’s free corner stamp (no white wordmark, no roam)
-  const cornerW = Math.max(280, Math.min(520, Number(process.env.EOF_WATERMARK_SIZE) || 440))
-  const markX = Math.max(4, Math.min(80, Number(process.env.EOF_WATERMARK_X) || 16))
-  const markY = Math.max(8, Math.min(120, Number(process.env.EOF_WATERMARK_Y) || 24))
+  // Large top-left badge — covers ZapCap’s free corner stamp (no white wordmark, no roam).
+  // Bigger + corner-hugging by default so it fully sits over the ZapCap mark; tune via env.
+  const cornerW = Math.max(280, Math.min(680, Number(process.env.EOF_WATERMARK_SIZE) || 520))
+  const markX = Math.max(0, Math.min(120, Number(process.env.EOF_WATERMARK_X ?? 0)))
+  const markY = Math.max(0, Math.min(160, Number(process.env.EOF_WATERMARK_Y ?? 0)))
   const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
 
   const inputs = ['-y', '-i', videoPath]

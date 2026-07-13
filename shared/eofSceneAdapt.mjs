@@ -1,6 +1,14 @@
 import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
 import { EOF_MAX_SCENES, normalizeEofScript } from './eofScriptTemplates.mjs'
 
+/** Words in a phrase. */
+function wordCount(s) {
+  return String(s || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
 /**
  * Split plain narration into sentence chunks for Short scenes.
  * @param {string} draft
@@ -19,27 +27,125 @@ export function splitDraftIntoSentences(draft) {
 
   if (parts.length >= 2) return parts
 
-  // Very short drafts — clause split
+  // Single long sentence — split on clause boundaries so we still get beats
   const clauses = text
-    .split(/\s*[—–-]\s*|\s*,\s+(?=[A-Z])/)
+    .split(/\s*[—–]\s*|\s*,\s+(?=[A-Z])/)
     .map((s) => s.trim())
     .filter((s) => s.length >= 8)
   return clauses.length >= 2 ? clauses : parts.length ? parts : [text]
 }
 
 /**
- * Trim a sentence to on-screen caption length.
+ * Split a long sentence into caption-sized chunks WITHOUT dropping words.
+ * Breaks on clause punctuation / conjunctions first, then word boundaries.
  * @param {string} sentence
- * @param {number} [maxWords]
+ * @param {number} maxWords
  */
-export function compressToSceneCaption(sentence, maxWords = 14) {
-  const raw = String(sentence || '').trim()
-  if (!raw) return ''
-  const hasQ = raw.includes('?')
-  const words = raw.replace(/\?+$/, '').split(/\s+/).filter(Boolean)
-  if (words.length <= maxWords) return raw
-  const cut = words.slice(0, maxWords).join(' ')
-  return hasQ && !cut.includes('?') ? `${cut}?` : cut
+export function splitLongSentence(sentence, maxWords = 16) {
+  const clean = String(sentence || '').trim()
+  if (wordCount(clean) <= maxWords) return [clean]
+
+  const clauses = clean
+    .split(/(?<=[,;:])\s+|\s*[—–]\s*|\s+(?=(?:and|but|so|because|while|as|then|before|after)\b)/i)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  const merged = []
+  let cur = ''
+  for (const part of clauses) {
+    const candidate = cur ? `${cur} ${part}` : part
+    if (cur && wordCount(candidate) > maxWords) {
+      merged.push(cur)
+      cur = part
+    } else {
+      cur = candidate
+    }
+  }
+  if (cur) merged.push(cur)
+
+  // Any chunk still over budget (no punctuation) → hard split on word boundaries (keeps all words)
+  const out = []
+  for (const chunk of merged) {
+    if (wordCount(chunk) <= maxWords) {
+      out.push(chunk)
+      continue
+    }
+    const words = chunk.split(/\s+/)
+    for (let i = 0; i < words.length; i += maxWords) {
+      out.push(words.slice(i, i + maxWords).join(' '))
+    }
+  }
+  return out.filter(Boolean)
+}
+
+/**
+ * Tidy a caption: collapse spaces, drop trailing punctuation, word-safe length cap.
+ * Never cuts a word in half; only trims whole trailing words if extremely long.
+ * @param {string} sentence
+ */
+export function tidyCaption(sentence) {
+  let c = String(sentence || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[,;:\-–—]+$/, '')
+    .trim()
+  if (c.length > 138) {
+    const words = c.split(' ')
+    let out = ''
+    for (const w of words) {
+      if ((out ? `${out} ${w}` : w).length > 138) break
+      out = out ? `${out} ${w}` : w
+    }
+    c = out || c.slice(0, 138)
+  }
+  return c
+}
+
+/**
+ * Balance sentence units into a sensible scene count (4..max) with clean, whole captions.
+ * @param {string[]} sentences
+ * @param {{ min?: number, max?: number, capWords?: number }} [opts]
+ */
+export function balanceSceneUnits(sentences, { min = 4, max = EOF_MAX_SCENES, capWords = 16 } = {}) {
+  let units = sentences.map((s) => s.trim()).filter(Boolean)
+  if (!units.length) return []
+
+  // Always break oversized sentences so no single caption is a wall of text
+  units = units.flatMap((s) => (wordCount(s) > 22 ? splitLongSentence(s, capWords) : [s]))
+
+  // Too few scenes → split the longest remaining sentences at clause boundaries
+  while (units.length < min) {
+    let idx = -1
+    let longest = 0
+    for (let i = 0; i < units.length; i += 1) {
+      const w = wordCount(units[i])
+      if (w > longest && w > capWords) {
+        longest = w
+        idx = i
+      }
+    }
+    if (idx < 0) break
+    const pieces = splitLongSentence(units[idx], Math.ceil(wordCount(units[idx]) / 2))
+    if (pieces.length < 2) break
+    units.splice(idx, 1, ...pieces)
+  }
+
+  // Too many scenes → merge the shortest adjacent pair until within budget
+  while (units.length > max) {
+    let idx = 0
+    let smallest = Infinity
+    for (let i = 0; i < units.length - 1; i += 1) {
+      const combined = wordCount(units[i]) + wordCount(units[i + 1])
+      if (combined < smallest) {
+        smallest = combined
+        idx = i
+      }
+    }
+    units[idx] = `${units[idx]} ${units[idx + 1]}`.replace(/\s+/g, ' ').trim()
+    units.splice(idx + 1, 1)
+  }
+
+  return units
 }
 
 function titleFromDraft(topic, draft) {
@@ -51,21 +157,10 @@ function titleFromDraft(topic, draft) {
   return String(topic || '').trim().slice(0, 90)
 }
 
-function distributeSentences(sentences, targetCount) {
-  const n = sentences.length
-  const target = Math.min(EOF_MAX_SCENES, Math.max(3, targetCount))
-  if (n <= target) return sentences.map((s) => [s])
-
-  const chunks = Array.from({ length: target }, () => [])
-  for (let i = 0; i < n; i += 1) {
-    chunks[Math.min(target - 1, Math.floor((i * target) / n))].push(sentences[i])
-  }
-  return chunks.map((c) => c.filter(Boolean))
-}
-
 /**
- * Deterministic fallback: split approved plain text into Short scenes (no AI).
- * Preserves draft facts; image queries stay tied to the topic (Messi, etc.).
+ * Deterministic, faithful split of an approved plain-text draft into Short scenes.
+ * Keeps the writer's words (no paraphrase, no dropped tail) and ties every image
+ * query to the topic's player/club (Bellingham, Messi, …).
  * @param {{ plainTextDraft: string, topic: string, format?: string }} input
  */
 export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, format = 'news' }) {
@@ -74,17 +169,17 @@ export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, form
   const sentences = splitDraftIntoSentences(draft)
   if (sentences.length < 2) return null
 
-  const preferred = sentences.length >= 5 ? 5 : Math.min(6, Math.max(4, sentences.length))
-  const groups = distributeSentences(sentences, preferred)
-  if (groups.length < 3) return null
+  const units = balanceSceneUnits(sentences, { min: 4, max: EOF_MAX_SCENES, capWords: 16 })
+  if (units.length < 3) return null
 
-  const scenes = groups.map((group, i) => {
-    const joined = group.join(' ')
-    const caption = compressToSceneCaption(joined, i === groups.length - 1 ? 16 : 14)
+  const scenes = units.map((unit, i) => {
+    const caption = tidyCaption(unit)
     return {
       caption,
-      imageQuery: defaultSceneImageQuery(`${t} ${caption}`, i),
-      role: i === 0 ? 'hook' : i === groups.length - 1 ? 'cta' : 'body',
+      // Anchor image search to the topic's player/club only — caption text has other proper
+      // nouns (opponents, managers, clubs) that would otherwise hijack the photo search.
+      imageQuery: defaultSceneImageQuery(t, i),
+      role: i === 0 ? 'hook' : i === units.length - 1 ? 'cta' : 'body',
     }
   })
 
