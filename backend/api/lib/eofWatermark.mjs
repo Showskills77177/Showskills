@@ -1,12 +1,12 @@
 /**
  * Eyes Of Football overlays for Shorts (static — never animate / free-roam):
- * - Brand logo: circular World Cup badge, anchored over ZapCap’s free watermark (bottom-center default)
+ * - Brand logo: circular World Cup badge, anchored over ZapCap’s free watermark (top-left default)
  * - Subscribe CTA: OFF by default (was cluttering the Short)
  *
  * Env:
  *   EOF_WATERMARK=1|0
  *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE / EOF_WATERMARK_POSITION / EOF_WATERMARK_X / EOF_WATERMARK_Y
- *     POSITION: bottom-center (default) | bottom-left | bottom-right | top-left | top-center | top-right | center
+ *     POSITION: top-left (default) | top-center | top-right | bottom-left | bottom-center | bottom-right | center
  *   EOF_SUBSCRIBE=1|0  (default off)
  *   EOF_SUBSCRIBE_PATH / EOF_SUBSCRIBE_WIDTH
  */
@@ -131,16 +131,16 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  // Badge sized to cover ZapCap’s free watermark. ZapCap burns its mark at the BOTTOM-CENTER
-  // of the video on free/lower tiers, so default the anchor there (was top-left, which never
-  // covered it). Everything is env-tunable without a code change:
-  //   EOF_WATERMARK_POSITION  anchor: bottom-center|bottom-left|bottom-right|top-left|top-center|top-right|center
+  // Badge sized to cover ZapCap’s free watermark. Confirmed on real renders: ZapCap burns its
+  // mark in the TOP-LEFT corner, so default the anchor there and hug the corner (X=0, Y=0) so the
+  // badge overlaps the mark instead of floating away. Everything is env-tunable without a code change:
+  //   EOF_WATERMARK_POSITION  anchor: top-left|top-center|top-right|bottom-left|bottom-center|bottom-right|center
   //   EOF_WATERMARK_SIZE      badge width/height in px (square)
-  //   EOF_WATERMARK_X / _Y    nudge from the anchor (px): +X = toward center-x from the edge, +Y = inward from the edge
-  const cornerW = Math.max(120, Math.min(420, Number(process.env.EOF_WATERMARK_SIZE) || 260))
+  //   EOF_WATERMARK_X / _Y    nudge from the anchor (px): inward from the anchored edge/corner
+  const cornerW = Math.max(120, Math.min(420, Number(process.env.EOF_WATERMARK_SIZE) || 230))
   const markX = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_X ?? 0)))
-  const markY = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_Y ?? 24)))
-  const position = String(process.env.EOF_WATERMARK_POSITION || 'bottom-center')
+  const markY = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_Y ?? 0)))
+  const position = String(process.env.EOF_WATERMARK_POSITION || 'top-left')
     .trim()
     .toLowerCase()
   const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
