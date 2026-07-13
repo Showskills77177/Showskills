@@ -2626,8 +2626,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         {busy || isRendering ? 'Rebuilding…' : 'Rebuild video'}
                       </button>
                       <span className="text-[11px] text-[#8a8a8a]">
-                        Refreshes images &amp; re-renders using your existing voiceover —{' '}
-                        <span className="text-[#7ee787]">no ElevenLabs credits</span>.
+                        Refreshes images (new photos each time) + applies your current captions, transitions &amp;
+                        filters — <span className="text-[#7ee787]">no voiceover credits</span>.
                       </span>
                     </div>
                     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">

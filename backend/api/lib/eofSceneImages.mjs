@@ -126,10 +126,26 @@ async function writeLabeledPlaceholder({ outPath, color, label }) {
   await runFfmpeg(args, { maxBuffer: 8 * 1024 * 1024 })
 }
 
+/** Coprime with common page sizes (10/12/15) so each rotation lands on a new candidate. */
+const IMAGE_ROTATE_STRIDE = 7
+const IMAGE_ROTATE_MAX_TRIES = 4
+
 /**
- * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean }} opts
+ * Fetch one scene image. On a rebuild, pass `attempt` (rotation count) and `avoidKeys`
+ * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
+ * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
+ * record what was used and avoid it next time.
+ * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[] }} opts
  */
-export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0, refresh = false }) {
+export async function fetchEofSceneImage({
+  imageQuery,
+  topic,
+  outPath,
+  index = 0,
+  refresh = false,
+  attempt = 0,
+  avoidKeys = [],
+}) {
   mkdirSync(dirname(outPath), { recursive: true })
   if (!refresh && existsSync(outPath)) {
     return { path: outPath, source: 'cache' }
@@ -147,6 +163,40 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
   const queries = buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex: index })
   const custom = String(imageQuery || '').trim()
 
+  const avoid = new Set((avoidKeys || []).filter(Boolean))
+  const rot = Math.max(0, Number(attempt) || 0)
+  // Only fan out across candidates when we're rotating (rebuild). First build stays a single fetch.
+  const tries = rot > 0 || avoid.size ? IMAGE_ROTATE_MAX_TRIES : 1
+  const effIndex = (t) => index + (rot + t) * IMAGE_ROTATE_STRIDE
+
+  /**
+   * Run a source across rotation tries, skipping images we've already used.
+   * @param {(eff: number) => Promise<{ key: string, meta: object, download: () => Promise<boolean> } | null>} probe
+   */
+  async function rotateSource(probe) {
+    let fallbackDup = null
+    for (let t = 0; t < tries; t += 1) {
+      let cand = null
+      try {
+        cand = await probe(effIndex(t))
+      } catch (e) {
+        console.warn('[eof-scene-images] source probe failed', e instanceof Error ? e.message : e)
+        cand = null
+      }
+      if (!cand) continue
+      if (avoid.has(cand.key)) {
+        // Remember the first usable duplicate so we still ship an image if all fresh tries miss.
+        if (!fallbackDup) fallbackDup = cand
+        continue
+      }
+      if (await cand.download()) return { ...cand.meta, imageKey: cand.key }
+    }
+    if (fallbackDup && (await fallbackDup.download())) {
+      return { ...fallbackDup.meta, imageKey: fallbackDup.key }
+    }
+    return null
+  }
+
   if (custom && isPinterestPinUrl(custom)) {
     try {
       const hit = await fetchPinterestPinImage(custom)
@@ -156,6 +206,7 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
           source: 'pinterest-pin',
           imageQuery: hit.queryUsed,
           pinTitle: hit.title,
+          imageKey: `pin-url:${custom}`,
         }
       }
     } catch (e) {
@@ -168,110 +219,119 @@ export async function fetchEofSceneImage({ imageQuery, topic, outPath, index = 0
 
     // AP editorial first — newest-first + topic-ranked (best for “latest Tuchel” etc.)
     if (isEofApImagesConfigured()) {
-      try {
-        const hit = await searchApMediaPicture(query, index, { topic })
-        if (hit) {
-          const score =
-            typeof hit.relevance === 'number'
-              ? hit.relevance
-              : scoreImageRelevance(topic || query, hit.title || '', query)
-          // Require a real topic/entity hit — never accept random AP stock
-          if (score >= 4 && (await downloadApRenditionToFile(hit, outPath))) {
-            return {
-              path: outPath,
-              source: 'ap',
-              imageQuery: query,
-              imageTitle: hit.title,
-              apItemId: hit.apItemId,
-              apRole: hit.role,
-              relevance: score,
-            }
-          }
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchApMediaPicture(query, eff, { topic })
+        if (!hit) return null
+        const score =
+          typeof hit.relevance === 'number'
+            ? hit.relevance
+            : scoreImageRelevance(topic || query, hit.title || '', query)
+        if (score < 4) return null // require a real topic/entity hit — never accept random AP stock
+        return {
+          key: `ap:${hit.apItemId || hit.title || hit.imgUrl || eff}`,
+          meta: {
+            path: outPath,
+            source: 'ap',
+            imageQuery: query,
+            imageTitle: hit.title,
+            apItemId: hit.apItemId,
+            apRole: hit.role,
+            relevance: score,
+          },
+          download: () => downloadApRenditionToFile(hit, outPath),
         }
-      } catch (e) {
-        console.warn('[eof-scene-images] AP Images fetch failed', query, e instanceof Error ? e.message : e)
-      }
+      })
+      if (meta) return meta
     }
 
     if (isEofGoogleCseConfigured()) {
-      try {
-        const hit = await searchGoogleCseImages(query, index)
-        if (hit) {
-          const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`, query)
-          if (score >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
-            return {
-              path: outPath,
-              source: 'google',
-              imageQuery: query,
-              imageTitle: hit.title,
-              sourcePage: hit.sourcePage,
-              relevance: score,
-            }
-          }
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchGoogleCseImages(query, eff)
+        if (!hit) return null
+        const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`, query)
+        if (score < 6) return null
+        return {
+          key: `google:${hit.imgUrl}`,
+          meta: {
+            path: outPath,
+            source: 'google',
+            imageQuery: query,
+            imageTitle: hit.title,
+            sourcePage: hit.sourcePage,
+            relevance: score,
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
-      } catch (e) {
-        console.warn('[eof-scene-images] Google image search failed', query, e)
-      }
+      })
+      if (meta) return meta
     }
 
     // Pinterest after editorial sources — often old fan pins / memes
     if (pinterestToken) {
-      try {
-        const hit = await searchPinterestPartnerPins(query, index, pinterestToken, { topic })
-        if (hit && (hit.relevance ?? 0) >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
-          return {
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
+        if (!hit || (hit.relevance ?? 0) < 6) return null
+        return {
+          key: `pin:${hit.pinId || hit.imgUrl}`,
+          meta: {
             path: outPath,
             source: 'pinterest',
             imageQuery: query,
             pinId: hit.pinId,
             pinTitle: hit.title,
             relevance: hit.relevance,
-          }
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
-      } catch (e) {
-        console.warn('[eof-scene-images] Pinterest search failed', query, e)
-      }
+      })
+      if (meta) return meta
     }
 
     if (pexelsKey) {
-      try {
-        const hit = await searchPexelsPhoto(query, index, pexelsKey)
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchPexelsPhoto(query, eff, pexelsKey)
+        if (!hit) return null
         const score =
-          typeof hit?.relevance === 'number'
+          typeof hit.relevance === 'number'
             ? hit.relevance
-            : scoreImageRelevance(topic || query, hit?.alt || '', query)
-        if (hit && score >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
-          return {
+            : scoreImageRelevance(topic || query, hit.alt || '', query)
+        if (score < 6) return null
+        return {
+          key: `pexels:${hit.pexelsId}`,
+          meta: {
             path: outPath,
             source: 'pexels',
             imageQuery: query,
             photographer: hit.photographer,
             pexelsId: hit.pexelsId,
             relevance: score,
-          }
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
-      } catch (e) {
-        console.warn('[eof-scene-images] Pexels fetch failed', query, e)
-      }
+      })
+      if (meta) return meta
     }
 
     // Free keyless fallback — real photos from Wikimedia Commons
-    try {
-      const hit = await searchWikimediaCommonsImages(query, index)
-      if (hit) {
+    {
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchWikimediaCommonsImages(query, eff)
+        if (!hit) return null
         const score = scoreImageRelevance(topic || query, hit.title || '', query)
-        if (score >= 6 && (await downloadImageToFile(hit.imgUrl, outPath))) {
-          return {
+        if (score < 6) return null
+        return {
+          key: `wiki:${hit.title || hit.imgUrl}`,
+          meta: {
             path: outPath,
             source: 'wikimedia',
             imageQuery: query,
             imageTitle: hit.title,
             relevance: score,
-          }
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
-      }
-    } catch (e) {
-      console.warn('[eof-scene-images] Wikimedia fetch failed', query, e)
+      })
+      if (meta) return meta
     }
   }
 

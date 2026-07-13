@@ -99,6 +99,19 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
       let imageMeta
       let resolvedImagePath = imagePath
+      const prior = priorManifest.find((m) => m.index === row.index) || priorManifest[row.index]
+      const priorHistory = Array.isArray(prior?.imageKeyHistory)
+        ? prior.imageKeyHistory.filter(Boolean)
+        : prior?.imageKey
+          ? [prior.imageKey]
+          : []
+      // A prior image render means this is a rebuild → rotate to a fresh candidate.
+      const hadPriorImage = Boolean(
+        prior && (prior.imageKey || prior.imageSource || prior.imageAttempt !== undefined),
+      )
+      let imageKey = prior?.imageKey || null
+      let imageAttempt = Number(prior?.imageAttempt) || 0
+      let imageKeyHistory = priorHistory
       if (reuseSceneImages) {
         const restored = await ensureEofSceneImageOnDisk(jobId, row.index + 1)
         if (!restored || !existsSync(restored)) {
@@ -112,13 +125,22 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           imageQuery: row.imageQuery,
         }
       } else {
+        const attempt = hadPriorImage ? imageAttempt + 1 : 0
         imageMeta = await fetchEofSceneImage({
           topic: job.topic,
           imageQuery: row.imageQuery,
           outPath: imagePath,
           index: row.index,
           refresh: true,
+          attempt,
+          avoidKeys: priorHistory,
         })
+        imageAttempt = attempt
+        imageKey = imageMeta.imageKey || null
+        // Track real (non-placeholder) keys so repeated rebuilds keep trying new photos.
+        if (imageKey && imageMeta.source !== 'placeholder' && imageMeta.source !== 'placeholder-no-image-keys') {
+          imageKeyHistory = [...priorHistory.filter((k) => k !== imageKey), imageKey].slice(-8)
+        }
       }
       imagesDone += 1
       await report(reuseSceneImages ? 'video' : 'images', imagesDone)
@@ -130,6 +152,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imagePath: resolvedImagePath,
         imageSource: imageMeta.source,
         imageQueryUsed: imageMeta.imageQuery || row.imageQuery,
+        imageKey,
+        imageAttempt,
+        imageKeyHistory,
       }
     })
 
@@ -161,6 +186,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageQuery: entry.imageQuery,
         imageSource: videoScene?.imageSource || null,
         imageQueryUsed: videoScene?.imageQueryUsed || entry.imageQuery,
+        imageKey: videoScene?.imageKey ?? null,
+        imageAttempt: videoScene?.imageAttempt ?? 0,
+        imageKeyHistory: Array.isArray(videoScene?.imageKeyHistory) ? videoScene.imageKeyHistory : [],
       }
     })
 
