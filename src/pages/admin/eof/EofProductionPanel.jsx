@@ -54,7 +54,12 @@ const SELECTED_JOB_KEY = 'eof_production_selected_job'
  * Animated caption-style preview (CapCut-like). Plays ZapCap's looping mp4/webm demo,
  * shows a gif/image when that's what's provided, and falls back to a labelled tile.
  */
-function CaptionTemplatePreview({ template, className = '', muted = 'text-[#888]' }) {
+function CaptionTemplatePreview({
+  template,
+  className = '',
+  muted = 'text-[#888]',
+  playMode = 'hover',
+}) {
   const url = template?.previewUrl || ''
   const type =
     template?.previewType ||
@@ -66,21 +71,69 @@ function CaptionTemplatePreview({ template, className = '', muted = 'text-[#888]
           ? 'video'
           : null)
 
-  if (url && type === 'video') {
+  const isVideo = Boolean(url) && type === 'video'
+  const isImage = Boolean(url) && type === 'image'
+  const poster = template?.posterUrl || (isImage ? url : '')
+
+  const [hovered, setHovered] = useState(false)
+  const videoRef = useRef(null)
+  // Only mount/decode a <video> when this card is actually being previewed.
+  // "always" is for the single selected-look strip; grid cards play on hover/focus
+  // so we never decode dozens of mp4s at once (that was crashing the tab on memory).
+  const shouldPlay = isVideo && (playMode === 'always' || hovered)
+
+  useEffect(() => {
+    if (!shouldPlay && videoRef.current) {
+      try {
+        videoRef.current.pause()
+        videoRef.current.removeAttribute('src')
+        videoRef.current.load()
+      } catch {
+        /* releasing decoder */
+      }
+    }
+  }, [shouldPlay])
+
+  if (isVideo) {
+    const idleFallback = poster ? (
+      <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" />
+    ) : (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[#0d0d12] px-2">
+        <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-black shadow">
+          {String(template?.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
+        </span>
+        {playMode !== 'always' ? (
+          <span className={`text-center text-[10px] font-semibold ${muted}`}>Hover to play</span>
+        ) : null}
+      </div>
+    )
     return (
-      <video
-        src={url}
-        poster={template?.posterUrl || undefined}
-        className={className}
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="metadata"
-      />
+      <div
+        className={`relative ${className}`}
+        onMouseEnter={playMode === 'hover' ? () => setHovered(true) : undefined}
+        onMouseLeave={playMode === 'hover' ? () => setHovered(false) : undefined}
+        onFocus={playMode === 'hover' ? () => setHovered(true) : undefined}
+        onBlur={playMode === 'hover' ? () => setHovered(false) : undefined}
+      >
+        {shouldPlay ? (
+          <video
+            ref={videoRef}
+            src={url}
+            poster={poster || undefined}
+            className="h-full w-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="none"
+          />
+        ) : (
+          idleFallback
+        )}
+      </div>
     )
   }
-  if (url && type === 'image') {
+  if (isImage) {
     return <img src={url} alt="" loading="lazy" className={className} />
   }
   return (
@@ -1602,6 +1655,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       <CaptionTemplatePreview
                         template={zapcapTemplates.find((t) => t.id === zapcapTemplateId)}
                         className="h-full w-full object-cover"
+                        playMode="always"
                       />
                     </div>
                     <div className="min-w-0">
