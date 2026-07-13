@@ -1581,7 +1581,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ) : null}
                 {zapcapTemplates.length ? (
                   <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()
@@ -1614,27 +1614,27 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                               }`}
                               title={t.description || t.name || t.id}
                             >
-                              <div className="relative aspect-[9/16] max-h-44 w-full overflow-hidden bg-[#0d0d12]">
+                              <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-[#0d0d12]">
                                 <CaptionTemplatePreview
                                   template={t}
                                   className="h-full w-full object-cover"
                                 />
                                 {active ? (
-                                  <span className="absolute right-1.5 top-1.5 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-black">
-                                    Selected
+                                  <span className="absolute right-1 top-1 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                                    ✓
                                   </span>
                                 ) : null}
                               </div>
-                              <div className="px-2.5 py-2">
+                              <div className="px-1.5 py-1">
                                 <span
-                                  className={`block truncate text-sm font-medium ${
+                                  className={`block truncate text-[11px] font-medium leading-tight ${
                                     active ? 'text-white' : 'text-[#e5e5e5]'
                                   }`}
                                 >
                                   {t.name}
                                 </span>
                                 {t.category ? (
-                                  <span className="mt-0.5 block truncate text-[11px] text-[#888]">
+                                  <span className="mt-0.5 block truncate text-[10px] text-[#888]">
                                     {t.category}
                                   </span>
                                 ) : null}
