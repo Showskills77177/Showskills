@@ -19,7 +19,7 @@ import {
   resolveEofColorGrade,
   resolveEofTransitionStyle,
 } from '../../../shared/eofVideoLook.mjs'
-import { resolveCaptionEngine, burnZapcapCaptions } from './eofZapcapCaptions.mjs'
+import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 
 const BUNDLED_CAPTION_FONT = join(
@@ -358,7 +358,9 @@ export async function renderEofProductionVideo({
   if (burnCaptions && !captionFont) {
     console.warn('[eof-video] No caption font found — captions will be missing from the Short.')
   }
-  if (style === 'off') {
+  if (style === 'off' && zapcapOnly) {
+    console.info('[eof-video] clean plate — paid ZapCap burn follows')
+  } else if (style === 'off') {
     console.info('[eof-video] captions off — clean plate')
   } else if (style === 'live') {
     console.info(

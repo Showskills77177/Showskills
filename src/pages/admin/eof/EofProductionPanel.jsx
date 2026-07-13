@@ -2265,8 +2265,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   className={`mt-4 ${PX.btnSoft}`}
                   title={
                     selected.status === 'video_rendered'
-                      ? 'Reuses your voiceover — no ElevenLabs credits'
-                      : 'Generates voiceover + images + video'
+                      ? 'Refreshes images + transitions with free captions — no ElevenLabs or ZapCap charges'
+                      : 'Generates voiceover + images + video (free captions until you Apply ZapCap)'
                   }
                 >
                   {selected.status === 'video_rendered' ? 'Rebuild video' : 'Build'}
