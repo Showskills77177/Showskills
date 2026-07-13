@@ -1384,20 +1384,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 watermark — Pro removes it.
               </p>
             )}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
               {[
-                {
-                  id: 'live',
-                  label: 'Live subs (free)',
-                  vibe: 'Bottom TV bar',
-                  preview: 'live',
-                },
-                {
-                  id: 'off',
-                  label: 'Off',
-                  vibe: 'No captions',
-                  preview: 'off',
-                },
+                { id: 'live', label: 'Live subs (free)', vibe: 'Bottom TV bar', preview: 'live', free: true },
+                { id: 'pop', label: 'Pop (Hormozi)', vibe: 'CapCut · 1–2 words', preview: 'pop' },
+                { id: 'karaoke', label: 'Karaoke fill', vibe: 'CapCut · word highlight', preview: 'karaoke' },
+                { id: 'beast', label: 'Beast bounce', vibe: 'CapCut · huge word', preview: 'beast' },
+                { id: 'off', label: 'Off', vibe: 'No captions', preview: 'off', free: true },
               ].map((s) => {
                 const active = captionStyle === s.id
                 return (
@@ -1410,29 +1403,63 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     }}
                     className={`overflow-hidden rounded-xl border text-left transition ${
                       active
-                        ? 'border-white/35 bg-[#272727]'
+                        ? 'border-white/35 bg-[#272727] ring-1 ring-white/20'
                         : 'border-[#303030] bg-[#121212] hover:border-[#555] hover:bg-[#1c1c1c]'
                     }`}
+                    title={s.label}
                   >
-                    <div className="relative aspect-[9/16] max-h-40 w-full bg-[#1a153d]">
+                    <div className="relative aspect-[9/16] max-h-44 w-full overflow-hidden bg-gradient-to-b from-[#1a153d] to-[#0f1a30]">
+                      {/* faux subject photo */}
+                      <div className="absolute inset-x-[16%] top-[16%] h-[42%] rounded-full bg-[#2a2460]/70" />
                       {s.preview === 'live' ? (
-                        <>
-                          <div className="absolute inset-x-[18%] top-[28%] h-[38%] rounded-full bg-[#2a2460]/ />
-                          <div className="absolute inset-x-0 bottom-[14%] bg-black/50 px-2 py-1.5 text-center">
-                            <span className="text-[11px] font-semibold leading-tight text-white drop-shadow">
-                              Tuchel: we go again
-                            </span>
-                          </div>
-                        </>
+                        <div className="absolute inset-x-0 bottom-[12%] bg-black/55 px-1.5 py-1 text-center">
+                          <span className="text-[10px] font-semibold leading-tight text-white drop-shadow">
+                            Tuchel: we go again
+                          </span>
+                        </div>
+                      ) : s.preview === 'pop' ? (
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
+                          <span className="inline-block rounded bg-[#FFE566] px-1.5 py-0.5 text-[13px] font-black uppercase tracking-tight text-black shadow-[0_2px_0_rgba(0,0,0,0.5)]">
+                            SPAIN
+                          </span>
+                        </div>
+                      ) : s.preview === 'karaoke' ? (
+                        <div className="absolute inset-x-1 top-1/2 -translate-y-1/2 text-center leading-tight">
+                          <span className="text-[11px] font-extrabold uppercase text-white/70">spain </span>
+                          <span className="text-[12px] font-black uppercase text-[#FFE566] drop-shadow">beat</span>
+                          <span className="text-[11px] font-extrabold uppercase text-white/70"> belgium</span>
+                        </div>
+                      ) : s.preview === 'beast' ? (
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
+                          <span className="text-[17px] font-black uppercase tracking-tight text-[#FFE566] drop-shadow-[0_2px_2px_rgba(0,0,0,0.9)]">
+                            GOAL
+                          </span>
+                        </div>
                       ) : (
-                        <div className="absolute inset-x-[18%] top-[28%] h-[38%] rounded-full bg-[#2a2460]" />
+                        <div className="absolute inset-x-0 bottom-[12%] text-center">
+                          <span className="text-[9px] uppercase tracking-widest text-white/40">clean plate</span>
+                        </div>
                       )}
+                      {s.free ? (
+                        <span className="absolute left-1 top-1 rounded bg-emerald-500/80 px-1 py-0.5 text-[8px] font-bold uppercase text-black">
+                          Free
+                        </span>
+                      ) : (
+                        <span className="absolute left-1 top-1 rounded bg-white/15 px-1 py-0.5 text-[8px] font-bold uppercase text-white/80">
+                          ZapCap
+                        </span>
+                      )}
+                      {active ? (
+                        <span className="absolute right-1 top-1 rounded bg-white px-1 py-0.5 text-[8px] font-semibold text-black">
+                          Selected
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="px-3 py-2">
-                      <span className={`block text-sm font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}>
+                    <div className="px-2.5 py-2">
+                      <span className={`block truncate text-xs font-medium ${active ? 'text-white' : 'text-[#e5e5e5]'}`}>
                         {s.label}
                       </span>
-                      <span className="mt-0.5 block text-xs text-[#aaaaaa]">{s.vibe}</span>
+                      <span className="mt-0.5 block truncate text-[10px] text-[#aaaaaa]">{s.vibe}</span>
                     </div>
                   </button>
                 )
