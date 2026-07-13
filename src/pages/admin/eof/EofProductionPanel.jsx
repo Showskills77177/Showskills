@@ -915,6 +915,77 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     }
   }
 
+  // Free rebuild: reuse the EXISTING voiceover audio, refresh images, re-render video.
+  // Hits the backend 'render-video' action which never calls TTS/ElevenLabs.
+  async function rebuildVideo() {
+    if (!selectedId || !draftScript) return
+    setBusy(true)
+    setErr('')
+    setSuccess('Rebuilding video — reusing your voiceover, refreshing images…')
+    setRenderPhase('rendering-video')
+    setVideoPreviewUrl('')
+
+    try {
+      const saved = await saveJob({ silent: true })
+      if (!saved) {
+        setErr((prev) => prev || 'Could not save changes — fix errors and try again.')
+        return
+      }
+
+      const estSec = estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5)
+      setRenderProgress({
+        percent: 4,
+        message: 'Refreshing images…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'images',
+        pipeline: 'video',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'render-video', jobId: selectedId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Rebuild failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForVideoComplete(selectedId)
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Rebuild did not finish with a video')
+      }
+
+      await loadVideoPreview()
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('Video rebuilt — same voiceover, fresh images. No ElevenLabs credits used.')
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
+
+      setTimeout(() => {
+        resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
   async function regenerateVoiceover() {
     if (!selectedId || !draftScript) return
     setBusy(true)
@@ -2111,10 +2182,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 <button
                   type="button"
                   disabled={busy || isRendering || sceneCount < 1}
-                  onClick={buildShort}
+                  onClick={selected.status === 'video_rendered' ? rebuildVideo : buildShort}
                   className={`mt-4 ${PX.btnSoft}`}
+                  title={
+                    selected.status === 'video_rendered'
+                      ? 'Reuses your voiceover — no ElevenLabs credits'
+                      : 'Generates voiceover + images + video'
+                  }
                 >
-                  {selected.status === 'video_rendered' ? 'Rebuild' : 'Build'}
+                  {selected.status === 'video_rendered' ? 'Rebuild video' : 'Build'}
                 </button>
                 <button
                   type="button"
@@ -2409,7 +2485,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     {voiceRegen.blockedReason ? (
                       <span className="text-[10px] text-[#fbbf24]">{voiceRegen.blockedReason}</span>
                     ) : (
-                      <span className="text-[10px] text-[#717171]">Same captions & photos — new Brian mix only.</span>
+                      <span className="text-[10px] text-[#717171]">
+                        Same captions &amp; photos — new voiceover only.
+                        {voicePreset === 'brian' ? (
+                          <span className="text-[#fbbf24]"> Uses ElevenLabs credits.</span>
+                        ) : null}
+                      </span>
                     )}
                   </div>
                 ) : null}
@@ -2533,18 +2614,57 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               )}
 
               {sceneCount >= 1 ? (
-                <button
-                  type="button"
-                  disabled={busy || (isRendering && !isRenderStuck)}
-                  onClick={buildShort}
-                  className={`mt-4 w-full ${PX.btnPrimary} sm:w-auto`}
-                >
-                  {busy || isRendering
-                    ? 'Building…'
-                    : selected.status === 'video_rendered'
-                      ? 'Rebuild Short'
-                      : 'Next: Build Short →'}
-                </button>
+                selected.status === 'video_rendered' ? (
+                  <div className="mt-4 space-y-3 border-t border-[#303030] pt-4">
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                      <button
+                        type="button"
+                        disabled={busy || (isRendering && !isRenderStuck)}
+                        onClick={rebuildVideo}
+                        className={`w-full ${PX.btnPrimary} sm:w-auto`}
+                      >
+                        {busy || isRendering ? 'Rebuilding…' : 'Rebuild video'}
+                      </button>
+                      <span className="text-[11px] text-[#8a8a8a]">
+                        Refreshes images &amp; re-renders using your existing voiceover —{' '}
+                        <span className="text-[#7ee787]">no ElevenLabs credits</span>.
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                      <button
+                        type="button"
+                        disabled={busy || (isRendering && !isRenderStuck)}
+                        onClick={buildShort}
+                        title="Regenerates the voiceover from scratch, then images + video"
+                        className={`w-full ${PX.btnGhost} sm:w-auto`}
+                      >
+                        {busy || isRendering ? '…' : 'Full rebuild (new voiceover)'}
+                      </button>
+                      <span className="text-[11px] text-[#8a8a8a]">
+                        Regenerates the voiceover
+                        {voicePreset === 'brian' ? (
+                          <>
+                            {' '}
+                            — <span className="text-[#fbbf24]">uses ElevenLabs credits</span>
+                          </>
+                        ) : (
+                          ' (free Edge voice)'
+                        )}
+                        .
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy || (isRendering && !isRenderStuck)}
+                    onClick={buildShort}
+                    title="Generates voiceover, images and video"
+                    className={`mt-4 w-full ${PX.btnPrimary} sm:w-auto`}
+                  >
+                    {busy || isRendering ? 'Building…' : 'Next: Build Short →'}
+                  </button>
+                )
               ) : null}
             </section>
 
