@@ -24,11 +24,13 @@ const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
  * Build 9:16 Short MP4 from script scenes: stock images + on-screen captions.
  * Audio is optional (legacy path). Image-only Shorts are the default.
  * @param {string} jobId
- * @param {{ includeAudioIfPresent?: boolean, reuseSceneImages?: boolean }} [opts]
+ * @param {{ includeAudioIfPresent?: boolean, reuseSceneImages?: boolean, captionMode?: 'auto' | 'free' | 'zapcap-only' }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
   const includeAudioIfPresent = opts.includeAudioIfPresent === true
   const reuseSceneImages = opts.reuseSceneImages === true
+  const captionMode =
+    opts.captionMode === 'zapcap-only' ? 'zapcap-only' : opts.captionMode === 'auto' ? 'auto' : 'free'
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
@@ -170,6 +172,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       transitionStyle: job.transitionStyle,
       colorGrade: job.colorGrade,
       format: job.script?.format,
+      captionMode,
       onSceneProgress: async (done) => report('video', done),
     })
     const { relPath } = rendered

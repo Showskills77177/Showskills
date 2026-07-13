@@ -12,7 +12,7 @@ import {
   deleteEofProductionJob,
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
-import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground, startEofProductionVoiceoverRegenerationBackground } from '../lib/eofProductionRenderRunner.mjs'
+import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground, startEofProductionVoiceoverRegenerationBackground, startApplyEofProductionZapcapBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
@@ -167,6 +167,47 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = await readJsonBody(req)
       const action = typeof body.action === 'string' ? body.action : 'create'
+
+      if (action === 'apply-zapcap-captions') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (!(existing.script?.scenes?.length >= 1)) {
+          return json(res, 400, { error: 'Job has no script scenes.' })
+        }
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          return json(res, 202, { ok: true, accepted: true, job: existing })
+        }
+        const style = resolveEofCaptionStyle(existing.captionStyle)
+        if (!isZapcapCaptionStyle(style)) {
+          return json(res, 400, {
+            error: 'Pick a ZapCap caption template first, then click Apply ZapCap captions.',
+          })
+        }
+        const catalog = await listZapcapTemplates().catch(() => ({ configured: false }))
+        if (!catalog.configured) {
+          return json(res, 400, { error: 'ZAPCAP_API_KEY is not set — cannot apply ZapCap captions.' })
+        }
+
+        try {
+          if (body.captionStyle !== undefined || body.zapcapTemplateId !== undefined) {
+            await updateEofProductionJob(jobId, {
+              captionStyle:
+                body.captionStyle !== undefined ? resolveEofCaptionStyle(body.captionStyle) : undefined,
+              zapcapTemplateId:
+                body.zapcapTemplateId !== undefined
+                  ? normalizeZapcapTemplateId(body.zapcapTemplateId) || null
+                  : undefined,
+            })
+          }
+          await startApplyEofProductionZapcapBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : 'ZapCap apply failed' })
+        }
+      }
 
       if (action === 'build-short' || action === 'render-video' || action === 'render') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''

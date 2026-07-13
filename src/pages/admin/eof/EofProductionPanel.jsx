@@ -21,7 +21,7 @@ import {
   normalizeElevenLabsVoiceSettings,
 } from '../../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
-import { EOF_DEFAULT_CAPTION_STYLE } from '../../../../shared/eofCaptionStyles.mjs'
+import { EOF_DEFAULT_CAPTION_STYLE, isZapcapCaptionStyle } from '../../../../shared/eofCaptionStyles.mjs'
 import {
   EOF_DEFAULT_TRANSITION_STYLE,
   EOF_DEFAULT_COLOR_GRADE,
@@ -921,7 +921,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (!selectedId || !draftScript) return
     setBusy(true)
     setErr('')
-    setSuccess('Rebuilding video — reusing your voiceover, refreshing images…')
+    setSuccess('Rebuilding video — reusing voiceover, refreshing images (free captions)…')
     setRenderPhase('rendering-video')
     setVideoPreviewUrl('')
 
@@ -966,7 +966,86 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
       await loadVideoPreview()
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
-      setSuccess('Video rebuilt — same voiceover, fresh images. No ElevenLabs credits used.')
+      setSuccess('Video rebuilt — same voiceover, fresh images, free captions. No ElevenLabs or ZapCap charges.')
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
+
+      setTimeout(() => {
+        resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
+  // Paid ZapCap pass only — burns the selected template onto the current render (no TTS, no image refetch).
+  async function applyZapcapCaptions() {
+    if (!selectedId || !draftScript) return
+    if (!isZapcapCaptionStyle(captionStyle)) {
+      setErr('Pick a ZapCap caption template first.')
+      return
+    }
+    if (!captionEngine.zapcap) {
+      setErr('ZAPCAP_API_KEY is not set — add it in Vercel to apply ZapCap captions.')
+      return
+    }
+
+    setBusy(true)
+    setErr('')
+    setSuccess('Applying ZapCap animated captions to your current video…')
+    setRenderPhase('rendering-video')
+    setVideoPreviewUrl('')
+
+    try {
+      const saved = await saveJob({ silent: true })
+      if (!saved) {
+        setErr((prev) => prev || 'Could not save caption settings — fix errors and try again.')
+        return
+      }
+
+      const estSec = estimateEofVideoRenderDurationSec(draftScript?.scenes?.length || 5) + 90
+      setRenderProgress({
+        percent: 6,
+        message: 'Applying ZapCap captions…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'video',
+        pipeline: 'video',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'apply-zapcap-captions', jobId: selectedId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `ZapCap apply failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForVideoComplete(selectedId)
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'ZapCap apply did not finish with a video')
+      }
+
+      await loadVideoPreview()
+      setRenderProgress({ percent: 100, message: 'ZapCap captions applied', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('ZapCap animated captions applied — this step uses ZapCap credits.')
       upsertJob(finishedJob)
       hydratedJobIdRef.current = selectedId
       hydrateDraftFromJob(finishedJob)
@@ -2626,10 +2705,28 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         {busy || isRendering ? 'Rebuilding…' : 'Rebuild video'}
                       </button>
                       <span className="text-[11px] text-[#8a8a8a]">
-                        Refreshes images (new photos each time) + applies your current captions, transitions &amp;
-                        filters — <span className="text-[#7ee787]">no voiceover credits</span>.
+                        Refreshes images + applies transitions &amp; filters with{' '}
+                        <span className="text-[#7ee787]">free live captions</span> — no ElevenLabs or ZapCap
+                        charges. Click again until photos look right.
                       </span>
                     </div>
+                    {captionEngine.zapcap && isZapcapCaptionStyle(captionStyle) ? (
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                        <button
+                          type="button"
+                          disabled={busy || (isRendering && !isRenderStuck)}
+                          onClick={applyZapcapCaptions}
+                          title="Burns the selected ZapCap template onto the current video"
+                          className={`w-full ${PX.btnSoft} sm:w-auto`}
+                        >
+                          {busy || isRendering ? '…' : 'Apply ZapCap captions'}
+                        </button>
+                        <span className="text-[11px] text-[#8a8a8a]">
+                          When images &amp; transitions look good, apply the CapCut-style animated captions once —{' '}
+                          <span className="text-[#fbbf24]">uses ZapCap credits</span>.
+                        </span>
+                      </div>
+                    ) : null}
                     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                       <button
                         type="button"

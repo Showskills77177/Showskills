@@ -34,7 +34,10 @@ export async function renderEofProductionFullBuild(jobId) {
 
   try {
     await renderEofProductionAudio(jobId)
-    return await renderEofProductionVideoJob(jobId, { includeAudioIfPresent: true })
+    return await renderEofProductionVideoJob(jobId, {
+      includeAudioIfPresent: true,
+      captionMode: 'free',
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Build failed'
     await markEofProductionJobFailed(jobId, message)
@@ -139,6 +142,7 @@ export async function renderEofProductionVoiceoverOnly(jobId) {
     return await renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
+      captionMode: 'free',
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Voiceover regeneration failed'
@@ -191,10 +195,74 @@ export async function startEofProductionVoiceoverRegenerationBackground(jobId) {
   void run()
 }
 
+/**
+ * Paid ZapCap pass only: re-stitch from cached scene stills + audio (no image refetch, no TTS),
+ * then burn the selected ZapCap template. This is the ONLY render path that calls ZapCap.
+ * @param {string} jobId
+ */
+export async function applyEofProductionZapcapCaptions(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+
+  return renderEofProductionVideoJob(jobId, {
+    includeAudioIfPresent: true,
+    reuseSceneImages: true,
+    captionMode: 'zapcap-only',
+  })
+}
+
+/** @param {string} jobId */
+export async function startApplyEofProductionZapcapBackground(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+
+  const sceneCount = job.script?.scenes?.length || 5
+  const startedAt = new Date().toISOString()
+  const estimatedTotalSec = estimateEofVideoRenderDurationSec(sceneCount) + 120
+
+  await updateEofProductionJob(jobId, {
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+    errorMessage: null,
+  })
+  await updateEofProductionRenderProgress(
+    jobId,
+    buildEofRenderProgress({
+      stage: 'video',
+      sceneIndex: 0,
+      sceneCount,
+      startedAt,
+      estimatedTotalSec,
+      pipeline: 'video',
+      message: 'Applying ZapCap animated captions…',
+    }),
+  )
+
+  const run = () =>
+    applyEofProductionZapcapCaptions(jobId).catch((e) => {
+      console.error('[eof-production] ZapCap apply failed', jobId, e)
+    })
+
+  if (process.env.VERCEL) {
+    try {
+      const { waitUntil } = await import('@vercel/functions')
+      waitUntil(run())
+      return
+    } catch (e) {
+      console.warn('[eof-production] waitUntil unavailable for ZapCap apply', e)
+    }
+  }
+
+  void run()
+}
+
 /** @param {string} jobId */
 export async function startEofProductionVideoRenderBackground(jobId) {
   const run = () =>
-    renderEofProductionVideoJob(jobId, { includeAudioIfPresent: true }).catch((e) => {
+    renderEofProductionVideoJob(jobId, {
+      includeAudioIfPresent: true,
+      captionMode: 'free',
+    }).catch((e) => {
       console.error('[eof-production] background video render failed', jobId, e)
     })
 

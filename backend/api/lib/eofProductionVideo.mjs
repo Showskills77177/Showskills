@@ -10,6 +10,7 @@ import {
   resolveEofCaptionStyle,
   captionsEnabledForStyle,
   isLocalCaptionStyle,
+  isZapcapCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
 import {
   autoTuneVideoLook,
@@ -44,6 +45,45 @@ function resolveCaptionFont() {
     if (path && existsSync(path)) return path
   }
   return null
+}
+
+/**
+ * Decide how captions are burned for a render pass.
+ * - free: iteration (Build/Rebuild/voiceover) — local live preview, never ZapCap
+ * - zapcap-only: Apply ZapCap — clean plate locally, then paid ZapCap burn
+ * - auto: legacy full zapcap when style requests it
+ * @param {{ captionStyle?: string, captionMode?: 'auto' | 'free' | 'zapcap-only' }} opts
+ */
+export function resolveCaptionRenderPlan({ captionStyle, captionMode = 'auto' }) {
+  const requestedStyle = resolveEofCaptionStyle(captionStyle)
+  const mode = captionMode === 'zapcap-only' ? 'zapcap-only' : captionMode === 'free' ? 'free' : 'auto'
+  const forceFreeCaptions = mode === 'free' && isZapcapCaptionStyle(requestedStyle)
+  const zapcapOnly = mode === 'zapcap-only' && isZapcapCaptionStyle(requestedStyle)
+
+  let style = requestedStyle
+  if (forceFreeCaptions) style = 'live'
+  else if (zapcapOnly) style = 'off'
+
+  let engine = 'none'
+  if (zapcapOnly) {
+    engine = 'zapcap'
+  } else if (!captionsEnabledForStyle(style)) {
+    engine = 'none'
+  } else if (isLocalCaptionStyle(style)) {
+    engine = 'local'
+  } else if (mode === 'auto' && isZapcapCaptionStyle(requestedStyle)) {
+    engine = 'zapcap'
+  }
+
+  return {
+    requestedStyle,
+    style,
+    engine,
+    forceFreeCaptions,
+    zapcapOnly,
+    burnCaptions: engine === 'local',
+    callZapcap: engine === 'zapcap',
+  }
 }
 
 export function eofProductionVideoRelPath(jobId) {
@@ -264,6 +304,7 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
  *   transitionStyle?: string,
  *   colorGrade?: string,
  *   format?: string,
+ *   captionMode?: 'auto' | 'free' | 'zapcap-only',
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
  * }} opts
  */
@@ -277,6 +318,7 @@ export async function renderEofProductionVideo({
   transitionStyle,
   colorGrade,
   format,
+  captionMode = 'auto',
   onSceneProgress,
 }) {
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
@@ -285,7 +327,8 @@ export async function renderEofProductionVideo({
   const out = outputPath || eofProductionVideoAbsPath(jobId)
   const workDir = dirname(out)
   mkdirSync(workDir, { recursive: true })
-  const style = resolveEofCaptionStyle(captionStyle)
+  const plan = resolveCaptionRenderPlan({ captionStyle, captionMode })
+  const { requestedStyle, style, forceFreeCaptions, zapcapOnly, burnCaptions, callZapcap } = plan
   const look = autoTuneVideoLook({
     format: format || 'news',
     transitionStyle: resolveEofTransitionStyle(transitionStyle),
@@ -310,19 +353,7 @@ export async function renderEofProductionVideo({
     kenBurns,
   )
 
-  let engine
-  if (!captionsEnabledForStyle(style)) {
-    engine = 'none'
-  } else if (isLocalCaptionStyle(style)) {
-    engine = 'local'
-  } else {
-    try {
-      engine = resolveCaptionEngine()
-    } catch (e) {
-      throw e
-    }
-  }
-  const burnCaptions = engine === 'local'
+  const engine = plan.engine
   const captionFont = burnCaptions ? resolveCaptionFont() : null
   if (burnCaptions && !captionFont) {
     console.warn('[eof-video] No caption font found — captions will be missing from the Short.')
@@ -330,7 +361,10 @@ export async function renderEofProductionVideo({
   if (style === 'off') {
     console.info('[eof-video] captions off — clean plate')
   } else if (style === 'live') {
-    console.info('[eof-video] live bottom subtitles (free)')
+    console.info(
+      '[eof-video] live bottom subtitles (free)',
+      forceFreeCaptions ? `(previewing ZapCap template ${preferredZapcapTemplateId || 'n/a'} without billing)` : '',
+    )
   } else if (engine === 'none') {
     console.warn(
       '[eof-video] No ZapCap key — pick Live subs (free) or set ZAPCAP_API_KEY for CapCut-class burn.',
@@ -412,13 +446,13 @@ export async function renderEofProductionVideo({
 
   if (!existsSync(out)) throw new Error('Video render produced no output file.')
 
-  let captionEngine = burnCaptions ? 'local' : engine === 'zapcap' ? 'pending-zapcap' : 'none'
+  let captionEngine = burnCaptions ? 'local' : callZapcap ? 'pending-zapcap' : 'none'
   let zapcapTemplateId = null
-  if (engine === 'zapcap') {
+  if (callZapcap) {
     try {
       const z = await burnZapcapCaptions({
         videoPath: out,
-        style,
+        style: requestedStyle,
         templateId: preferredZapcapTemplateId,
         scenes: sorted.map((s) => ({
           caption: s.caption,
@@ -455,8 +489,11 @@ export async function renderEofProductionVideo({
     relPath: eofProductionVideoRelPath(jobId),
     hasAudio,
     captionStyle: style,
+    requestedStyle,
+    freeCaptions: forceFreeCaptions,
     captionEngine,
-    zapcapTemplateId,
+    // Preserve the user's chosen template through free previews so "Apply ZapCap captions" still knows it.
+    zapcapTemplateId: forceFreeCaptions ? preferredZapcapTemplateId || null : zapcapTemplateId,
     watermark,
     videoLook: {
       transitionStyle: look.transitionStyle,
