@@ -54,6 +54,27 @@ describe('eofSceneImageQueries', () => {
     assert.match(q, /football|match|celebrating|press|training/i)
   })
 
+  it('does not glue the year onto the name entity (Tuchel 2026)', () => {
+    // Regression: "2026" was glued into the proper-noun run → required entity became
+    // "Thomas Tuchel 2026", hard-rejecting real current photos titled "Thomas Tuchel England v Ghana 2026".
+    const tokens = extractTopicImageTokens('Thomas Tuchel 2026')
+    assert.ok(tokens.includes('Thomas Tuchel'), `expected clean name token, got ${JSON.stringify(tokens)}`)
+    assert.ok(!tokens.some((t) => /tuchel\s+2026/i.test(t)), `year must not glue to name: ${JSON.stringify(tokens)}`)
+    const current = scoreImageRelevance(
+      'Thomas Tuchel 2026',
+      'Thomas Tuchel England v Ghana 23 June 2026',
+      'Thomas Tuchel 2026',
+    )
+    assert.ok(current > 5, `current on-topic photo must be accepted, got ${current}`)
+  })
+
+  it('prefers a current-year photo over an old one (rejects stale)', () => {
+    const current = scoreImageRelevance('Thomas Tuchel', 'Thomas Tuchel England v Ghana 23 June 2026')
+    const old = scoreImageRelevance('Thomas Tuchel', 'Thomas Tuchel coach Mainz05 at away match in Leverkusen 2014')
+    assert.ok(current > old, `current (${current}) should beat old (${old})`)
+    assert.ok(old < 6, `old 2014 photo should fall below the accept threshold, got ${old}`)
+  })
+
   it('Messi World Cup topics search Messi first, not generic World Cup stock', () => {
     const topic = 'Messi shines at World Cup 2026'
     const tokens = extractTopicImageTokens(topic)

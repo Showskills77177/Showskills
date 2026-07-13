@@ -176,7 +176,10 @@ export function extractTopicImageTokens(topic) {
   const tokens = []
   let proper = []
   for (const w of words) {
-    if (/^[A-Z]/.test(w) || /^[A-Z0-9-]{2,}$/.test(w)) {
+    // Capitalized words + acronyms (PSG, USA) are proper-noun runs — but NOT pure numbers/years
+    // (e.g. "2026"), which must never be glued onto a name like "Thomas Tuchel 2026".
+    const isProper = /^[A-Z]/.test(w) || (/^[A-Z0-9-]{2,}$/.test(w) && /[A-Z]/.test(w))
+    if (isProper) {
       proper.push(w)
     } else if (proper.length) {
       tokens.push(proper.join(' '))
@@ -316,9 +319,10 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '') {
     score += 4
   }
   const year = new Date().getFullYear()
-  if (hay.includes(String(year))) score += 6
-  else if (hay.includes(String(year - 1))) score += 3
-  if (/\b(throwback|archive|young|childhood|retro|199\d|200\d|201[0-8])\b/i.test(hay)) score -= 8
+  if (hay.includes(String(year))) score += 8
+  else if (hay.includes(String(year - 1))) score += 5
+  // Strongly penalize clearly-old photos (<= ~6 yrs) so a current-year image wins when one exists.
+  if (/\b(throwback|archive|young|childhood|retro|199\d|200\d|201\d)\b/i.test(hay)) score -= 14
   if (/\b(nfl|nba|mlb|nhl|rugby|cricket|american football)\b/i.test(hay)) score -= 12
   // Generic World Cup / stadium with no person hit already rejected above
   if (COMP_NOISE_RE.test(hay) && !strongHit) score -= 10

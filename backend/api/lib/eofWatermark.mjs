@@ -1,11 +1,12 @@
 /**
  * Eyes Of Football overlays for Shorts (static — never animate / free-roam):
- * - Brand logo: circular World Cup badge, top-left, sized to JUST cover ZapCap’s free top-left watermark
+ * - Brand logo: circular World Cup badge, anchored over ZapCap’s free watermark (bottom-center default)
  * - Subscribe CTA: OFF by default (was cluttering the Short)
  *
  * Env:
  *   EOF_WATERMARK=1|0
- *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE / EOF_WATERMARK_X / EOF_WATERMARK_Y
+ *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE / EOF_WATERMARK_POSITION / EOF_WATERMARK_X / EOF_WATERMARK_Y
+ *     POSITION: bottom-center (default) | bottom-left | bottom-right | top-left | top-center | top-right | center
  *   EOF_SUBSCRIBE=1|0  (default off)
  *   EOF_SUBSCRIBE_PATH / EOF_SUBSCRIBE_WIDTH
  */
@@ -60,6 +61,40 @@ export function resolveEofSubscribePath() {
   return null
 }
 
+/**
+ * ffmpeg overlay x/y expressions for a named anchor on the 1080x1920 canvas (W,H = main, w,h = badge).
+ * mx/my are inward nudges from the anchored edge/corner.
+ * @param {string} position
+ * @param {number} mx
+ * @param {number} my
+ */
+export function watermarkOverlayXY(position, mx = 0, my = 0) {
+  const pos = String(position || 'bottom-center').trim().toLowerCase()
+  const left = `${mx}`
+  const right = `W-w-${mx}`
+  const centerX = `(W-w)/2+${mx}`
+  const top = `${my}`
+  const bottom = `H-h-${my}`
+  const centerY = `(H-h)/2+${my}`
+  switch (pos) {
+    case 'top-left':
+      return { x: left, y: top }
+    case 'top-center':
+      return { x: centerX, y: top }
+    case 'top-right':
+      return { x: right, y: top }
+    case 'center':
+      return { x: centerX, y: centerY }
+    case 'bottom-left':
+      return { x: left, y: bottom }
+    case 'bottom-right':
+      return { x: right, y: bottom }
+    case 'bottom-center':
+    default:
+      return { x: centerX, y: bottom }
+  }
+}
+
 async function probeDurationSec(videoPath) {
   try {
     const { stdout } = await runFfprobe([
@@ -96,12 +131,18 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  // Small top-left badge sized to JUST cover ZapCap’s free top-left watermark (a modest logo,
-  // not a giant badge). ~220px on a 1080-wide Short ≈ the ZapCap mark + a small margin.
-  // Tune with EOF_WATERMARK_SIZE (px, square) and nudge with EOF_WATERMARK_X / EOF_WATERMARK_Y.
-  const cornerW = Math.max(120, Math.min(360, Number(process.env.EOF_WATERMARK_SIZE) || 220))
-  const markX = Math.max(0, Math.min(300, Number(process.env.EOF_WATERMARK_X ?? 0)))
-  const markY = Math.max(0, Math.min(300, Number(process.env.EOF_WATERMARK_Y ?? 0)))
+  // Badge sized to cover ZapCap’s free watermark. ZapCap burns its mark at the BOTTOM-CENTER
+  // of the video on free/lower tiers, so default the anchor there (was top-left, which never
+  // covered it). Everything is env-tunable without a code change:
+  //   EOF_WATERMARK_POSITION  anchor: bottom-center|bottom-left|bottom-right|top-left|top-center|top-right|center
+  //   EOF_WATERMARK_SIZE      badge width/height in px (square)
+  //   EOF_WATERMARK_X / _Y    nudge from the anchor (px): +X = toward center-x from the edge, +Y = inward from the edge
+  const cornerW = Math.max(120, Math.min(420, Number(process.env.EOF_WATERMARK_SIZE) || 260))
+  const markX = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_X ?? 0)))
+  const markY = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_Y ?? 24)))
+  const position = String(process.env.EOF_WATERMARK_POSITION || 'bottom-center')
+    .trim()
+    .toLowerCase()
   const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
 
   const inputs = ['-y', '-i', videoPath]
@@ -115,8 +156,9 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
     inputs.push('-loop', '1', '-t', durArg, '-i', mark)
     const i = inputIdx
     inputIdx += 1
+    const { x: overlayX, y: overlayY } = watermarkOverlayXY(position, markX, markY)
     filterParts.push(`[${i}:v]format=rgba,scale=${cornerW}:${cornerW}[wm]`)
-    filterParts.push(`[${lastLabel}][wm]overlay=x=${markX}:y=${markY}:format=auto[v_wm]`)
+    filterParts.push(`[${lastLabel}][wm]overlay=x=${overlayX}:y=${overlayY}:format=auto[v_wm]`)
     lastLabel = 'v_wm'
   }
 
@@ -169,6 +211,7 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
       cornerW,
       markX,
       markY,
+      position,
       subW,
       static: true,
       total,
