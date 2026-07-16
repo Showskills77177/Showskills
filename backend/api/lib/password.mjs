@@ -25,6 +25,23 @@ export async function verifyUserPassword(plain, storedHash) {
   return bcrypt.compare(plain, hash)
 }
 
+/**
+ * Where admin password verification will look (safe for diagnostics; no secrets).
+ * Precedence matches verifyAdminPassword: database → env hash → env plain.
+ * @returns {Promise<'database'|'env_hash'|'env_plain'|'none'>}
+ */
+export async function getAdminPasswordSource() {
+  try {
+    const stored = await getStoredAdminPasswordHash()
+    if (stored) return 'database'
+  } catch {
+    /* DB unavailable — fall through to env */
+  }
+  if (process.env.ADMIN_PASSWORD_HASH?.trim()) return 'env_hash'
+  if (process.env.ADMIN_PASSWORD?.trim()) return 'env_plain'
+  return 'none'
+}
+
 export async function verifyAdminPassword(plain) {
   const stored = await getStoredAdminPasswordHash()
   if (stored) {

@@ -583,7 +583,7 @@ export default function AdminLoginPage() {
             <form className="mt-6 flex flex-col gap-4" onSubmit={onPasswordSubmit}>
               <div>
                 <label htmlFor="admin-user" className="block text-xs font-medium text-stone-400">
-                  Username
+                  Username or admin email
                 </label>
                 <input
                   id="admin-user"
@@ -592,6 +592,10 @@ export default function AdminLoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   className={theme.input}
                 />
+                <p className="mt-1 text-[11px] text-stone-600">
+                  Use the configured admin username, or the same email codes are sent to
+                  {setupStatus?.maskedAdminEmail ? ` (${setupStatus.maskedAdminEmail})` : ''}.
+                </p>
               </div>
               <div>
                 <label htmlFor="admin-pass" className="block text-xs font-medium text-stone-400">

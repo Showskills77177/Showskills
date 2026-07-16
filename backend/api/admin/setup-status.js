@@ -5,12 +5,14 @@ import {
   getAdminEmailSetupHint,
   adminEmail,
   maskAdminEmail,
+  adminLoginUsername,
 } from '../lib/adminEmailOtp.mjs'
 import {
   adminResetSecretConfigured,
   getAdminResetSecretQuestion,
 } from '../lib/adminResetSecret.mjs'
 import { getResendApiKey, isResendProductionMode, resolveResendFrom } from '../lib/resendConfig.mjs'
+import { getAdminPasswordSource } from '../lib/password.mjs'
 import { json } from '../lib/http.mjs'
 
 /** Safe diagnostics for admin login page (no secrets). */
@@ -34,11 +36,15 @@ export default async function handler(req, res) {
   const missingEmail = []
   if (!hasResendKey) missingEmail.push('RESEND_API_KEY')
   if (!hasAdminEmail) missingEmail.push('ADMIN_EMAIL')
+  const passwordSource = await getAdminPasswordSource()
+  const adminUserLen = adminLoginUsername().length
 
   return json(res, 200, {
     ok: true,
     adminAuthConfigured: isAdminAuthConfigured(),
     adminAuthMissing: auth.missing,
+    passwordSource,
+    adminUsernameLength: adminUserLen || null,
     emailOtpEnabled: emailOtp,
     emailOtpBypassed: otpBypassed,
     passwordResetEnabled:

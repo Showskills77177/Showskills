@@ -13,6 +13,7 @@ import {
   isAdminEmailOtpBypassed,
   getAdminEmailSetupHint,
   adminOtpVerificationPayload,
+  matchesAdminLoginIdentity,
 } from '../lib/adminEmailOtp.mjs'
 import { getResendApiKey } from '../lib/resendConfig.mjs'
 import { readJsonBody, json } from '../lib/http.mjs'
@@ -51,8 +52,8 @@ export default async function handler(req, res) {
   const username = typeof body.username === 'string' ? body.username.trim() : ''
   const password = typeof body.password === 'string' ? body.password : ''
 
-  const adminUser = (process.env.ADMIN_USER || '').trim()
-  if (!adminUser || username !== adminUser) {
+  // Accept ADMIN_USER or ADMIN_EMAIL (same identity as password-reset).
+  if (!matchesAdminLoginIdentity(username)) {
     return json(res, 401, { error: 'Invalid credentials' })
   }
   const ok = await verifyAdminPassword(password)
