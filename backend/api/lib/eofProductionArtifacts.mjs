@@ -1,20 +1,27 @@
 /**
  * Durable EOF render artifacts (audio / video / scene stills) stored in the DB.
  * Vercel serverless uses ephemeral /tmp — files vanish across instances.
- * Small Shorts (~0.5MB) fit in Postgres TEXT as base64.
+ * Small Shorts fit in Postgres TEXT as base64 — oversize files must be recompressed
+ * or the admin preview returns “Video is not available” on the next instance.
  */
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, renameSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { query, dbIsPostgres } from './db.mjs'
 import { ensureEofProductionSchema } from './ensureEofProductionSchema.mjs'
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { eofSceneImageAbsPath } from './eofSceneImages.mjs'
+import { runFfmpeg } from './eofFfmpeg.mjs'
 
-/** ~8MB base64 (~6MB binary) — hard stop so we never bloat the DB. */
-const MAX_ARTIFACT_BASE64_CHARS = 8_000_000
+/** ~12MB base64 (~9MB binary) — Shorts with Oxylabs stills often exceed the old 6MB cap. */
+const MAX_ARTIFACT_BASE64_CHARS = 12_000_000
 /** Scene stills pack — allow a bit more for 5 JPGs. */
 const MAX_SCENE_IMAGES_JSON_CHARS = 12_000_000
+
+/** Max binary size that still fits under MAX_ARTIFACT_BASE64_CHARS (with margin). */
+export function eofVideoArtifactMaxBytes() {
+  return Math.floor(MAX_ARTIFACT_BASE64_CHARS * 0.75) - 64_000
+}
 
 export async function saveEofMixedAudioArtifact(jobId, absPath) {
   return saveArtifactColumn(jobId, 'mixed_audio_base64', absPath)
@@ -22,6 +29,90 @@ export async function saveEofMixedAudioArtifact(jobId, absPath) {
 
 export async function saveEofVideoArtifact(jobId, absPath) {
   return saveArtifactColumn(jobId, 'video_base64', absPath)
+}
+
+/**
+ * Persist Short MP4; if over the DB cap, recompress in place (higher CRF) then retry.
+ * @returns {Promise<{ saved: boolean, bytes: number, recompressed: boolean }>}
+ */
+export async function persistEofVideoArtifact(jobId, absPath) {
+  if (!jobId || !absPath || !existsSync(absPath)) {
+    return { saved: false, bytes: 0, recompressed: false }
+  }
+  let bytes = statSync(absPath).size
+  let recompressed = false
+  if (await saveEofVideoArtifact(jobId, absPath)) {
+    return { saved: true, bytes, recompressed }
+  }
+
+  const maxBytes = eofVideoArtifactMaxBytes()
+  console.warn(
+    `[eof-production] video too large to store (${bytes} bytes) for job ${jobId} — recompressing under ${maxBytes}`,
+  )
+  const ok = await recompressEofVideoUnderLimit(absPath, maxBytes)
+  recompressed = ok
+  if (!ok) {
+    return { saved: false, bytes: existsSync(absPath) ? statSync(absPath).size : bytes, recompressed }
+  }
+  bytes = statSync(absPath).size
+  const saved = await saveEofVideoArtifact(jobId, absPath)
+  return { saved, bytes, recompressed }
+}
+
+/**
+ * Re-encode MP4 until under maxBytes (or CRF ladder exhausted).
+ * @param {string} absPath
+ * @param {number} maxBytes
+ */
+export async function recompressEofVideoUnderLimit(absPath, maxBytes) {
+  if (!absPath || !existsSync(absPath)) return false
+  if (statSync(absPath).size <= maxBytes) return true
+
+  const tmp = absPath.replace(/\.mp4$/i, '.compact.mp4')
+  for (const crf of [32, 35, 38, 42]) {
+    try {
+      await runFfmpeg(
+        [
+          '-y',
+          '-i',
+          absPath,
+          '-c:v',
+          'libx264',
+          '-preset',
+          'veryfast',
+          '-crf',
+          String(crf),
+          '-c:a',
+          'aac',
+          '-b:a',
+          '96k',
+          '-ac',
+          '1',
+          '-movflags',
+          '+faststart',
+          '-pix_fmt',
+          'yuv420p',
+          tmp,
+        ],
+        { maxBuffer: 16 * 1024 * 1024 },
+      )
+    } catch (e) {
+      console.warn('[eof-production] recompress failed crf', crf, e instanceof Error ? e.message : e)
+      continue
+    }
+    if (!existsSync(tmp)) continue
+    const size = statSync(tmp).size
+    if (size <= maxBytes) {
+      renameSync(tmp, absPath)
+      return true
+    }
+  }
+  try {
+    if (existsSync(tmp)) unlinkSync(tmp)
+  } catch {
+    /* ignore */
+  }
+  return existsSync(absPath) && statSync(absPath).size <= maxBytes
 }
 
 /**

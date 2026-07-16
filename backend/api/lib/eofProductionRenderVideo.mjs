@@ -17,7 +17,12 @@ import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mj
 import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
-import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact, saveEofSceneImagesArtifact, ensureEofSceneImageOnDisk } from './eofProductionArtifacts.mjs'
+import {
+  ensureEofMixedAudioOnDisk,
+  persistEofVideoArtifact,
+  saveEofSceneImagesArtifact,
+  ensureEofSceneImageOnDisk,
+} from './eofProductionArtifacts.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 
@@ -249,7 +254,18 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
 
     const videoAbs = eofProductionVideoAbsPath(jobId)
     await saveEofSceneImagesArtifact(jobId, workDir)
-    await saveEofVideoArtifact(jobId, videoAbs)
+    const persisted = await persistEofVideoArtifact(jobId, videoAbs)
+    if (!persisted.saved) {
+      const mb = (persisted.bytes / (1024 * 1024)).toFixed(1)
+      throw new Error(
+        `Short rendered but could not be stored for preview (${mb}MB after compression). Rebuild video, or shorten the voiceover.`,
+      )
+    }
+    if (persisted.recompressed) {
+      console.info(
+        `[eof-production] stored compressed Short for job ${jobId} (${persisted.bytes} bytes)`,
+      )
+    }
 
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED,

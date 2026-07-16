@@ -67,9 +67,12 @@ export default async function handler(req, res) {
   if (!videoPath || !existsSync(videoPath)) {
     res.statusCode = 404
     res.setHeader('Content-Type', 'application/json')
+    const renderedButMissing = job.status === 'video_rendered'
     res.end(
       JSON.stringify({
-        error: 'Video is not available. Re-run Build Short or “Render video” to generate it again.',
+        error: renderedButMissing
+          ? 'Video finished encoding but was too large to keep on staging. Hit Rebuild video — it will compress and store a previewable Short.'
+          : 'Video is not available. Re-run Build Short or “Render video” to generate it again.',
       }),
     )
     return
