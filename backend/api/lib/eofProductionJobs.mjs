@@ -184,6 +184,7 @@ export async function createEofProductionJob({
       plainTextDraft: draft.plainTextDraft,
       title: draft.title || resolvedTopic,
       source: draft.source,
+      judge: draft.judge || null,
     })
     scriptSource = draft.source || 'template'
     status = EOF_PRODUCTION_JOB_STATUS.DRAFT
@@ -246,6 +247,7 @@ export async function regenerateEofProductionDraft(
     plainTextDraft: draft.plainTextDraft,
     title: draft.title || resolvedTopic,
     source: draft.source,
+    judge: draft.judge || null,
   })
   const updated = await updateEofProductionJob(id, {
     script,

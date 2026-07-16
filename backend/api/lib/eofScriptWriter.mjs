@@ -247,7 +247,7 @@ function draftFormatGuide(format) {
 /**
  * Shell script object for draft-only jobs (no scenes yet).
  */
-export function buildEofDraftShell({ topic, format, plainTextDraft, title, source }) {
+export function buildEofDraftShell({ topic, format, plainTextDraft, title, source, judge = null }) {
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
   const draft = String(plainTextDraft || '').trim()
@@ -260,6 +260,7 @@ export function buildEofDraftShell({ topic, format, plainTextDraft, title, sourc
     plainTextDraft: draft,
     scenes: [],
     draftSource: source || null,
+    judge: judge && !judge.skipped ? judge : null,
   }
 }
 
