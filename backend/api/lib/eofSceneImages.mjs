@@ -267,9 +267,10 @@ export async function fetchEofSceneImage({
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
-    // Oxylabs Google Images — primary. ONE billable SERP call per query, then walk the hit
-    // pool skipping avoidKeys (rebuilds 2…N) until a fresh URL downloads.
-    if (isEofOxylabsConfigured()) {
+    // Oxylabs Google Images — primary. ONE billable SERP call for the first search query
+    // only (extra variants were burning the Vercel timeout and Oxylabs quota). Walk the hit
+    // pool skipping avoidKeys until a fresh URL downloads.
+    if (isEofOxylabsConfigured() && query === queries[0]) {
       try {
         const hits = await searchOxylabsGoogleImages(query, { limit: 20 })
         const startIndex = effIndex(0)

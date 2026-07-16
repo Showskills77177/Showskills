@@ -19,8 +19,8 @@ function envTrim(name) {
 }
 
 export function getOxylabsCredentials() {
-  const username = envTrim('OXYLABS_USERNAME')
-  const password = envTrim('OXYLABS_PASSWORD')
+  const username = envTrim('OXYLABS_USERNAME') || envTrim('OXYLABS_USER')
+  const password = envTrim('OXYLABS_PASSWORD') || envTrim('OXYLABS_PASS')
   if (!username || !password) return null
   return { username, password }
 }
@@ -174,12 +174,13 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
         Authorization: basicAuthHeader(creds.username, creds.password),
         Accept: 'application/json',
       },
+      // Docs prefer udm=2 for Image Search; tbm=isch is the legacy equivalent.
       body: JSON.stringify({
         source: 'google_search',
         query: q,
         geo_location: oxylabsGeoLocation(),
         parse: true,
-        context: [{ key: 'tbm', value: 'isch' }],
+        context: [{ key: 'udm', value: 2 }],
       }),
       signal: controller.signal,
     })
@@ -191,7 +192,7 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
         console.warn(
           '[eof-oxylabs] auth failed',
           res.status,
-          '— OXYLABS_USERNAME/PASSWORD rejected by realtime API. Fix credentials on Vercel; scene fetch will fall back to Wikimedia.',
+          '— OXYLABS_PASSWORD on Vercel does not match the Oxylabs dashboard user (username may still be correct).',
         )
       } else {
         console.warn('[eof-oxylabs] search failed', res.status, body.slice(0, 180))
@@ -201,7 +202,13 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
 
     const data = await res.json()
     const rows = extractOxylabsImageRows(data)
-    rows.sort((a, b) => scoreImageCandidate(b.url, b.width, b.height) - scoreImageCandidate(a.url, a.width, a.height))
+    console.info('[eof-oxylabs] google images', q.slice(0, 60), '→', rows.length, 'urls')
+    if (!rows.length) {
+      console.warn(
+        '[eof-oxylabs] parsed 0 image URLs — check response shape / high_res_image fields for',
+        q.slice(0, 60),
+      )
+    }
 
     return rows.slice(0, limit).map((r) => ({
       url: r.url,
