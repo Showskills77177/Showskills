@@ -379,7 +379,8 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
         ? `${subject} football manager`
         : `${subject} football`
 
-  const need = Math.min(16, sceneCount + 4)
+  // Only keep what this Short needs: one still per scene + a single spare for a dead download.
+  const need = Math.max(1, sceneCount + 1)
   const hits = await searchOxylabsGoogleImages(query, {
     limit: need,
     signal: opts.signal,
@@ -388,8 +389,8 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
     '[eof-oxylabs] job pool',
     query.slice(0, 60),
     `scenes=${sceneCount}`,
-    `urls=${hits.length}`,
-    `(max ${EOF_OXYLABS_MAX_QUERIES_PER_JOB} query/job)`,
+    `kept=${hits.length}/${need}`,
+    `(${EOF_OXYLABS_MAX_QUERIES_PER_JOB} query/Short — not per scene)`,
   )
   return {
     query,

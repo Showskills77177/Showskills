@@ -41,7 +41,7 @@ export function eofImageSourceStatus() {
 export function eofImagesConfigurationNote() {
   const { ap, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
   if (oxylabs) {
-    return 'Oxylabs: 1 Google Images credit per Short (all scenes share one SERP). Wikimedia is last-resort only.'
+    return 'Oxylabs: 1 search per Short (only as many stills as scenes). Wikimedia last-resort.'
   }
   if (ap || google || pexels || pinterestApi) {
     return pinterestApi && !ap && !google && !pexels
