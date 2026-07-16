@@ -9,6 +9,7 @@ import {
   fetchPinterestPinImage,
   searchPinterestPartnerPins,
   isEofPinterestApiConfigured,
+  getEofPinterestAccessToken,
 } from './eofPinterestImages.mjs'
 import { isEofGoogleCseConfigured, searchGoogleCseImages } from './eofGoogleImages.mjs'
 import { searchWikimediaCommonsImages } from './eofWikimediaImages.mjs'
@@ -37,7 +38,10 @@ export function eofImageSourceStatus() {
 
 export function eofImagesConfigurationNote() {
   const { ap, google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (pinterestApi || ap || google || pexels) return null
+  if (pinterestApi) {
+    return 'Pinterest token detected — Rebuild video will search Pinterest (partner catalog, then your account pins) for topic photos.'
+  }
+  if (ap || google || pexels) return null
   return 'Using free Wikimedia Commons images. Add PINTEREST_ACCESS_TOKEN (or AP_MEDIA_API_KEY / PEXELS / Google CSE) for better topic photos.'
 }
 
@@ -62,13 +66,20 @@ function looksLikeImageBuffer(buf) {
 }
 
 async function downloadImageToFile(imgUrl, outPath) {
-  const imgRes = await fetch(imgUrl, {
-    headers: {
-      'User-Agent': 'ShowSkillsEOF/1.0 (https://showskills.co.uk; eof-production@showskills.co.uk)',
-      Accept: 'image/*,*/*',
-    },
-  })
-  if (!imgRes.ok) return false
+  const headers = {
+    'User-Agent':
+      'Mozilla/5.0 (compatible; ShowSkillsEOF/1.0; +https://showskills.co.uk; eof-production@showskills.co.uk)',
+    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+  }
+  // pinimg CDN often rejects hotlinks without a Pinterest Referer
+  if (String(imgUrl || '').includes('pinimg.com') || String(imgUrl || '').includes('pinterest.')) {
+    headers.Referer = 'https://www.pinterest.com/'
+  }
+  const imgRes = await fetch(imgUrl, { headers })
+  if (!imgRes.ok) {
+    console.warn('[eof-scene-images] image download failed', imgRes.status, String(imgUrl).slice(0, 120))
+    return false
+  }
   const buf = Buffer.from(await imgRes.arrayBuffer())
   if (buf.length < 8_000) return false
   if (!looksLikeImageBuffer(buf)) return false
@@ -159,7 +170,7 @@ export async function fetchEofSceneImage({
   }
 
   const pexelsKey = (process.env.PEXELS_API_KEY || process.env.EOF_PEXELS_API_KEY || '').trim()
-  const pinterestToken = (process.env.PINTEREST_ACCESS_TOKEN || process.env.EOF_PINTEREST_ACCESS_TOKEN || '').trim()
+  const pinterestToken = getEofPinterestAccessToken()
   const queries = buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex: index })
   const custom = String(imageQuery || '').trim()
 
@@ -244,6 +255,27 @@ export async function fetchEofSceneImage({
       if (meta) return meta
     }
 
+    // Pinterest next when a token is set — partner catalog, then account pins
+    if (pinterestToken) {
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
+        if (!hit || (hit.relevance ?? 0) < 6) return null
+        return {
+          key: `pin:${hit.pinId || hit.imgUrl}`,
+          meta: {
+            path: outPath,
+            source: 'pinterest',
+            imageQuery: query,
+            pinId: hit.pinId,
+            pinTitle: hit.title,
+            relevance: hit.relevance,
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
+        }
+      })
+      if (meta) return meta
+    }
+
     if (isEofGoogleCseConfigured()) {
       const meta = await rotateSource(async (eff) => {
         const hit = await searchGoogleCseImages(query, eff)
@@ -259,27 +291,6 @@ export async function fetchEofSceneImage({
             imageTitle: hit.title,
             sourcePage: hit.sourcePage,
             relevance: score,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
-        }
-      })
-      if (meta) return meta
-    }
-
-    // Pinterest after editorial sources — often old fan pins / memes
-    if (pinterestToken) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
-        if (!hit || (hit.relevance ?? 0) < 6) return null
-        return {
-          key: `pin:${hit.pinId || hit.imgUrl}`,
-          meta: {
-            path: outPath,
-            source: 'pinterest',
-            imageQuery: query,
-            pinId: hit.pinId,
-            pinTitle: hit.title,
-            relevance: hit.relevance,
           },
           download: () => downloadImageToFile(hit.imgUrl, outPath),
         }

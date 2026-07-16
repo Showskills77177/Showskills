@@ -420,6 +420,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     wikimedia: true,
   })
   const [imagesNote, setImagesNote] = useState('')
+  const [pinterestStatus, setPinterestStatus] = useState(null)
   const [progressTick, setProgressTick] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
   const renderPollRef = useRef(null)
@@ -486,6 +487,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           : { google: false, pexels: Boolean(j.pexelsConfigured), pinterestApi: false, pinterestPinUrl: true },
       )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
+      setPinterestStatus(j.pinterest && typeof j.pinterest === 'object' ? j.pinterest : null)
       setRenderStack(j.renderStack || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
@@ -1632,6 +1634,21 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 .join(' · ')}
             </p>
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
+            {pinterestStatus?.configured ? (
+              <p className={pinterestStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
+                Pinterest API:{' '}
+                {pinterestStatus.ok
+                  ? 'token valid — Rebuild will search Pinterest'
+                  : `token rejected (${pinterestStatus.status || 'error'}${
+                      pinterestStatus.detail ? `: ${String(pinterestStatus.detail).slice(0, 80)}` : ''
+                    })`}
+              </p>
+            ) : (
+              <p className="text-[#8a8a8a]">
+                Pinterest API: not set — add <code className="text-[#aaa]">PINTEREST_ACCESS_TOKEN</code> in
+                Vercel (staging) and redeploy.
+              </p>
+            )}
             <p>
               Captions:{' '}
               {captionEngine.zapcap
