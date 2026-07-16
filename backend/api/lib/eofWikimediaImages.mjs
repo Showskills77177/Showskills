@@ -301,12 +301,14 @@ export async function listWikimediaPersonImages(topic, opts = {}) {
     console.warn('[eof-wikimedia] list person resolve failed', subject, e instanceof Error ? e.message : e)
   }
 
+  // Always score against the clean person subject — never the raw headline with quotes
+  // ("Thomas Tuchel: \"We were sloppy\"") which used to require entity "Thomas Tuchel We".
   let ranked = preferRecentCandidates(
-    rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
+    rankWikimediaCandidates([...byKey.values()], subject, ''),
   )
 
   if (ranked.length < 2) {
-    for (const q of subjectSearchQueries(subject, topic).slice(0, 2)) {
+    for (const q of subjectSearchQueries(subject, subject).slice(0, 2)) {
       try {
         const hits = await searchCommonsRaw(q, 12)
         for (const h of hits) add(h, q, 'commons-search')
@@ -315,7 +317,7 @@ export async function listWikimediaPersonImages(topic, opts = {}) {
       }
     }
     ranked = preferRecentCandidates(
-      rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
+      rankWikimediaCandidates([...byKey.values()], subject, ''),
     )
   }
 

@@ -135,28 +135,29 @@ const COMP_WORD_RE =
  * @returns {string}
  */
 export function resolveImageSubject(topic) {
-  const entities = primaryImageEntities(topic)
+  const cleaned = sanitizeTopicForImageSearch(topic)
+  const entities = primaryImageEntities(cleaned)
   for (const e of entities) {
     for (const w of e.split(/\s+/)) {
       const full = expandPlayerFullName(w)
       if (full) return full
     }
     if (KNOWN_PLAYER_RE.test(e) || KNOWN_COACH_RE.test(e)) {
-      const cleaned = e
+      const cleanedEnt = e
         .split(/\s+/)
-        .filter((w) => !COMP_WORD_RE.test(w))
+        .filter((w) => !COMP_WORD_RE.test(w) && !NAME_BREAK_RE.test(w))
         .join(' ')
         .trim()
-      if (cleaned) return cleaned
+      if (cleanedEnt) return cleanedEnt
     }
   }
-  const first = entities[0] || String(topic || '').trim()
-  const cleaned = first
+  const first = entities[0] || cleaned || String(topic || '').trim()
+  const cleanedEnt = first
     .split(/\s+/)
-    .filter((w) => !COMP_WORD_RE.test(w))
+    .filter((w) => !COMP_WORD_RE.test(w) && !NAME_BREAK_RE.test(w))
     .join(' ')
     .trim()
-  return cleaned || first || 'football'
+  return cleanedEnt || first || 'football'
 }
 
 /**
@@ -167,38 +168,65 @@ export function topicLooksLikeCoach(topic) {
   return COACH_ROLE_RE.test(t) || KNOWN_COACH_RE.test(t)
 }
 
+/** Sentence/dialogue words that must never glue onto a person name ("Thomas Tuchel We"). */
+const NAME_BREAK_RE =
+  /^(we|i|you|they|he|she|it|this|that|these|those|what|when|where|why|how|who|whom|whose|were|was|are|is|am|been|being|have|has|had|do|does|did|will|would|can|could|should|may|might|must|not|no|yes|ok|okay|sloppy|enough|fast|slow|good|bad|very|really|just|also|then|than|too|so|if|or|but|and|the|a|an)$/i
+
+/**
+ * Strip headline dialogue / quote tails so image search keys off the person, not the soundbite.
+ * e.g. `Thomas Tuchel: "We were sloppy…"` → `Thomas Tuchel`
+ * @param {string} topic
+ */
+export function sanitizeTopicForImageSearch(topic) {
+  let t = String(topic || '')
+  // Remove quoted dialogue entirely (straight + curly quotes)
+  t = t.replace(/[\u201C\u201D"']([^\"\u201C\u201D']*)[\u201C\u201D"']/g, ' ')
+  // Drop trailing subtitle after colon/dash once quotes are gone
+  t = t.replace(/\s*[:\u2013\u2014\-]\s*.*$/u, ' ')
+  t = t.replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+  return t.replace(/\s+/g, ' ').trim()
+}
+
 /**
  * Pull searchable topic tokens (names, clubs, competitions).
  * Person / club names rank above “World Cup” / fluff verbs.
  * @param {string} topic
  */
 export function extractTopicImageTokens(topic) {
-  const raw = String(topic || '')
-    .replace(/[“”"']/g, '')
-    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  const raw = sanitizeTopicForImageSearch(topic)
   if (!raw) return []
 
   const words = raw.split(' ').filter(Boolean)
   const tokens = []
   let proper = []
+  const flushProper = () => {
+    if (!proper.length) return
+    // Drop trailing sentence words accidentally capitalized after a colon/quote strip
+    while (proper.length && NAME_BREAK_RE.test(proper[proper.length - 1])) proper.pop()
+    // If a break word sat in the middle ("Thomas We Tuchel"), keep only the leading name chunk
+    const breakAt = proper.findIndex((w, i) => i > 0 && NAME_BREAK_RE.test(w))
+    const chunk = breakAt >= 0 ? proper.slice(0, breakAt) : proper
+    if (chunk.length) tokens.push(chunk.join(' '))
+    proper = []
+  }
+
   for (const w of words) {
     // Capitalized words + acronyms (PSG, USA) are proper-noun runs — but NOT pure numbers/years
     // (e.g. "2026"), which must never be glued onto a name like "Thomas Tuchel 2026".
     const isProper = /^[A-Z]/.test(w) || (/^[A-Z0-9-]{2,}$/.test(w) && /[A-Z]/.test(w))
-    if (isProper) {
+    if (isProper && !NAME_BREAK_RE.test(w)) {
       proper.push(w)
+    } else if (isProper && NAME_BREAK_RE.test(w)) {
+      flushProper()
     } else if (proper.length) {
-      tokens.push(proper.join(' '))
-      proper = []
+      flushProper()
     }
   }
-  if (proper.length) tokens.push(proper.join(' '))
+  flushProper()
 
   for (const w of words) {
     const low = w.toLowerCase()
-    if (STOP.has(low) || low.length < 3) continue
+    if (STOP.has(low) || NAME_BREAK_RE.test(low) || low.length < 3) continue
     if (!tokens.some((t) => t.toLowerCase().includes(low))) tokens.push(w)
   }
 
@@ -227,8 +255,8 @@ function entityRank(token) {
 export function primaryImageEntities(topic, imageQuery = '') {
   // Don't concatenate identical topic+query into "Thomas Tuchel Thomas Tuchel" —
   // that becomes a required entity no real photo title will ever contain.
-  const topicStr = String(topic || '').trim()
-  const queryStr = String(imageQuery || '').trim()
+  const topicStr = sanitizeTopicForImageSearch(topic)
+  const queryStr = sanitizeTopicForImageSearch(imageQuery)
   const blob =
     !queryStr || queryStr.toLowerCase() === topicStr.toLowerCase()
       ? topicStr
@@ -242,6 +270,7 @@ export function primaryImageEntities(topic, imageQuery = '') {
     if (COMP_NOISE_RE.test(t)) return false
     if (/^\d{4}$/.test(t)) return false
     if (STOP.has(t.toLowerCase())) return false
+    if (NAME_BREAK_RE.test(t)) return false
     return t.length >= 4 || KNOWN_PLAYER_RE.test(t) || KNOWN_COACH_RE.test(t)
   })
   // Collapse accidental duplicated names ("Thomas Tuchel Thomas Tuchel")

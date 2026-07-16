@@ -5,6 +5,8 @@ import {
   buildSceneImageSearchQueries,
   scoreImageRelevance,
   defaultSceneImageQuery,
+  sanitizeTopicForImageSearch,
+  resolveImageSubject,
 } from './eofSceneImageQueries.mjs'
 
 describe('eofSceneImageQueries', () => {
@@ -84,6 +86,17 @@ describe('eofSceneImageQueries', () => {
       'Thomas Tuchel',
     )
     assert.ok(score >= 6, `repeated name must still accept current photo, got ${score}`)
+  })
+
+  it('strips quote soundbites so Tuchel headlines still resolve to Thomas Tuchel', () => {
+    const topic = 'Thomas Tuchel: "We were sloppy, we were not fast enough"'
+    assert.equal(sanitizeTopicForImageSearch(topic), 'Thomas Tuchel')
+    assert.equal(resolveImageSubject(topic), 'Thomas Tuchel')
+    const tokens = extractTopicImageTokens(topic)
+    assert.ok(tokens.includes('Thomas Tuchel'), `tokens=${JSON.stringify(tokens)}`)
+    assert.ok(!tokens.some((t) => /\bWe\b/.test(t)), `must not glue We onto name: ${JSON.stringify(tokens)}`)
+    const score = scoreImageRelevance(topic, 'Thomas Tuchel England v Ghana 23 June 2026-081.jpg')
+    assert.ok(score >= 6, `quoted headline must accept current photo, got ${score}`)
   })
 
   it('Messi World Cup topics search Messi first, not generic World Cup stock', () => {
