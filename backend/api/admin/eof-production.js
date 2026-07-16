@@ -13,10 +13,21 @@ import {
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
 import { withEofArtifactFlags } from '../lib/eofProductionArtifacts.mjs'
-import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground, startEofProductionVoiceoverRegenerationBackground, startApplyEofProductionZapcapBackground } from '../lib/eofProductionRenderRunner.mjs'
+import {
+  startEofProductionVideoRenderBackground,
+  startEofProductionFullBuildBackground,
+  startEofProductionVoiceoverRegenerationBackground,
+  startApplyEofProductionZapcapBackground,
+  startEofProductionMusicRemixBackground,
+} from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
-import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
+import {
+  EOF_VOICE_PRESETS,
+  EOF_RENDER_STACK,
+  EOF_DEFAULT_VOICE_PRESET,
+  EOF_DEFAULT_MUSIC_VOLUME,
+} from '../../../shared/eofProduction.mjs'
 import { eofCaptionEngineStatus, listZapcapTemplates } from '../lib/eofZapcapCaptions.mjs'
 import { probeEofPinterestApi } from '../lib/eofPinterestImages.mjs'
 import { probeEofOxylabsApi } from '../lib/eofOxylabsImages.mjs'
@@ -30,11 +41,19 @@ import {
 import {
   EOF_DEFAULT_TRANSITION_STYLE,
   EOF_DEFAULT_COLOR_GRADE,
+  EOF_DEFAULT_ENHANCE_STYLE,
   listEofTransitionStyles,
   listEofColorGrades,
+  listEofEnhanceStyles,
   resolveEofTransitionStyle,
   resolveEofColorGrade,
+  resolveEofEnhanceStyle,
 } from '../../../shared/eofVideoLook.mjs'
+import {
+  ensureEofMusicCatalogSeeded,
+  listEofMusicTracks,
+  listEofDefaultMusicBeds,
+} from '../lib/eofMusicTracks.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
 import {
   isEofOpenAiScriptConfigured,
@@ -115,10 +134,20 @@ export default async function handler(req, res) {
         detail: e instanceof Error ? e.message : String(e),
       }))
 
+      let tracks = []
+      try {
+        tracks = await ensureEofMusicCatalogSeeded()
+      } catch (e) {
+        console.error('[eof-production] music tracks', e)
+        tracks = await listEofMusicTracks({ activeOnly: false }).catch(() => [])
+      }
+
       return json(res, 200, {
         ok: true,
         jobs,
-        tracks: [],
+        tracks,
+        defaultMusicBeds: listEofDefaultMusicBeds(),
+        defaultMusicVolume: EOF_DEFAULT_MUSIC_VOLUME,
         voicePresets: Object.values(EOF_VOICE_PRESETS),
         defaultVoicePreset: EOF_DEFAULT_VOICE_PRESET,
         elevenLabsConfigured: isEofElevenLabsConfigured(),
@@ -133,6 +162,8 @@ export default async function handler(req, res) {
         defaultTransitionStyle: EOF_DEFAULT_TRANSITION_STYLE,
         colorGrades: listEofColorGrades(),
         defaultColorGrade: EOF_DEFAULT_COLOR_GRADE,
+        enhanceStyles: listEofEnhanceStyles(),
+        defaultEnhanceStyle: EOF_DEFAULT_ENHANCE_STYLE,
         captionEngine: eofCaptionEngineStatus(),
         zapcapTemplates: zapcapCatalog.templates,
         zapcapTemplatesError: zapcapCatalog.error,
@@ -287,6 +318,37 @@ export default async function handler(req, res) {
         }
       }
 
+      if (action === 'remix-music') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (!(existing.script?.scenes?.length >= 1)) {
+          return json(res, 400, { error: 'Job has no script scenes.' })
+        }
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          return json(res, 202, { ok: true, accepted: true, job: existing })
+        }
+
+        try {
+          await updateEofProductionJob(jobId, {
+            musicTrackId:
+              body.musicTrackId !== undefined
+                ? body.musicTrackId === null || body.musicTrackId === ''
+                  ? null
+                  : String(body.musicTrackId)
+                : undefined,
+            musicVolume:
+              body.musicVolume !== undefined ? Number(body.musicVolume) : undefined,
+          })
+          await startEofProductionMusicRemixBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : 'Music remix failed' })
+        }
+      }
+
       if (action === 'delete') {
         try {
           await requireEofOwner(req)
@@ -418,6 +480,9 @@ export default async function handler(req, res) {
       const colorGrade = resolveEofColorGrade(
         typeof body.colorGrade === 'string' ? body.colorGrade : EOF_DEFAULT_COLOR_GRADE,
       )
+      const enhanceStyle = resolveEofEnhanceStyle(
+        typeof body.enhanceStyle === 'string' ? body.enhanceStyle : EOF_DEFAULT_ENHANCE_STYLE,
+      )
       try {
         const job = await createEofProductionJob({
           topic,
@@ -429,6 +494,7 @@ export default async function handler(req, res) {
           zapcapTemplateId,
           transitionStyle,
           colorGrade,
+          enhanceStyle,
         })
         return json(res, 201, {
           ok: true,
@@ -469,6 +535,8 @@ export default async function handler(req, res) {
             ? resolveEofTransitionStyle(body.transitionStyle)
             : undefined,
         colorGrade: body.colorGrade !== undefined ? resolveEofColorGrade(body.colorGrade) : undefined,
+        enhanceStyle:
+          body.enhanceStyle !== undefined ? resolveEofEnhanceStyle(body.enhanceStyle) : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

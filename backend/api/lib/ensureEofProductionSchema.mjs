@@ -104,6 +104,7 @@ async function addEofProductionJobColumns() {
     'zapcap_template_id',
     'transition_style',
     'color_grade',
+    'enhance_style',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {

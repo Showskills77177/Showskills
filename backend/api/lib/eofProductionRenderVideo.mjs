@@ -265,6 +265,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       zapcapTemplateId: job.zapcapTemplateId,
       transitionStyle: job.transitionStyle,
       colorGrade: job.colorGrade,
+      enhanceStyle: job.enhanceStyle,
       format: job.script?.format,
       captionMode,
       onSceneProgress: async (done) => report('video', done),

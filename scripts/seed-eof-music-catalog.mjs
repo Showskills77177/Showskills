@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 process.env.SQLITE_PATH = process.env.SQLITE_PATH || 'db/db.sqlite'
 
+/** Mirrors EOF_DEFAULT_MUSIC_BEDS — only registers slots whose MP3 exists on disk. */
 const CATALOG = [
   {
     title: 'EOF Neutral bed',
@@ -21,6 +22,18 @@ const CATALOG = [
     title: 'EOF Dramatic bed',
     mood: 'dramatic',
     publicUrl: '/eof/music/default-dramatic.mp3',
+    isDefault: false,
+  },
+  {
+    title: 'EOF Upbeat bed',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/default-upbeat.mp3',
+    isDefault: false,
+  },
+  {
+    title: 'EOF Calm bed',
+    mood: 'calm',
+    publicUrl: '/eof/music/default-calm.mp3',
     isDefault: false,
   },
 ]

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
 import {
@@ -14,7 +15,7 @@ import {
   resetEofVoiceRegenerationBaseline,
   incrementEofVoiceRegenerationCount,
 } from './eofProductionJobs.mjs'
-import { getEofMusicTrack, resolveEofMusicTrackFilePath } from './eofMusicTracks.mjs'
+import { pickEofMusicTrackForTopic, resolveEofMusicTrackFilePath } from './eofMusicTracks.mjs'
 import {
   eofProductionWorkDir,
   eofProductionMixedAudioRelPath,
@@ -58,11 +59,12 @@ export async function readEofMixedAudioInline(jobId) {
 /**
  * Generate per-scene TTS and mix with catalog music bed.
  * @param {string} jobId
- * @param {{ preserveSceneImages?: boolean, voiceRegenerationMode?: boolean }} [opts]
+ * @param {{ preserveSceneImages?: boolean, voiceRegenerationMode?: boolean, reuseSceneAudio?: boolean }} [opts]
  */
 export async function renderEofProductionAudio(jobId, opts = {}) {
   const preserveSceneImages = opts.preserveSceneImages === true
   const voiceRegenerationMode = opts.voiceRegenerationMode === true
+  const reuseSceneAudio = opts.reuseSceneAudio === true
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
@@ -125,25 +127,37 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
     const sceneManifest = await mapWithConcurrency(job.script.scenes, ttsConcurrency, async (scene, i) => {
       const outPath = join(workDir, `scene-${i + 1}.mp3`)
       const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]
-      const ttsResult = await synthesizeEofSceneNarration({
-        text: scene.narration,
-        voicePreset: job.voicePreset,
-        voiceSettings: job.voiceSettings,
-        regenerateFromRequestId:
-          voiceRegenerationMode && prior?.elevenLabsRequestId ? prior.elevenLabsRequestId : null,
-        outPath,
-      })
-      const audioPath = typeof ttsResult === 'string' ? ttsResult : ttsResult.outPath
+      let audioPath = outPath
+      let elevenLabsRequestId = prior?.elevenLabsRequestId || null
+
+      if (reuseSceneAudio && existsSync(outPath)) {
+        // Music remix: keep existing VO takes — only re-bed under narration.
+        audioPath = outPath
+      } else {
+        const ttsResult = await synthesizeEofSceneNarration({
+          text: scene.narration,
+          voicePreset: job.voicePreset,
+          voiceSettings: job.voiceSettings,
+          regenerateFromRequestId:
+            voiceRegenerationMode && prior?.elevenLabsRequestId ? prior.elevenLabsRequestId : null,
+          outPath,
+        })
+        audioPath = typeof ttsResult === 'string' ? ttsResult : ttsResult.outPath
+        elevenLabsRequestId =
+          typeof ttsResult === 'object' && ttsResult.requestId
+            ? ttsResult.requestId
+            : prior?.elevenLabsRequestId || null
+      }
+
       scenesDone += 1
-      await reportProgress('tts', scenesDone)
+      await reportProgress(reuseSceneAudio ? 'mix' : 'tts', scenesDone)
       return {
         sceneId: scene.id,
         index: i,
         audioPath,
         caption: scene.caption,
         imageQuery: scene.imageQuery,
-        elevenLabsRequestId:
-          typeof ttsResult === 'object' && ttsResult.requestId ? ttsResult.requestId : prior?.elevenLabsRequestId || null,
+        elevenLabsRequestId,
         imageSource: prior?.imageSource || null,
         imageQueryUsed: prior?.imageQueryUsed || scene.imageQuery,
         // Keep rotation memory across voiceover remux / full builds so Rebuild still avoids recent stills.
@@ -171,7 +185,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
 
     await reportProgress('mix', sceneCount, { force: true })
 
-    const track = job.musicTrackId ? await getEofMusicTrack(job.musicTrackId) : null
+    const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
     const musicPath = resolveEofMusicTrackFilePath(track)
     const mixedPath = join(workDir, 'mixed.mp3')
 
@@ -207,6 +221,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
       renderOutputPath: null,
       errorMessage: null,
+      musicTrackId: track?.id || job.musicTrackId || null,
       ...regenPatch,
       script: {
         ...job.script,

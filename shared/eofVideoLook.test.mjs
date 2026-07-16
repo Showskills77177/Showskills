@@ -4,15 +4,19 @@ import {
   autoTuneVideoLook,
   buildXfadeFilterComplex,
   colorGradeFilterChain,
+  enhanceFilterChain,
   resolveEofColorGrade,
+  resolveEofEnhanceStyle,
   resolveEofTransitionStyle,
+  sceneLookFilterChain,
   xfadeNameForTransition,
 } from './eofVideoLook.mjs'
 
 describe('eofVideoLook', () => {
-  it('defaults auto transition + color', () => {
+  it('defaults auto transition + color + enhance', () => {
     assert.equal(resolveEofTransitionStyle(''), 'auto')
     assert.equal(resolveEofColorGrade(undefined), 'auto')
+    assert.equal(resolveEofEnhanceStyle(undefined), 'auto')
   })
 
   it('tunes news cooler/faster and debate punchier', () => {
@@ -20,6 +24,8 @@ describe('eofVideoLook', () => {
     const debate = autoTuneVideoLook({ format: 'debate', sceneCount: 5 })
     assert.equal(news.colorGrade, 'match')
     assert.equal(debate.colorGrade, 'punchy')
+    assert.equal(news.enhanceStyle, 'hd')
+    assert.equal(debate.enhanceStyle, 'crisp')
     assert.ok(news.transitionSec <= debate.transitionSec)
     assert.ok(news.perCutTransitions.length === 4)
     assert.ok(debate.perCutTransitions.includes('slideleft'))
@@ -29,6 +35,17 @@ describe('eofVideoLook', () => {
     const chain = colorGradeFilterChain('match')
     assert.ok(chain.some((f) => f.startsWith('eq=')))
     assert.deepEqual(colorGradeFilterChain('off'), [])
+  })
+
+  it('builds CapCut HD enhance without plastic over-sharpen', () => {
+    const hd = enhanceFilterChain('hd')
+    assert.ok(hd.some((f) => f.startsWith('hqdn3d=')))
+    assert.ok(hd.some((f) => f.startsWith('unsharp=')))
+    assert.ok(hd.some((f) => f.startsWith('eq=')))
+    assert.deepEqual(enhanceFilterChain('off'), [])
+    const stacked = sceneLookFilterChain({ enhanceStyle: 'hd', colorGrade: 'match' })
+    assert.ok(stacked[0].startsWith('hqdn3d='))
+    assert.ok(stacked.some((f) => f.startsWith('eq=contrast=1.06')))
   })
 
   it('maps CapCut styles to xfade names', () => {

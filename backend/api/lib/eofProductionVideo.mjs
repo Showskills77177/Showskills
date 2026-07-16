@@ -15,8 +15,9 @@ import {
 import {
   autoTuneVideoLook,
   buildXfadeFilterComplex,
-  colorGradeFilterChain,
+  sceneLookFilterChain,
   resolveEofColorGrade,
+  resolveEofEnhanceStyle,
   resolveEofTransitionStyle,
 } from '../../../shared/eofVideoLook.mjs'
 import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
@@ -97,7 +98,7 @@ export function eofProductionVideoAbsPath(jobId) {
 
 /**
  * Local caption burn: live = bottom bar; CapCut styles = mid vignette (escape hatch only).
- * Color grade sits after crop so every stock still matches the CapCut pack look.
+ * Enhance + color grade sit after crop so 9:16 faces stay framed, then CapCut pack look.
  */
 function buildSceneVideoFilter({
   frames,
@@ -106,7 +107,7 @@ function buildSceneVideoFilter({
   captionFont,
   captionStyle,
   burnCaptions,
-  colorFilters = [],
+  lookFilters = [],
   kenBurns = false,
   textDir,
 }) {
@@ -117,8 +118,8 @@ function buildSceneVideoFilter({
     'crop=1080:1920:(iw-ow)/2:min(ih*0.12\\,ih-oh)',
   ]
 
-  if (colorFilters?.length) {
-    base.push(...colorFilters)
+  if (lookFilters?.length) {
+    base.push(...lookFilters)
   }
 
   if (kenBurns) {
@@ -156,7 +157,7 @@ async function encodeSceneClip({
   captionFont,
   captionStyle,
   burnCaptions,
-  colorFilters,
+  lookFilters,
   kenBurns,
   encodeDurationSec,
 }) {
@@ -175,7 +176,7 @@ async function encodeSceneClip({
     captionFont,
     captionStyle,
     burnCaptions,
-    colorFilters,
+    lookFilters,
     kenBurns,
     textDir,
   })
@@ -310,6 +311,7 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
  *   zapcapTemplateId?: string | null,
  *   transitionStyle?: string,
  *   colorGrade?: string,
+ *   enhanceStyle?: string,
  *   format?: string,
  *   captionMode?: 'auto' | 'free' | 'zapcap-only',
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
@@ -324,6 +326,7 @@ export async function renderEofProductionVideo({
   zapcapTemplateId: preferredZapcapTemplateId,
   transitionStyle,
   colorGrade,
+  enhanceStyle,
   format,
   captionMode = 'auto',
   onSceneProgress,
@@ -340,9 +343,13 @@ export async function renderEofProductionVideo({
     format: format || 'news',
     transitionStyle: resolveEofTransitionStyle(transitionStyle),
     colorGrade: resolveEofColorGrade(colorGrade),
+    enhanceStyle: resolveEofEnhanceStyle(enhanceStyle),
     sceneCount: sorted.length,
   })
-  const colorFilters = colorGradeFilterChain(look.colorGrade)
+  const lookFilters = sceneLookFilterChain({
+    enhanceStyle: look.enhanceStyle,
+    colorGrade: look.colorGrade,
+  })
   const useXfade = look.perCutTransitions.length > 0 && sorted.length > 1
   const kenBurns = Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1'
 
@@ -352,6 +359,8 @@ export async function renderEofProductionVideo({
     look.transitionStyle,
     'cuts',
     look.perCutTransitions.join(',') || 'hard',
+    'enhance',
+    look.enhanceStyle,
     'color',
     look.colorGrade,
     'td',
@@ -403,7 +412,7 @@ export async function renderEofProductionVideo({
       captionFont,
       captionStyle: style,
       burnCaptions,
-      colorFilters,
+      lookFilters,
       kenBurns,
       encodeDurationSec: encodeDurs[i] ?? contentDurs[i],
     })
@@ -441,7 +450,7 @@ export async function renderEofProductionVideo({
             captionFont,
             captionStyle: style,
             burnCaptions,
-            colorFilters,
+            lookFilters,
             kenBurns,
             encodeDurationSec: contentDurs[i],
           }),
@@ -507,6 +516,7 @@ export async function renderEofProductionVideo({
     videoLook: {
       transitionStyle: look.transitionStyle,
       colorGrade: look.colorGrade,
+      enhanceStyle: look.enhanceStyle,
       perCutTransitions: look.perCutTransitions,
       transitionSec: look.transitionSec,
       kenBurns,

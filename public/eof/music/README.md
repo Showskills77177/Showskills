@@ -1,16 +1,24 @@
 # Eyes Of Football — background music beds
 
-Placeholder beds (`default-neutral.mp3`, `default-dramatic.mp3`) ship for local/staging renders so Build Short works without extra setup. Replace them with real tracks before publishing to YouTube.
+Default Shorts bed registry lives in `backend/api/lib/eofMusicTracks.mjs` (`EOF_DEFAULT_MUSIC_BEDS`).
+
+| Slot | File | Status |
+|------|------|--------|
+| Neutral (default) | `default-neutral.mp3` | Placeholder stub ships for pipeline testing |
+| Dramatic | `default-dramatic.mp3` | Placeholder stub ships for pipeline testing |
+| Upbeat | `default-upbeat.mp3` | Empty slot — drop your cleared track here |
+| Calm | `default-calm.mp3` | Empty slot — drop your cleared track here |
+
+**Do not** put Spotify, YouTube Music, or other copyrighted chart tracks here. Use only cleared / royalty-safe beds (e.g. YouTube Audio Library) that you own rights to use on YouTube.
+
+## Replace placeholders with your cleared beds
 
 1. In **YouTube Studio** go to **Audio library**.
 2. Download royalty-free tracks you like (MP3).
-3. Overwrite files here, e.g.:
-   - `default-neutral.mp3` — general narration (mark as **default** in admin)
-   - `default-dramatic.mp3` — facts / records / hype
-
+3. Overwrite / add files in this folder using the names above.
 4. Register in admin: **Eyes of Football → Music → Register track**  
    Or run: `npm run seed:eof-music`
 
-Tracks are mixed **under** narration at low volume during **Production → Build Short**.
+Optional env: `EOF_MUSIC_BEDS_JSON` — JSON array of `{ title, mood, publicUrl, isDefault?, licenseNote? }` to override the registry without a code change.
 
-**License:** YouTube Audio Library tracks are for use on YouTube. Do not use in off-platform ads without checking each track’s terms. Placeholder noise beds are only for pipeline testing.
+Tracks are mixed **under** narration at low volume during **Production → Build Short**. After a Short is built, use **Remix music bed** to swap beds without re-fetching images.

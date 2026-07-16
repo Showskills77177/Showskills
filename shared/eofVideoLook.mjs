@@ -5,9 +5,11 @@
 
 export const EOF_DEFAULT_TRANSITION_STYLE = 'auto'
 export const EOF_DEFAULT_COLOR_GRADE = 'auto'
+export const EOF_DEFAULT_ENHANCE_STYLE = 'auto'
 
 /** @typedef {'auto' | 'cut' | 'fade' | 'fadeblack' | 'dissolve' | 'slideleft' | 'slideright' | 'slideup' | 'wipeleft' | 'circleopen' | 'radial' | 'pixelize'} EofTransitionStyleId */
 /** @typedef {'auto' | 'off' | 'match' | 'punchy' | 'cinematic' | 'warm' | 'cool'} EofColorGradeId */
+/** @typedef {'auto' | 'off' | 'hd' | 'soft' | 'crisp' | 'clean'} EofEnhanceStyleId */
 
 /**
  * ffmpeg xfade transition names that ship in modern ffmpeg builds.
@@ -162,8 +164,63 @@ export const EOF_COLOR_GRADES = [
   },
 ]
 
+/**
+ * CapCut-like HD / enhance looks — subtle clarify after 9:16 crop (not plastic AI faces).
+ * Applied after scale+crop so framing stays face-safe; stacks with color grade.
+ * @type {Array<{ id: EofEnhanceStyleId, label: string, detail: string, filters: string[], vibe: string }>}
+ */
+export const EOF_ENHANCE_STYLES = [
+  {
+    id: 'auto',
+    label: 'Auto enhance',
+    detail: 'Picks a gentle CapCut-style clarify from the Short format.',
+    filters: [],
+    vibe: 'Auto · natural HD',
+  },
+  {
+    id: 'off',
+    label: 'Off',
+    detail: 'No sharpen / denoise — grade only.',
+    filters: [],
+    vibe: 'Raw stock',
+  },
+  {
+    id: 'hd',
+    label: 'Enhance / HD',
+    detail: 'Mild denoise + soft unsharp + light contrast/sat — CapCut HD without the plastic look.',
+    filters: [
+      'hqdn3d=1.2:1.2:2.5:2.5',
+      'unsharp=5:5:0.4:5:5:0.0',
+      'eq=contrast=1.04:brightness=0.008:saturation=1.05',
+    ],
+    vibe: 'CapCut · HD',
+  },
+  {
+    id: 'soft',
+    label: 'Soft clarify',
+    detail: 'Light denoise and a whisper of contrast — flattering for portraits.',
+    filters: ['hqdn3d=1.8:1.8:3:3', 'eq=contrast=1.02:brightness=0.01:saturation=1.03'],
+    vibe: 'CapCut · soft',
+  },
+  {
+    id: 'crisp',
+    label: 'Crisp social',
+    detail: 'A touch more edge for feed clarity — still natural, not over-sharpened.',
+    filters: ['unsharp=5:5:0.55:5:5:0.0', 'eq=contrast=1.05:saturation=1.06'],
+    vibe: 'CapCut · crisp',
+  },
+  {
+    id: 'clean',
+    label: 'Clean noise',
+    detail: 'Denoise-first for compressed Google/AP stills, then a tiny clarify.',
+    filters: ['hqdn3d=2.2:2.2:4:4', 'unsharp=3:3:0.3:3:3:0.0', 'eq=contrast=1.03:saturation=1.04'],
+    vibe: 'CapCut · clean',
+  },
+]
+
 const TRANSITION_IDS = new Set(EOF_TRANSITION_STYLES.map((t) => t.id))
 const COLOR_IDS = new Set(EOF_COLOR_GRADES.map((g) => g.id))
+const ENHANCE_IDS = new Set(EOF_ENHANCE_STYLES.map((e) => e.id))
 
 /** CapCut packs cycled when transition = auto / mix */
 const AUTO_PACKS = {
@@ -186,12 +243,27 @@ const AUTO_COLOR_BY_FORMAT = {
   default: 'match',
 }
 
+/** Format-aware CapCut enhance — HD for punchy formats, softer for quote/news portraits. */
+const AUTO_ENHANCE_BY_FORMAT = {
+  news: 'hd',
+  quote: 'soft',
+  debate: 'crisp',
+  listicle: 'hd',
+  timeline: 'clean',
+  hook_reveal: 'hd',
+  default: 'hd',
+}
+
 export function listEofTransitionStyles() {
   return EOF_TRANSITION_STYLES.map(({ id, label, detail, vibe }) => ({ id, label, detail, vibe }))
 }
 
 export function listEofColorGrades() {
   return EOF_COLOR_GRADES.map(({ id, label, detail, vibe }) => ({ id, label, detail, vibe }))
+}
+
+export function listEofEnhanceStyles() {
+  return EOF_ENHANCE_STYLES.map(({ id, label, detail, vibe }) => ({ id, label, detail, vibe }))
 }
 
 export function resolveEofTransitionStyle(raw) {
@@ -208,6 +280,13 @@ export function resolveEofColorGrade(raw) {
   return COLOR_IDS.has(id) ? /** @type {EofColorGradeId} */ (id) : EOF_DEFAULT_COLOR_GRADE
 }
 
+export function resolveEofEnhanceStyle(raw) {
+  const id = String(raw || EOF_DEFAULT_ENHANCE_STYLE)
+    .trim()
+    .toLowerCase()
+  return ENHANCE_IDS.has(id) ? /** @type {EofEnhanceStyleId} */ (id) : EOF_DEFAULT_ENHANCE_STYLE
+}
+
 export function isAutoTransitionStyle(style) {
   return resolveEofTransitionStyle(style) === 'auto'
 }
@@ -216,14 +295,19 @@ export function isAutoColorGrade(grade) {
   return resolveEofColorGrade(grade) === 'auto'
 }
 
+export function isAutoEnhanceStyle(style) {
+  return resolveEofEnhanceStyle(style) === 'auto'
+}
+
 /**
  * Format-aware CapCut look (mirrors script autoTune).
- * @param {{ format?: string, transitionStyle?: string, colorGrade?: string, sceneCount?: number }} opts
+ * @param {{ format?: string, transitionStyle?: string, colorGrade?: string, enhanceStyle?: string, sceneCount?: number }} opts
  */
 export function autoTuneVideoLook({
   format = 'news',
   transitionStyle = EOF_DEFAULT_TRANSITION_STYLE,
   colorGrade = EOF_DEFAULT_COLOR_GRADE,
+  enhanceStyle = EOF_DEFAULT_ENHANCE_STYLE,
   sceneCount = 5,
 } = {}) {
   const fmt = String(format || 'news')
@@ -231,10 +315,13 @@ export function autoTuneVideoLook({
     .toLowerCase()
   const transitionPick = resolveEofTransitionStyle(transitionStyle)
   const colorPick = resolveEofColorGrade(colorGrade)
+  const enhancePick = resolveEofEnhanceStyle(enhanceStyle)
 
   const pack = AUTO_PACKS[fmt] || AUTO_PACKS.default
   const resolvedColor =
     colorPick === 'auto' ? AUTO_COLOR_BY_FORMAT[fmt] || AUTO_COLOR_BY_FORMAT.default : colorPick
+  const resolvedEnhance =
+    enhancePick === 'auto' ? AUTO_ENHANCE_BY_FORMAT[fmt] || AUTO_ENHANCE_BY_FORMAT.default : enhancePick
 
   /** @type {string[]} */
   let perCut = []
@@ -262,6 +349,7 @@ export function autoTuneVideoLook({
     format: fmt,
     transitionStyle: transitionPick,
     colorGrade: resolvedColor,
+    enhanceStyle: resolvedEnhance,
     perCutTransitions: perCut,
     transitionSec,
     // Ken Burns only when explicitly enabled — keeps serverless builds fast.
@@ -275,6 +363,22 @@ export function colorGradeFilterChain(gradeId) {
   if (id === 'auto' || id === 'off') return []
   const row = EOF_COLOR_GRADES.find((g) => g.id === id)
   return row?.filters?.length ? [...row.filters] : []
+}
+
+/** ffmpeg denoise/unsharp/eq chain for a resolved enhance id (not auto/off). */
+export function enhanceFilterChain(enhanceId) {
+  const id = resolveEofEnhanceStyle(enhanceId)
+  if (id === 'auto' || id === 'off') return []
+  const row = EOF_ENHANCE_STYLES.find((e) => e.id === id)
+  return row?.filters?.length ? [...row.filters] : []
+}
+
+/**
+ * Scene look chain after 9:16 crop: enhance first (clarify framed pixels), then color grade.
+ * @param {{ enhanceStyle?: string, colorGrade?: string }} opts
+ */
+export function sceneLookFilterChain({ enhanceStyle, colorGrade } = {}) {
+  return [...enhanceFilterChain(enhanceStyle), ...colorGradeFilterChain(colorGrade)]
 }
 
 /** Map style id → xfade name (null = hard cut). */

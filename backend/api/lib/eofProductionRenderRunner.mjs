@@ -256,6 +256,90 @@ export async function startApplyEofProductionZapcapBackground(jobId) {
   void run()
 }
 
+/**
+ * Post-build music bed remix: re-mix narration under a default/safe bed, remux Short
+ * (reuse scene stills — no Oxylabs / TTS when scene MP3s are warm).
+ * @param {string} jobId
+ */
+export async function renderEofProductionMusicRemix(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+
+  try {
+    await renderEofProductionAudio(jobId, {
+      preserveSceneImages: true,
+      reuseSceneAudio: true,
+    })
+
+    const refreshed = await getEofProductionJob(jobId)
+    const flags = await getEofArtifactFlags(jobId)
+    const canRemux =
+      flags.hasDurableSceneImages ||
+      flags.hasDurableVideo ||
+      refreshed?.status === EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED ||
+      Boolean(refreshed?.renderOutputPath)
+
+    if (!canRemux) {
+      return refreshed
+    }
+
+    return await renderEofProductionVideoJob(jobId, {
+      includeAudioIfPresent: true,
+      reuseSceneImages: true,
+      captionMode: 'free',
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Music remix failed'
+    await markEofProductionJobFailed(jobId, message)
+    throw e
+  }
+}
+
+/** @param {string} jobId */
+export async function startEofProductionMusicRemixBackground(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+
+  const sceneCount = job.script?.scenes?.length || 5
+  const startedAt = new Date().toISOString()
+  const estimatedTotalSec = Math.max(45, Math.round(estimateEofVoiceoverRemuxDurationSec(job.script) * 0.7))
+
+  await updateEofProductionJob(jobId, {
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
+    errorMessage: null,
+  })
+  await updateEofProductionRenderProgress(
+    jobId,
+    buildEofRenderProgress({
+      stage: 'mix',
+      sceneIndex: 0,
+      sceneCount,
+      startedAt,
+      estimatedTotalSec,
+      pipeline: 'audio',
+      message: 'Remixing music bed under voiceover…',
+    }),
+  )
+
+  const run = () =>
+    renderEofProductionMusicRemix(jobId).catch((e) => {
+      console.error('[eof-production] music remix failed', jobId, e)
+    })
+
+  if (process.env.VERCEL) {
+    try {
+      const { waitUntil } = await import('@vercel/functions')
+      waitUntil(run())
+      return
+    } catch (e) {
+      console.warn('[eof-production] waitUntil unavailable for music remix', e)
+    }
+  }
+
+  void run()
+}
+
 /** @param {string} jobId */
 export async function startEofProductionVideoRenderBackground(jobId) {
   const job = await getEofProductionJob(jobId)

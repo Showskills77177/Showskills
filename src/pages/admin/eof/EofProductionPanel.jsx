@@ -8,6 +8,7 @@ import {
   refreshEofRenderProgress,
   buildFallbackRenderProgress,
   EOF_DEFAULT_VOICE_PRESET,
+  EOF_DEFAULT_MUSIC_VOLUME,
 } from '../../../../shared/eofProduction.mjs'
 import {
   EOF_DEFAULT_SCRIPT_FORMAT,
@@ -25,8 +26,10 @@ import { EOF_DEFAULT_CAPTION_STYLE, isZapcapCaptionStyle } from '../../../../sha
 import {
   EOF_DEFAULT_TRANSITION_STYLE,
   EOF_DEFAULT_COLOR_GRADE,
+  EOF_DEFAULT_ENHANCE_STYLE,
   EOF_TRANSITION_STYLES,
   EOF_COLOR_GRADES,
+  EOF_ENHANCE_STYLES,
 } from '../../../../shared/eofVideoLook.mjs'
 
 /** Clean Production chrome — keep Studio gray panels so cards don’t blend into page black. */
@@ -274,6 +277,16 @@ const COLOR_GRADE_PREVIEW = {
   },
 }
 
+/** CSS approximation of CapCut-style HD / enhance looks. */
+const ENHANCE_STYLE_PREVIEW = {
+  auto: { filter: 'contrast(1.04) saturate(1.05) brightness(1.01)', badge: 'Auto' },
+  off: { filter: 'none' },
+  hd: { filter: 'contrast(1.05) saturate(1.06) brightness(1.01)' },
+  soft: { filter: 'contrast(1.02) saturate(1.03) brightness(1.02) blur(0.2px)' },
+  crisp: { filter: 'contrast(1.08) saturate(1.08) brightness(1.01)' },
+  clean: { filter: 'contrast(1.03) saturate(1.04) brightness(1.01)' },
+}
+
 /** Still sample frame with the grade's CSS filter + tint overlay so the mood is visible. */
 function ColorGradePreview({ gradeId, className = '' }) {
   const g = COLOR_GRADE_PREVIEW[gradeId] || COLOR_GRADE_PREVIEW.off
@@ -291,6 +304,27 @@ function ColorGradePreview({ gradeId, className = '' }) {
       {g.badge ? (
         <span className="absolute bottom-0.5 left-1/2 z-10 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold uppercase tracking-wide text-white">
           {g.badge}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function EnhanceStylePreview({ styleId, className = '' }) {
+  const g = ENHANCE_STYLE_PREVIEW[styleId] || ENHANCE_STYLE_PREVIEW.off
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      <div className="h-full w-full" style={{ filter: g.filter }}>
+        <SampleMiniFrame variant="b" />
+      </div>
+      {g.badge ? (
+        <span className="absolute bottom-0.5 left-1/2 z-10 -translate-x-1/2 rounded bg-black/60 px-1 text-[8px] font-bold uppercase tracking-wide text-white">
+          {g.badge}
+        </span>
+      ) : null}
+      {styleId === 'hd' ? (
+        <span className="absolute left-1 top-1 z-10 rounded bg-white/90 px-1 text-[8px] font-bold text-black">
+          HD
         </span>
       ) : null}
     </div>
@@ -366,6 +400,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [transitionStyle, setTransitionStyle] = useState(EOF_DEFAULT_TRANSITION_STYLE)
   const [colorGrades, setColorGrades] = useState([])
   const [colorGrade, setColorGrade] = useState(EOF_DEFAULT_COLOR_GRADE)
+  const [enhanceStyles, setEnhanceStyles] = useState([])
+  const [enhanceStyle, setEnhanceStyle] = useState(EOF_DEFAULT_ENHANCE_STYLE)
+  const [musicTracks, setMusicTracks] = useState([])
+  const [defaultMusicBeds, setDefaultMusicBeds] = useState([])
+  const [musicTrackId, setMusicTrackId] = useState('')
+  const [musicVolume, setMusicVolume] = useState(EOF_DEFAULT_MUSIC_VOLUME)
   const [zapcapTemplates, setZapcapTemplates] = useState([])
   const [zapcapTemplatesError, setZapcapTemplatesError] = useState('')
   const [zapcapTemplateId, setZapcapTemplateId] = useState('')
@@ -463,6 +503,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (j.defaultTransitionStyle) setTransitionStyle((prev) => prev || j.defaultTransitionStyle)
       setColorGrades(Array.isArray(j.colorGrades) ? j.colorGrades : [])
       if (j.defaultColorGrade) setColorGrade((prev) => prev || j.defaultColorGrade)
+      setEnhanceStyles(Array.isArray(j.enhanceStyles) ? j.enhanceStyles : [])
+      if (j.defaultEnhanceStyle) setEnhanceStyle((prev) => prev || j.defaultEnhanceStyle)
+      setMusicTracks(Array.isArray(j.tracks) ? j.tracks : [])
+      setDefaultMusicBeds(Array.isArray(j.defaultMusicBeds) ? j.defaultMusicBeds : [])
+      if (typeof j.defaultMusicVolume === 'number' && Number.isFinite(j.defaultMusicVolume)) {
+        setMusicVolume((prev) => (prev === EOF_DEFAULT_MUSIC_VOLUME ? j.defaultMusicVolume : prev))
+      }
       if (j.captionEngine && typeof j.captionEngine === 'object') setCaptionEngine(j.captionEngine)
       setZapcapTemplates(Array.isArray(j.zapcapTemplates) ? j.zapcapTemplates : [])
       setZapcapTemplatesError(typeof j.zapcapTemplatesError === 'string' ? j.zapcapTemplatesError : '')
@@ -558,6 +605,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.captionStyle) setCaptionStyle(job.captionStyle)
     if (job.transitionStyle) setTransitionStyle(job.transitionStyle)
     if (job.colorGrade) setColorGrade(job.colorGrade)
+    if (job.enhanceStyle) setEnhanceStyle(job.enhanceStyle)
+    setMusicTrackId(job.musicTrackId || '')
+    if (job.musicVolume != null && Number.isFinite(Number(job.musicVolume))) {
+      setMusicVolume(Number(job.musicVolume))
+    }
     setZapcapTemplateId(job.zapcapTemplateId || '')
     if (job.voiceSettings) {
       setVoiceSettings(normalizeElevenLabsVoiceSettings(job.voiceSettings))
@@ -928,6 +980,71 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     }
   }
 
+  /** Post-build: swap default/safe music bed under existing VO, remux Short (no image refetch). */
+  async function remixMusicBed() {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    setSuccess('Remixing music bed under voiceover…')
+    setRenderPhase('rendering')
+    setVideoPreviewUrl('')
+
+    try {
+      const estSec = Math.max(40, Math.round(estimateEofVoiceoverRemuxDurationSec(draftScript) * 0.7))
+      setRenderProgress({
+        percent: 5,
+        message: 'Mixing music bed…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'mix',
+        pipeline: 'audio',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'remix-music',
+          jobId: selectedId,
+          musicTrackId: musicTrackId || null,
+          musicVolume,
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Music remix failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForVideoComplete(selectedId)
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Music remix did not finish with a video')
+      }
+
+      await loadVideoPreview()
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('Music bed remixed under voiceover — preview refreshed.')
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
   // Free rebuild: reuse the EXISTING voiceover audio, refresh images, re-render video.
   // Hits the backend 'render-video' action which never calls TTS/ElevenLabs.
   async function rebuildVideo() {
@@ -1183,6 +1300,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
           transitionStyle,
           colorGrade,
+          enhanceStyle,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -1231,6 +1349,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
           transitionStyle,
           colorGrade,
+          enhanceStyle,
+          musicTrackId: musicTrackId || null,
+          musicVolume,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
         }),
       })
@@ -1862,6 +1983,52 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 })}
               </div>
             </div>
+            <div>
+              <p className={PX.label}>Enhance / HD</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                CapCut-style clarify after the 9:16 crop — mild denoise + soft sharpen, not plastic AI faces.
+                Stacks with color match. Apply before Rebuild.
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+                {(enhanceStyles.length ? enhanceStyles : EOF_ENHANCE_STYLES).map((e) => {
+                  const active = enhanceStyle === e.id
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => setEnhanceStyle(e.id)}
+                      className={`overflow-hidden rounded-lg border text-left transition ${
+                        active
+                          ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                          : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+                      }`}
+                      title={e.detail || e.label}
+                    >
+                      <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                        <EnhanceStylePreview styleId={e.id} className="h-full w-full" />
+                        {active ? (
+                          <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                            ✓
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="px-1.5 py-1">
+                        <span
+                          className={`block truncate text-[11px] font-medium leading-tight ${
+                            active ? 'text-white' : 'text-[#e5e5e5]'
+                          }`}
+                        >
+                          {e.label}
+                        </span>
+                        {e.vibe ? (
+                          <span className="mt-0.5 block truncate text-[10px] text-[#888]">{e.vibe}</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           <div>
@@ -2436,6 +2603,80 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     ))}
                   </div>
                 ) : null}
+
+                <div className="mt-5 rounded-xl border border-[#303030] bg-[#161616] p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
+                    Music bed · remix
+                  </p>
+                  <p className={`mt-1 text-xs ${PX.muted}`}>
+                    Pick a default/safe bed and remix under the voiceover. Drop cleared tracks in{' '}
+                    <code className="text-[#ccc]">public/eof/music/</code> — no Spotify/YouTube chart
+                    songs.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-end gap-3">
+                    <label className="block min-w-[200px] flex-1 text-xs text-[#aaa]">
+                      Bed track
+                      <select
+                        className={inputCls}
+                        value={musicTrackId}
+                        onChange={(e) => setMusicTrackId(e.target.value)}
+                        disabled={busy || isRendering}
+                      >
+                        <option value="">Auto (default / mood)</option>
+                        {musicTracks
+                          .filter((t) => t.active !== false)
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.title}
+                              {t.isDefault ? ' · default' : ''}
+                              {t.mood ? ` · ${t.mood}` : ''}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <label className="block w-36 text-xs text-[#aaa]">
+                      Bed volume
+                      <input
+                        type="range"
+                        min={0.08}
+                        max={0.45}
+                        step={0.01}
+                        value={musicVolume}
+                        onChange={(e) => setMusicVolume(Number(e.target.value))}
+                        disabled={busy || isRendering}
+                        className="mt-2 w-full accent-white"
+                      />
+                      <span className="mt-0.5 block tabular-nums text-[10px] text-[#717171]">
+                        {Math.round(musicVolume * 100)}% under VO
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={busy || isRendering || !musicTracks.length}
+                      onClick={remixMusicBed}
+                      className={PX.btnSoft}
+                      title="Re-mix bed under existing voiceover and remux the Short"
+                    >
+                      {busy && renderPhase === 'rendering' ? 'Remixing…' : 'Remix music bed'}
+                    </button>
+                  </div>
+                  {defaultMusicBeds.length ? (
+                    <ul className="mt-3 space-y-1 text-[10px] text-[#717171]">
+                      {defaultMusicBeds.map((bed) => (
+                        <li key={bed.id}>
+                          {bed.title} ({bed.mood}) —{' '}
+                          {bed.filePresent ? 'file ready' : 'empty slot · drop MP3 later'}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {!musicTracks.length ? (
+                    <p className="mt-2 text-xs text-[#fbbf24]">
+                      No beds registered yet — open Music tab or run npm run seed:eof-music after adding
+                      MP3s.
+                    </p>
+                  ) : null}
+                </div>
               </div>
             ) : null}
 

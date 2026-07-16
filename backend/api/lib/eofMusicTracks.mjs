@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { query, dbIsPostgres } from './db.mjs'
@@ -7,24 +8,103 @@ import { EOF_MUSIC_SOURCE_YOUTUBE_LIBRARY } from '../../../shared/eofProduction.
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
-const DEFAULT_EOF_MUSIC_CATALOG = [
+/**
+ * Default Shorts music-bed registry (royalty-safe slots only).
+ *
+ * Drop cleared YouTube Audio Library (or other licensed) MP3s into `public/eof/music/`:
+ *   - default-neutral.mp3   — general narration bed (ships as soft placeholder stub)
+ *   - default-dramatic.mp3  — facts / records / hype (ships as soft placeholder stub)
+ *   - default-upbeat.mp3    — empty slot — add your cleared upbeat bed later
+ *   - default-calm.mp3      — empty slot — add your cleared calm bed later
+ *
+ * Do NOT register Spotify/YouTube chart tracks. Placeholders are for pipeline testing only.
+ * Env override: EOF_MUSIC_BEDS_JSON = JSON array of { title, mood, publicUrl, isDefault?, licenseNote? }
+ */
+export const EOF_DEFAULT_MUSIC_BEDS = [
   {
+    id: 'neutral',
     title: 'Neutral bed',
     mood: 'neutral',
     publicUrl: '/eof/music/default-neutral.mp3',
+    fileName: 'default-neutral.mp3',
     isDefault: true,
+    required: true,
     licenseNote:
-      'Placeholder bed ships for pipeline testing. Replace with a YouTube Audio Library MP3 before publishing to YouTube.',
+      'Placeholder stub for pipeline testing. Replace with a cleared YouTube Audio Library (or other licensed) MP3 before publishing.',
   },
   {
+    id: 'dramatic',
     title: 'Dramatic bed',
     mood: 'dramatic',
     publicUrl: '/eof/music/default-dramatic.mp3',
+    fileName: 'default-dramatic.mp3',
     isDefault: false,
+    required: true,
     licenseNote:
-      'Placeholder bed ships for pipeline testing. Replace with a YouTube Audio Library MP3 before publishing to YouTube.',
+      'Placeholder stub for pipeline testing. Replace with a cleared dramatic bed before publishing.',
+  },
+  {
+    id: 'upbeat',
+    title: 'Upbeat bed',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/default-upbeat.mp3',
+    fileName: 'default-upbeat.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote:
+      'Empty slot — drop a cleared upbeat Shorts bed at public/eof/music/default-upbeat.mp3, then seed/register.',
+  },
+  {
+    id: 'calm',
+    title: 'Calm bed',
+    mood: 'calm',
+    publicUrl: '/eof/music/default-calm.mp3',
+    fileName: 'default-calm.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote:
+      'Empty slot — drop a cleared calm Shorts bed at public/eof/music/default-calm.mp3, then seed/register.',
   },
 ]
+
+function catalogFromEnvOrDefault() {
+  const raw = process.env.EOF_MUSIC_BEDS_JSON
+  if (!raw || !String(raw).trim()) return EOF_DEFAULT_MUSIC_BEDS
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || !parsed.length) return EOF_DEFAULT_MUSIC_BEDS
+    return parsed.map((row, i) => ({
+      id: String(row.id || row.mood || `bed-${i}`),
+      title: String(row.title || 'Music bed').trim() || 'Music bed',
+      mood: String(row.mood || 'neutral').trim() || 'neutral',
+      publicUrl: String(row.publicUrl || '').trim(),
+      fileName: String(row.fileName || '').trim() || null,
+      isDefault: Boolean(row.isDefault),
+      required: row.required !== false,
+      licenseNote: row.licenseNote || null,
+    })).filter((row) => row.publicUrl)
+  } catch {
+    return EOF_DEFAULT_MUSIC_BEDS
+  }
+}
+
+/** Public registry for admin UI — which slots exist, which files are on disk. */
+export function listEofDefaultMusicBeds() {
+  return catalogFromEnvOrDefault().map((bed) => {
+    const abs = join(root, 'public', bed.publicUrl.replace(/^\/+/, ''))
+    return {
+      id: bed.id,
+      title: bed.title,
+      mood: bed.mood,
+      publicUrl: bed.publicUrl,
+      fileName: bed.fileName,
+      isDefault: Boolean(bed.isDefault),
+      required: Boolean(bed.required),
+      licenseNote: bed.licenseNote,
+      filePresent: existsSync(abs),
+    }
+  })
+}
 
 function normalizeTimestamp(value) {
   if (value == null || value === '') return null
@@ -56,11 +136,18 @@ function rowToTrack(row) {
 export async function ensureEofMusicCatalogSeeded() {
   await ensureEofProductionSchema()
   const existing = await listEofMusicTracks({ activeOnly: false })
-  if (existing.length) return existing
+  const byUrl = new Map(existing.map((t) => [t.publicUrl, t]))
 
-  for (const item of DEFAULT_EOF_MUSIC_CATALOG) {
+  for (const item of catalogFromEnvOrDefault()) {
+    const abs = join(root, 'public', item.publicUrl.replace(/^\/+/, ''))
+    if (!existsSync(abs)) continue
+    if (byUrl.has(item.publicUrl)) continue
     await createEofMusicTrack({
-      ...item,
+      title: item.title,
+      mood: item.mood,
+      publicUrl: item.publicUrl,
+      isDefault: Boolean(item.isDefault),
+      licenseNote: item.licenseNote,
       source: EOF_MUSIC_SOURCE_YOUTUBE_LIBRARY,
     }).catch(() => {})
   }
