@@ -9,6 +9,11 @@
  */
 import { isXaiConfigured, xaiJsonCompletion } from './eofXaiClient.mjs'
 import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
+import {
+  EOF_SHORTS_DIRECT_VOICE,
+  scoreDraftDirectness,
+  mergeDirectnessIntoVerdict,
+} from '../../../shared/eofScriptDirectness.mjs'
 
 function envKey(...names) {
   for (const name of names) {
@@ -36,12 +41,12 @@ export function eofScriptJudgeStatus() {
     enabled: mode !== 'off' && (isOpenAiConfigured() || isXaiConfigured() || isGroqConfigured()),
     note:
       mode === 'off'
-        ? 'Script judge off (EOF_SCRIPT_JUDGE=off).'
+        ? 'Script judge off (EOF_SCRIPT_JUDGE=off) — local directness gate still runs.'
         : isOpenAiConfigured() || isXaiConfigured()
-          ? 'Judge ready — a second model scores merit / interest / real value.'
+          ? 'Second-tier judge ready — merit / interest / value / directness (rejects vague waffle).'
           : isGroqConfigured()
-            ? 'Only Groq is keyed — judge can run on Groq, but a second model (OpenAI or xAI) is better.'
-            : 'Add OPENAI_API_KEY or XAI_API_KEY so a second model can judge Groq drafts.',
+            ? 'Only Groq keyed — judge can run on Groq; OpenAI/xAI is better as a second model. Local directness always runs.'
+            : 'Local directness gate is on. Add OPENAI_API_KEY or XAI_API_KEY for a stronger second-model judge.',
   }
 }
 
@@ -90,9 +95,15 @@ function normalizeVerdict(raw, judgeProvider) {
   const merit = clampScore(raw?.merit ?? raw?.meritScore)
   const interest = clampScore(raw?.interest ?? raw?.interestScore)
   const value = clampScore(raw?.value ?? raw?.valuableInfo ?? raw?.valueScore)
+  const directness = clampScore(raw?.directness ?? raw?.directnessScore ?? raw?.punch)
   const overall =
     clampScore(raw?.overall ?? raw?.score) ||
-    Number((((merit + interest + value) / 3) || 0).toFixed(1))
+    Number(
+      (
+        (merit + interest + value + (directness || (merit + interest + value) / 3)) /
+        (directness ? 4 : 3)
+      ).toFixed(1),
+    )
 
   const reasons = Array.isArray(raw?.reasons)
     ? raw.reasons.map((r) => String(r).trim()).filter(Boolean).slice(0, 5)
@@ -113,12 +124,17 @@ function normalizeVerdict(raw, judgeProvider) {
   const min = passThreshold()
   const explicitPass = raw?.pass === true || String(raw?.verdict || '').toLowerCase() === 'pass'
   const explicitFail = raw?.pass === false || String(raw?.verdict || '').toLowerCase() === 'fail'
+  const dimsOk =
+    merit >= min - 1 &&
+    interest >= min - 1 &&
+    value >= min - 1 &&
+    (directness === 0 || directness >= min - 1)
   const pass =
     explicitFail
       ? false
       : explicitPass
-        ? overall >= min - 0.5
-        : overall >= min && merit >= min - 1 && interest >= min - 1 && value >= min - 1
+        ? overall >= min - 0.5 && (directness === 0 || directness >= min - 1.5)
+        : overall >= min && dimsOk
 
   return {
     pass,
@@ -126,6 +142,7 @@ function normalizeVerdict(raw, judgeProvider) {
     merit,
     interest,
     value,
+    directness,
     reasons,
     rewriteHints,
     judgeProvider,
@@ -140,16 +157,24 @@ function clampScore(v) {
 }
 
 function buildJudgePrompts({ topic, format, draft, deskBrief }) {
-  const system = `You are the Eyes Of Football desk editor. Judge Shorts voiceover scripts ruthlessly.
+  const system = `You are the Eyes Of Football desk editor. Second-tier quality gate after the writer model.
+Reject vague, bookish, over-the-surface VO that needs human regenerate loops — automation cannot ship waffle.
 
 ${EOF_FOOTBALL_SCOPE}
+
+${EOF_SHORTS_DIRECT_VOICE}
 
 Score 0–10 on:
 - merit: factual substance, names/events clear, no invented scores/quotes beyond the desk brief
 - interest: would a football fan stop scrolling? hook + opinion + stakes
-- value: is this truly valuable info (news/insight/angle) vs empty fluff / filler / generic career waffle
+- value: truly valuable info (news/insight/angle) vs empty fluff / career waffle
+- directness: punchy desk copy with concrete claims/responses — NOT soft storytelling
 
-Fail scripts that are vague, bookish, soccer/NFL, clickbait lies, or zero new information.
+HARD FAIL (pass=false) if:
+- vague / bookish / "journey/narrative/chapter" tone
+- quote/claim topics that never say who said what / who hit back
+- soccer/NFL language
+- zero concrete football claim
 
 Return JSON only:
 {
@@ -158,6 +183,7 @@ Return JSON only:
   "merit": number,
   "interest": number,
   "value": number,
+  "directness": number,
   "reasons": string[],
   "rewriteHints": string[]
 }`
@@ -173,7 +199,7 @@ SCRIPT TO JUDGE:
 ${String(draft || '').trim().slice(0, 1800)}
 """
 
-Judge on merit, interest, and whether it's truly valuable info.`
+Judge merit, interest, value, AND directness. Fail soft waffle even if names appear.`
 
   return { system, user }
 }
@@ -260,20 +286,27 @@ export async function judgeEofScriptDraft(input = {}) {
     }
   }
 
+  const local = scoreDraftDirectness(draft, { format: input.format, topic: input.topic })
   const judgeProvider = resolveScriptJudgeProvider(input.writerProvider)
   if (!judgeProvider) {
-    return {
-      pass: true,
-      overall: 0,
-      merit: 0,
-      interest: 0,
-      value: 0,
-      reasons: ['Judge skipped — no second model configured'],
-      rewriteHints: [],
-      judgeProvider: null,
-      threshold: passThreshold(),
-      skipped: true,
-    }
+    // Still enforce local directness so automation cannot ship waffle without a second API.
+    return mergeDirectnessIntoVerdict(
+      {
+        pass: local.pass,
+        overall: local.score,
+        merit: local.score,
+        interest: local.score,
+        value: local.score,
+        reasons: local.pass
+          ? ['Second model unavailable — local directness gate only']
+          : local.reasons,
+        rewriteHints: local.rewriteHints,
+        judgeProvider: 'local-directness',
+        threshold: passThreshold(),
+        skipped: false,
+      },
+      local,
+    )
   }
 
   const { system, user } = buildJudgePrompts({
@@ -292,7 +325,8 @@ export async function judgeEofScriptDraft(input = {}) {
     raw = await judgeWithGroq({ system, user })
   }
 
-  const verdict = normalizeVerdict(raw, judgeProvider)
+  const modelVerdict = normalizeVerdict(raw, judgeProvider)
+  const verdict = mergeDirectnessIntoVerdict({ ...modelVerdict, skipped: false }, local)
   console.info(
     '[eof-script-judge]',
     judgeProvider,
@@ -306,6 +340,8 @@ export async function judgeEofScriptDraft(input = {}) {
     verdict.interest,
     'value',
     verdict.value,
+    'directness',
+    verdict.directness,
   )
   return { ...verdict, skipped: false }
 }

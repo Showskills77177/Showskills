@@ -74,7 +74,11 @@ export async function runEofDailyShortPipeline(opts = {}) {
       voicePreset,
       mode: 'full',
       context: [news.angle, news.whyNow].filter(Boolean).join('\n'),
-      scriptProvider: process.env.EOF_SCRIPT_PROVIDER || process.env.EOF_DEFAULT_SCRIPT_PROVIDER || null,
+      // Force auto writer→judge→escalate so scheduled posts don't ship vague VO.
+      scriptProvider:
+        process.env.EOF_SCRIPT_PROVIDER ||
+        process.env.EOF_DEFAULT_SCRIPT_PROVIDER ||
+        'auto',
     })
     jobId = job.id
 

@@ -46,6 +46,10 @@ import {
   appendJudgeFeedbackToContext,
   eofScriptJudgeStatus,
 } from './eofScriptJudge.mjs'
+import {
+  EOF_SHORTS_DIRECT_VOICE,
+  scoreDraftDirectness,
+} from '../../../shared/eofScriptDirectness.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -226,7 +230,7 @@ function formatGuide(format) {
 function draftFormatGuide(format) {
   return {
     quote:
-      'QUOTE SHORT: Open with the speaker + the quote (or a tight paraphrase). Then where it was said (BBC studio / Sky / presser / newspaper). Then who it hits and why fans argue. End with agree/disagree CTA. Do not write an essay — punchy spoken VO.',
+      'QUOTE SHORT — DIRECT CLAIM/RESPONSE only. Pattern: "[A] hit back at [B] after [B] said [concrete claim]. [A] said [concrete response]. That\'s the row. Agree with A or B?" Example: Jude Bellingham hit back at Thomas Tuchel after Tuchel questioned him; Bellingham said Tuchel doesn\'t know what it\'s like to play in that heat. No career essays. No soft "raises questions" filler.',
     listicle:
       'Structure: hook → 3 punchy football beats → CTA. Each beat = one concrete club/nation/era fact. No essay padding.',
     hook_reveal:
@@ -375,8 +379,8 @@ function classifyScriptFailureProvider(detail) {
 const DRAFT_FLUFF_RE =
   /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
-/** Prefer punchy Shorts VO — only reject obvious fluff / tiny stubs. */
-function isWeakDraft(text) {
+/** Prefer punchy Shorts VO — reject fluff, stubs, and vague bookish copy. */
+function isWeakDraft(text, format = '', topic = '') {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
   if (words < 45) return true
@@ -384,6 +388,8 @@ function isWeakDraft(text) {
   if (DRAFT_FLUFF_RE.test(t)) return true
   if (/\bsoccer\b/i.test(t)) return true
   if (/\b(NFL|NBA|MLB|NHL)\b/.test(t)) return true
+  const direct = scoreDraftDirectness(t, { format, topic })
+  if (!direct.pass && direct.score < 5.5) return true
   return false
 }
 
@@ -759,7 +765,21 @@ export async function writeEofPlainTextDraft({
       )
     } catch (e) {
       console.warn('[eof-script] judge failed', writerId, e instanceof Error ? e.message : e)
-      judge = { skipped: true, pass: true, reasons: ['Judge error — accepted draft'] }
+      // Never auto-accept on judge API errors — local directness still gates quality.
+      const local = scoreDraftDirectness(ai.plainTextDraft, { format: fmt, topic: t })
+      judge = {
+        skipped: false,
+        pass: local.pass,
+        overall: local.score,
+        merit: local.score,
+        interest: local.score,
+        value: local.score,
+        directness: local.score,
+        reasons: ['Judge API error — local directness gate', ...local.reasons],
+        rewriteHints: local.rewriteHints,
+        judgeProvider: 'local-directness',
+        threshold: 6.5,
+      }
     }
     const candidate = {
       ...ai,
@@ -796,7 +816,7 @@ export async function writeEofPlainTextDraft({
         directorNote: note
           ? `${note}\n\nAlso fix the editor judge feedback above.`
           : autoMode
-            ? 'Auto quality pass: sharper hook, denser football facts, stronger CTA. Stay inside the desk brief.'
+            ? 'Auto quality pass: DIRECT desk VO — name who said what / who hit back, cut waffle, short sentences, sharper CTA. Stay inside the desk brief.'
             : '',
       }),
       90000,
@@ -847,7 +867,7 @@ export async function writeEofPlainTextDraft({
         softBest = softBest || { ...ai, deskSources }
         continue
       }
-      if (isWeakDraft(ai.plainTextDraft)) {
+      if (isWeakDraft(ai.plainTextDraft, fmt, t)) {
         softBest = softBest || { ...ai, deskSources }
         failures.push(`[${id}] soft-weak draft kept as candidate`)
         console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
@@ -863,7 +883,7 @@ export async function writeEofPlainTextDraft({
         )
         try {
           const rewrittenAi = await rewriteWithFeedback(id, ai.plainTextDraft, judge, 0.12)
-          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft)) {
+          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft, fmt, t)) {
             ;({ candidate, judge } = await scoreAndMaybeKeep(rewrittenAi, id))
             if (judge && !judge.skipped && judge.pass && (!autoMode || isExcellentJudge(judge, excellentMin))) {
               return candidate
@@ -894,9 +914,10 @@ export async function writeEofPlainTextDraft({
                   skipped: false,
                   reasons: ['Auto quality: push for denser, more valuable football VO'],
                   rewriteHints: [
-                    'Stronger first-line hook with names + event',
+                    'First line: names + concrete claim or response',
+                    'Use said / hit back / responded — no career essay',
                     'More concrete desk-brief facts',
-                    'Sharper CTA question',
+                    'Sharper agree/disagree CTA',
                   ],
                   merit: 5,
                   interest: 5,
@@ -906,7 +927,7 @@ export async function writeEofPlainTextDraft({
                 },
                 0.08,
               )
-              if (!escalated || isWeakDraft(escalated.plainTextDraft)) continue
+              if (!escalated || isWeakDraft(escalated.plainTextDraft, fmt, t)) continue
               const scored = await scoreAndMaybeKeep(escalated, nextId)
               baseText = scored.candidate.plainTextDraft
               baseJudge = scored.judge
@@ -955,9 +976,9 @@ export async function writeEofPlainTextDraft({
           `${id} auto-fallback draft`,
         )
         const ai = finalizeAiDraft(raw, t, resolvedTopic)
-        if (!ai || isWeakDraft(ai.plainTextDraft)) continue
+        if (!ai || isWeakDraft(ai.plainTextDraft, fmt, t)) continue
         const { candidate, judge } = await scoreAndMaybeKeep(ai, id)
-        if (isExcellentJudge(judge, excellentMin) || judge?.pass || judge?.skipped) return candidate
+        if (isExcellentJudge(judge, excellentMin) || judge?.pass) return candidate
       } catch (e) {
         failures.push(`[${id}] ${e instanceof Error ? e.message : e}`)
       }
@@ -1081,19 +1102,20 @@ ${EOF_FOOTBALL_SCOPE}
 
 OUTPUT = ONE continuous spoken script. Plain prose only. No JSON, bullets, scene labels, hashtags, or titles.
 
-SHORTS VOICE (non-negotiable):
+${EOF_SHORTS_DIRECT_VOICE}
+
+SHORTS LENGTH:
 - 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
 - Short sentences. Average under 16 words. Max one clause per beat.
-- Sound like Sky Sports News / BBC Sport desk at 10pm: punchy, opinionated, common-sense.
-- Always say football — never soccer. Never NFL / NBA / American sports.
-- FIRST SENTENCE must name the player/club/nation AND the event.
-- FACT LOCK: Use ONLY names, scores, clubs, and claims present in the DESK BRIEF / current draft. If thin, stay general — do NOT invent match scores, transfer fees, or fake quotes.
-- If PRODUCER DIRECTION is provided, follow it closely (tone, angle, names to stress, what to open with) while keeping Shorts length and fact lock.
+- Sound like Sky Sports News / BBC Sport desk at 10pm — not a podcast monologue.
+- FIRST SENTENCE must name the player/coach AND the claim or event.
+- FACT LOCK: Use ONLY names, scores, clubs, and claims in the DESK BRIEF / current draft. Do NOT invent scores, fees, or fake quotes.
+- If PRODUCER DIRECTION is provided, follow it closely while keeping Shorts length and fact lock.
 - Structure for format "${format}": ${draftFormatGuide(format)}
-- End with ONE sharp question for comments (Comment / Drop your take).
+- End with ONE sharp comment CTA.
 
 BANNED forever:
-"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", literary metaphors, long subordinate clauses.
+"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", "raises questions", "speaks volumes", "a reminder that", "the narrative", "the journey", literary metaphors, long subordinate clauses.
 Never reply with meta chat ("Sure", "I'll rewrite", "Here is a plan"). Output the voiceover only.`
 
   // Directed rewrite: keep the prompt lean so Groq free tier actually returns a full VO
@@ -1130,11 +1152,13 @@ Write the spoken Shorts voiceover only. No preamble.`
 function buildPolishPrompt({ topic, format, draft }) {
   const system = `You are a ruthless YouTube Shorts editor for Eyes Of Football.
 
-Rewrite the draft into a TIGHTER spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
+Rewrite the draft into a DIRECT spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
+
+${EOF_SHORTS_DIRECT_VOICE}
 
 Rules:
-- 90–130 words. Cut every soft phrase.
-- First line must hook with names + event.
+- 90–130 words. Cut every soft phrase and career waffle.
+- First line: names + the claim/event (who hit back / what happened).
 - Short spoken sentences. No book language.
 - Always football, never soccer. Never NFL.
 - Keep one CTA question at the end.

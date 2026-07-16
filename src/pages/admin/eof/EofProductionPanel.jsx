@@ -1737,7 +1737,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               Script judge:{' '}
               {scriptProviders.judge?.enabled
                 ? scriptProviders.judge.openai || scriptProviders.judge.xai
-                  ? 'Second model (merit · interest · value)'
+                  ? 'Second tier (merit · interest · value · directness)'
                   : 'Groq-only fallback'
                 : 'Off / not keyed'}
             </p>
