@@ -12,6 +12,7 @@ import {
   deleteEofProductionJob,
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
+import { withEofArtifactFlags } from '../lib/eofProductionArtifacts.mjs'
 import { startEofProductionVideoRenderBackground, startEofProductionFullBuildBackground, startEofProductionVoiceoverRegenerationBackground, startApplyEofProductionZapcapBackground } from '../lib/eofProductionRenderRunner.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
       let ffmpeg = false
 
       try {
-        jobs = await listEofProductionJobs()
+        jobs = await withEofArtifactFlags(await listEofProductionJobs())
       } catch (e) {
         console.error('[eof-production] jobs', e)
       }

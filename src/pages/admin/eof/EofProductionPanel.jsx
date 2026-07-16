@@ -2348,24 +2348,30 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               <div ref={resultPanelRef} className={`${PX.surface} p-6`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-[#d4d4d4]">Short ready</p>
+                    <p className="text-sm font-semibold text-[#d4d4d4]">
+                      {selected.status === 'video_rendered' && selected.hasDurableVideo === false
+                        ? 'Short encoded — preview missing'
+                        : 'Short ready'}
+                    </p>
                     <p className={`mt-0.5 text-xs ${PX.muted}`}>
-                      9:16 with voiceover and images
-                      {selected.captionStyle === 'off' || selected.captionEngine === 'none'
-                        ? ' · captions off'
-                        : selected.captionStyle === 'live' || selected.captionEngine === 'local'
-                          ? ' · live bottom subtitles'
-                          : selected.captionEngine === 'zapcap' || selected.zapcapTemplateId
-                            ? ` · ZapCap${
-                                selected.zapcapTemplateId
-                                  ? ` · ${
-                                      zapcapTemplates.find((t) => t.id === selected.zapcapTemplateId)?.name ||
-                                      `${String(selected.zapcapTemplateId).slice(0, 8)}…`
+                      {selected.status === 'video_rendered' && selected.hasDurableVideo === false
+                        ? 'The MP4 was too large to keep on staging after the last render. Hit Rebuild video to compress and store a previewable Short.'
+                        : `9:16 with voiceover and images${
+                            selected.captionStyle === 'off' || selected.captionEngine === 'none'
+                              ? ' · captions off'
+                              : selected.captionStyle === 'live' || selected.captionEngine === 'local'
+                                ? ' · live bottom subtitles'
+                                : selected.captionEngine === 'zapcap' || selected.zapcapTemplateId
+                                  ? ` · ZapCap${
+                                      selected.zapcapTemplateId
+                                        ? ` · ${
+                                            zapcapTemplates.find((t) => t.id === selected.zapcapTemplateId)?.name ||
+                                            `${String(selected.zapcapTemplateId).slice(0, 8)}…`
+                                          }`
+                                        : ''
                                     }`
                                   : ''
-                              }`
-                            : ''}
-                      .
+                          }.`}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
