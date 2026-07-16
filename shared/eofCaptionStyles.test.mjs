@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, it } from 'node:test'
 import {
   EOF_CAPTION_STYLES,
@@ -12,6 +15,7 @@ import {
 import {
   buildWordBeats,
   buildCaptionDrawtextFilters,
+  escapeDrawtext,
 } from '../backend/api/lib/eofTikTokCaptions.mjs'
 import { normalizeZapcapTemplateList } from '../backend/api/lib/eofZapcapCaptions.mjs'
 
@@ -115,7 +119,7 @@ describe('caption drawtext builders', () => {
     assert.ok(filters.some((f) => f.includes('y=h*0.78')))
   })
 
-  it('escapes commas and apostrophes in live captions', () => {
+  it('inline live mode escapes commas when no textDir', () => {
     const filters = buildCaptionDrawtextFilters({
       caption: "At 38, he's still running the show — dictating tempo, finding space, and making",
       durationSec: 7,
@@ -123,7 +127,33 @@ describe('caption drawtext builders', () => {
       style: 'live',
     })
     assert.ok(filters.length >= 1)
+    assert.ok(filters.every((f) => f.includes("text='")), 'inline mode uses text=')
     assert.ok(filters.some((f) => f.includes('\\,')), 'commas in caption text must be escaped')
-    assert.ok(filters.some((f) => f.includes("\\'")), 'apostrophes must be escaped')
+    assert.equal(escapeDrawtext("Tuchel's").includes("'"), false)
+    assert.ok(escapeDrawtext("Tuchel's").includes('\u2019'), 'apostrophes become typographic')
+  })
+
+  it('live captions with commas/apostrophes use textfile when textDir is set', () => {
+    const textDir = mkdtempSync(join(tmpdir(), 'eof-caption-'))
+    try {
+      const caption = "Fans are divided, some backing Tuchel's"
+      const filters = buildCaptionDrawtextFilters({
+        caption,
+        durationSec: 5,
+        captionFont: '/tmp/font.ttf',
+        style: 'live',
+        textDir,
+      })
+      assert.ok(filters.length >= 1)
+      assert.ok(filters.every((f) => f.includes('textfile=')), 'production burns must use textfile=')
+      assert.ok(filters.every((f) => !f.includes("text='")), 'must not use inline text=')
+      const live0 = join(textDir, 'live-0.txt')
+      const body = readFileSync(live0, 'utf8')
+      assert.ok(body.includes('Fans are divided') || body.includes('Tuchel'), 'caption chunk written to file')
+      assert.ok(body.includes('\u2019') || body.includes('Tuchel'), 'apostrophe sanitized in file')
+    } finally {
+      rmSync(textDir, { recursive: true, force: true })
+    }
   })
 })
+

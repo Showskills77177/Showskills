@@ -7,6 +7,26 @@ const execFileAsync = promisify(execFile)
 let ffmpegPathCache
 let ffprobePathCache
 
+const MAX_ERROR_MESSAGE = 1400
+const STDERR_EXCERPT = 700
+
+/**
+ * Prefer a short stderr excerpt over Node's giant "Command failed: …argv…" message
+ * so admin job error_message stays actionable.
+ */
+function formatBinaryError(binLabel, err) {
+  const stderr = String(err?.stderr || err?.message || '').trim()
+  const excerpt = stderr.slice(-STDERR_EXCERPT).trim() || String(err?.message || err || 'unknown error')
+  const code = err?.code != null ? ` (code ${err.code})` : ''
+  const msg = `${binLabel} failed${code}: ${excerpt}`
+  const wrapped = new Error(msg.length > MAX_ERROR_MESSAGE ? `${msg.slice(0, MAX_ERROR_MESSAGE - 1)}…` : msg)
+  wrapped.code = err?.code
+  wrapped.stderr = err?.stderr
+  wrapped.stdout = err?.stdout
+  wrapped.cause = err
+  return wrapped
+}
+
 async function resolveFfmpegPath() {
   if (ffmpegPathCache) return ffmpegPathCache
 
@@ -61,7 +81,11 @@ async function resolveFfprobePath() {
  */
 export async function runFfmpeg(args, opts) {
   const bin = await resolveFfmpegPath()
-  return execFileAsync(bin, args, opts)
+  try {
+    return await execFileAsync(bin, args, opts)
+  } catch (err) {
+    throw formatBinaryError('ffmpeg', err)
+  }
 }
 
 /**
@@ -70,7 +94,11 @@ export async function runFfmpeg(args, opts) {
  */
 export async function runFfprobe(args, opts) {
   const bin = await resolveFfprobePath()
-  return execFileAsync(bin, args, opts)
+  try {
+    return await execFileAsync(bin, args, opts)
+  } catch (err) {
+    throw formatBinaryError('ffprobe', err)
+  }
 }
 
 export async function hasBundledFfmpeg() {

@@ -108,6 +108,7 @@ function buildSceneVideoFilter({
   burnCaptions,
   colorFilters = [],
   kenBurns = false,
+  textDir,
 }) {
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
@@ -138,6 +139,7 @@ function buildSceneVideoFilter({
           durationSec,
           captionFont,
           style: captionStyle,
+          textDir,
         }),
       )
     }
@@ -161,6 +163,8 @@ async function encodeSceneClip({
   const frames = Math.max(1, Math.ceil(dur * VIDEO_FPS))
   const clipPath = join(workDir, `clip-${scene.index + 1}.mp4`)
   const caption = String(scene.caption || '').trim().slice(0, 140) || `Scene ${scene.index + 1}`
+  const textDir = join(workDir, `caption-text-${scene.index + 1}`)
+  mkdirSync(textDir, { recursive: true })
 
   const vf = buildSceneVideoFilter({
     frames,
@@ -171,6 +175,7 @@ async function encodeSceneClip({
     burnCaptions,
     colorFilters,
     kenBurns,
+    textDir,
   })
 
   await runFfmpeg(
