@@ -18,6 +18,7 @@ import {
   searchApMediaPicture,
   downloadApRenditionToFile,
 } from './eofApImages.mjs'
+import { isEofOxylabsConfigured, searchOxylabsGoogleImage } from './eofOxylabsImages.mjs'
 
 const PALETTES = ['0x1e3a5f', '0x1a4d3e', '0x3d2a1a', '0x2a1f4d', '0x4a1f2a']
 
@@ -28,6 +29,7 @@ export function isEofPexelsConfigured() {
 export function eofImageSourceStatus() {
   return {
     ap: isEofApImagesConfigured(),
+    oxylabs: isEofOxylabsConfigured(),
     google: isEofGoogleCseConfigured(),
     pexels: isEofPexelsConfigured(),
     pinterestApi: isEofPinterestApiConfigured(),
@@ -37,13 +39,13 @@ export function eofImageSourceStatus() {
 }
 
 export function eofImagesConfigurationNote() {
-  const { ap, google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (ap || google || pexels || pinterestApi) {
-    return pinterestApi && !ap && !google && !pexels
+  const { ap, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
+  if (ap || oxylabs || google || pexels || pinterestApi) {
+    return pinterestApi && !ap && !oxylabs && !google && !pexels
       ? 'Pinterest token is set, but pin search needs Pinterest app approval — named people use Wikidata/Commons portraits first.'
       : null
   }
-  return 'Using Wikidata + Wikimedia Commons for named players/coaches (current portraits preferred). Add AP/PEXELS keys for broader coverage.'
+  return 'Using Wikidata + Wikimedia Commons for named players/coaches (current portraits preferred). Add AP / Oxylabs / Pexels keys for broader coverage.'
 }
 
 function paletteForQuery(query, index) {
@@ -321,20 +323,21 @@ export async function fetchEofSceneImage({
       if (meta) return meta
     }
 
-    // Pinterest — only if token present (often unauthorized for catalog search)
-    if (pinterestToken) {
+    // Oxylabs Google Images — high hit-rate SERP images (after licensed AP)
+    if (isEofOxylabsConfigured()) {
       const meta = await rotateSource(async (eff) => {
-        const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
-        if (!hit || (hit.relevance ?? 0) < 6) return null
+        const hit = await searchOxylabsGoogleImage(query, eff)
+        if (!hit) return null
+        const score = scoreImageRelevance(topic || query, hit.title || '', query)
+        if (score < 4) return null
         return {
-          key: `pin:${hit.pinId || hit.imgUrl}`,
+          key: `oxylabs:${hit.imgUrl}`,
           meta: {
             path: outPath,
-            source: 'pinterest',
+            source: 'oxylabs',
             imageQuery: query,
-            pinId: hit.pinId,
-            pinTitle: hit.title,
-            relevance: hit.relevance,
+            imageTitle: hit.title,
+            relevance: score,
           },
           download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
@@ -382,6 +385,27 @@ export async function fetchEofSceneImage({
             photographer: hit.photographer,
             pexelsId: hit.pexelsId,
             relevance: score,
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
+        }
+      })
+      if (meta) return meta
+    }
+
+    // Pinterest — only if token present (often unauthorized for catalog search)
+    if (pinterestToken) {
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
+        if (!hit || (hit.relevance ?? 0) < 6) return null
+        return {
+          key: `pin:${hit.pinId || hit.imgUrl}`,
+          meta: {
+            path: outPath,
+            source: 'pinterest',
+            imageQuery: query,
+            pinId: hit.pinId,
+            pinTitle: hit.title,
+            relevance: hit.relevance,
           },
           download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
@@ -439,7 +463,12 @@ export async function fetchEofSceneImage({
   })
   if (!existsSync(outPath)) throw new Error(`Could not create image for “${fallbackQuery}”.`)
 
-  const hasAnyKey = isEofApImagesConfigured() || pexelsKey || pinterestToken || isEofGoogleCseConfigured()
+  const hasAnyKey =
+    isEofApImagesConfigured() ||
+    isEofOxylabsConfigured() ||
+    pexelsKey ||
+    pinterestToken ||
+    isEofGoogleCseConfigured()
   return {
     path: outPath,
     source: hasAnyKey ? 'placeholder' : 'placeholder-no-image-keys',

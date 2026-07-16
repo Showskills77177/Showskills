@@ -18,6 +18,7 @@ import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofScen
 import { EOF_VOICE_PRESETS, EOF_RENDER_STACK, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { eofCaptionEngineStatus, listZapcapTemplates } from '../lib/eofZapcapCaptions.mjs'
 import { probeEofPinterestApi } from '../lib/eofPinterestImages.mjs'
+import { probeEofOxylabsApi } from '../lib/eofOxylabsImages.mjs'
 import {
   EOF_DEFAULT_CAPTION_STYLE,
   listEofCaptionStyles,
@@ -107,6 +108,12 @@ export default async function handler(req, res) {
         detail: e instanceof Error ? e.message : String(e),
       }))
 
+      const oxylabsProbe = await probeEofOxylabsApi().catch((e) => ({
+        configured: false,
+        ok: false,
+        detail: e instanceof Error ? e.message : String(e),
+      }))
+
       return json(res, 200, {
         ok: true,
         jobs,
@@ -167,6 +174,7 @@ export default async function handler(req, res) {
         imageSources: eofImageSourceStatus(),
         imagesNote: eofImagesConfigurationNote(),
         pinterest: pinterestProbe,
+        oxylabs: oxylabsProbe,
         renderStack: EOF_RENDER_STACK,
         session: info,
       })

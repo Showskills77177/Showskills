@@ -413,6 +413,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [renderStack, setRenderStack] = useState(null)
   const [imageSources, setImageSources] = useState({
     ap: false,
+    oxylabs: false,
     google: false,
     pexels: false,
     pinterestApi: false,
@@ -421,6 +422,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   })
   const [imagesNote, setImagesNote] = useState('')
   const [pinterestStatus, setPinterestStatus] = useState(null)
+  const [oxylabsStatus, setOxylabsStatus] = useState(null)
   const [progressTick, setProgressTick] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
   const renderPollRef = useRef(null)
@@ -484,10 +486,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setImageSources(
         j.imageSources && typeof j.imageSources === 'object'
           ? j.imageSources
-          : { google: false, pexels: Boolean(j.pexelsConfigured), pinterestApi: false, pinterestPinUrl: true },
+          : {
+              ap: false,
+              oxylabs: false,
+              google: false,
+              pexels: Boolean(j.pexelsConfigured),
+              pinterestApi: false,
+              pinterestPinUrl: true,
+              wikimedia: true,
+            },
       )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
       setPinterestStatus(j.pinterest && typeof j.pinterest === 'object' ? j.pinterest : null)
+      setOxylabsStatus(j.oxylabs && typeof j.oxylabs === 'object' ? j.oxylabs : null)
       setRenderStack(j.renderStack || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
@@ -1625,15 +1636,31 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               Images:{' '}
               {[
                 imageSources.ap && 'AP (latest first)',
+                imageSources.oxylabs && 'Oxylabs',
                 imageSources.google && 'Google',
-                imageSources.pinterestApi && 'Pinterest',
                 imageSources.pexels && 'Pexels',
+                imageSources.pinterestApi && 'Pinterest',
                 'Wikimedia',
               ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
+            {oxylabsStatus?.configured ? (
+              <p className={oxylabsStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
+                Oxylabs:{' '}
+                {oxylabsStatus.ok
+                  ? `ready${oxylabsStatus.detail ? ` — ${String(oxylabsStatus.detail).slice(0, 60)}` : ''}`
+                  : `check failed (${oxylabsStatus.status || 'error'}${
+                      oxylabsStatus.detail ? `: ${String(oxylabsStatus.detail).slice(0, 80)}` : ''
+                    })`}
+              </p>
+            ) : (
+              <p className="text-[#8a8a8a]">
+                Oxylabs: not set — add <code className="text-[#aaa]">OXYLABS_USERNAME</code> +{' '}
+                <code className="text-[#aaa]">OXYLABS_PASSWORD</code> and redeploy.
+              </p>
+            )}
             {pinterestStatus?.configured ? (
               <p className={pinterestStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
                 Pinterest API:{' '}
