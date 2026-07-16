@@ -15,6 +15,7 @@ import {
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
+import { isEofOxylabsConfigured } from './eofOxylabsImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
@@ -103,9 +104,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     })
 
     let imagesDone = 0
-    // One Wikidata/Commons resolve for the whole job — avoids 5× parallel API storms on Vercel.
+    // Wikidata pool is last-resort only (Oxylabs is primary). Skip the resolve when Oxylabs is live.
     let wikiPool = []
-    if (!reuseSceneImages) {
+    if (!reuseSceneImages && !isEofOxylabsConfigured()) {
       try {
         wikiPool = await listWikimediaPersonImages(job.topic, {
           limit: Math.max(8, rows.length + 3),
@@ -117,9 +118,6 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           e instanceof Error ? e.message : e,
         )
         wikiPool = []
-      }
-      if (!wikiPool.length) {
-        console.warn('[eof-video] no Wikidata/Commons pool for', job.topic, '— falling back per-scene')
       }
     }
 

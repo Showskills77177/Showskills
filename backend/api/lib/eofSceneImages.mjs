@@ -40,12 +40,15 @@ export function eofImageSourceStatus() {
 
 export function eofImagesConfigurationNote() {
   const { ap, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (ap || oxylabs || google || pexels || pinterestApi) {
-    return pinterestApi && !ap && !oxylabs && !google && !pexels
-      ? 'Pinterest token is set, but pin search needs Pinterest app approval — named people use Wikidata/Commons portraits first.'
+  if (oxylabs) {
+    return 'Oxylabs Google Images is primary — Wikimedia Commons is last-resort only.'
+  }
+  if (ap || google || pexels || pinterestApi) {
+    return pinterestApi && !ap && !google && !pexels
+      ? 'Pinterest token is set, but pin search needs Pinterest app approval. Add Oxylabs for Google Images hit-rate.'
       : null
   }
-  return 'Using Wikidata + Wikimedia Commons for named players/coaches (current portraits preferred). Add AP / Oxylabs / Pexels keys for broader coverage.'
+  return 'No Oxylabs/AP/CSE/Pexels keys — falling back to Wikidata + Wikimedia Commons.'
 }
 
 function paletteForQuery(query, index) {
@@ -250,53 +253,35 @@ export async function fetchEofSceneImage({
     }
   }
 
-  // Named person/coach first: use a pre-built Wikidata pool when provided (one resolve per job),
-  // otherwise resolve once via list/search helpers.
-  const subject = resolveImageSubject(topic || custom)
-  if ((Array.isArray(wikiPool) && wikiPool.length) || (subject && subject !== 'football')) {
-    let fallbackDup = null
-    for (let t = 0; t < tries; t += 1) {
-      let cand = null
-      try {
-        const hit = await searchWikimediaCommonsImages(subject || topic || custom, index, {
-          topic: topic || subject,
-          rotate: rot + t,
-          pool: Array.isArray(wikiPool) && wikiPool.length ? wikiPool : undefined,
-        })
-        if (hit && (hit.relevance ?? 0) >= 6) {
-          cand = {
-            key: `wiki:${hit.title || hit.imgUrl}`,
-            meta: {
-              path: outPath,
-              source: 'wikimedia',
-              imageQuery: hit.queryUsed || subject,
-              imageTitle: hit.title,
-              relevance: hit.relevance,
-              imageYear: hit.year || null,
-              wikiDetail: hit.sourceDetail || null,
-            },
-            download: () => downloadImageToFile(hit.imgUrl, outPath),
-          }
-        }
-      } catch (e) {
-        console.warn('[eof-scene-images] wikimedia probe failed', e instanceof Error ? e.message : e)
-      }
-      if (!cand) continue
-      if (avoid.has(cand.key)) {
-        if (!fallbackDup) fallbackDup = cand
-        continue
-      }
-      if (await cand.download()) return { ...cand.meta, imageKey: cand.key }
-    }
-    if (fallbackDup && (await fallbackDup.download())) {
-      return { ...fallbackDup.meta, imageKey: fallbackDup.key }
-    }
-  }
-
+  // Search order: Oxylabs (primary hit-rate) → AP → CSE → Pexels → Pinterest → Wikimedia last.
+  // Do NOT short-circuit named people through Wikidata portraits — that was forcing old Commons stills.
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
-    // AP editorial — newest-first + topic-ranked (best for breaking news stills)
+    // Oxylabs Google Images — primary (why we pay for scrape access)
+    if (isEofOxylabsConfigured()) {
+      const meta = await rotateSource(async (eff) => {
+        const hit = await searchOxylabsGoogleImage(query, eff)
+        if (!hit) return null
+        // SERP titles are often thin — score against query text so we don't reject good stills.
+        const score = scoreImageRelevance(topic || query, hit.title || query, query)
+        if (score < 3) return null
+        return {
+          key: `oxylabs:${hit.imgUrl}`,
+          meta: {
+            path: outPath,
+            source: 'oxylabs',
+            imageQuery: query,
+            imageTitle: hit.title,
+            relevance: score,
+          },
+          download: () => downloadImageToFile(hit.imgUrl, outPath),
+        }
+      })
+      if (meta) return meta
+    }
+
+    // AP editorial — licensed breaking-news stills when keyed
     if (isEofApImagesConfigured()) {
       const meta = await rotateSource(async (eff) => {
         const hit = await searchApMediaPicture(query, eff, { topic })
@@ -318,28 +303,6 @@ export async function fetchEofSceneImage({
             relevance: score,
           },
           download: () => downloadApRenditionToFile(hit, outPath),
-        }
-      })
-      if (meta) return meta
-    }
-
-    // Oxylabs Google Images — high hit-rate SERP images (after licensed AP)
-    if (isEofOxylabsConfigured()) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchOxylabsGoogleImage(query, eff)
-        if (!hit) return null
-        const score = scoreImageRelevance(topic || query, hit.title || '', query)
-        if (score < 4) return null
-        return {
-          key: `oxylabs:${hit.imgUrl}`,
-          meta: {
-            path: outPath,
-            source: 'oxylabs',
-            imageQuery: query,
-            imageTitle: hit.title,
-            relevance: score,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
         }
       })
       if (meta) return meta
@@ -414,15 +377,17 @@ export async function fetchEofSceneImage({
     }
   }
 
-  // Last resort: Wikimedia search even without a clean subject resolve
+  // Last resort only: Wikidata/Commons (pre-built pool when available)
   {
+    const subject = resolveImageSubject(topic || custom)
     let fallbackDup = null
     for (let t = 0; t < tries; t += 1) {
       let cand = null
       try {
-        const hit = await searchWikimediaCommonsImages(queries[0] || topic || 'football', index, {
-          topic,
+        const hit = await searchWikimediaCommonsImages(subject || queries[0] || topic || 'football', index, {
+          topic: topic || subject,
           rotate: rot + t,
+          pool: Array.isArray(wikiPool) && wikiPool.length ? wikiPool : undefined,
         })
         if (hit && (hit.relevance ?? 0) >= 6) {
           cand = {
@@ -430,7 +395,7 @@ export async function fetchEofSceneImage({
             meta: {
               path: outPath,
               source: 'wikimedia',
-              imageQuery: hit.queryUsed || queries[0],
+              imageQuery: hit.queryUsed || subject || queries[0],
               imageTitle: hit.title,
               relevance: hit.relevance,
               imageYear: hit.year || null,
