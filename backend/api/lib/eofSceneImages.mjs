@@ -18,11 +18,7 @@ import {
   searchApMediaPicture,
   downloadApRenditionToFile,
 } from './eofApImages.mjs'
-import {
-  isEofOxylabsConfigured,
-  searchOxylabsGoogleImages,
-  listOxylabsImageCandidates,
-} from './eofOxylabsImages.mjs'
+import { isEofOxylabsConfigured, claimOxylabsPoolHit } from './eofOxylabsImages.mjs'
 
 const PALETTES = ['0x1e3a5f', '0x1a4d3e', '0x3d2a1a', '0x2a1f4d', '0x4a1f2a']
 
@@ -45,7 +41,7 @@ export function eofImageSourceStatus() {
 export function eofImagesConfigurationNote() {
   const { ap, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
   if (oxylabs) {
-    return 'Oxylabs Google Images is primary — Wikimedia Commons is last-resort only.'
+    return 'Oxylabs: 1 Google Images credit per Short (all scenes share one SERP). Wikimedia is last-resort only.'
   }
   if (ap || google || pexels || pinterestApi) {
     return pinterestApi && !ap && !google && !pexels
@@ -182,7 +178,7 @@ const IMAGE_ROTATE_MAX_TRIES = 8
  * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
  * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
  * record what was used and avoid it next time.
- * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array }} opts
+ * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string } | null }} opts
  */
 export async function fetchEofSceneImage({
   imageQuery,
@@ -193,6 +189,7 @@ export async function fetchEofSceneImage({
   attempt = 0,
   avoidKeys = [],
   wikiPool = null,
+  oxyPool = null,
 }) {
   mkdirSync(dirname(outPath), { recursive: true })
   if (!refresh && existsSync(outPath)) {
@@ -262,73 +259,46 @@ export async function fetchEofSceneImage({
     }
   }
 
-  // Search order: Oxylabs (primary hit-rate) → AP → CSE → Pexels → Pinterest → Wikimedia last.
+  // Oxylabs: consume the shared job pool only — NEVER fire a new realtime query per scene.
+  // The job runner spends exactly 1 credit for the whole Short (see fetchEofOxylabsJobPool).
+  if (oxyPool && Array.isArray(oxyPool.hits) && oxyPool.hits.length) {
+    const maxDownloadTries = 5
+    for (let t = 0; t < maxDownloadTries; t += 1) {
+      const claimed = claimOxylabsPoolHit({
+        hits: oxyPool.hits,
+        claimed: oxyPool.claimed || (oxyPool.claimed = new Set()),
+        avoidKeys: avoid,
+        index: index + attempt + t,
+      })
+      if (!claimed) break
+      const score = scoreImageRelevance(
+        topic || claimed.title || '',
+        `${claimed.title || ''} ${oxyPool.query || imageQuery || ''}`.trim(),
+        imageQuery || oxyPool.query || '',
+      )
+      if (score < 3) {
+        // Release so another scene can try a better-titled hit.
+        oxyPool.claimed?.delete?.(claimed.key)
+        continue
+      }
+      if (await downloadImageToFile(claimed.imgUrl, outPath)) {
+        return {
+          path: outPath,
+          source: 'oxylabs',
+          imageQuery: oxyPool.query || imageQuery,
+          imageTitle: claimed.title,
+          relevance: score,
+          imageKey: claimed.key,
+        }
+      }
+      // Keep claimed on download failure — don't burn retries on a dead URL.
+    }
+  }
+
+  // Search order after Oxylabs pool: AP → CSE → Pexels → Pinterest → Wikimedia last.
   // Do NOT short-circuit named people through Wikidata portraits — that was forcing old Commons stills.
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
-
-    // Oxylabs Google Images — primary. ONE billable SERP call for the first search query
-    // only (extra variants were burning the Vercel timeout and Oxylabs quota). Walk the hit
-    // pool skipping avoidKeys until a fresh URL downloads.
-    if (isEofOxylabsConfigured() && query === queries[0]) {
-      try {
-        const hits = await searchOxylabsGoogleImages(query, { limit: 20 })
-        const startIndex = effIndex(0)
-        const candidates = listOxylabsImageCandidates(hits, {
-          index: startIndex,
-          avoidUrls: avoid,
-        })
-        let fallbackDup = null
-        let scored = 0
-        let downloaded = 0
-        for (const hit of candidates) {
-          // Always include the search query in the haystack — Google titles often omit the name
-          // and would hard-reject (-25) against a multi-person topic (e.g. Rooney + Tuchel).
-          const score = scoreImageRelevance(
-            topic || query,
-            `${hit.title || ''} ${query}`.trim(),
-            query,
-          )
-          if (score < 3) continue
-          scored += 1
-          const key = `oxylabs:${hit.imgUrl}`
-          const cand = {
-            key,
-            meta: {
-              path: outPath,
-              source: 'oxylabs',
-              imageQuery: query,
-              imageTitle: hit.title,
-              relevance: score,
-            },
-            download: () => downloadImageToFile(hit.imgUrl, outPath),
-          }
-          if (hit.reused || avoid.has(key)) {
-            if (!fallbackDup) fallbackDup = cand
-            continue
-          }
-          if (await cand.download()) {
-            downloaded += 1
-            return { ...cand.meta, imageKey: cand.key }
-          }
-        }
-        if (fallbackDup && (await fallbackDup.download())) {
-          return { ...fallbackDup.meta, imageKey: fallbackDup.key }
-        }
-        if (hits.length && !downloaded) {
-          console.warn(
-            '[eof-scene-images] oxylabs returned',
-            hits.length,
-            'hits but none downloaded (scored',
-            scored,
-            ') for',
-            String(query).slice(0, 80),
-          )
-        }
-      } catch (e) {
-        console.warn('[eof-scene-images] oxylabs pool failed', e instanceof Error ? e.message : e)
-      }
-    }
 
     // AP editorial — licensed breaking-news stills when keyed
     if (isEofApImagesConfigured()) {

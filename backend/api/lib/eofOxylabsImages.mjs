@@ -1,6 +1,9 @@
 /**
  * Oxylabs Realtime API — Google Images search for EOF Shorts scene photos.
  *
+ * Billing rule: at most ONE Google Images query per Short rebuild. All scenes
+ * share that SERP pool (6–7 stills ≠ 6–7 credits).
+ *
  * Docs: https://developers.oxylabs.io/api-targets/search-engines/google/search/image-search
  * Auth: Basic Auth (OXYLABS_USERNAME / OXYLABS_PASSWORD). Never log credentials.
  *
@@ -9,10 +12,14 @@
  *   OXYLABS_PASSWORD
  *   OXYLABS_GEO_LOCATION   (optional, default "United States")
  */
+import { resolveImageSubject } from '../../../shared/eofSceneImageQueries.mjs'
 
 const OXYLABS_REALTIME_URL = 'https://realtime.oxylabs.io/v1/queries'
 const DEFAULT_TIMEOUT_MS = 60_000
+/** Keep only what a Short needs from one SERP page (billing is per query, not per URL). */
 const DEFAULT_LIMIT = 12
+/** Hard cap on billable Google Images queries per production job / rebuild. */
+export const EOF_OXYLABS_MAX_QUERIES_PER_JOB = 1
 
 function envTrim(name) {
   return String(process.env[name] || '').trim()
@@ -174,12 +181,13 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
         Authorization: basicAuthHeader(creds.username, creds.password),
         Accept: 'application/json',
       },
-      // Docs prefer udm=2 for Image Search; tbm=isch is the legacy equivalent.
+      // Docs prefer udm=2 for Image Search. pages:1 = one SERP page = one credit.
       body: JSON.stringify({
         source: 'google_search',
         query: q,
         geo_location: oxylabsGeoLocation(),
         parse: true,
+        pages: 1,
         context: [{ key: 'udm', value: 2 }],
       }),
       signal: controller.signal,
@@ -335,7 +343,10 @@ export function listOxylabsImageCandidates(hits, opts = {}) {
  * @param {{ signal?: AbortSignal, avoidUrls?: Iterable<string> }} [opts]
  */
 export async function searchOxylabsGoogleImage(query, index = 0, opts = {}) {
-  const hits = await searchOxylabsGoogleImages(query, { limit: 20, signal: opts.signal })
+  const hits = await searchOxylabsGoogleImages(query, {
+    limit: Math.min(12, Number(opts.limit) || DEFAULT_LIMIT),
+    signal: opts.signal,
+  })
   if (!hits.length) return null
   const picked = pickOxylabsImageFromHits(hits, { index, avoidUrls: opts.avoidUrls })
   if (!picked) return null
@@ -347,6 +358,95 @@ export async function searchOxylabsGoogleImage(query, index = 0, opts = {}) {
     queryUsed: query,
     source: 'oxylabs',
     reused: picked.reused,
+  }
+}
+
+/**
+ * ONE billable Google Images query for an entire Short (all scenes share the SERP pool).
+ * For 6–7 scenes this costs 1 credit, not 6–7.
+ * @param {{ topic?: string, sceneCount?: number, attempt?: number, signal?: AbortSignal }} opts
+ */
+export async function fetchEofOxylabsJobPool(opts = {}) {
+  const sceneCount = Math.max(1, Math.min(12, Number(opts.sceneCount) || 6))
+  const attempt = Math.max(0, Number(opts.attempt) || 0)
+  const subject = resolveImageSubject(opts.topic || '') || String(opts.topic || 'football').trim()
+  const year = new Date().getFullYear()
+  // Rotate query slightly on rebuilds without spending extra credits beyond this single call.
+  const query =
+    attempt % 3 === 1
+      ? `${subject} ${year}`
+      : attempt % 3 === 2
+        ? `${subject} football manager`
+        : `${subject} football`
+
+  const need = Math.min(16, sceneCount + 4)
+  const hits = await searchOxylabsGoogleImages(query, {
+    limit: need,
+    signal: opts.signal,
+  })
+  console.info(
+    '[eof-oxylabs] job pool',
+    query.slice(0, 60),
+    `scenes=${sceneCount}`,
+    `urls=${hits.length}`,
+    `(max ${EOF_OXYLABS_MAX_QUERIES_PER_JOB} query/job)`,
+  )
+  return {
+    query,
+    hits: hits.map((h) => ({
+      url: h.url,
+      title: h.title || null,
+      width: h.width,
+      height: h.height,
+    })),
+  }
+}
+
+/**
+ * Claim a unique URL from a shared job pool (safe under scene concurrency).
+ * @param {{ hits: Array<{ url: string, title?: string|null }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number }} opts
+ */
+export function claimOxylabsPoolHit(opts = {}) {
+  const hits = Array.isArray(opts.hits) ? opts.hits : []
+  const claimed = opts.claimed instanceof Set ? opts.claimed : new Set()
+  const avoid = new Set()
+  for (const raw of opts.avoidKeys || []) {
+    const k = String(raw || '').trim()
+    if (!k) continue
+    avoid.add(k)
+    if (k.startsWith('oxylabs:')) avoid.add(k.slice('oxylabs:'.length))
+    else avoid.add(`oxylabs:${k}`)
+  }
+  const ordered = orderOxylabsHitsForRotation(hits, opts.index)
+  let fallback = null
+  for (const hit of ordered) {
+    const url = String(hit?.url || '').trim()
+    if (!url) continue
+    const key = `oxylabs:${url}`
+    if (claimed.has(key)) continue
+    if (avoid.has(url) || avoid.has(key)) {
+      if (!fallback) fallback = { hit, key, url, reused: true }
+      continue
+    }
+    claimed.add(key)
+    return {
+      imgUrl: url,
+      title: hit.title || null,
+      width: hit.width,
+      height: hit.height,
+      key,
+      reused: false,
+    }
+  }
+  if (!fallback) return null
+  claimed.add(fallback.key)
+  return {
+    imgUrl: fallback.url,
+    title: fallback.hit.title || null,
+    width: fallback.hit.width,
+    height: fallback.hit.height,
+    key: fallback.key,
+    reused: true,
   }
 }
 

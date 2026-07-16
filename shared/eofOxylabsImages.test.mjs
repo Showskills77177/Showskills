@@ -6,6 +6,8 @@ import {
   pickOxylabsImageFromHits,
   listOxylabsImageCandidates,
   orderOxylabsHitsForRotation,
+  claimOxylabsPoolHit,
+  EOF_OXYLABS_MAX_QUERIES_PER_JOB,
 } from '../backend/api/lib/eofOxylabsImages.mjs'
 import {
   appendEofImageKeyHistory,
@@ -101,6 +103,23 @@ describe('eofOxylabsImages', () => {
     const overflow = pickOxylabsImageFromHits(hits, { index: 21 * 7, avoidUrls: history })
     assert.ok(overflow)
     assert.equal(overflow.reused, true)
+  })
+
+  it('caps billable Google Images queries to 1 per Short job', () => {
+    assert.equal(EOF_OXYLABS_MAX_QUERIES_PER_JOB, 1)
+  })
+
+  it('claims unique pool URLs across 7 concurrent scenes (one SERP, seven stills)', () => {
+    const hits = mockHits(12)
+    const claimed = new Set()
+    const keys = []
+    for (let scene = 0; scene < 7; scene += 1) {
+      const hit = claimOxylabsPoolHit({ hits, claimed, index: scene })
+      assert.ok(hit, `scene ${scene}`)
+      keys.push(hit.key)
+    }
+    assert.equal(new Set(keys).size, 7)
+    assert.equal(claimed.size, 7)
   })
 
   it('lists fresh candidates before avoided ones for download retries', () => {

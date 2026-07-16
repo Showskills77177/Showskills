@@ -15,7 +15,7 @@ import {
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
-import { isEofOxylabsConfigured } from './eofOxylabsImages.mjs'
+import { isEofOxylabsConfigured, fetchEofOxylabsJobPool } from './eofOxylabsImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
@@ -135,9 +135,28 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     })
 
     let imagesDone = 0
-    // Wikidata pool is last-resort only (Oxylabs is primary). Skip the resolve when Oxylabs is live.
+    // Oxylabs: exactly ONE billable Google Images query for the whole Short.
+    // All scenes share that SERP pool (7 scenes ≠ 7 credits).
+    let oxyPool = null
     let wikiPool = []
-    if (!reuseSceneImages && !isEofOxylabsConfigured()) {
+    if (!reuseSceneImages && isEofOxylabsConfigured()) {
+      try {
+        const maxAttempt = Math.max(
+          0,
+          ...priorManifest.map((m) => Number(m?.imageAttempt) || 0),
+        )
+        const pool = await fetchEofOxylabsJobPool({
+          topic: job.topic,
+          sceneCount: rows.length,
+          attempt: maxAttempt,
+        })
+        oxyPool = { query: pool.query, hits: pool.hits, claimed: new Set() }
+      } catch (e) {
+        console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
+        oxyPool = null
+      }
+    } else if (!reuseSceneImages) {
+      // Wikidata only when Oxylabs is not configured.
       try {
         wikiPool = await listWikimediaPersonImages(job.topic, {
           limit: Math.max(8, rows.length + 3),
@@ -192,6 +211,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           attempt,
           avoidKeys: priorHistory,
           wikiPool,
+          oxyPool,
         })
         imageAttempt = attempt
         imageKey = imageMeta.imageKey || null
