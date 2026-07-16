@@ -443,6 +443,27 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '') {
 }
 
 /**
+ * Caption → photo angle so scene stills match the beat (tactics, England, celebration…).
+ * @param {string} caption
+ * @param {string} subject
+ * @param {boolean} coach
+ */
+export function imageAngleFromCaption(caption, subject, coach = false) {
+  const core = String(subject || '').trim() || 'football'
+  const c = String(caption || '').toLowerCase()
+  if (/\btactic|formation|system|shape|press(ing)?\b/.test(c)) {
+    return coach ? `${core} tactics board` : `${core} football tactics`
+  }
+  if (/\bengland\b/.test(c) && coach) return `${core} England manager`
+  if (/\bpress|interview|says|said|quotes?\b/.test(c)) return `${core} press conference`
+  if (/\btrain|session|drill\b/.test(c)) return `${core} training`
+  if (/\bcelebrat|goal|scores?|winner\b/.test(c)) return `${core} celebrating football`
+  if (/\bsideline|touchline|bench\b/.test(c)) return `${core} sideline`
+  if (/\bmatch|game|derby|final\b/.test(c)) return `${core} match football`
+  return coach ? `${core} manager` : `${core} football`
+}
+
+/**
  * Per-scene image search line for auto-generated scripts.
  * @param {string} topic
  * @param {number} sceneIndex
@@ -453,4 +474,29 @@ export function defaultSceneImageQuery(topic, sceneIndex) {
   const core = resolveImageSubject(name) || name
   const angles = topicLooksLikeCoach(name) ? COACH_ANGLES : PLAYER_ANGLES
   return angles[sceneIndex % angles.length](core)
+}
+
+/**
+ * Ensure AI / adapted imageQuery still names the lead subject and matches the caption beat.
+ * @param {{ topic?: string, imageQuery?: string, caption?: string, sceneIndex?: number }} input
+ */
+export function anchorSceneImageQuery({ topic, imageQuery, caption, sceneIndex = 0 } = {}) {
+  const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const coach = topicLooksLikeCoach(`${topic || ''} ${caption || ''}`)
+  const raw = String(imageQuery || '').trim()
+  const surname = subject.split(/\s+/).filter(Boolean).pop() || subject
+  const namesSubject =
+    raw &&
+    (new RegExp(subject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(raw) ||
+      (surname.length >= 4 && new RegExp(`\\b${surname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(raw)))
+
+  if (namesSubject && !/^(stadium|crowd|fans?|generic)\b/i.test(raw)) {
+    // Keep AI angle when it already names the person; lightly enrich with caption cues.
+    if (caption && /\btactic|england|celebrat|press|train/i.test(caption) && !/\btactic|england|celebrat|press|train/i.test(raw)) {
+      return imageAngleFromCaption(caption, subject, coach)
+    }
+    return raw
+  }
+  if (caption) return imageAngleFromCaption(caption, subject, coach)
+  return defaultSceneImageQuery(topic || subject, sceneIndex)
 }

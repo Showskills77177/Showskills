@@ -7,6 +7,8 @@ import {
   defaultSceneImageQuery,
   sanitizeTopicForImageSearch,
   resolveImageSubject,
+  anchorSceneImageQuery,
+  imageAngleFromCaption,
 } from './eofSceneImageQueries.mjs'
 
 describe('eofSceneImageQueries', () => {
@@ -110,6 +112,21 @@ describe('eofSceneImageQueries', () => {
     const bad = scoreImageRelevance(topic, 'World Cup stadium crowd Mexico 2026')
     assert.ok(good > 5)
     assert.ok(bad < 0, `generic World Cup stock must be rejected, got ${bad}`)
+  })
+
+  it('anchors tactics/England caption beats to the lead coach', () => {
+    const q = anchorSceneImageQuery({
+      topic: 'Did Tuchel tactics cost England?',
+      imageQuery: 'stadium crowd night lights',
+      caption: 'Did his tactics cost England again?',
+      sceneIndex: 1,
+    })
+    assert.match(q, /Tuchel/i)
+    assert.match(q, /tactic|England/i)
+    assert.equal(
+      imageAngleFromCaption('Did his tactics cost England again?', 'Thomas Tuchel', true),
+      'Thomas Tuchel tactics board',
+    )
   })
 
   it('resolves Rooney topics to Wayne Rooney and keeps career match photos', () => {

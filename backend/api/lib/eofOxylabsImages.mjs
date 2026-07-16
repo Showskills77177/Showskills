@@ -12,7 +12,10 @@
  *   OXYLABS_PASSWORD
  *   OXYLABS_GEO_LOCATION   (optional, default "United States")
  */
-import { resolveImageSubject } from '../../../shared/eofSceneImageQueries.mjs'
+import {
+  resolveImageSubject,
+  scoreImageRelevance,
+} from '../../../shared/eofSceneImageQueries.mjs'
 
 const OXYLABS_REALTIME_URL = 'https://realtime.oxylabs.io/v1/queries'
 const DEFAULT_TIMEOUT_MS = 60_000
@@ -422,8 +425,35 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
 }
 
 /**
+ * Rank a SERP hit for a specific scene using title relevance + portrait preference.
+ * Do NOT inject the job search query into the haystack — that hid weak titles.
+ * @param {{ url?: string, title?: string|null, width?: number, height?: number }} hit
+ * @param {{ topic?: string, imageQuery?: string, caption?: string }} scene
+ */
+export function scoreOxylabsHitForScene(hit, scene = {}) {
+  const title = String(hit?.title || '').trim()
+  const topic = String(scene.topic || '').trim()
+  const imageQuery = String(scene.imageQuery || '').trim()
+  const caption = String(scene.caption || '').trim()
+  const relevance = scoreImageRelevance(
+    topic || imageQuery || caption,
+    title,
+    imageQuery || caption,
+  )
+  const portrait = scoreImageCandidate(hit?.url, hit?.width, hit?.height)
+  // Caption tokens in the title (tactics / England / celebrate) get a small extra nudge.
+  let captionBoost = 0
+  const hay = title.toLowerCase()
+  for (const tok of caption.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 5)) {
+    if (hay.includes(tok)) captionBoost += 3
+  }
+  return relevance * 12 + Math.max(-20, Math.min(40, portrait)) + captionBoost
+}
+
+/**
  * Claim a unique URL from a shared job pool (safe under scene concurrency).
- * @param {{ hits: Array<{ url: string, title?: string|null }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number }} opts
+ * Prefers the best title match for this scene’s topic/imageQuery/caption, not blind rotation.
+ * @param {{ hits: Array<{ url: string, title?: string|null, width?: number, height?: number }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number, topic?: string, imageQuery?: string, caption?: string }} opts
  */
 export function claimOxylabsPoolHit(opts = {}) {
   const hits = Array.isArray(opts.hits) ? opts.hits : []
@@ -436,25 +466,40 @@ export function claimOxylabsPoolHit(opts = {}) {
     if (k.startsWith('oxylabs:')) avoid.add(k.slice('oxylabs:'.length))
     else avoid.add(`oxylabs:${k}`)
   }
-  const ordered = orderOxylabsHitsForRotation(hits, opts.index)
+
+  const scene = {
+    topic: opts.topic,
+    imageQuery: opts.imageQuery,
+    caption: opts.caption,
+  }
+  const ranked = hits
+    .map((hit, i) => ({
+      hit,
+      url: String(hit?.url || '').trim(),
+      key: `oxylabs:${String(hit?.url || '').trim()}`,
+      score: scoreOxylabsHitForScene(hit, scene),
+      // Tiny index bias so rebuilds still diversify when scores tie.
+      tie: (i + Math.max(0, Number(opts.index) || 0)) % Math.max(1, hits.length),
+    }))
+    .filter((row) => row.url)
+    .sort((a, b) => b.score - a.score || a.tie - b.tie)
+
   let fallback = null
-  for (const hit of ordered) {
-    const url = String(hit?.url || '').trim()
-    if (!url) continue
-    const key = `oxylabs:${url}`
-    if (claimed.has(key)) continue
-    if (avoid.has(url) || avoid.has(key)) {
-      if (!fallback) fallback = { hit, key, url, reused: true }
+  for (const row of ranked) {
+    if (claimed.has(row.key)) continue
+    if (avoid.has(row.url) || avoid.has(row.key)) {
+      if (!fallback) fallback = { ...row, reused: true }
       continue
     }
-    claimed.add(key)
+    claimed.add(row.key)
     return {
-      imgUrl: url,
-      title: hit.title || null,
-      width: hit.width,
-      height: hit.height,
-      key,
+      imgUrl: row.url,
+      title: row.hit.title || null,
+      width: row.hit.width,
+      height: row.hit.height,
+      key: row.key,
       reused: false,
+      sceneScore: row.score,
     }
   }
   if (!fallback) return null
@@ -466,6 +511,7 @@ export function claimOxylabsPoolHit(opts = {}) {
     height: fallback.hit.height,
     key: fallback.key,
     reused: true,
+    sceneScore: fallback.score,
   }
 }
 

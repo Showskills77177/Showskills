@@ -9,6 +9,7 @@ import {
   claimOxylabsPoolHit,
   buildOxylabsJobQuery,
   scoreImageCandidate,
+  scoreOxylabsHitForScene,
   EOF_OXYLABS_MAX_QUERIES_PER_JOB,
 } from '../backend/api/lib/eofOxylabsImages.mjs'
 import {
@@ -135,6 +136,36 @@ describe('eofOxylabsImages', () => {
     }
     assert.equal(new Set(keys).size, 7)
     assert.equal(claimed.size, 7)
+  })
+
+  it('claims the SERP title that matches the scene beat (tactics vs celebration)', () => {
+    const hits = [
+      { url: 'https://cdn.example.com/celebrate.jpg', title: 'Thomas Tuchel celebrating goal', width: 900, height: 1200 },
+      { url: 'https://cdn.example.com/tactics.jpg', title: 'Thomas Tuchel tactics board England', width: 1000, height: 1400 },
+      { url: 'https://cdn.example.com/crowd.jpg', title: 'Wembley stadium crowd night', width: 1600, height: 900 },
+    ]
+    const claimed = new Set()
+    const pick = claimOxylabsPoolHit({
+      hits,
+      claimed,
+      topic: 'Did Tuchel tactics cost England?',
+      imageQuery: 'Thomas Tuchel tactics board',
+      caption: 'Did his tactics cost England?',
+      index: 0,
+    })
+    assert.equal(pick.imgUrl, 'https://cdn.example.com/tactics.jpg')
+    assert.ok(
+      scoreOxylabsHitForScene(hits[1], {
+        topic: 'Did Tuchel tactics cost England?',
+        imageQuery: 'Thomas Tuchel tactics board',
+        caption: 'tactics England',
+      }) >
+        scoreOxylabsHitForScene(hits[2], {
+          topic: 'Did Tuchel tactics cost England?',
+          imageQuery: 'Thomas Tuchel tactics board',
+          caption: 'tactics England',
+        }),
+    )
   })
 
   it('lists fresh candidates before avoided ones for download retries', () => {

@@ -1343,7 +1343,7 @@ Hard rules:
 - Always say football — never soccer.
 - PRESERVE the draft's facts, teams, and meaning — compress, do not replace with generic filler.
 - Hook (scene 1) from the draft's lead. CTA (last scene) from the draft's question.
-- Each scene needs imageQuery: short English photo search naming the SAME player/club/nation as the caption (plus action like celebrating, presser, training). Prefer recent match photos. Always say football, never soccer. Never use generic queries like "stadium crowd" alone.
+- Each scene needs imageQuery: short English photo search that matches THAT caption's beat. Always name the lead player/coach/club from the topic first (e.g. Thomas Tuchel, Wayne Rooney). Then add the scene action: tactics/formation → "tactics board" or "sideline"; England debate → "England manager"; quote/press → "press conference"; goal → "celebrating". Prefer clear face-forward match photos. Always say football, never soccer. Never generic "stadium crowd" alone. Never switch the subject to a secondary name mentioned later in the draft.
 - tags must include "shortsfeed" and football keywords (never NFL / American football).
 - Return JSON only.
 - Format: ${format}. ${formatGuide(format)}`

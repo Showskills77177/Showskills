@@ -1,4 +1,4 @@
-import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
+import { defaultSceneImageQuery, anchorSceneImageQuery } from './eofSceneImageQueries.mjs'
 
 /** Browser + Node safe UUID (avoid node:crypto in client bundles). */
 function newSceneId() {
@@ -307,7 +307,12 @@ export function normalizeEofScript(script, topicFallback = '') {
     .map((s, i) => {
       const caption = String(s?.caption || s?.narration || s?.text || '').trim()
       if (!caption) return null
-      const imageQuery = String(s?.imageQuery || s?.image_query || defaultSceneImageQuery(topic, i)).trim()
+      const imageQuery = anchorSceneImageQuery({
+        topic,
+        imageQuery: s?.imageQuery || s?.image_query || defaultSceneImageQuery(topic, i),
+        caption,
+        sceneIndex: i,
+      })
       return createEofScene({
         id: s?.id,
         caption: caption.slice(0, 140),

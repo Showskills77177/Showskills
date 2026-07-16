@@ -3,7 +3,12 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
-import { buildSceneImageSearchQueries, scoreImageRelevance, resolveImageSubject } from '../../../shared/eofSceneImageQueries.mjs'
+import {
+  buildSceneImageSearchQueries,
+  scoreImageRelevance,
+  resolveImageSubject,
+  anchorSceneImageQuery,
+} from '../../../shared/eofSceneImageQueries.mjs'
 import {
   isPinterestPinUrl,
   fetchPinterestPinImage,
@@ -178,11 +183,12 @@ const IMAGE_ROTATE_MAX_TRIES = 8
  * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
  * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
  * record what was used and avoid it next time.
- * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string } | null }} opts
+ * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string } | null }} opts
  */
 export async function fetchEofSceneImage({
   imageQuery,
   topic,
+  caption = '',
   outPath,
   index = 0,
   refresh = false,
@@ -205,8 +211,14 @@ export async function fetchEofSceneImage({
 
   const pexelsKey = (process.env.PEXELS_API_KEY || process.env.EOF_PEXELS_API_KEY || '').trim()
   const pinterestToken = getEofPinterestAccessToken()
-  const queries = buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex: index })
-  const custom = String(imageQuery || '').trim()
+  const anchoredQuery = anchorSceneImageQuery({
+    topic,
+    imageQuery,
+    caption,
+    sceneIndex: index,
+  })
+  const queries = buildSceneImageSearchQueries({ topic, imageQuery: anchoredQuery, sceneIndex: index })
+  const custom = String(anchoredQuery || '').trim()
 
   const avoid = new Set((avoidKeys || []).filter(Boolean))
   const rot = Math.max(0, Number(attempt) || 0)
@@ -269,14 +281,18 @@ export async function fetchEofSceneImage({
         claimed: oxyPool.claimed || (oxyPool.claimed = new Set()),
         avoidKeys: avoid,
         index: index + attempt + t,
+        topic,
+        imageQuery: anchoredQuery,
+        caption,
       })
       if (!claimed) break
+      // Score the TITLE for the scene — job query alone must not rubber-stamp weak stills.
       const score = scoreImageRelevance(
-        topic || claimed.title || '',
-        `${claimed.title || ''} ${oxyPool.query || imageQuery || ''}`.trim(),
-        imageQuery || oxyPool.query || '',
+        topic || anchoredQuery || '',
+        claimed.title || '',
+        anchoredQuery || caption || '',
       )
-      if (score < 3) {
+      if (score < 2 && claimed.title) {
         // Release so another scene can try a better-titled hit.
         oxyPool.claimed?.delete?.(claimed.key)
         continue
@@ -285,10 +301,11 @@ export async function fetchEofSceneImage({
         return {
           path: outPath,
           source: 'oxylabs',
-          imageQuery: oxyPool.query || imageQuery,
+          imageQuery: anchoredQuery || oxyPool.query || imageQuery,
           imageTitle: claimed.title,
           relevance: score,
           imageKey: claimed.key,
+          sceneScore: claimed.sceneScore,
         }
       }
       // Keep claimed on download failure — don't burn retries on a dead URL.

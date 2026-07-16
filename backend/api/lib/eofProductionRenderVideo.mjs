@@ -205,6 +205,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageMeta = await fetchEofSceneImage({
           topic: job.topic,
           imageQuery: row.imageQuery,
+          caption: row.caption,
           outPath: imagePath,
           index: row.index,
           refresh: true,
