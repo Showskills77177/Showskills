@@ -115,6 +115,9 @@ describe('eofSceneImageQueries', () => {
   it('resolves Rooney topics to Wayne Rooney and keeps career match photos', () => {
     assert.equal(resolveImageSubject('Rooney returns to Old Trafford'), 'Wayne Rooney')
     assert.equal(resolveImageSubject('Wayne Rooney Everton legend'), 'Wayne Rooney')
+    // Lead speaker wins over a secondary star named later in the headline.
+    assert.equal(resolveImageSubject('Rooney on Ronaldo service'), 'Wayne Rooney')
+    assert.equal(resolveImageSubject('Wayne Rooney says Ronaldo is the problem'), 'Wayne Rooney')
     const career = scoreImageRelevance(
       'Wayne Rooney',
       'Wayne Rooney Manchester United Champions League final 2008',

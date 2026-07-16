@@ -145,28 +145,58 @@ const COMP_WORD_RE =
   /^(world|cup|champions|league|premier|liga|serie|bundesliga|ligue|euro|euros|copa|america|américa|nations|fifa|uefa|afcon|final|finals|qualifier|qualifiers|group|match|game|news|latest|breaking|update)$/i
 
 /**
+ * Expand a multi-word entity to a known full name when any token matches.
+ * @param {string} entity
+ * @returns {string}
+ */
+function expandEntityFullName(entity) {
+  const e = String(entity || '').trim()
+  if (!e) return ''
+  for (const w of e.split(/\s+/)) {
+    const full = expandPlayerFullName(w)
+    if (full) return full
+  }
+  if (KNOWN_PLAYER_RE.test(e) || KNOWN_COACH_RE.test(e)) {
+    return e
+      .split(/\s+/)
+      .filter((w) => !COMP_WORD_RE.test(w) && !NAME_BREAK_RE.test(w))
+      .join(' ')
+      .trim()
+  }
+  return ''
+}
+
+/**
  * The single best image subject for a topic — a known player/coach full name when possible,
  * with competition noise (World Cup, Champions League, …) stripped so photo search stays on the person.
+ * When two stars appear (Rooney on Ronaldo), prefer the name that appears first in the topic —
+ * not whichever mononym ranks higher in the entity sort.
  * @param {string} topic
  * @returns {string}
  */
 export function resolveImageSubject(topic) {
   const cleaned = sanitizeTopicForImageSearch(topic)
   const entities = primaryImageEntities(cleaned)
+  const hay = cleaned.toLowerCase()
+
+  /** @type {{ full: string, at: number }[]} */
+  const named = []
   for (const e of entities) {
-    for (const w of e.split(/\s+/)) {
-      const full = expandPlayerFullName(w)
-      if (full) return full
+    const full = expandEntityFullName(e)
+    if (!full) continue
+    const needle = String(e).toLowerCase()
+    let at = hay.indexOf(needle)
+    if (at < 0) {
+      // Fall back to first token position (e.g. entity "Ronaldo" in "Rooney on Ronaldo")
+      const firstTok = needle.split(/\s+/)[0] || needle
+      at = hay.indexOf(firstTok)
     }
-    if (KNOWN_PLAYER_RE.test(e) || KNOWN_COACH_RE.test(e)) {
-      const cleanedEnt = e
-        .split(/\s+/)
-        .filter((w) => !COMP_WORD_RE.test(w) && !NAME_BREAK_RE.test(w))
-        .join(' ')
-        .trim()
-      if (cleanedEnt) return cleanedEnt
-    }
+    if (at < 0) at = 9999
+    named.push({ full, at })
   }
+  named.sort((a, b) => a.at - b.at || b.full.length - a.full.length)
+  if (named[0]?.full) return named[0].full
+
   const first = entities[0] || cleaned || String(topic || '').trim()
   const cleanedEnt = first
     .split(/\s+/)
