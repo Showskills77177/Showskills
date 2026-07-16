@@ -258,6 +258,31 @@ export async function startApplyEofProductionZapcapBackground(jobId) {
 
 /** @param {string} jobId */
 export async function startEofProductionVideoRenderBackground(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+
+  const sceneCount = job.script?.scenes?.length || 5
+  const startedAt = new Date().toISOString()
+  const estimatedTotalSec = estimateEofVideoRenderDurationSec(sceneCount)
+
+  // Claim the job immediately so a second Rebuild click cannot share the same workDir/tmp.
+  await updateEofProductionJob(jobId, {
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+    errorMessage: null,
+  })
+  await updateEofProductionRenderProgress(
+    jobId,
+    buildEofRenderProgress({
+      stage: 'images',
+      sceneIndex: 0,
+      sceneCount,
+      startedAt,
+      estimatedTotalSec,
+      pipeline: 'video',
+      message: 'Refreshing images…',
+    }),
+  )
+
   const run = () =>
     renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,

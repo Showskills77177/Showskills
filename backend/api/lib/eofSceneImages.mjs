@@ -18,7 +18,11 @@ import {
   searchApMediaPicture,
   downloadApRenditionToFile,
 } from './eofApImages.mjs'
-import { isEofOxylabsConfigured, searchOxylabsGoogleImage } from './eofOxylabsImages.mjs'
+import {
+  isEofOxylabsConfigured,
+  searchOxylabsGoogleImages,
+  listOxylabsImageCandidates,
+} from './eofOxylabsImages.mjs'
 
 const PALETTES = ['0x1e3a5f', '0x1a4d3e', '0x3d2a1a', '0x2a1f4d', '0x4a1f2a']
 
@@ -166,7 +170,8 @@ async function writeLabeledPlaceholder({ outPath, color, label }) {
 
 /** Coprime with common page sizes (10/12/15) so each rotation lands on a new candidate. */
 const IMAGE_ROTATE_STRIDE = 7
-const IMAGE_ROTATE_MAX_TRIES = 4
+/** Extra probe slots for AP/CSE/Pexels when avoid history is large (Oxylabs walks its full SERP pool). */
+const IMAGE_ROTATE_MAX_TRIES = 8
 
 /**
  * Fetch one scene image. On a rebuild, pass `attempt` (rotation count) and `avoidKeys`
@@ -258,27 +263,45 @@ export async function fetchEofSceneImage({
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
-    // Oxylabs Google Images — primary (why we pay for scrape access)
+    // Oxylabs Google Images — primary. ONE billable SERP call per query, then walk the hit
+    // pool skipping avoidKeys (rebuilds 2…N) until a fresh URL downloads.
     if (isEofOxylabsConfigured()) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchOxylabsGoogleImage(query, eff)
-        if (!hit) return null
-        // SERP titles are often thin — score against query text so we don't reject good stills.
-        const score = scoreImageRelevance(topic || query, hit.title || query, query)
-        if (score < 3) return null
-        return {
-          key: `oxylabs:${hit.imgUrl}`,
-          meta: {
-            path: outPath,
-            source: 'oxylabs',
-            imageQuery: query,
-            imageTitle: hit.title,
-            relevance: score,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
+      try {
+        const hits = await searchOxylabsGoogleImages(query, { limit: 20 })
+        const startIndex = effIndex(0)
+        const candidates = listOxylabsImageCandidates(hits, {
+          index: startIndex,
+          avoidUrls: avoid,
+        })
+        let fallbackDup = null
+        for (const hit of candidates) {
+          // SERP titles are often thin — score against query text so we don't reject good stills.
+          const score = scoreImageRelevance(topic || query, hit.title || query, query)
+          if (score < 3) continue
+          const key = `oxylabs:${hit.imgUrl}`
+          const cand = {
+            key,
+            meta: {
+              path: outPath,
+              source: 'oxylabs',
+              imageQuery: query,
+              imageTitle: hit.title,
+              relevance: score,
+            },
+            download: () => downloadImageToFile(hit.imgUrl, outPath),
+          }
+          if (hit.reused || avoid.has(key)) {
+            if (!fallbackDup) fallbackDup = cand
+            continue
+          }
+          if (await cand.download()) return { ...cand.meta, imageKey: cand.key }
         }
-      })
-      if (meta) return meta
+        if (fallbackDup && (await fallbackDup.download())) {
+          return { ...fallbackDup.meta, imageKey: fallbackDup.key }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] oxylabs pool failed', e instanceof Error ? e.message : e)
+      }
     }
 
     // AP editorial — licensed breaking-news stills when keyed

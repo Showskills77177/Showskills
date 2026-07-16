@@ -23,9 +23,34 @@ import {
   persistEofVideoArtifact,
   saveEofSceneImagesArtifact,
   ensureEofSceneImageOnDisk,
+  clearEofVideoArtifact,
+  clearEofVideoOnlyArtifact,
 } from './eofProductionArtifacts.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
+/** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
+export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
+
+/** Append a used image key; newest last, capped for durable narrationManifest size. */
+export function appendEofImageKeyHistory(priorHistory, imageKey, limit = EOF_IMAGE_KEY_HISTORY_LIMIT) {
+  const prior = Array.isArray(priorHistory) ? priorHistory.filter(Boolean) : []
+  const key = String(imageKey || '').trim()
+  if (!key) return prior.slice(-Math.max(1, limit))
+  return [...prior.filter((k) => k !== key), key].slice(-Math.max(1, Number(limit) || EOF_IMAGE_KEY_HISTORY_LIMIT))
+}
+
+/**
+ * After encode: require durable video_base64 (or fail the job — never leave video_rendered empty).
+ * @param {{ saved?: boolean, bytes?: number, recompressed?: boolean }} persisted
+ */
+export function assertEofVideoPersisted(persisted) {
+  if (persisted?.saved) return persisted
+  const bytes = Number(persisted?.bytes) || 0
+  const mb = (bytes / (1024 * 1024)).toFixed(1)
+  throw new Error(
+    `Short rendered but could not be stored for preview (${mb}MB after compression). Rebuild video, or shorten the voiceover.`,
+  )
+}
 
 /**
  * Build 9:16 Short MP4 from script scenes: stock images + on-screen captions.
@@ -83,10 +108,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   }
 
   try {
-    await report(reuseSceneImages ? 'video' : 'images', 0, { force: true })
-    if (!reuseSceneImages) {
+    // Drop prior durable MP4 (and stills when refreshing) so a failed rebuild cannot leave
+    // status=video_rendered with an empty/stale video_base64 from a half-written path.
+    if (reuseSceneImages) {
+      await clearEofVideoOnlyArtifact(jobId).catch(() => {})
+    } else {
+      await clearEofVideoArtifact(jobId).catch(() => {})
       clearEofSceneImageCache(workDir)
     }
+
+    await report(reuseSceneImages ? 'video' : 'images', 0, { force: true })
 
     const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
     const rows = scriptScenes.map((s, i) => {
@@ -166,7 +197,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageKey = imageMeta.imageKey || null
         // Track real (non-placeholder) keys so repeated rebuilds keep trying new photos.
         if (imageKey && imageMeta.source !== 'placeholder' && imageMeta.source !== 'placeholder-no-image-keys') {
-          imageKeyHistory = [...priorHistory.filter((k) => k !== imageKey), imageKey].slice(-8)
+          imageKeyHistory = appendEofImageKeyHistory(priorHistory, imageKey)
         }
       }
       imagesDone += 1
@@ -252,19 +283,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
 
     const videoAbs = eofProductionVideoAbsPath(jobId)
     await saveEofSceneImagesArtifact(jobId, workDir)
-    const persisted = await persistEofVideoArtifact(jobId, videoAbs)
-    if (!persisted.saved) {
-      const mb = (persisted.bytes / (1024 * 1024)).toFixed(1)
-      throw new Error(
-        `Short rendered but could not be stored for preview (${mb}MB after compression). Rebuild video, or shorten the voiceover.`,
-      )
-    }
+    const persisted = assertEofVideoPersisted(await persistEofVideoArtifact(jobId, videoAbs))
     if (persisted.recompressed) {
       console.info(
         `[eof-production] stored compressed Short for job ${jobId} (${persisted.bytes} bytes)`,
       )
     }
 
+    // Only mark video_rendered after durable base64 is stored (assert above throws otherwise).
     return updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED,
       renderOutputPath: relPath,

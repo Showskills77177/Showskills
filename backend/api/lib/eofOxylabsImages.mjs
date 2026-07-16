@@ -216,25 +216,122 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
 }
 
 /**
+ * Rotate the SERP list so rebuild `attempt` / scene index lands on a different start slot.
+ * @param {Array<{ url: string, width?: number, height?: number, title?: string|null }>} hits
+ * @param {number} [index]
+ */
+export function orderOxylabsHitsForRotation(hits, index = 0) {
+  if (!Array.isArray(hits) || !hits.length) return []
+  const pick = Math.max(0, Number(index) || 0) % hits.length
+  return [...hits.slice(pick), ...hits.slice(0, pick)]
+}
+
+/**
+ * Pick the next unused Oxylabs hit from a single SERP pool (no extra API calls).
+ * Skips URLs in `avoidUrls` / `oxylabs:` keys; falls back to the first avoided hit only
+ * when every candidate was already used (so rebuilds never return empty when SERP has rows).
+ *
+ * @param {Array<{ url: string, width?: number, height?: number, title?: string|null }>} hits
+ * @param {{ index?: number, avoidUrls?: Iterable<string> }} [opts]
+ * @returns {{ imgUrl: string, title: string|null, width?: number, height?: number, reused: boolean } | null}
+ */
+export function pickOxylabsImageFromHits(hits, opts = {}) {
+  const ordered = orderOxylabsHitsForRotation(hits, opts.index)
+  if (!ordered.length) return null
+
+  const avoid = new Set()
+  for (const raw of opts.avoidUrls || []) {
+    const k = String(raw || '').trim()
+    if (!k) continue
+    avoid.add(k)
+    if (k.startsWith('oxylabs:')) avoid.add(k.slice('oxylabs:'.length))
+    else avoid.add(`oxylabs:${k}`)
+  }
+
+  let fallback = null
+  for (const hit of ordered) {
+    const url = String(hit?.url || '').trim()
+    if (!url) continue
+    const reused = avoid.has(url) || avoid.has(`oxylabs:${url}`)
+    if (reused) {
+      if (!fallback) fallback = hit
+      continue
+    }
+    return {
+      imgUrl: url,
+      title: hit.title || null,
+      width: hit.width,
+      height: hit.height,
+      reused: false,
+    }
+  }
+  if (!fallback?.url) return null
+  return {
+    imgUrl: String(fallback.url).trim(),
+    title: fallback.title || null,
+    width: fallback.width,
+    height: fallback.height,
+    reused: true,
+  }
+}
+
+/**
+ * Enumerate Oxylabs hits for download attempts: fresh URLs first (rotated), then avoided as last resort.
+ * @param {Array<{ url: string, width?: number, height?: number, title?: string|null }>} hits
+ * @param {{ index?: number, avoidUrls?: Iterable<string> }} [opts]
+ * @returns {Array<{ imgUrl: string, title: string|null, width?: number, height?: number, reused: boolean }>}
+ */
+export function listOxylabsImageCandidates(hits, opts = {}) {
+  const ordered = orderOxylabsHitsForRotation(hits, opts.index)
+  if (!ordered.length) return []
+
+  const avoid = new Set()
+  for (const raw of opts.avoidUrls || []) {
+    const k = String(raw || '').trim()
+    if (!k) continue
+    avoid.add(k)
+    if (k.startsWith('oxylabs:')) avoid.add(k.slice('oxylabs:'.length))
+    else avoid.add(`oxylabs:${k}`)
+  }
+
+  const fresh = []
+  const reused = []
+  for (const hit of ordered) {
+    const url = String(hit?.url || '').trim()
+    if (!url) continue
+    const row = {
+      imgUrl: url,
+      title: hit.title || null,
+      width: hit.width,
+      height: hit.height,
+      reused: avoid.has(url) || avoid.has(`oxylabs:${url}`),
+    }
+    if (row.reused) reused.push(row)
+    else fresh.push(row)
+  }
+  return [...fresh, ...reused]
+}
+
+/**
  * Pick one image for a scene index (rotation-friendly), with title for relevance scoring.
+ * One billable SERP call; walks the hit list skipping avoided URLs when provided.
  * @param {string} query
  * @param {number} index
- * @param {{ signal?: AbortSignal }} [opts]
+ * @param {{ signal?: AbortSignal, avoidUrls?: Iterable<string> }} [opts]
  */
 export async function searchOxylabsGoogleImage(query, index = 0, opts = {}) {
   const hits = await searchOxylabsGoogleImages(query, { limit: 20, signal: opts.signal })
   if (!hits.length) return null
-  const pick = Math.max(0, Number(index) || 0) % hits.length
-  const ordered = [...hits.slice(pick), ...hits.slice(0, pick)]
-  const hit = ordered[0]
-  if (!hit) return null
+  const picked = pickOxylabsImageFromHits(hits, { index, avoidUrls: opts.avoidUrls })
+  if (!picked) return null
   return {
-    imgUrl: hit.url,
-    title: hit.title || null,
-    width: hit.width,
-    height: hit.height,
+    imgUrl: picked.imgUrl,
+    title: picked.title || null,
+    width: picked.width,
+    height: picked.height,
     queryUsed: query,
     source: 'oxylabs',
+    reused: picked.reused,
   }
 }
 

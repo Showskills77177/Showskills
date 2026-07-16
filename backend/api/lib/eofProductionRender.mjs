@@ -146,6 +146,16 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
           typeof ttsResult === 'object' && ttsResult.requestId ? ttsResult.requestId : prior?.elevenLabsRequestId || null,
         imageSource: prior?.imageSource || null,
         imageQueryUsed: prior?.imageQueryUsed || scene.imageQuery,
+        // Keep rotation memory across voiceover remux / full builds so Rebuild still avoids recent stills.
+        imageKey: prior?.imageKey || null,
+        imageAttempt: Number(prior?.imageAttempt) || 0,
+        imageKeyHistory: Array.isArray(prior?.imageKeyHistory)
+          ? prior.imageKeyHistory.filter(Boolean)
+          : prior?.imageKey
+            ? [prior.imageKey]
+            : [],
+        imageTitle: prior?.imageTitle || null,
+        imageYear: prior?.imageYear || null,
       }
     })
 
