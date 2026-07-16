@@ -453,18 +453,20 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
 /**
  * Claim a unique URL from a shared job pool (safe under scene concurrency).
  * Prefers the best title match for this scene’s topic/imageQuery/caption, not blind rotation.
- * @param {{ hits: Array<{ url: string, title?: string|null, width?: number, height?: number }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number, topic?: string, imageQuery?: string, caption?: string }} opts
+ * @param {{ hits: Array<{ url: string, title?: string|null, width?: number, height?: number }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number, topic?: string, imageQuery?: string, caption?: string, keyPrefix?: string }} opts
  */
 export function claimOxylabsPoolHit(opts = {}) {
   const hits = Array.isArray(opts.hits) ? opts.hits : []
   const claimed = opts.claimed instanceof Set ? opts.claimed : new Set()
+  const prefix = String(opts.keyPrefix || 'oxylabs').trim() || 'oxylabs'
+  const prefixTag = `${prefix}:`
   const avoid = new Set()
   for (const raw of opts.avoidKeys || []) {
     const k = String(raw || '').trim()
     if (!k) continue
     avoid.add(k)
-    if (k.startsWith('oxylabs:')) avoid.add(k.slice('oxylabs:'.length))
-    else avoid.add(`oxylabs:${k}`)
+    if (k.startsWith(prefixTag)) avoid.add(k.slice(prefixTag.length))
+    else avoid.add(`${prefixTag}${k}`)
   }
 
   const scene = {
@@ -476,7 +478,7 @@ export function claimOxylabsPoolHit(opts = {}) {
     .map((hit, i) => ({
       hit,
       url: String(hit?.url || '').trim(),
-      key: `oxylabs:${String(hit?.url || '').trim()}`,
+      key: `${prefixTag}${String(hit?.url || '').trim()}`,
       score: scoreOxylabsHitForScene(hit, scene),
       // Tiny index bias so rebuilds still diversify when scores tie.
       tie: (i + Math.max(0, Number(opts.index) || 0)) % Math.max(1, hits.length),

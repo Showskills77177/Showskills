@@ -24,6 +24,7 @@ import {
   downloadApRenditionToFile,
 } from './eofApImages.mjs'
 import { isEofOxylabsConfigured, claimOxylabsPoolHit } from './eofOxylabsImages.mjs'
+import { isEofSerpApiConfigured } from './eofSerpApiImages.mjs'
 
 const PALETTES = ['0x1e3a5f', '0x1a4d3e', '0x3d2a1a', '0x2a1f4d', '0x4a1f2a']
 
@@ -34,6 +35,7 @@ export function isEofPexelsConfigured() {
 export function eofImageSourceStatus() {
   return {
     ap: isEofApImagesConfigured(),
+    serpapi: isEofSerpApiConfigured(),
     oxylabs: isEofOxylabsConfigured(),
     google: isEofGoogleCseConfigured(),
     pexels: isEofPexelsConfigured(),
@@ -44,16 +46,19 @@ export function eofImageSourceStatus() {
 }
 
 export function eofImagesConfigurationNote() {
-  const { ap, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
+  const { ap, serpapi, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
+  if (serpapi) {
+    return 'SerpAPI: 1 Google Images search per Short (cheaper primary). Oxylabs/CSE fallback when needed.'
+  }
   if (oxylabs) {
     return 'Oxylabs: 1 search per Short (only as many stills as scenes). Wikimedia last-resort.'
   }
   if (ap || google || pexels || pinterestApi) {
     return pinterestApi && !ap && !google && !pexels
-      ? 'Pinterest token is set, but pin search needs Pinterest app approval. Add Oxylabs for Google Images hit-rate.'
+      ? 'Pinterest token is set, but pin search needs Pinterest app approval. Add SERPAPI_API_KEY or Oxylabs for Google Images hit-rate.'
       : null
   }
-  return 'No Oxylabs/AP/CSE/Pexels keys — falling back to Wikidata + Wikimedia Commons.'
+  return 'No SerpAPI/Oxylabs/AP/CSE/Pexels keys — falling back to Wikidata + Wikimedia Commons.'
 }
 
 function paletteForQuery(query, index) {
@@ -183,7 +188,7 @@ const IMAGE_ROTATE_MAX_TRIES = 8
  * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
  * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
  * record what was used and avoid it next time.
- * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string } | null }} opts
+ * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string, source?: string } | null }} opts
  */
 export async function fetchEofSceneImage({
   imageQuery,
@@ -271,9 +276,10 @@ export async function fetchEofSceneImage({
     }
   }
 
-  // Oxylabs: consume the shared job pool only — NEVER fire a new realtime query per scene.
-  // The job runner spends exactly 1 credit for the whole Short (see fetchEofOxylabsJobPool).
+  // SerpAPI / Oxylabs job pool: consume shared hits only — NEVER fire a new query per scene.
+  // The job runner spends exactly 1 credit for the whole Short.
   if (oxyPool && Array.isArray(oxyPool.hits) && oxyPool.hits.length) {
+    const poolSource = oxyPool.source === 'serpapi' ? 'serpapi' : 'oxylabs'
     const maxDownloadTries = 5
     for (let t = 0; t < maxDownloadTries; t += 1) {
       const claimed = claimOxylabsPoolHit({
@@ -284,6 +290,7 @@ export async function fetchEofSceneImage({
         topic,
         imageQuery: anchoredQuery,
         caption,
+        keyPrefix: poolSource,
       })
       if (!claimed) break
       // Score the TITLE for the scene — job query alone must not rubber-stamp weak stills.
@@ -300,7 +307,7 @@ export async function fetchEofSceneImage({
       if (await downloadImageToFile(claimed.imgUrl, outPath)) {
         return {
           path: outPath,
-          source: 'oxylabs',
+          source: poolSource,
           imageQuery: anchoredQuery || oxyPool.query || imageQuery,
           imageTitle: claimed.title,
           relevance: score,
@@ -312,7 +319,7 @@ export async function fetchEofSceneImage({
     }
   }
 
-  // Search order after Oxylabs pool: AP → CSE → Pexels → Pinterest → Wikimedia last.
+  // Search order after Google Images pool: AP → CSE → Pexels → Pinterest → Wikimedia last.
   // Do NOT short-circuit named people through Wikidata portraits — that was forcing old Commons stills.
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
@@ -466,6 +473,7 @@ export async function fetchEofSceneImage({
 
   const hasAnyKey =
     isEofApImagesConfigured() ||
+    isEofSerpApiConfigured() ||
     isEofOxylabsConfigured() ||
     pexelsKey ||
     pinterestToken ||

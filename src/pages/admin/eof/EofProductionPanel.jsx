@@ -453,6 +453,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [renderStack, setRenderStack] = useState(null)
   const [imageSources, setImageSources] = useState({
     ap: false,
+    serpapi: false,
     oxylabs: false,
     google: false,
     pexels: false,
@@ -462,6 +463,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   })
   const [imagesNote, setImagesNote] = useState('')
   const [pinterestStatus, setPinterestStatus] = useState(null)
+  const [serpapiStatus, setSerpapiStatus] = useState(null)
   const [oxylabsStatus, setOxylabsStatus] = useState(null)
   const [progressTick, setProgressTick] = useState(0)
   const [deletingId, setDeletingId] = useState(null)
@@ -535,6 +537,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           ? j.imageSources
           : {
               ap: false,
+              serpapi: false,
               oxylabs: false,
               google: false,
               pexels: Boolean(j.pexelsConfigured),
@@ -545,6 +548,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
       setPinterestStatus(j.pinterest && typeof j.pinterest === 'object' ? j.pinterest : null)
+      setSerpapiStatus(j.serpapi && typeof j.serpapi === 'object' ? j.serpapi : null)
       setOxylabsStatus(j.oxylabs && typeof j.oxylabs === 'object' ? j.oxylabs : null)
       setRenderStack(j.renderStack || null)
     } catch (e) {
@@ -1757,6 +1761,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               Images:{' '}
               {[
                 imageSources.ap && 'AP (latest first)',
+                imageSources.serpapi && 'SerpAPI',
                 imageSources.oxylabs && 'Oxylabs',
                 imageSources.google && 'Google',
                 imageSources.pexels && 'Pexels',
@@ -1767,6 +1772,29 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 .join(' · ')}
             </p>
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
+            {serpapiStatus?.configured ? (
+              <p className={serpapiStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
+                SerpAPI:{' '}
+                {serpapiStatus.ok
+                  ? `ready${serpapiStatus.detail ? ` — ${String(serpapiStatus.detail).slice(0, 60)}` : ''}`
+                  : `check failed (${serpapiStatus.status || 'error'}${
+                      serpapiStatus.detail ? `: ${String(serpapiStatus.detail).slice(0, 80)}` : ''
+                    })`}
+              </p>
+            ) : (
+              <p className="text-[#8a8a8a]">
+                SerpAPI: not set — add <code className="text-[#aaa]">SERPAPI_API_KEY</code> (from{' '}
+                <a
+                  className="text-[#8ab4f8] underline"
+                  href="https://serpapi.com/manage-api-key"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  serpapi.com/manage-api-key
+                </a>
+                ) and redeploy.
+              </p>
+            )}
             {oxylabsStatus?.configured ? (
               <p className={oxylabsStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
                 Oxylabs:{' '}

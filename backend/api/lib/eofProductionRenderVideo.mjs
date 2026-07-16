@@ -16,6 +16,7 @@ import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
 import { isEofOxylabsConfigured, fetchEofOxylabsJobPool } from './eofOxylabsImages.mjs'
+import { isEofSerpApiConfigured, fetchEofSerpApiJobPool } from './eofSerpApiImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
@@ -135,39 +136,67 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     })
 
     let imagesDone = 0
-    // Oxylabs: exactly ONE billable Google Images query for the whole Short.
-    // All scenes share that SERP pool (7 scenes ≠ 7 credits).
+    // Google Images pool: exactly ONE billable query for the whole Short.
+    // Prefer SerpAPI (cheaper) → Oxylabs → per-scene CSE/AP later. 7 scenes ≠ 7 credits.
     let oxyPool = null
     let wikiPool = []
-    if (!reuseSceneImages && isEofOxylabsConfigured()) {
-      try {
-        const maxAttempt = Math.max(
-          0,
-          ...priorManifest.map((m) => Number(m?.imageAttempt) || 0),
-        )
-        const pool = await fetchEofOxylabsJobPool({
-          topic: job.topic,
-          sceneCount: rows.length,
-          attempt: maxAttempt,
-        })
-        oxyPool = { query: pool.query, hits: pool.hits, claimed: new Set() }
-      } catch (e) {
-        console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
-        oxyPool = null
+    if (!reuseSceneImages) {
+      const maxAttempt = Math.max(
+        0,
+        ...priorManifest.map((m) => Number(m?.imageAttempt) || 0),
+      )
+      if (isEofSerpApiConfigured()) {
+        try {
+          const pool = await fetchEofSerpApiJobPool({
+            topic: job.topic,
+            sceneCount: rows.length,
+            attempt: maxAttempt,
+          })
+          if (pool.hits?.length) {
+            oxyPool = {
+              query: pool.query,
+              hits: pool.hits,
+              claimed: new Set(),
+              source: 'serpapi',
+            }
+          }
+        } catch (e) {
+          console.warn('[eof-video] serpapi job pool failed', e instanceof Error ? e.message : e)
+          oxyPool = null
+        }
       }
-    } else if (!reuseSceneImages) {
-      // Wikidata only when Oxylabs is not configured.
-      try {
-        wikiPool = await listWikimediaPersonImages(job.topic, {
-          limit: Math.max(8, rows.length + 3),
-        })
-      } catch (e) {
-        console.warn(
-          '[eof-video] wikimedia person pool failed',
-          job.topic,
-          e instanceof Error ? e.message : e,
-        )
-        wikiPool = []
+      if (!oxyPool?.hits?.length && isEofOxylabsConfigured()) {
+        try {
+          const pool = await fetchEofOxylabsJobPool({
+            topic: job.topic,
+            sceneCount: rows.length,
+            attempt: maxAttempt,
+          })
+          oxyPool = {
+            query: pool.query,
+            hits: pool.hits,
+            claimed: new Set(),
+            source: 'oxylabs',
+          }
+        } catch (e) {
+          console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
+          oxyPool = null
+        }
+      }
+      if (!oxyPool?.hits?.length) {
+        // Wikidata only when no Google Images job pool is available.
+        try {
+          wikiPool = await listWikimediaPersonImages(job.topic, {
+            limit: Math.max(8, rows.length + 3),
+          })
+        } catch (e) {
+          console.warn(
+            '[eof-video] wikimedia person pool failed',
+            job.topic,
+            e instanceof Error ? e.message : e,
+          )
+          wikiPool = []
+        }
       }
     }
 

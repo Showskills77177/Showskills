@@ -31,6 +31,7 @@ import {
 import { eofCaptionEngineStatus, listZapcapTemplates } from '../lib/eofZapcapCaptions.mjs'
 import { probeEofPinterestApi } from '../lib/eofPinterestImages.mjs'
 import { probeEofOxylabsApi } from '../lib/eofOxylabsImages.mjs'
+import { probeEofSerpApi } from '../lib/eofSerpApiImages.mjs'
 import {
   EOF_DEFAULT_CAPTION_STYLE,
   listEofCaptionStyles,
@@ -134,6 +135,12 @@ export default async function handler(req, res) {
         detail: e instanceof Error ? e.message : String(e),
       }))
 
+      const serpapiProbe = await probeEofSerpApi().catch((e) => ({
+        configured: false,
+        ok: false,
+        detail: e instanceof Error ? e.message : String(e),
+      }))
+
       let tracks = []
       try {
         tracks = await ensureEofMusicCatalogSeeded()
@@ -206,6 +213,7 @@ export default async function handler(req, res) {
         imageSources: eofImageSourceStatus(),
         imagesNote: eofImagesConfigurationNote(),
         pinterest: pinterestProbe,
+        serpapi: serpapiProbe,
         oxylabs: oxylabsProbe,
         renderStack: EOF_RENDER_STACK,
         session: info,
