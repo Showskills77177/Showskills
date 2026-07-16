@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
-import { buildSceneImageSearchQueries, scoreImageRelevance } from '../../../shared/eofSceneImageQueries.mjs'
+import { buildSceneImageSearchQueries, scoreImageRelevance, resolveImageSubject } from '../../../shared/eofSceneImageQueries.mjs'
 import {
   isPinterestPinUrl,
   fetchPinterestPinImage,
@@ -38,11 +38,12 @@ export function eofImageSourceStatus() {
 
 export function eofImagesConfigurationNote() {
   const { ap, google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (pinterestApi) {
-    return 'Pinterest token detected — Rebuild video will search Pinterest (partner catalog, then your account pins) for topic photos.'
+  if (ap || google || pexels || pinterestApi) {
+    return pinterestApi && !ap && !google && !pexels
+      ? 'Pinterest token is set, but pin search needs Pinterest app approval — named people use Wikidata/Commons portraits first.'
+      : null
   }
-  if (ap || google || pexels) return null
-  return 'Using free Wikimedia Commons images. Add PINTEREST_ACCESS_TOKEN (or AP_MEDIA_API_KEY / PEXELS / Google CSE) for better topic photos.'
+  return 'Using Wikidata + Wikimedia Commons for named players/coaches (current portraits preferred). Add AP/PEXELS keys for broader coverage.'
 }
 
 function paletteForQuery(query, index) {
@@ -225,10 +226,53 @@ export async function fetchEofSceneImage({
     }
   }
 
+  // Named person/coach first: Wikidata P18 + recent Commons category.
+  // Do this BEFORE Pinterest/Pexels so Rebuild doesn't burn time on broken tokens
+  // or land on old stock while a current Wikidata portrait exists.
+  const subject = resolveImageSubject(topic || custom)
+  if (subject && subject !== 'football') {
+    let fallbackDup = null
+    for (let t = 0; t < tries; t += 1) {
+      let cand = null
+      try {
+        const hit = await searchWikimediaCommonsImages(subject, index, {
+          topic: topic || subject,
+          rotate: rot + t,
+        })
+        if (hit && (hit.relevance ?? 0) >= 6) {
+          cand = {
+            key: `wiki:${hit.title || hit.imgUrl}`,
+            meta: {
+              path: outPath,
+              source: 'wikimedia',
+              imageQuery: hit.queryUsed || subject,
+              imageTitle: hit.title,
+              relevance: hit.relevance,
+              imageYear: hit.year || null,
+              wikiDetail: hit.sourceDetail || null,
+            },
+            download: () => downloadImageToFile(hit.imgUrl, outPath),
+          }
+        }
+      } catch (e) {
+        console.warn('[eof-scene-images] wikimedia probe failed', e instanceof Error ? e.message : e)
+      }
+      if (!cand) continue
+      if (avoid.has(cand.key)) {
+        if (!fallbackDup) fallbackDup = cand
+        continue
+      }
+      if (await cand.download()) return { ...cand.meta, imageKey: cand.key }
+    }
+    if (fallbackDup && (await fallbackDup.download())) {
+      return { ...fallbackDup.meta, imageKey: fallbackDup.key }
+    }
+  }
+
   for (const query of queries) {
     if (isPinterestPinUrl(query)) continue
 
-    // AP editorial first — newest-first + topic-ranked (best for “latest Tuchel” etc.)
+    // AP editorial — newest-first + topic-ranked (best for breaking news stills)
     if (isEofApImagesConfigured()) {
       const meta = await rotateSource(async (eff) => {
         const hit = await searchApMediaPicture(query, eff, { topic })
@@ -255,7 +299,7 @@ export async function fetchEofSceneImage({
       if (meta) return meta
     }
 
-    // Pinterest next when a token is set — partner catalog, then account pins
+    // Pinterest — only if token present (often unauthorized for catalog search)
     if (pinterestToken) {
       const meta = await rotateSource(async (eff) => {
         const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
@@ -322,32 +366,45 @@ export async function fetchEofSceneImage({
       })
       if (meta) return meta
     }
+  }
 
-    // Free keyless fallback — Wikidata identity + ranked Commons (prefers current portraits)
-    {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchWikimediaCommonsImages(query, eff, { topic })
-        if (!hit) return null
-        const score =
-          typeof hit.relevance === 'number'
-            ? hit.relevance
-            : scoreImageRelevance(topic || query, hit.title || '', query)
-        if (score < 6) return null
-        return {
-          key: `wiki:${hit.title || hit.imgUrl}`,
-          meta: {
-            path: outPath,
-            source: 'wikimedia',
-            imageQuery: query,
-            imageTitle: hit.title,
-            relevance: score,
-            imageYear: hit.year || null,
-            wikiDetail: hit.sourceDetail || null,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
+  // Last resort: Wikimedia search even without a clean subject resolve
+  {
+    let fallbackDup = null
+    for (let t = 0; t < tries; t += 1) {
+      let cand = null
+      try {
+        const hit = await searchWikimediaCommonsImages(queries[0] || topic || 'football', index, {
+          topic,
+          rotate: rot + t,
+        })
+        if (hit && (hit.relevance ?? 0) >= 6) {
+          cand = {
+            key: `wiki:${hit.title || hit.imgUrl}`,
+            meta: {
+              path: outPath,
+              source: 'wikimedia',
+              imageQuery: hit.queryUsed || queries[0],
+              imageTitle: hit.title,
+              relevance: hit.relevance,
+              imageYear: hit.year || null,
+              wikiDetail: hit.sourceDetail || null,
+            },
+            download: () => downloadImageToFile(hit.imgUrl, outPath),
+          }
         }
-      })
-      if (meta) return meta
+      } catch (e) {
+        console.warn('[eof-scene-images] wikimedia fallback failed', e instanceof Error ? e.message : e)
+      }
+      if (!cand) continue
+      if (avoid.has(cand.key)) {
+        if (!fallbackDup) fallbackDup = cand
+        continue
+      }
+      if (await cand.download()) return { ...cand.meta, imageKey: cand.key }
+    }
+    if (fallbackDup && (await fallbackDup.download())) {
+      return { ...fallbackDup.meta, imageKey: fallbackDup.key }
     }
   }
 

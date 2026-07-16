@@ -157,6 +157,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageKey,
         imageAttempt,
         imageKeyHistory,
+        imageTitle: imageMeta.imageTitle || imageMeta.pinTitle || null,
+        imageYear: imageMeta.imageYear || null,
       }
     })
 
@@ -192,6 +194,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageKey: videoScene?.imageKey ?? null,
         imageAttempt: videoScene?.imageAttempt ?? 0,
         imageKeyHistory: Array.isArray(videoScene?.imageKeyHistory) ? videoScene.imageKeyHistory : [],
+        imageTitle: videoScene?.imageTitle || null,
+        imageYear: videoScene?.imageYear || null,
       }
     })
 

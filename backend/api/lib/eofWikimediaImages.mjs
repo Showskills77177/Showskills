@@ -255,15 +255,19 @@ function subjectSearchQueries(subject, topic) {
  * Best Commons photo for a football topic/person.
  * Uses Wikidata identity (P18 + category) then ranked Commons search.
  *
+ * Fast path for serverless: if Wikidata gives a strong current portrait + category
+ * stills, return immediately — don't burn the render budget on five extra searches.
+ *
  * @param {string} query
- * @param {number} [index] rotation index (rebuilds pick next-best)
- * @param {{ topic?: string }} [opts]
+ * @param {number} [index] scene index (diverse picks across scenes)
+ * @param {{ topic?: string, rotate?: number }} [opts]
  * @returns {Promise<{ imgUrl: string, title: string, queryUsed: string, relevance: number, year: number, sourceDetail: string } | null>}
  */
 export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) {
   const topic = String(opts.topic || query || '').trim()
   const subject = resolveImageSubject(topic) || String(query || '').trim()
   if (subject.length < 2) return null
+  const rotate = Math.max(0, Number(opts.rotate) || 0)
 
   const byKey = new Map()
   const add = (c, queryUsed, sourceDetail) => {
@@ -281,28 +285,38 @@ export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) 
     if (portrait) add(portrait, `wikidata:${wd.id}`, 'wikidata-p18')
   }
   if (wd?.commonsCategory) {
-    const catFiles = await listCommonsCategoryFiles(wd.commonsCategory, 30)
+    const catFiles = await listCommonsCategoryFiles(wd.commonsCategory, 24)
     for (const f of catFiles) add(f, wd.commonsCategory, 'wikidata-category')
   }
 
-  // 2) Year-biased Commons search (never rely on unranked "Thomas Tuchel" alone)
-  const queries = [
-    ...subjectSearchQueries(subject, topic),
-    String(query || '').trim() && String(query).trim() !== subject ? String(query).trim() : '',
-  ].filter(Boolean)
+  let ranked = preferRecentCandidates(
+    rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
+  )
 
-  for (const q of queries.slice(0, 5)) {
-    const hits = await searchCommonsRaw(q, 20)
-    for (const h of hits) add(h, q, 'commons-search')
+  // 2) Only hit free-text Commons search if identity path didn't yield recent on-topic stills
+  if (ranked.length < 2) {
+    const queries = [
+      ...subjectSearchQueries(subject, topic),
+      String(query || '').trim() && String(query).trim() !== subject ? String(query).trim() : '',
+    ].filter(Boolean)
+
+    for (const q of queries.slice(0, 3)) {
+      const hits = await searchCommonsRaw(q, 16)
+      for (const h of hits) add(h, q, 'commons-search')
+    }
+    ranked = preferRecentCandidates(
+      rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
+    )
   }
 
-  const ranked = rankWikimediaCandidates([...byKey.values()], topic || subject, '')
   if (!ranked.length) {
     console.warn('[eof-wikimedia] no on-topic recent hits for', subject)
     return null
   }
 
-  const pick = ranked[Math.abs(Number(index) || 0) % ranked.length]
+  // Scene index + rebuild rotate → next still in the RECENT ranked list (not stride*7 into old junk)
+  const pickIndex = Math.abs((Number(index) || 0) + rotate) % ranked.length
+  const pick = ranked[pickIndex]
   console.info(
     '[eof-wikimedia] pick',
     pick.title,
@@ -312,7 +326,7 @@ export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) 
     pick.relevance,
     'via',
     pick.sourceDetail,
-    `(${ranked.length} candidates)`,
+    `idx=${pickIndex}/${ranked.length}`,
   )
   return {
     imgUrl: pick.imgUrl,
@@ -322,4 +336,18 @@ export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) 
     year: pick.year || 0,
     sourceDetail: pick.sourceDetail || 'commons',
   }
+}
+
+/**
+ * When current/last-year photos exist, drop older archive shots from the pick pool.
+ * @param {Array<{ year?: number, relevance?: number, title?: string }>} ranked
+ */
+export function preferRecentCandidates(ranked) {
+  if (!Array.isArray(ranked) || ranked.length <= 1) return ranked || []
+  const year = CURRENT_YEAR
+  const veryRecent = ranked.filter((c) => Number(c.year) >= year - 1)
+  if (veryRecent.length) return veryRecent
+  const recent = ranked.filter((c) => Number(c.year) >= year - 3)
+  if (recent.length) return recent
+  return ranked
 }

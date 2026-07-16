@@ -61,4 +61,17 @@ describe('eofWikimediaImages ranking', () => {
     assert.ok(ranked.some((c) => /Tuchel/i.test(c.title)))
     assert.match(ranked[0].title, /2026|England/i)
   })
+
+  it('preferRecentCandidates keeps only current/last-year when available', async () => {
+    const { preferRecentCandidates } = await import('../backend/api/lib/eofWikimediaImages.mjs')
+    const year = new Date().getFullYear()
+    const pool = preferRecentCandidates([
+      { title: 'old', year: year - 5, relevance: 20 },
+      { title: 'current', year, relevance: 30 },
+      { title: 'last', year: year - 1, relevance: 28 },
+      { title: 'club-world-cup', year: year - 5, relevance: 25 },
+    ])
+    assert.equal(pool.length, 2)
+    assert.ok(pool.every((c) => c.year >= year - 1))
+  })
 })
