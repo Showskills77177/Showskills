@@ -54,6 +54,7 @@ async function verifyAgainstEnvPassword(plain) {
 /**
  * Prefer DB hash (password-reset), but fall back to Vercel env password/hash so a
  * forgotten DB password cannot permanently lock out Production ADMIN_PASSWORD.
+ * Deployed via normal GitHub → Vercel main push.
  */
 export async function verifyAdminPassword(plain) {
   const candidate = typeof plain === 'string' ? plain : ''
