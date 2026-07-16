@@ -77,17 +77,21 @@ function looksLikeImageBuffer(buf) {
 
 async function downloadImageToFile(imgUrl, outPath) {
   const headers = {
-    // Wikimedia requires a descriptive UA; generic bots get 403 on upload.wikimedia.org
-    'User-Agent': 'ShowSkillsEOF/1.0 (https://showskills.co.uk; eof-production@showskills.co.uk)',
+    // Browser-like UA — many news CDNs (and Google SERP hosts) reject bot UAs.
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     Accept: 'image/avif,image/webp,image/apng,image/jpeg,image/*,*/*;q=0.8',
   }
   const url = String(imgUrl || '')
   // pinimg CDN often rejects hotlinks without a Pinterest Referer
   if (url.includes('pinimg.com') || url.includes('pinterest.')) {
     headers.Referer = 'https://www.pinterest.com/'
-  }
-  if (url.includes('wikimedia.org') || url.includes('wikipedia.org')) {
+  } else if (url.includes('wikimedia.org') || url.includes('wikipedia.org')) {
     headers.Referer = 'https://commons.wikimedia.org/'
+    headers['User-Agent'] = 'ShowSkillsEOF/1.0 (https://showskills.co.uk; eof-production@showskills.co.uk)'
+  } else {
+    // Oxylabs / Google Images / news wire stills
+    headers.Referer = 'https://www.google.com/'
   }
 
   const tryOnce = async (target) => {
@@ -274,10 +278,18 @@ export async function fetchEofSceneImage({
           avoidUrls: avoid,
         })
         let fallbackDup = null
+        let scored = 0
+        let downloaded = 0
         for (const hit of candidates) {
-          // SERP titles are often thin — score against query text so we don't reject good stills.
-          const score = scoreImageRelevance(topic || query, hit.title || query, query)
+          // Always include the search query in the haystack — Google titles often omit the name
+          // and would hard-reject (-25) against a multi-person topic (e.g. Rooney + Tuchel).
+          const score = scoreImageRelevance(
+            topic || query,
+            `${hit.title || ''} ${query}`.trim(),
+            query,
+          )
           if (score < 3) continue
+          scored += 1
           const key = `oxylabs:${hit.imgUrl}`
           const cand = {
             key,
@@ -294,10 +306,23 @@ export async function fetchEofSceneImage({
             if (!fallbackDup) fallbackDup = cand
             continue
           }
-          if (await cand.download()) return { ...cand.meta, imageKey: cand.key }
+          if (await cand.download()) {
+            downloaded += 1
+            return { ...cand.meta, imageKey: cand.key }
+          }
         }
         if (fallbackDup && (await fallbackDup.download())) {
           return { ...fallbackDup.meta, imageKey: fallbackDup.key }
+        }
+        if (hits.length && !downloaded) {
+          console.warn(
+            '[eof-scene-images] oxylabs returned',
+            hits.length,
+            'hits but none downloaded (scored',
+            scored,
+            ') for',
+            String(query).slice(0, 80),
+          )
         }
       } catch (e) {
         console.warn('[eof-scene-images] oxylabs pool failed', e instanceof Error ? e.message : e)

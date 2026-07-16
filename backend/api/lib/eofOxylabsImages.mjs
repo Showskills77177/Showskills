@@ -187,7 +187,15 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
     if (!res.ok) {
       const body = await res.text().catch(() => '')
       // Never include auth material; body slice only.
-      console.warn('[eof-oxylabs] search failed', res.status, body.slice(0, 180))
+      if (res.status === 401 || res.status === 403) {
+        console.warn(
+          '[eof-oxylabs] auth failed',
+          res.status,
+          '— OXYLABS_USERNAME/PASSWORD rejected by realtime API. Fix credentials on Vercel; scene fetch will fall back to Wikimedia.',
+        )
+      } else {
+        console.warn('[eof-oxylabs] search failed', res.status, body.slice(0, 180))
+      }
       return []
     }
 
@@ -336,12 +344,62 @@ export async function searchOxylabsGoogleImage(query, index = 0, opts = {}) {
 }
 
 /**
- * Lightweight status for Production UI.
- * Does not call Oxylabs (realtime queries are billable) — only checks env presence.
- * @returns {Promise<{ configured: boolean, ok: boolean, detail?: string }>}
+ * Status for Production UI — verifies Basic Auth against realtime API
+ * with a tiny sandbox universal request (not a Google Images bill).
+ * @returns {Promise<{ configured: boolean, ok: boolean, status?: number, detail?: string }>}
  */
 export async function probeEofOxylabsApi() {
   const creds = getOxylabsCredentials()
-  if (!creds) return { configured: false, ok: false, detail: 'OXYLABS_USERNAME / OXYLABS_PASSWORD not set' }
-  return { configured: true, ok: true, detail: 'credentials set (Google Images via realtime API)' }
+  if (!creds) {
+    return { configured: false, ok: false, detail: 'OXYLABS_USERNAME / OXYLABS_PASSWORD not set' }
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 20_000)
+  try {
+    const res = await fetch(OXYLABS_REALTIME_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: basicAuthHeader(creds.username, creds.password),
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        source: 'universal',
+        url: 'https://sandbox.oxylabs.io/',
+      }),
+      signal: controller.signal,
+    })
+    if (res.status === 401 || res.status === 403) {
+      return {
+        configured: true,
+        ok: false,
+        status: res.status,
+        detail: 'Unauthorized — username/password rejected. Re-copy from Oxylabs dashboard into Vercel.',
+      }
+    }
+    if (!res.ok) {
+      return {
+        configured: true,
+        ok: false,
+        status: res.status,
+        detail: `API error HTTP ${res.status}`,
+      }
+    }
+    return {
+      configured: true,
+      ok: true,
+      status: res.status,
+      detail: 'auth ok (Google Images ready)',
+    }
+  } catch (e) {
+    const aborted = e?.name === 'AbortError'
+    return {
+      configured: true,
+      ok: false,
+      detail: aborted ? 'probe timed out' : e instanceof Error ? e.message : 'probe failed',
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }
