@@ -76,7 +76,7 @@ const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
 
 /** High-signal football surnames / mononyms for hard entity matching. */
 const KNOWN_PLAYER_RE =
-  /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|lewa(ndowski)?|ney(mar)?|benzema|modric|de\s*bruyne|rodri|yamal|pedri|gavi|osimhen|lookman|palmer|rice|son|heung|lavelle|putellas)\b/i
+  /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|lewa(ndowski)?|ney(mar)?|benzema|modric|de\s*bruyne|rodri|yamal|pedri|gavi|osimhen|lookman|palmer|rice|son|heung|lavelle|putellas|rooney|beckham|giggs|shearer|drogba|henry|torres|aguero|suarez|iniesta|xavi|zidane|ronaldinho|owen|gerrard|lampard|terry|ferdinand|scholes|neville|cole|ashley\s*cole)\b/i
 
 /** Common football mononyms → full name (helps Wikimedia / Pexels / Google find the player). */
 const PLAYER_FULL_NAMES = [
@@ -103,6 +103,22 @@ const PLAYER_FULL_NAMES = [
   [/^osimhen$/i, 'Victor Osimhen'],
   [/^lookman$/i, 'Ademola Lookman'],
   [/^son$/i, 'Son Heung-min'],
+  [/^rooney$/i, 'Wayne Rooney'],
+  [/^beckham$/i, 'David Beckham'],
+  [/^giggs$/i, 'Ryan Giggs'],
+  [/^shearer$/i, 'Alan Shearer'],
+  [/^drogba$/i, 'Didier Drogba'],
+  [/^henry$/i, 'Thierry Henry'],
+  [/^torres$/i, 'Fernando Torres'],
+  [/^aguero$/i, 'Sergio Aguero'],
+  [/^suarez$/i, 'Luis Suarez'],
+  [/^iniesta$/i, 'Andres Iniesta'],
+  [/^xavi$/i, 'Xavi Hernandez'],
+  [/^zidane$/i, 'Zinedine Zidane'],
+  [/^ronaldinho$/i, 'Ronaldinho'],
+  [/^owen$/i, 'Michael Owen'],
+  [/^gerrard$/i, 'Steven Gerrard'],
+  [/^lampard$/i, 'Frank Lampard'],
   [/^tuchel$/i, 'Thomas Tuchel'],
   [/^guardiola$/i, 'Pep Guardiola'],
   [/^klopp$/i, 'Jurgen Klopp'],
@@ -382,8 +398,13 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '') {
   const year = new Date().getFullYear()
   if (hay.includes(String(year))) score += 8
   else if (hay.includes(String(year - 1))) score += 5
-  // Strongly penalize clearly-old photos (<= ~6 yrs) so a current-year image wins when one exists.
-  if (/\b(throwback|archive|young|childhood|retro|199\d|200\d|201\d)\b/i.test(hay)) score -= 14
+  // Prefer current stills for active coaches/stories, but keep career match photos for
+  // named players (Rooney / Beckham / Henry — best Google hits are often 2000s–2010s).
+  const namedStarHit = mustHit.some((t) => hay.includes(t.toLowerCase()))
+  const softLegacyYears = namedStarHit && !topicLooksLikeCoach(topic)
+  if (/\b(throwback|archive|young|childhood|retro)\b/i.test(hay)) score -= softLegacyYears ? 4 : 14
+  else if (/\b(199\d|200\d|201[0-6])\b/i.test(hay)) score -= softLegacyYears ? 2 : 14
+  else if (/\b(201[7-9])\b/i.test(hay) && !softLegacyYears) score -= 8
   if (/\b(nfl|nba|mlb|nhl|rugby|cricket|american football)\b/i.test(hay)) score -= 12
   // Generic World Cup / stadium with no person hit already rejected above
   if (COMP_NOISE_RE.test(hay) && !strongHit) score -= 10

@@ -111,4 +111,14 @@ describe('eofSceneImageQueries', () => {
     assert.ok(good > 5)
     assert.ok(bad < 0, `generic World Cup stock must be rejected, got ${bad}`)
   })
+
+  it('resolves Rooney topics to Wayne Rooney and keeps career match photos', () => {
+    assert.equal(resolveImageSubject('Rooney returns to Old Trafford'), 'Wayne Rooney')
+    assert.equal(resolveImageSubject('Wayne Rooney Everton legend'), 'Wayne Rooney')
+    const career = scoreImageRelevance(
+      'Wayne Rooney',
+      'Wayne Rooney Manchester United Champions League final 2008',
+    )
+    assert.ok(career >= 6, `career Rooney photo must stay usable, got ${career}`)
+  })
 })

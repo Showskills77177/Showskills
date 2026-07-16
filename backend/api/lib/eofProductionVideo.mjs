@@ -110,9 +110,11 @@ function buildSceneVideoFilter({
   kenBurns = false,
   textDir,
 }) {
+  // Cover-scale into 9:16, then bias the crop upward so faces/action stay in frame
+  // (center crop was cutting heads off landscape Google stills).
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
-    'crop=1080:1920',
+    'crop=1080:1920:(iw-ow)/2:min((ih-oh)*0.22\\,ih-oh)',
   ]
 
   if (colorFilters?.length) {

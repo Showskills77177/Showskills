@@ -7,6 +7,8 @@ import {
   listOxylabsImageCandidates,
   orderOxylabsHitsForRotation,
   claimOxylabsPoolHit,
+  buildOxylabsJobQuery,
+  scoreImageCandidate,
   EOF_OXYLABS_MAX_QUERIES_PER_JOB,
 } from '../backend/api/lib/eofOxylabsImages.mjs'
 import {
@@ -25,6 +27,19 @@ function mockHits(n) {
 }
 
 describe('eofOxylabsImages', () => {
+  it('builds person-first Oxylabs job queries (not manager/year noise)', () => {
+    assert.match(buildOxylabsJobQuery('Wayne Rooney Everton', 0), /Wayne Rooney/i)
+    assert.match(buildOxylabsJobQuery('Rooney', 0), /"Wayne Rooney" football/)
+    assert.match(buildOxylabsJobQuery('Rooney', 1), /portrait/)
+    assert.doesNotMatch(buildOxylabsJobQuery('Rooney', 2), /manager/i)
+  })
+
+  it('prefers portrait stills over ultra-wide landscapes for Shorts', () => {
+    const portrait = scoreImageCandidate('https://cdn.example.com/a.jpg', 900, 1400)
+    const wide = scoreImageCandidate('https://cdn.example.com/b.jpg', 1600, 900)
+    assert.ok(portrait > wide, `portrait (${portrait}) should beat wide (${wide})`)
+  })
+
   it('reports configured from OXYLABS_USERNAME + OXYLABS_PASSWORD', () => {
     const prevUser = process.env.OXYLABS_USERNAME
     const prevPass = process.env.OXYLABS_PASSWORD

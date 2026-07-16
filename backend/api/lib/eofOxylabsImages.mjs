@@ -48,8 +48,8 @@ function isHttpUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim())
 }
 
-/** Prefer direct image hosts; demote tiny/junk gstatic thumbs. */
-function scoreImageCandidate(url, width = 0, height = 0) {
+/** Prefer direct image hosts + portrait stills (Shorts are 9:16); demote tiny/junk thumbs. */
+export function scoreImageCandidate(url, width = 0, height = 0) {
   const u = String(url || '').toLowerCase()
   let s = 0
   if (!isHttpUrl(url)) return -100
@@ -57,11 +57,34 @@ function scoreImageCandidate(url, width = 0, height = 0) {
   if (/encrypted-tbn\d*\.gstatic\.com/i.test(u)) s -= 15
   if (/gstatic\.com\/images/i.test(u) && /[?&]s=\d{1,2}(?:&|$)/i.test(u)) s -= 40
   if (/favicon|sprite|logo\.svg|1x1|pixel/i.test(u)) s -= 80
-  const area = (Number(width) || 0) * (Number(height) || 0)
-  if (area >= 800 * 800) s += 20
+  const w = Number(width) || 0
+  const h = Number(height) || 0
+  const area = w * h
+  if (area >= 1200 * 1200) s += 28
+  else if (area >= 800 * 800) s += 20
   else if (area >= 400 * 400) s += 10
   else if (area > 0 && area < 120 * 120) s -= 30
+  // Vertical / square frames survive 9:16 cover-crop better than wide landscapes.
+  if (w > 0 && h > 0) {
+    if (h >= w * 1.15) s += 18
+    else if (h >= w * 0.95) s += 8
+    else if (w >= h * 1.6) s -= 12
+  }
   return s
+}
+
+/**
+ * Job-level Google Images query for one Short. Prefer the person full name; avoid
+ * wrong “manager” angles for players and avoid year-only queries that miss legends.
+ * @param {string} topic
+ * @param {number} [attempt]
+ */
+export function buildOxylabsJobQuery(topic, attempt = 0) {
+  const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const n = Math.max(0, Number(attempt) || 0) % 3
+  if (n === 1) return `"${subject}" football portrait`
+  if (n === 2) return `"${subject}" football action`
+  return `"${subject}" football`
 }
 
 function pickUrlFromOrganicItem(item) {
@@ -369,32 +392,27 @@ export async function searchOxylabsGoogleImage(query, index = 0, opts = {}) {
 export async function fetchEofOxylabsJobPool(opts = {}) {
   const sceneCount = Math.max(1, Math.min(12, Number(opts.sceneCount) || 6))
   const attempt = Math.max(0, Number(opts.attempt) || 0)
-  const subject = resolveImageSubject(opts.topic || '') || String(opts.topic || 'football').trim()
-  const year = new Date().getFullYear()
-  // Rotate query slightly on rebuilds without spending extra credits beyond this single call.
-  const query =
-    attempt % 3 === 1
-      ? `${subject} ${year}`
-      : attempt % 3 === 2
-        ? `${subject} football manager`
-        : `${subject} football`
+  const query = buildOxylabsJobQuery(opts.topic || '', attempt)
 
-  // Only keep what this Short needs: one still per scene + a single spare for a dead download.
+  // Pull a wider SERP slice (still 1 credit), then keep the best portrait/high-res rows
+  // so scenes are not stuck with the first 7 thin landscape thumbs.
   const need = Math.max(1, sceneCount + 1)
+  const fetchLimit = Math.min(40, Math.max(16, need * 3))
   const hits = await searchOxylabsGoogleImages(query, {
-    limit: need,
+    limit: fetchLimit,
     signal: opts.signal,
   })
+  const kept = hits.slice(0, Math.max(need, Math.min(hits.length, need + 4)))
   console.info(
     '[eof-oxylabs] job pool',
     query.slice(0, 60),
     `scenes=${sceneCount}`,
-    `kept=${hits.length}/${need}`,
+    `kept=${kept.length}/${fetchLimit}`,
     `(${EOF_OXYLABS_MAX_QUERIES_PER_JOB} query/Short — not per scene)`,
   )
   return {
     query,
-    hits: hits.map((h) => ({
+    hits: kept.map((h) => ({
       url: h.url,
       title: h.title || null,
       width: h.width,
