@@ -30,9 +30,13 @@ export default async function handler(req, res) {
     return json(res, 405, { error: 'Method not allowed' })
   }
 
-  const limited = applyRateLimit(req, res, { pathKey: 'admin-forgot-password', max: 5, windowMs: 900_000 })
+  const limited = applyRateLimit(req, res, { pathKey: 'admin-forgot-password', max: 12, windowMs: 900_000 })
   if (limited.blocked) {
-    return json(res, 429, { error: 'Too many reset requests. Try again later.' })
+    const mins = Math.max(1, Math.ceil((limited.retryAfterSec || 900) / 60))
+    return json(res, 429, {
+      error: `Too many reset requests. Wait about ${mins} minute(s), then try Forgot password again.`,
+      retryAfterSec: limited.retryAfterSec,
+    })
   }
 
   if (!isAdminAuthConfigured()) {

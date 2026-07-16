@@ -26,8 +26,8 @@ export async function verifyUserPassword(plain, storedHash) {
 }
 
 /**
- * Where admin password verification will look (safe for diagnostics; no secrets).
- * Precedence matches verifyAdminPassword: database → env hash → env plain.
+ * Where admin password verification will look first (safe for diagnostics; no secrets).
+ * Verification may still accept env credentials when a stale DB hash does not match.
  * @returns {Promise<'database'|'env_hash'|'env_plain'|'none'>}
  */
 export async function getAdminPasswordSource() {
@@ -42,17 +42,26 @@ export async function getAdminPasswordSource() {
   return 'none'
 }
 
-export async function verifyAdminPassword(plain) {
-  const stored = await getStoredAdminPasswordHash()
-  if (stored) {
-    return bcrypt.compare(plain, stored)
-  }
-
+async function verifyAgainstEnvPassword(plain) {
+  const candidate = typeof plain === 'string' ? plain : ''
   const hash = process.env.ADMIN_PASSWORD_HASH?.trim()
-  if (hash) {
-    return bcrypt.compare(plain, hash)
-  }
+  if (hash && (await bcrypt.compare(candidate, hash))) return true
   const p = process.env.ADMIN_PASSWORD?.trim() ?? ''
   if (!p) return false
-  return plain === p
+  return candidate === p || candidate.trim() === p
+}
+
+/**
+ * Prefer DB hash (password-reset), but fall back to Vercel env password/hash so a
+ * forgotten DB password cannot permanently lock out Production ADMIN_PASSWORD.
+ */
+export async function verifyAdminPassword(plain) {
+  const candidate = typeof plain === 'string' ? plain : ''
+  try {
+    const stored = await getStoredAdminPasswordHash()
+    if (stored && (await bcrypt.compare(candidate, stored))) return true
+  } catch {
+    /* DB unavailable — try env */
+  }
+  return verifyAgainstEnvPassword(candidate)
 }
