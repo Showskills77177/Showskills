@@ -75,6 +75,17 @@ describe('eofSceneImageQueries', () => {
     assert.ok(old < 6, `old 2014 photo should fall below the accept threshold, got ${old}`)
   })
 
+  it('does not reject photos when topic and imageQuery repeat the same name', () => {
+    // Regression: "Thomas Tuchel" + "Thomas Tuchel" glued into required entity
+    // "Thomas Tuchel Thomas Tuchel" → hard-rejected every real Commons file.
+    const score = scoreImageRelevance(
+      'Thomas Tuchel',
+      'Thomas Tuchel England v Ghana 23 June 2026-081.jpg',
+      'Thomas Tuchel',
+    )
+    assert.ok(score >= 6, `repeated name must still accept current photo, got ${score}`)
+  })
+
   it('Messi World Cup topics search Messi first, not generic World Cup stock', () => {
     const topic = 'Messi shines at World Cup 2026'
     const tokens = extractTopicImageTokens(topic)

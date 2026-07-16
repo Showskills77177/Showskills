@@ -323,12 +323,15 @@ export async function fetchEofSceneImage({
       if (meta) return meta
     }
 
-    // Free keyless fallback — real photos from Wikimedia Commons
+    // Free keyless fallback — Wikidata identity + ranked Commons (prefers current portraits)
     {
       const meta = await rotateSource(async (eff) => {
-        const hit = await searchWikimediaCommonsImages(query, eff)
+        const hit = await searchWikimediaCommonsImages(query, eff, { topic })
         if (!hit) return null
-        const score = scoreImageRelevance(topic || query, hit.title || '', query)
+        const score =
+          typeof hit.relevance === 'number'
+            ? hit.relevance
+            : scoreImageRelevance(topic || query, hit.title || '', query)
         if (score < 6) return null
         return {
           key: `wiki:${hit.title || hit.imgUrl}`,
@@ -338,6 +341,8 @@ export async function fetchEofSceneImage({
             imageQuery: query,
             imageTitle: hit.title,
             relevance: score,
+            imageYear: hit.year || null,
+            wikiDetail: hit.sourceDetail || null,
           },
           download: () => downloadImageToFile(hit.imgUrl, outPath),
         }

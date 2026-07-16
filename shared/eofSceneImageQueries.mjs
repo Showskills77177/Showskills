@@ -103,6 +103,14 @@ const PLAYER_FULL_NAMES = [
   [/^osimhen$/i, 'Victor Osimhen'],
   [/^lookman$/i, 'Ademola Lookman'],
   [/^son$/i, 'Son Heung-min'],
+  [/^tuchel$/i, 'Thomas Tuchel'],
+  [/^guardiola$/i, 'Pep Guardiola'],
+  [/^klopp$/i, 'Jurgen Klopp'],
+  [/^arteta$/i, 'Mikel Arteta'],
+  [/^mourinho$/i, 'Jose Mourinho'],
+  [/^ancelotti$/i, 'Carlo Ancelotti'],
+  [/^nagelsmann$/i, 'Julian Nagelsmann'],
+  [/^southgate$/i, 'Gareth Southgate'],
 ]
 
 /**
@@ -217,7 +225,18 @@ function entityRank(token) {
  * @param {string} [imageQuery]
  */
 export function primaryImageEntities(topic, imageQuery = '') {
-  const blob = `${topic || ''} ${imageQuery || ''}`.trim()
+  // Don't concatenate identical topic+query into "Thomas Tuchel Thomas Tuchel" —
+  // that becomes a required entity no real photo title will ever contain.
+  const topicStr = String(topic || '').trim()
+  const queryStr = String(imageQuery || '').trim()
+  const blob =
+    !queryStr || queryStr.toLowerCase() === topicStr.toLowerCase()
+      ? topicStr
+      : topicStr.toLowerCase().includes(queryStr.toLowerCase())
+        ? topicStr
+        : queryStr.toLowerCase().includes(topicStr.toLowerCase())
+          ? queryStr
+          : `${topicStr} ${queryStr}`.trim()
   const tokens = extractTopicImageTokens(blob)
   const entities = tokens.filter((t) => {
     if (COMP_NOISE_RE.test(t)) return false
@@ -225,7 +244,20 @@ export function primaryImageEntities(topic, imageQuery = '') {
     if (STOP.has(t.toLowerCase())) return false
     return t.length >= 4 || KNOWN_PLAYER_RE.test(t) || KNOWN_COACH_RE.test(t)
   })
-  return entities.length ? entities.slice(0, 4) : tokens.slice(0, 2)
+  // Collapse accidental duplicated names ("Thomas Tuchel Thomas Tuchel")
+  const cleaned = entities.map((e) => {
+    const parts = e.split(/\s+/).filter(Boolean)
+    const half = Math.floor(parts.length / 2)
+    if (
+      half >= 2 &&
+      parts.length === half * 2 &&
+      parts.slice(0, half).join(' ').toLowerCase() === parts.slice(half).join(' ').toLowerCase()
+    ) {
+      return parts.slice(0, half).join(' ')
+    }
+    return e
+  })
+  return cleaned.length ? cleaned.slice(0, 4) : tokens.slice(0, 2)
 }
 
 const PLAYER_ANGLES = [
