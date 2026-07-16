@@ -12,7 +12,7 @@ import {
   getEofPinterestAccessToken,
 } from './eofPinterestImages.mjs'
 import { isEofGoogleCseConfigured, searchGoogleCseImages } from './eofGoogleImages.mjs'
-import { searchWikimediaCommonsImages } from './eofWikimediaImages.mjs'
+import { searchWikimediaCommonsImages, listWikimediaPersonImages } from './eofWikimediaImages.mjs'
 import {
   isEofApImagesConfigured,
   searchApMediaPicture,
@@ -68,24 +68,45 @@ function looksLikeImageBuffer(buf) {
 
 async function downloadImageToFile(imgUrl, outPath) {
   const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (compatible; ShowSkillsEOF/1.0; +https://showskills.co.uk; eof-production@showskills.co.uk)',
-    Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    // Wikimedia requires a descriptive UA; generic bots get 403 on upload.wikimedia.org
+    'User-Agent': 'ShowSkillsEOF/1.0 (https://showskills.co.uk; eof-production@showskills.co.uk)',
+    Accept: 'image/avif,image/webp,image/apng,image/jpeg,image/*,*/*;q=0.8',
   }
+  const url = String(imgUrl || '')
   // pinimg CDN often rejects hotlinks without a Pinterest Referer
-  if (String(imgUrl || '').includes('pinimg.com') || String(imgUrl || '').includes('pinterest.')) {
+  if (url.includes('pinimg.com') || url.includes('pinterest.')) {
     headers.Referer = 'https://www.pinterest.com/'
   }
-  const imgRes = await fetch(imgUrl, { headers })
-  if (!imgRes.ok) {
-    console.warn('[eof-scene-images] image download failed', imgRes.status, String(imgUrl).slice(0, 120))
-    return false
+  if (url.includes('wikimedia.org') || url.includes('wikipedia.org')) {
+    headers.Referer = 'https://commons.wikimedia.org/'
   }
-  const buf = Buffer.from(await imgRes.arrayBuffer())
-  if (buf.length < 8_000) return false
-  if (!looksLikeImageBuffer(buf)) return false
-  await writeFile(outPath, buf)
-  return true
+
+  const tryOnce = async (target) => {
+    const imgRes = await fetch(target, { headers, redirect: 'follow' })
+    if (!imgRes.ok) {
+      console.warn('[eof-scene-images] image download failed', imgRes.status, String(target).slice(0, 140))
+      return false
+    }
+    const buf = Buffer.from(await imgRes.arrayBuffer())
+    if (buf.length < 8_000) {
+      console.warn('[eof-scene-images] image too small', buf.length, String(target).slice(0, 100))
+      return false
+    }
+    if (!looksLikeImageBuffer(buf)) {
+      console.warn('[eof-scene-images] not an image buffer', String(target).slice(0, 100))
+      return false
+    }
+    await writeFile(outPath, buf)
+    return true
+  }
+
+  if (await tryOnce(url)) return true
+  // Commons sometimes serves thumb URLs that 429; retry original path if present
+  if (url.includes('/thumb/')) {
+    const original = url.replace(/\/thumb\/(.*?\/.*?)\/\d+px-[^/]+$/, '/$1')
+    if (original !== url) return tryOnce(original)
+  }
+  return false
 }
 
 async function searchPexelsPhoto(query, index, key) {
@@ -147,7 +168,7 @@ const IMAGE_ROTATE_MAX_TRIES = 4
  * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
  * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
  * record what was used and avoid it next time.
- * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[] }} opts
+ * @param {{ imageQuery: string, topic?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array }} opts
  */
 export async function fetchEofSceneImage({
   imageQuery,
@@ -157,6 +178,7 @@ export async function fetchEofSceneImage({
   refresh = false,
   attempt = 0,
   avoidKeys = [],
+  wikiPool = null,
 }) {
   mkdirSync(dirname(outPath), { recursive: true })
   if (!refresh && existsSync(outPath)) {
@@ -226,18 +248,18 @@ export async function fetchEofSceneImage({
     }
   }
 
-  // Named person/coach first: Wikidata P18 + recent Commons category.
-  // Do this BEFORE Pinterest/Pexels so Rebuild doesn't burn time on broken tokens
-  // or land on old stock while a current Wikidata portrait exists.
+  // Named person/coach first: use a pre-built Wikidata pool when provided (one resolve per job),
+  // otherwise resolve once via list/search helpers.
   const subject = resolveImageSubject(topic || custom)
-  if (subject && subject !== 'football') {
+  if ((Array.isArray(wikiPool) && wikiPool.length) || (subject && subject !== 'football')) {
     let fallbackDup = null
     for (let t = 0; t < tries; t += 1) {
       let cand = null
       try {
-        const hit = await searchWikimediaCommonsImages(subject, index, {
+        const hit = await searchWikimediaCommonsImages(subject || topic || custom, index, {
           topic: topic || subject,
           rotate: rot + t,
+          pool: Array.isArray(wikiPool) && wikiPool.length ? wikiPool : undefined,
         })
         if (hit && (hit.relevance ?? 0) >= 6) {
           cand = {

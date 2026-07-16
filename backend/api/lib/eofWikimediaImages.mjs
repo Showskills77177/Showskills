@@ -237,6 +237,20 @@ export function rankWikimediaCandidates(candidates, topic, imageQuery = '') {
     })
 }
 
+/**
+ * When current/last-year photos exist, drop older archive shots from the pick pool.
+ * @param {Array<{ year?: number, relevance?: number, title?: string }>} ranked
+ */
+export function preferRecentCandidates(ranked) {
+  if (!Array.isArray(ranked) || ranked.length <= 1) return ranked || []
+  const year = CURRENT_YEAR
+  const veryRecent = ranked.filter((c) => Number(c.year) >= year - 1)
+  if (veryRecent.length) return veryRecent
+  const recent = ranked.filter((c) => Number(c.year) >= year - 3)
+  if (recent.length) return recent
+  return ranked
+}
+
 function subjectSearchQueries(subject, topic) {
   const year = CURRENT_YEAR
   const base = String(subject || topic || '').trim()
@@ -252,6 +266,77 @@ function subjectSearchQueries(subject, topic) {
 }
 
 /**
+ * Resolve + rank all usable recent Commons photos for a named person ONCE.
+ * Use this on Rebuild so we don't hammer Wikidata once per scene (Vercel timeouts).
+ *
+ * @param {string} topic
+ * @param {{ limit?: number }} [opts]
+ * @returns {Promise<Array<{ imgUrl: string, title: string, queryUsed: string, relevance: number, year: number, sourceDetail: string }>>}
+ */
+export async function listWikimediaPersonImages(topic, opts = {}) {
+  const limit = Math.max(1, Math.min(20, Number(opts.limit) || 8))
+  const subject = resolveImageSubject(topic) || String(topic || '').trim()
+  if (!subject || subject === 'football' || subject.length < 2) return []
+
+  const byKey = new Map()
+  const add = (c, queryUsed, sourceDetail) => {
+    if (!c?.imgUrl || !c.title) return
+    const key = c.title.toLowerCase()
+    const prev = byKey.get(key)
+    if (prev && (prev.dateMs || 0) >= (c.dateMs || 0)) return
+    byKey.set(key, { ...c, queryUsed: queryUsed || subject, sourceDetail })
+  }
+
+  try {
+    const wd = await resolveWikidataSubject(subject)
+    if (wd?.p18File) {
+      const portrait = await fetchCommonsFile(wd.p18File)
+      if (portrait) add(portrait, `wikidata:${wd.id}`, 'wikidata-p18')
+    }
+    if (wd?.commonsCategory) {
+      const catFiles = await listCommonsCategoryFiles(wd.commonsCategory, 24)
+      for (const f of catFiles) add(f, wd.commonsCategory, 'wikidata-category')
+    }
+  } catch (e) {
+    console.warn('[eof-wikimedia] list person resolve failed', subject, e instanceof Error ? e.message : e)
+  }
+
+  let ranked = preferRecentCandidates(
+    rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
+  )
+
+  if (ranked.length < 2) {
+    for (const q of subjectSearchQueries(subject, topic).slice(0, 2)) {
+      try {
+        const hits = await searchCommonsRaw(q, 12)
+        for (const h of hits) add(h, q, 'commons-search')
+      } catch (e) {
+        console.warn('[eof-wikimedia] list search failed', q, e instanceof Error ? e.message : e)
+      }
+    }
+    ranked = preferRecentCandidates(
+      rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
+    )
+  }
+
+  const out = ranked.slice(0, limit).map((pick) => ({
+    imgUrl: pick.imgUrl,
+    title: pick.title,
+    queryUsed: pick.queryUsed || subject,
+    relevance: pick.relevance,
+    year: pick.year || 0,
+    sourceDetail: pick.sourceDetail || 'commons',
+  }))
+  console.info(
+    '[eof-wikimedia] person pool',
+    subject,
+    out.length,
+    out.map((c) => `${c.year}:${String(c.title).slice(0, 40)}`).join(' | '),
+  )
+  return out
+}
+
+/**
  * Best Commons photo for a football topic/person.
  * Uses Wikidata identity (P18 + category) then ranked Commons search.
  *
@@ -260,63 +345,26 @@ function subjectSearchQueries(subject, topic) {
  *
  * @param {string} query
  * @param {number} [index] scene index (diverse picks across scenes)
- * @param {{ topic?: string, rotate?: number }} [opts]
+ * @param {{ topic?: string, rotate?: number, pool?: Array }} [opts]
  * @returns {Promise<{ imgUrl: string, title: string, queryUsed: string, relevance: number, year: number, sourceDetail: string } | null>}
  */
 export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) {
   const topic = String(opts.topic || query || '').trim()
-  const subject = resolveImageSubject(topic) || String(query || '').trim()
-  if (subject.length < 2) return null
   const rotate = Math.max(0, Number(opts.rotate) || 0)
 
-  const byKey = new Map()
-  const add = (c, queryUsed, sourceDetail) => {
-    if (!c?.imgUrl || !c.title) return
-    const key = c.title.toLowerCase()
-    const prev = byKey.get(key)
-    if (prev && (prev.dateMs || 0) >= (c.dateMs || 0)) return
-    byKey.set(key, { ...c, queryUsed: queryUsed || c.queryUsed || subject, sourceDetail })
+  // Prefer a pre-built pool (one Wikidata resolve per Rebuild job)
+  const pool = Array.isArray(opts.pool) ? opts.pool : null
+  if (pool?.length) {
+    const pick = pool[Math.abs((Number(index) || 0) + rotate) % pool.length]
+    return { ...pick }
   }
 
-  // 1) Wikidata identity → canonical face (P18) + recent category files
-  const wd = await resolveWikidataSubject(subject)
-  if (wd?.p18File) {
-    const portrait = await fetchCommonsFile(wd.p18File)
-    if (portrait) add(portrait, `wikidata:${wd.id}`, 'wikidata-p18')
-  }
-  if (wd?.commonsCategory) {
-    const catFiles = await listCommonsCategoryFiles(wd.commonsCategory, 24)
-    for (const f of catFiles) add(f, wd.commonsCategory, 'wikidata-category')
-  }
-
-  let ranked = preferRecentCandidates(
-    rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
-  )
-
-  // 2) Only hit free-text Commons search if identity path didn't yield recent on-topic stills
-  if (ranked.length < 2) {
-    const queries = [
-      ...subjectSearchQueries(subject, topic),
-      String(query || '').trim() && String(query).trim() !== subject ? String(query).trim() : '',
-    ].filter(Boolean)
-
-    for (const q of queries.slice(0, 3)) {
-      const hits = await searchCommonsRaw(q, 16)
-      for (const h of hits) add(h, q, 'commons-search')
-    }
-    ranked = preferRecentCandidates(
-      rankWikimediaCandidates([...byKey.values()], topic || subject, ''),
-    )
-  }
-
-  if (!ranked.length) {
-    console.warn('[eof-wikimedia] no on-topic recent hits for', subject)
+  const listed = await listWikimediaPersonImages(topic || query, { limit: 12 })
+  if (!listed.length) {
+    console.warn('[eof-wikimedia] no on-topic recent hits for', topic || query)
     return null
   }
-
-  // Scene index + rebuild rotate → next still in the RECENT ranked list (not stride*7 into old junk)
-  const pickIndex = Math.abs((Number(index) || 0) + rotate) % ranked.length
-  const pick = ranked[pickIndex]
+  const pick = listed[Math.abs((Number(index) || 0) + rotate) % listed.length]
   console.info(
     '[eof-wikimedia] pick',
     pick.title,
@@ -326,28 +374,7 @@ export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) 
     pick.relevance,
     'via',
     pick.sourceDetail,
-    `idx=${pickIndex}/${ranked.length}`,
+    `idx=${(Number(index) || 0) + rotate}/${listed.length}`,
   )
-  return {
-    imgUrl: pick.imgUrl,
-    title: pick.title,
-    queryUsed: pick.queryUsed || subject,
-    relevance: pick.relevance,
-    year: pick.year || 0,
-    sourceDetail: pick.sourceDetail || 'commons',
-  }
-}
-
-/**
- * When current/last-year photos exist, drop older archive shots from the pick pool.
- * @param {Array<{ year?: number, relevance?: number, title?: string }>} ranked
- */
-export function preferRecentCandidates(ranked) {
-  if (!Array.isArray(ranked) || ranked.length <= 1) return ranked || []
-  const year = CURRENT_YEAR
-  const veryRecent = ranked.filter((c) => Number(c.year) >= year - 1)
-  if (veryRecent.length) return veryRecent
-  const recent = ranked.filter((c) => Number(c.year) >= year - 3)
-  if (recent.length) return recent
-  return ranked
+  return pick
 }

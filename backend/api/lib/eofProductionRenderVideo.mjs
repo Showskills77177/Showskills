@@ -14,6 +14,7 @@ import {
 } from './eofProductionJobs.mjs'
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
+import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import { ensureEofMixedAudioOnDisk, saveEofVideoArtifact, saveEofSceneImagesArtifact, ensureEofSceneImageOnDisk } from './eofProductionArtifacts.mjs'
@@ -97,6 +98,26 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     })
 
     let imagesDone = 0
+    // One Wikidata/Commons resolve for the whole job — avoids 5× parallel API storms on Vercel.
+    let wikiPool = []
+    if (!reuseSceneImages) {
+      try {
+        wikiPool = await listWikimediaPersonImages(job.topic, {
+          limit: Math.max(8, rows.length + 3),
+        })
+      } catch (e) {
+        console.warn(
+          '[eof-video] wikimedia person pool failed',
+          job.topic,
+          e instanceof Error ? e.message : e,
+        )
+        wikiPool = []
+      }
+      if (!wikiPool.length) {
+        console.warn('[eof-video] no Wikidata/Commons pool for', job.topic, '— falling back per-scene')
+      }
+    }
+
     const scenesForVideo = await mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
       const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
       let imageMeta
@@ -136,6 +157,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           refresh: true,
           attempt,
           avoidKeys: priorHistory,
+          wikiPool,
         })
         imageAttempt = attempt
         imageKey = imageMeta.imageKey || null
@@ -161,6 +183,21 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageYear: imageMeta.imageYear || null,
       }
     })
+
+    const placeholderCount = scenesForVideo.filter((s) =>
+      String(s.imageSource || '').startsWith('placeholder'),
+    ).length
+    if (placeholderCount > 0) {
+      console.warn(
+        `[eof-video] ${placeholderCount}/${scenesForVideo.length} scenes used placeholders for job ${jobId}`,
+        scenesForVideo.map((s) => `${s.index}:${s.imageSource}:${s.imageTitle || ''}`).join(' | '),
+      )
+    }
+    if (placeholderCount === scenesForVideo.length && scenesForVideo.length > 0) {
+      throw new Error(
+        `No real scene images could be downloaded for “${job.topic}”. Wikidata/Commons returned nothing usable — check server logs / network, then Rebuild video again.`,
+      )
+    }
 
     scenesForVideo.sort((a, b) => a.index - b.index)
     await report('video', 0, { force: true })
