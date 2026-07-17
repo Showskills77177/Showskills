@@ -9,8 +9,18 @@ function fmtTime(sec) {
   return `${m}:${String(r).padStart(2, '0')}.${ms}`
 }
 
+function resolveTrackPreviewUrl(track) {
+  const raw = String(track?.publicUrl || '').trim()
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+  // Absolute site path — keep relative so it works on staging/preview hosts.
+  if (raw.startsWith('/')) return raw
+  return `/${raw.replace(/^\/+/, '')}`
+}
+
 /**
  * YouTube-style music segment picker — drag the window to choose which part of the bed plays.
+ * Remount with key={track.id} from the parent when the bed changes.
  */
 export default function EofMusicSegmentMixer({
   track,
@@ -20,9 +30,9 @@ export default function EofMusicSegmentMixer({
   disabled = false,
 }) {
   const audioRef = useRef(null)
-  const trimRef = useRef({ startSec: 0, endSec: null, duration: 0 })
   const railRef = useRef(null)
   const dragRef = useRef(null)
+  const previewUrl = resolveTrackPreviewUrl(track)
   const [duration, setDuration] = useState(
     track?.durationSeconds != null && Number(track.durationSeconds) > 0
       ? Number(track.durationSeconds)
@@ -30,6 +40,7 @@ export default function EofMusicSegmentMixer({
   )
   const [playing, setPlaying] = useState(false)
   const [playhead, setPlayhead] = useState(0)
+  const [loadError, setLoadError] = useState('')
 
   const trim = useMemo(
     () =>
@@ -44,67 +55,16 @@ export default function EofMusicSegmentMixer({
   const effectiveEnd = trim.endSec != null ? trim.endSec : duration || trim.startSec + 30
   const span = Math.max(0.5, (duration || effectiveEnd) - 0)
 
-  trimRef.current = { startSec: trim.startSec, endSec: trim.endSec, duration }
-
-  // Always rebuild the Audio element when the track changes so preview isn't stuck on the last song.
   useEffect(() => {
-    const prev = audioRef.current
-    if (prev) {
-      try {
-        prev.pause()
-        prev.removeAttribute('src')
-        prev.load()
-      } catch {
-        /* ignore */
-      }
-      audioRef.current = null
-    }
     setPlaying(false)
     setPlayhead(0)
+    setLoadError('')
     setDuration(
       track?.durationSeconds != null && Number(track.durationSeconds) > 0
         ? Number(track.durationSeconds)
         : 0,
     )
-
-    const url = track?.publicUrl
-    if (!url) return undefined
-
-    const a = new Audio()
-    a.preload = 'metadata'
-    a.src = url
-    const onMeta = () => {
-      if (Number.isFinite(a.duration) && a.duration > 0) setDuration(a.duration)
-    }
-    const onTime = () => {
-      setPlayhead(a.currentTime)
-      const t = trimRef.current
-      const stopAt = t.endSec != null ? t.endSec : t.duration || a.duration
-      if (Number.isFinite(stopAt) && a.currentTime >= stopAt - 0.04) {
-        a.pause()
-        setPlaying(false)
-      }
-    }
-    const onEnded = () => setPlaying(false)
-    a.addEventListener('loadedmetadata', onMeta)
-    a.addEventListener('timeupdate', onTime)
-    a.addEventListener('ended', onEnded)
-    audioRef.current = a
-
-    return () => {
-      a.removeEventListener('loadedmetadata', onMeta)
-      a.removeEventListener('timeupdate', onTime)
-      a.removeEventListener('ended', onEnded)
-      try {
-        a.pause()
-        a.removeAttribute('src')
-        a.load()
-      } catch {
-        /* ignore */
-      }
-      if (audioRef.current === a) audioRef.current = null
-    }
-  }, [track?.id, track?.publicUrl, track?.durationSeconds])
+  }, [track?.id, previewUrl, track?.durationSeconds])
 
   function emit(nextStart, nextEnd) {
     if (typeof onChange !== 'function' || disabled) return
@@ -128,7 +88,7 @@ export default function EofMusicSegmentMixer({
     if (disabled || !duration) return
     e.preventDefault()
     e.currentTarget.setPointerCapture?.(e.pointerId)
-    dragRef.current = { kind, startTrim: trim }
+    dragRef.current = { kind }
     if (kind === 'move') {
       dragRef.current.grabOffset = pctToSec(e.clientX) - trim.startSec
     }
@@ -158,20 +118,21 @@ export default function EofMusicSegmentMixer({
   }
 
   async function togglePreview() {
-    if (!track?.publicUrl || disabled) return
     const a = audioRef.current
-    if (!a) return
-    if (playing) {
+    if (!a || !previewUrl || disabled) return
+    if (!a.paused) {
       a.pause()
       setPlaying(false)
       return
     }
     try {
+      setLoadError('')
       a.currentTime = trim.startSec
       await a.play()
       setPlaying(true)
-    } catch {
+    } catch (e) {
       setPlaying(false)
+      setLoadError(e instanceof Error ? e.message : 'Could not play this track')
     }
   }
 
@@ -183,12 +144,46 @@ export default function EofMusicSegmentMixer({
     )
   }
 
+  if (!previewUrl) {
+    return (
+      <p className="mt-3 text-xs text-[#fbbf24]">
+        {track.title} has no playable URL — re-seed music beds or pick another track.
+      </p>
+    )
+  }
+
   const leftPct = duration ? (trim.startSec / span) * 100 : 0
   const widthPct = duration ? ((effectiveEnd - trim.startSec) / span) * 100 : 100
   const playPct = duration ? (playhead / span) * 100 : 0
 
   return (
     <div className="mt-4 rounded-xl border border-[#303030] bg-[#121212] p-3">
+      {/* Native element keyed by track — guarantees each song loads its own file */}
+      <audio
+        key={track.id}
+        ref={audioRef}
+        src={`${previewUrl}${previewUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(track.id)}`}
+        preload="metadata"
+        className="sr-only"
+        onLoadedMetadata={(e) => {
+          const d = e.currentTarget.duration
+          if (Number.isFinite(d) && d > 0) setDuration(d)
+        }}
+        onTimeUpdate={(e) => {
+          const t = e.currentTarget.currentTime
+          setPlayhead(t)
+          const stopAt = trim.endSec != null ? trim.endSec : duration || e.currentTarget.duration
+          if (Number.isFinite(stopAt) && t >= stopAt - 0.04) {
+            e.currentTarget.pause()
+            setPlaying(false)
+          }
+        }}
+        onEnded={() => setPlaying(false)}
+        onPause={() => setPlaying(false)}
+        onPlay={() => setPlaying(true)}
+        onError={() => setLoadError('Track file failed to load — check deploy includes this MP3.')}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
@@ -200,7 +195,7 @@ export default function EofMusicSegmentMixer({
         </div>
         <button
           type="button"
-          disabled={disabled || !duration}
+          disabled={disabled || !duration || Boolean(loadError)}
           onClick={togglePreview}
           className="rounded-lg border border-[#303030] bg-[#272727] px-3 py-1.5 text-xs text-white hover:bg-[#3f3f3f] disabled:opacity-40"
         >
@@ -208,9 +203,35 @@ export default function EofMusicSegmentMixer({
         </button>
       </div>
 
-      {!duration ? (
+      {/* Always-visible player so you can scrub/hear any selected bed */}
+      <audio
+        key={`controls-${track.id}`}
+        controls
+        src={`${previewUrl}${previewUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(track.id)}`}
+        className="mt-3 h-9 w-full max-w-xl accent-white"
+        preload="metadata"
+        onPlay={(e) => {
+          // Keep segment preview element in sync if user uses native controls.
+          const main = audioRef.current
+          if (main && main !== e.currentTarget) {
+            try {
+              main.pause()
+            } catch {
+              /* ignore */
+            }
+          }
+          setPlaying(true)
+        }}
+        onPause={() => setPlaying(false)}
+      />
+
+      {loadError ? <p className="mt-2 text-xs text-[#fbbf24]">{loadError}</p> : null}
+
+      {!duration && !loadError ? (
         <p className="mt-3 text-xs text-[#717171]">Loading track length…</p>
-      ) : (
+      ) : null}
+
+      {duration ? (
         <>
           <div
             ref={railRef}
@@ -297,7 +318,7 @@ export default function EofMusicSegmentMixer({
             </button>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   )
 }

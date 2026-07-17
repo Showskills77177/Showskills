@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { apiFetch } from '../../../lib/api'
 import {
   productionJobStatusLabel,
@@ -202,153 +201,42 @@ function CaptionTemplatePreview({
   )
 }
 
-/** Compact ZapCap picker cell: tiny caption-zoomed thumb + hover flyout for animation. */
+/** Compact ZapCap picker cell — plays the preview in-place on hover (no sticky portal flyout). */
 function ZapCapTemplateCell({ template, active, onSelect }) {
-  const btnRef = useRef(null)
-  const [hovering, setHovering] = useState(false)
-  const [flyoutPos, setFlyoutPos] = useState(null)
-  const closeTimerRef = useRef(null)
-
-  function clearCloseTimer() {
-    if (closeTimerRef.current != null) {
-      clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-  }
-
-  function openFlyout() {
-    clearCloseTimer()
-    setHovering(true)
-  }
-
-  function scheduleClose() {
-    clearCloseTimer()
-    // Brief delay avoids flicker when the thumb remounts its <video> on hover.
-    closeTimerRef.current = setTimeout(() => {
-      setHovering(false)
-      setFlyoutPos(null)
-      closeTimerRef.current = null
-    }, 60)
-  }
-
-  function closeFlyoutNow() {
-    clearCloseTimer()
-    setHovering(false)
-    setFlyoutPos(null)
-  }
-
-  useEffect(() => () => clearCloseTimer(), [])
-
-  useEffect(() => {
-    if (!hovering || !btnRef.current) {
-      setFlyoutPos(null)
-      return
-    }
-    const place = () => {
-      const r = btnRef.current?.getBoundingClientRect()
-      if (!r) return
-      const flyoutW = 120
-      const flyoutH = 140
-      let left = r.left + r.width / 2
-      let top = r.top - 8
-      left = Math.min(Math.max(flyoutW / 2 + 8, left), window.innerWidth - flyoutW / 2 - 8)
-      const showBelow = top - flyoutH < 8
-      setFlyoutPos({
-        left,
-        top: showBelow ? r.bottom + 8 : top,
-        place: showBelow ? 'below' : 'above',
-      })
-    }
-    place()
-    const onScrollOrResize = () => closeFlyoutNow()
-    window.addEventListener('scroll', onScrollOrResize, true)
-    window.addEventListener('resize', onScrollOrResize)
-    // Failsafe: if pointer is no longer over this cell, force-close.
-    const onPointerMove = (e) => {
-      const el = btnRef.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      const inside =
-        e.clientX >= r.left &&
-        e.clientX <= r.right &&
-        e.clientY >= r.top &&
-        e.clientY <= r.bottom
-      if (!inside) scheduleClose()
-    }
-    window.addEventListener('pointermove', onPointerMove)
-    return () => {
-      window.removeEventListener('scroll', onScrollOrResize, true)
-      window.removeEventListener('resize', onScrollOrResize)
-      window.removeEventListener('pointermove', onPointerMove)
-    }
-  }, [hovering])
-
   return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => {
-          closeFlyoutNow()
-          onSelect?.()
-        }}
-        onPointerEnter={openFlyout}
-        onPointerLeave={scheduleClose}
-        className={`relative overflow-hidden rounded-md border text-left transition ${
-          active
-            ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
-            : hovering
-              ? 'border-[#555] bg-[#161616]'
-              : 'border-[#2a2a2a] bg-[#161616]'
-        }`}
-        title={template.description || template.name || template.id}
-      >
-        <div className="relative mx-auto h-10 w-full overflow-hidden rounded-sm bg-[#0d0d12]">
-          <CaptionTemplatePreview template={template} className="h-full w-full" emphasizeCaptions />
-          {active ? (
-            <span className="absolute right-0.5 top-0.5 rounded bg-white px-1 py-px text-[7px] font-semibold text-black">
-              ✓
-            </span>
-          ) : null}
-        </div>
-        <div className="px-0.5 py-0.5">
-          <span
-            className={`block truncate text-[9px] font-medium leading-tight ${
-              active ? 'text-white' : 'text-[#e5e5e5]'
-            }`}
-          >
-            {template.name}
+    <button
+      type="button"
+      onClick={() => onSelect?.()}
+      className={`group relative overflow-hidden rounded-md border text-left transition ${
+        active
+          ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+          : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+      }`}
+      title={template.description || template.name || template.id}
+    >
+      <div className="relative mx-auto h-11 w-full overflow-hidden rounded-sm bg-[#0d0d12]">
+        <CaptionTemplatePreview
+          template={template}
+          className="h-full w-full transition-transform duration-150 group-hover:scale-[1.02]"
+          emphasizeCaptions
+          playMode="hover"
+        />
+        {active ? (
+          <span className="absolute right-0.5 top-0.5 rounded bg-white px-1 py-px text-[7px] font-semibold text-black">
+            ✓
           </span>
-        </div>
-      </button>
-      {hovering && flyoutPos && typeof document !== 'undefined'
-        ? createPortal(
-            <div
-              className="pointer-events-none fixed z-[200]"
-              style={{
-                left: flyoutPos.left,
-                top: flyoutPos.top,
-                transform:
-                  flyoutPos.place === 'below' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
-              }}
-              aria-hidden
-            >
-              <div className="w-[7.5rem] overflow-hidden rounded-md border border-white/25 bg-[#0d0d12] shadow-xl shadow-black/70">
-                <div className="h-[7.25rem] w-full overflow-hidden">
-                  <CaptionTemplatePreview
-                    template={template}
-                    className="h-full w-full"
-                    playMode="always"
-                    emphasizeCaptions
-                  />
-                </div>
-                <p className="truncate px-1.5 py-1 text-[9px] font-medium text-white">{template.name}</p>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+        ) : null}
+      </div>
+      <div className="px-0.5 py-0.5">
+        <span
+          className={`block truncate text-[9px] font-medium leading-tight ${
+            active ? 'text-white' : 'text-[#e5e5e5]'
+          }`}
+        >
+          {template.name}
+        </span>
+      </div>
+    </button>
   )
 }
 
@@ -4323,6 +4211,7 @@ export default function EofProductionPanel({
                 </button>
               </div>
               <EofMusicSegmentMixer
+                key={musicTrackId || 'no-track'}
                 track={musicTracks.find((t) => t.id === musicTrackId) || null}
                 startSec={musicStartSec}
                 endSec={musicEndSec}
