@@ -86,7 +86,11 @@ export default async function handler(req, res) {
 
   res.statusCode = 200
   res.setHeader('Content-Type', 'video/mp4')
-  res.setHeader('Cache-Control', 'private, no-store')
+  res.setHeader('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  if (job.updatedAt) {
+    res.setHeader('ETag', `"eof-vid-${jobId}-${String(job.updatedAt)}"`)
+  }
   if (download) {
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}.mp4"`)
   }

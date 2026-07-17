@@ -188,19 +188,40 @@ export async function ensureEofMixedAudioOnDisk(jobId) {
 }
 
 /**
+ * Decide how to materialize short.mp4 for preview/serve.
+ *
+ * INVARIANT: Never trust an existing on-disk short.mp4 when durable video_base64 is
+ * missing or when a newer blob exists in the DB. On Vercel, /tmp can retain a prior
+ * captioned plate on a warm instance after Replace Captions rewrote video_base64 on
+ * another instance — serving disk-first was the production double-caption bug.
+ *
+ * @param {{ diskExists: boolean, hasDurableBase64: boolean }} opts
+ * @returns {'write-durable' | null}
+ */
+export function resolveEofVideoDiskMaterialize({ diskExists: _diskExists, hasDurableBase64 }) {
+  if (hasDurableBase64) return 'write-durable'
+  // Mid-replace / cleared artifact: refuse leftover /tmp plate.
+  return null
+}
+
+/**
  * @param {string} jobId
  * @returns {Promise<string|null>} absolute path to short.mp4 on disk (restored if needed)
  */
 export async function ensureEofVideoOnDisk(jobId) {
-  const abs = eofProductionVideoAbsPath(jobId)
-  if (existsSync(abs)) return abs
-
   await ensureEofProductionSchema()
   const { rows } = await query(`SELECT video_base64 FROM eof_production_jobs WHERE id = $1`, [jobId])
   const b64 = rows[0]?.video_base64
-  if (!b64 || typeof b64 !== 'string') return null
+  const abs = eofProductionVideoAbsPath(jobId)
+  const hasDurable = Boolean(b64 && typeof b64 === 'string')
+  const action = resolveEofVideoDiskMaterialize({
+    diskExists: existsSync(abs),
+    hasDurableBase64: hasDurable,
+  })
+  if (action !== 'write-durable') return null
 
   mkdirSync(dirname(abs), { recursive: true })
+  // Always refresh from durable store so a stale /tmp captioned plate cannot win.
   writeFileSync(abs, Buffer.from(b64, 'base64'))
   return existsSync(abs) ? abs : null
 }
@@ -244,6 +265,8 @@ export async function clearEofVideoOnlyArtifact(jobId) {
   try {
     const abs = eofProductionVideoAbsPath(jobId)
     if (abs && existsSync(abs)) unlinkSync(abs)
+    const compact = abs ? abs.replace(/\.mp4$/i, '.compact.mp4') : null
+    if (compact && existsSync(compact)) unlinkSync(compact)
   } catch {
     /* ignore */
   }
@@ -259,6 +282,8 @@ export async function clearEofVideoArtifact(jobId) {
   try {
     const abs = eofProductionVideoAbsPath(jobId)
     if (abs && existsSync(abs)) unlinkSync(abs)
+    const compact = abs ? abs.replace(/\.mp4$/i, '.compact.mp4') : null
+    if (compact && existsSync(compact)) unlinkSync(compact)
   } catch {
     /* ignore */
   }

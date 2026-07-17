@@ -279,6 +279,13 @@ export async function renderEofProductionCaptionReplace(jobId) {
     )
   }
 
+  console.info(
+    '[eof-production] caption replace from clean stills (not short.mp4)',
+    jobId,
+    `scenes=${job.script.scenes.length}`,
+    `style=${job.captionStyle || 'default'}`,
+  )
+
   try {
     return await renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,

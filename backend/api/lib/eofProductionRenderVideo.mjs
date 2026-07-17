@@ -39,7 +39,7 @@ import {
   normalizeEofImageProvider,
   resolveEofImageProviderAttemptOrder,
 } from './eofImageProviderSettings.mjs'
-import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache } from './eofProductionVideo.mjs'
+import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache, assertEofCleanPlateImagePath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
   ensureEofMixedAudioOnDisk,
@@ -356,6 +356,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             `Scene ${row.index + 1} image is missing. Run Build Short once before regenerating voiceover only.`,
           )
         }
+        assertEofCleanPlateImagePath(restored)
         resolvedImagePath = restored
         imageMeta = {
           source: 'cache',

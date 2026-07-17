@@ -100,15 +100,22 @@ export function eofProductionVideoAbsPath(jobId) {
 }
 
 /**
- * Drop prior scene clips + caption textfiles so a remux cannot stitch or burn
- * against leftover captioned intermediates from the previous Short.
+ * Drop prior scene clips + caption textfiles + concat lists so a remux cannot stitch
+ * or burn against leftover captioned intermediates from the previous Short.
+ * Also removes short.mp4 / compact temps in the work dir (belt-and-suspenders with
+ * clearEofVideoOnlyArtifact) so encode never concatenates an old captioned plate.
  * @param {string} workDir
  */
 export function clearEofSceneClipCache(workDir) {
   if (!workDir || !existsSync(workDir)) return
   try {
     for (const name of readdirSync(workDir)) {
-      if (/^clip-\d+\.mp4$/i.test(name) || /^caption-text-\d+$/i.test(name)) {
+      if (
+        /^clip-\d+\.mp4$/i.test(name) ||
+        /^caption-text-\d+$/i.test(name) ||
+        /^short(\.compact)?\.mp4$/i.test(name) ||
+        /^video-concat\.txt$/i.test(name)
+      ) {
         const abs = join(workDir, name)
         try {
           rmSync(abs, { recursive: true, force: true })
@@ -123,6 +130,21 @@ export function clearEofSceneClipCache(workDir) {
     }
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Replace Captions / remux must encode from still images only — never an MP4 plate
+ * that may already have burned captions.
+ * @param {string} imagePath
+ */
+export function assertEofCleanPlateImagePath(imagePath) {
+  const p = String(imagePath || '')
+  if (!p) throw new Error('Scene image path is missing (clean plate required).')
+  if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(p)) {
+    throw new Error(
+      'Replace Captions refused a video plate as a scene still — rebuild from clean JPGs only.',
+    )
   }
 }
 
@@ -457,6 +479,7 @@ export async function renderEofProductionVideo({
     if (!scene.imagePath || !existsSync(scene.imagePath)) {
       throw new Error(`Scene ${scene.index + 1} image is missing.`)
     }
+    assertEofCleanPlateImagePath(scene.imagePath)
     const clipPath = await encodeSceneClip({
       scene,
       workDir,

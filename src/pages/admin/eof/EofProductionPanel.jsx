@@ -660,7 +660,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   /** Preview overlay only while drafting caption changes — hide once burned so it doesn't stack on the Short. */
   const showCaptionPreviewOverlay = (() => {
     if (captionStyle === 'off') return false
-    if (captionEditOpen) return true
+    // Editor open alone must not stack yellow text on an already-burned Short —
+    // only show overlay when draft differs from what is burned on the job.
     if (!selected || selected.status !== 'video_rendered') return true
     if (captionStyle !== (selected.captionStyle || EOF_DEFAULT_CAPTION_STYLE)) return true
     const jobLay = normalizeEofCaptionLayout(selected.captionLayout, selected.captionStyle || captionStyle)
@@ -985,8 +986,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     }
   }
 
-  async function waitForJobComplete(jobId, acceptableStatuses = ['video_rendered']) {
+  async function waitForJobComplete(jobId, acceptableStatuses = ['video_rendered'], opts = {}) {
+    const baselineUpdatedAt = opts.baselineUpdatedAt != null ? String(opts.baselineUpdatedAt) : null
     const deadline = Date.now() + 12 * 60 * 1000
+    let sawRendering = false
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500))
       const j = await fetchProduction()
@@ -994,14 +997,23 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (!job) throw new Error('Job disappeared during build.')
       upsertJob(job)
       if (job.renderProgress) setRenderProgress(job.renderProgress)
-      if (acceptableStatuses.includes(job.status)) return job
+      if (job.status === 'rendering' || job.status === 'rendering_video') sawRendering = true
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Build failed')
+      if (acceptableStatuses.includes(job.status)) {
+        // Replace Captions must not accept the pre-replace video_rendered snapshot.
+        if (baselineUpdatedAt) {
+          const movedOn =
+            sawRendering || (job.updatedAt != null && String(job.updatedAt) !== baselineUpdatedAt)
+          if (!movedOn) continue
+        }
+        return job
+      }
     }
     throw new Error('Build timed out — click Reset & retry, then try again.')
   }
 
-  async function waitForVideoComplete(jobId) {
-    return waitForJobComplete(jobId, ['video_rendered'])
+  async function waitForVideoComplete(jobId, opts = {}) {
+    return waitForJobComplete(jobId, ['video_rendered'], opts)
   }
 
   async function buildShort() {
@@ -1089,7 +1101,17 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     setErr('')
     setSuccess('Replacing captions (keeping images + voiceover)…')
     setRenderPhase('rendering-video')
+    setCaptionEditOpen(false)
+    if (videoPreviewUrl) {
+      try {
+        URL.revokeObjectURL(videoPreviewUrl)
+      } catch {
+        /* ignore */
+      }
+    }
     setVideoPreviewUrl('')
+
+    const baselineUpdatedAt = selected?.updatedAt || null
 
     try {
       const estSec = Math.max(40, (draftScript.scenes.length || 4) * 12)
@@ -1129,12 +1151,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
       }
 
-      const finishedJob = await waitForVideoComplete(selectedId)
+      const finishedJob = await waitForVideoComplete(selectedId, { baselineUpdatedAt })
       if (finishedJob.status !== 'video_rendered') {
         throw new Error(finishedJob.errorMessage || 'Caption replace did not finish with a video')
       }
 
-      await loadVideoPreview()
+      await loadVideoPreview({ bust: finishedJob.updatedAt || Date.now() })
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
       setSuccess('Captions replaced — images and voiceover kept.')
       upsertJob(finishedJob)
@@ -1727,17 +1749,30 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     }
   }
 
-  async function loadVideoPreview() {
+  async function loadVideoPreview(opts = {}) {
     if (!selectedId) return
     setErr('')
     try {
-      const videoRes = await apiFetch(`/api/admin/eof-production-video?jobId=${encodeURIComponent(selectedId)}`)
+      const bust = opts.bust != null ? String(opts.bust) : String(Date.now())
+      const videoRes = await apiFetch(
+        `/api/admin/eof-production-video?jobId=${encodeURIComponent(selectedId)}&t=${encodeURIComponent(bust)}`,
+      )
       if (!videoRes.ok) {
         const j = await videoRes.json().catch(() => ({}))
         throw new Error(j.error || 'Could not load video preview')
       }
       const blob = await videoRes.blob()
-      setVideoPreviewUrl(URL.createObjectURL(blob))
+      const nextUrl = URL.createObjectURL(blob)
+      setVideoPreviewUrl((prev) => {
+        if (prev) {
+          try {
+            URL.revokeObjectURL(prev)
+          } catch {
+            /* ignore */
+          }
+        }
+        return nextUrl
+      })
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not load video preview')
     }
@@ -2869,6 +2904,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   <div className="mt-4">
                     <div className="relative mx-auto max-h-[min(70vh,640px)] w-full max-w-[360px] overflow-hidden rounded-xl bg-black">
                       <video
+                        key={videoPreviewUrl}
                         ref={videoRef}
                         controls
                         playsInline

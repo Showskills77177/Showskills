@@ -418,7 +418,10 @@ export default async function handler(req, res) {
           return json(res, 400, { error: 'Job has no script scenes.' })
         }
         if (existing.status === 'rendering' || existing.status === 'rendering_video') {
-          return json(res, 202, { ok: true, accepted: true, job: existing })
+          return json(res, 409, {
+            error:
+              'This Short is already rendering. Wait until it finishes, then click Replace Captions again.',
+          })
         }
 
         try {

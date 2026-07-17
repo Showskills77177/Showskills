@@ -109,10 +109,40 @@ async function main() {
     ])
     const saved = await saveEofVideoArtifact(durableJob.id, videoPath)
     if (!saved) throw new Error('saveEofVideoArtifact failed')
+    const durableBytes = statSync(videoPath).size
     rmSync(dirname(videoPath), { recursive: true, force: true })
     const restored = await ensureEofVideoOnDisk(durableJob.id)
     if (!restored || !existsSync(restored)) throw new Error('durable video restore failed')
     if (statSync(restored).size < 1000) throw new Error('restored video too small')
+
+    // Stale /tmp plate must lose to durable video_base64 (Replace Captions preview bug).
+    mkdirSync(dirname(videoPath), { recursive: true })
+    await runFfmpeg([
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=red:s=320x240:d=1',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-t',
+      '1',
+      videoPath,
+    ])
+    const staleBytes = statSync(videoPath).size
+    if (staleBytes === durableBytes) {
+      // Extremely unlikely; still prove overwrite by comparing contents after ensure.
+    }
+    const refreshed = await ensureEofVideoOnDisk(durableJob.id)
+    if (!refreshed || !existsSync(refreshed)) throw new Error('stale-disk refresh failed')
+    if (statSync(refreshed).size !== durableBytes) {
+      throw new Error(
+        `ensureEofVideoOnDisk served stale disk plate (${statSync(refreshed).size}b) instead of durable (${durableBytes}b)`,
+      )
+    }
+
     await deleteEofProductionJob(durableJob.id)
   }
 
