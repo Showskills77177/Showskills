@@ -1512,7 +1512,8 @@ HARD SCOPE:
 ${EOF_FOOTBALL_SCOPE}
 
 Hard rules:
-- Exactly 5 scenes (4–6 only if the draft truly needs it; never more than ${EOF_MAX_SCENES}).
+- 3–5 scenes only. Prefer 3–4 for short hot takes. Never pad to 7. Never more than ${EOF_MAX_SCENES}.
+- If the draft names TWO people (e.g. Rooney + Tuchel), give the secondary person at least ONE scene imageQuery.
 - Each caption is ON-SCREEN TEXT and spoken as voiceover. Max 12 words. Punchy. Mobile-first. No hashtags in captions.
 - Always say football — never soccer.
 - PRESERVE the draft's facts, teams, and meaning — compress, do not replace with generic filler.

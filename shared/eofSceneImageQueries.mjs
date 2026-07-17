@@ -81,7 +81,7 @@ const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
 const PUNDIT_STRONG_RE =
   /\b(pundit|punditry|studio|presenter|commentator|commentary|co[- ]?commentary|analyst|analysis|sky\s*sports|tnt\s*sports|bt\s*sport|talksport|monday\s*night\s*football|soccer\s*saturday|match\s*of\s*the\s*day|motd)\b/i
 const PUNDIT_MEDIUM_RE =
-  /\b(tv\s*desk|television|tv\s*panel|panel\s*show|on\s*the\s*couch|couch\s*panel|broadcast|presenter'?s?\s*chair|mic\s*in\s*hand)\b/i
+  /\b(tv\s*desk|on\s*the\s*desk|the\s*desk|television|tv\s*panel|panel\s*show|on\s*the\s*couch|couch\s*panel|broadcast|presenter'?s?\s*chair|mic\s*in\s*hand)\b/i
 const PUNDIT_WEAK_RE =
   /\b(slammed|reckons|argues|opines|his\s+take|her\s+take|their\s+take|hot\s*take|reaction|reacts|claims\s+that|insists|warns|blasts|tears\s+into)\b/i
 
@@ -92,7 +92,7 @@ const PLAYING_MEDIUM_RE =
 
 /** Title/URL cues when ranking SERP hits for a known intent. */
 const PUNDIT_HIT_BOOST_RE =
-  /\b(pundit|studio|presenter|commentator|commentary|analyst|analysis|sky|tnt|talksport|suit|tv\s*desk|television|panel|broadcast|motd)\b/i
+  /\b(pundit|studio|presenter|commentator|commentary|analyst|analysis|sky|tnt|talksport|suit|tv\s*desk|on\s*the\s*desk|television|panel|broadcast|motd)\b/i
 const PLAYING_HIT_BOOST_RE =
   /\b(goal|goals|celebrat|scoring|scored|kit|jersey|in\s+action|match|debut|hat[- ]?trick|volley|free[- ]?kick|champions\s*league|world\s*cup)\b/i
 const PLAYING_HIT_DEMOTE_RE =
@@ -200,6 +200,88 @@ function expandEntityFullName(entity) {
  * @param {string} topic
  * @returns {string}
  */
+/**
+ * All named people/clubs from topic + draft (lead first). Used so Rooney+Tuchel
+ * Shorts can assign at least one still to the secondary person.
+ * @param {string} topic
+ * @param {string} [plainTextDraft]
+ * @returns {string[]} expanded full names when known
+ */
+export function listImageSubjects(topic, plainTextDraft = '') {
+  const blob = [topic, plainTextDraft].filter(Boolean).join(' ')
+  const entities = primaryImageEntities(blob)
+  const out = []
+  const seen = new Set()
+  for (const e of entities) {
+    const full = expandEntityFullName(e) || e
+    const key = String(full).toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(full)
+  }
+  // Ensure topic lead is first
+  const lead = resolveImageSubject(topic)
+  if (lead) {
+    const li = out.findIndex((x) => x.toLowerCase() === lead.toLowerCase())
+    if (li > 0) {
+      out.splice(li, 1)
+      out.unshift(lead)
+    } else if (li < 0) out.unshift(lead)
+  }
+  return out.slice(0, 4)
+}
+
+/**
+ * Known players/coaches only — not “England”, “tactics”, clubs-as-noise.
+ * @param {string} topic
+ * @param {string} [plainTextDraft]
+ */
+export function listSecondaryImageSubjects(topic, plainTextDraft = '') {
+  const all = listImageSubjects(topic, plainTextDraft)
+  const lead = resolveImageSubject(topic)
+  return all.filter((s) => {
+    if (lead && s.toLowerCase() === lead.toLowerCase()) return false
+    const full = expandEntityFullName(s) || s
+    const surname = full.split(/\s+/).pop() || ''
+    return Boolean(expandPlayerFullName(surname) || topicLooksLikeCoach(full))
+  })
+}
+
+function personMentionedInText(person, text) {
+  const parts = String(person || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length >= 4)
+  const surname = parts[parts.length - 1]
+  if (!surname) return false
+  return new RegExp(`\\b${surname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(String(text || ''))
+}
+
+/**
+ * Pick imageQuery subject for a caption.
+ * Lead wins when both people are named in the same beat (Rooney slammed Tuchel → Rooney still).
+ * Secondary wins only when the caption is about them alone, or on one reserved scene slot.
+ * @param {{ topic: string, caption?: string, plainTextDraft?: string, sceneIndex?: number, sceneCount?: number }} input
+ */
+export function resolveSceneImageSubject(input = {}) {
+  const topic = String(input.topic || '').trim()
+  const caption = String(input.caption || '')
+  const draft = String(input.plainTextDraft || '')
+  const lead = resolveImageSubject(topic) || topic || 'football'
+  const secondary = listSecondaryImageSubjects(topic, draft)
+  if (!secondary.length) return lead
+
+  // Exactly one secondary still per Short (reserved beat). Other beats stay on the lead —
+  // even if the caption says “Tuchel’s tactics” while Rooney is talking.
+  const sceneCount = Math.max(1, Number(input.sceneCount) || 4)
+  const sceneIndex = Math.max(0, Number(input.sceneIndex) || 0)
+  const reserved = Math.min(1, Math.max(0, sceneCount - 2)) // usually scene index 1
+  if (sceneCount >= 3 && sceneIndex === reserved) {
+    return secondary[0]
+  }
+  return lead
+}
+
 export function resolveImageSubject(topic) {
   const cleaned = sanitizeTopicForImageSearch(topic)
   const entities = primaryImageEntities(cleaned)
@@ -662,10 +744,39 @@ export function imageAngleFromCaption(caption, subject, coachOrIntent = false) {
  */
 export function defaultSceneImageQuery(topic, sceneIndex, opts = {}) {
   const name = String(topic || '').trim() || 'football'
-  // Anchor every scene to the topic's player/club (expanded full name), never caption noise
-  const core = resolveImageSubject(name) || name
-  const intent = detectImageRoleIntent({ topic: name, ...opts })
-  const angles = anglesForIntent(intent)
+  const caption = String(opts.caption || '')
+  const core = resolveSceneImageSubject({
+    topic: name,
+    caption,
+    plainTextDraft: opts.plainTextDraft,
+    sceneIndex,
+    sceneCount: opts.sceneCount,
+  })
+  // Per-subject intent: Tuchel → coach; Rooney pundit VO → pundit (ignore coach bias from Tuchel in topic).
+  let resolvedIntent
+  if (topicLooksLikeCoach(core)) {
+    const blobIntent = detectImageRoleIntent({
+      topic: name,
+      caption,
+      plainTextDraft: opts.plainTextDraft,
+      intent: opts.intent,
+    })
+    resolvedIntent = blobIntent === 'playing' ? 'playing' : 'coach'
+  } else {
+    // Strip other named coaches from the draft so “Rooney on Tuchel” stays pundit/playing for Rooney.
+    const stripCoaches = (text) =>
+      String(text || '')
+        .replace(new RegExp(KNOWN_COACH_RE.source, 'gi'), ' ')
+        .replace(/\bthomas\b/gi, ' ')
+    resolvedIntent = detectImageRoleIntent({
+      topic: core,
+      caption: stripCoaches(caption),
+      plainTextDraft: stripCoaches(opts.plainTextDraft),
+      intent: opts.intent === 'coach' ? undefined : opts.intent,
+    })
+    if (resolvedIntent === 'coach') resolvedIntent = 'neutral'
+  }
+  const angles = anglesForIntent(resolvedIntent)
   return angles[sceneIndex % angles.length](core)
 }
 
@@ -680,8 +791,34 @@ export function anchorSceneImageQuery({
   sceneIndex = 0,
   plainTextDraft,
   intent: intentOpt,
+  sceneCount,
 } = {}) {
-  const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const lead = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const secondary = listSecondaryImageSubjects(topic || '', plainTextDraft || '')
+  const raw = String(imageQuery || '').trim()
+
+  // Keep queries that already name a secondary person (e.g. Thomas Tuchel).
+  for (const person of secondary) {
+    const surname = person.split(/\s+/).filter(Boolean).pop() || person
+    if (
+      surname.length >= 4 &&
+      new RegExp(`\\b${surname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(raw)
+    ) {
+      const secIntent = topicLooksLikeCoach(person) ? 'coach' : intentOpt || 'neutral'
+      if (PUNDIT_HIT_DEMOTE_RE.test(raw) && secIntent === 'pundit') {
+        return imageAngleFromCaption(caption || person, person, secIntent)
+      }
+      return raw
+    }
+  }
+
+  const subject = resolveSceneImageSubject({
+    topic,
+    caption,
+    plainTextDraft,
+    sceneIndex,
+    sceneCount,
+  })
   const intent = detectImageRoleIntent({
     topic,
     caption,
@@ -689,8 +826,8 @@ export function anchorSceneImageQuery({
     plainTextDraft,
     intent: intentOpt,
   })
-  const coach = intent === 'coach'
-  const raw = String(imageQuery || '').trim()
+  const resolvedIntent =
+    topicLooksLikeCoach(subject) && intent !== 'playing' ? 'coach' : intent
   const surname = subject.split(/\s+/).filter(Boolean).pop() || subject
   const namesSubject =
     raw &&
@@ -698,21 +835,30 @@ export function anchorSceneImageQuery({
       (surname.length >= 4 && new RegExp(`\\b${surname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(raw)))
 
   // Pundit scripts: rewrite playing-career imageQueries (kit / celebration / old club action).
-  if (intent === 'pundit' && namesSubject && PUNDIT_HIT_DEMOTE_RE.test(raw) && !PUNDIT_HIT_BOOST_RE.test(raw)) {
-    return imageAngleFromCaption(caption || topic || '', subject, intent)
+  if (
+    resolvedIntent === 'pundit' &&
+    namesSubject &&
+    PUNDIT_HIT_DEMOTE_RE.test(raw) &&
+    !PUNDIT_HIT_BOOST_RE.test(raw)
+  ) {
+    return imageAngleFromCaption(caption || topic || '', subject, resolvedIntent)
   }
 
   if (namesSubject && !/^(stadium|crowd|fans?|generic)\b/i.test(raw)) {
-    // Keep AI angle when it already names the person; lightly enrich with caption cues.
     if (
       caption &&
       /\btactic|england|celebrat|press|train|pundit|studio|sky|tnt/i.test(caption) &&
       !/\btactic|england|celebrat|press|train|pundit|studio|sky|tnt/i.test(raw)
     ) {
-      return imageAngleFromCaption(caption, subject, intent)
+      return imageAngleFromCaption(caption, subject, resolvedIntent)
     }
     return raw
   }
-  if (caption) return imageAngleFromCaption(caption, subject, intent)
-  return defaultSceneImageQuery(topic || subject, sceneIndex, { plainTextDraft, intent })
+  if (caption) return imageAngleFromCaption(caption, subject, resolvedIntent)
+  return defaultSceneImageQuery(topic || lead, sceneIndex, {
+    plainTextDraft,
+    intent: resolvedIntent,
+    caption,
+    sceneCount,
+  })
 }

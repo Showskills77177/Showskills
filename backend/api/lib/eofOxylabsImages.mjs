@@ -17,14 +17,18 @@ import {
   scoreImageRelevance,
   detectImageRoleIntent,
   scoreImageRoleIntentMatch,
+  listSecondaryImageSubjects,
+  topicLooksLikeCoach,
 } from '../../../shared/eofSceneImageQueries.mjs'
+import { isBlockedStockImageUrl, filterBlockedStockImages } from '../../../shared/eofStockImageFilter.mjs'
 
 const OXYLABS_REALTIME_URL = 'https://realtime.oxylabs.io/v1/queries'
 const DEFAULT_TIMEOUT_MS = 60_000
 /** Keep only what a Short needs from one SERP page (billing is per query, not per URL). */
 const DEFAULT_LIMIT = 12
-/** Hard cap on billable Google Images queries per production job / rebuild. */
-export const EOF_OXYLABS_MAX_QUERIES_PER_JOB = 1
+/** Hard cap on billable Google Images queries per production job / rebuild.
+ * 1 for single-subject Shorts; +1 allowed when a secondary person (e.g. Tuchel) needs a still. */
+export const EOF_OXYLABS_MAX_QUERIES_PER_JOB = 2
 
 function envTrim(name) {
   return String(process.env[name] || '').trim()
@@ -58,6 +62,7 @@ export function scoreImageCandidate(url, width = 0, height = 0) {
   const u = String(url || '').toLowerCase()
   let s = 0
   if (!isHttpUrl(url)) return -100
+  if (isBlockedStockImageUrl(url)) return -200
   if (/\.(jpe?g|png|webp)(\?|$)/i.test(url)) s += 25
   if (/encrypted-tbn\d*\.gstatic\.com/i.test(u)) s -= 15
   if (/gstatic\.com\/images/i.test(u) && /[?&]s=\d{1,2}(?:&|$)/i.test(u)) s -= 40
@@ -197,10 +202,11 @@ export function extractOxylabsImageRows(payload) {
   }
 
   walk(payload)
-  rows.sort(
+  const filtered = filterBlockedStockImages(rows)
+  filtered.sort(
     (a, b) => scoreImageCandidate(b.url, b.width, b.height) - scoreImageCandidate(a.url, a.width, a.height),
   )
-  return rows
+  return filtered
 }
 
 /**
@@ -432,27 +438,60 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
   const intent = detectImageRoleIntent({ topic: opts.topic, ...context })
   const query = buildOxylabsJobQuery(opts.topic || '', attempt, context)
 
-  // Pull a wider SERP slice (still 1 credit), then keep the best portrait/high-res rows
-  // so scenes are not stuck with the first 7 thin landscape thumbs.
-  const need = Math.max(1, sceneCount + 1)
-  const fetchLimit = Math.min(40, Math.max(16, need * 3))
-  const hits = await searchOxylabsGoogleImages(query, {
-    limit: fetchLimit,
-    signal: opts.signal,
-  })
-  const kept = hits.slice(0, Math.max(need, Math.min(hits.length, need + 4)))
+  // Tight pool sized to scene count — do not keep 20 Rooney stills for a 3–4 beat Short.
+  const need = Math.max(3, sceneCount + 1)
+  const fetchLimit = Math.min(24, Math.max(10, need * 2))
+  const hits = filterBlockedStockImages(
+    await searchOxylabsGoogleImages(query, {
+      limit: fetchLimit,
+      signal: opts.signal,
+    }),
+  )
+  const kept = hits.slice(0, Math.min(hits.length, need + 2))
   console.info(
     '[eof-oxylabs] job pool',
     query.slice(0, 60),
     `intent=${intent}`,
     `scenes=${sceneCount}`,
     `kept=${kept.length}/${fetchLimit}`,
-    `(${EOF_OXYLABS_MAX_QUERIES_PER_JOB} query/Short — not per scene)`,
+    `(≤${EOF_OXYLABS_MAX_QUERIES_PER_JOB} queries/Short — not per scene)`,
   )
   return {
     query,
     intent,
+    subject: resolveImageSubject(opts.topic || '') || null,
     hits: kept.map((h) => ({
+      url: h.url,
+      title: h.title || null,
+      width: h.width,
+      height: h.height,
+    })),
+  }
+}
+
+/**
+ * Optional second credit: stills for a secondary person (Tuchel when lead is Rooney).
+ * @param {{ topic?: string, plainTextDraft?: string, captions?: string|string[], signal?: AbortSignal }} opts
+ */
+export async function fetchEofOxylabsSecondaryPool(opts = {}) {
+  const secondary = listSecondaryImageSubjects(opts.topic || '', opts.plainTextDraft || '')
+  const person = secondary[0]
+  if (!person) return null
+  const intent = topicLooksLikeCoach(person) ? 'coach' : 'neutral'
+  const query =
+    intent === 'coach'
+      ? `"${person}" manager sideline`
+      : `"${person}" football portrait`
+  const hits = filterBlockedStockImages(
+    await searchOxylabsGoogleImages(query, { limit: 8, signal: opts.signal }),
+  ).slice(0, 5)
+  console.info('[eof-oxylabs] secondary pool', person, `kept=${hits.length}`, '(+1 credit)')
+  if (!hits.length) return null
+  return {
+    subject: person,
+    query,
+    intent,
+    hits: hits.map((h) => ({
       url: h.url,
       title: h.title || null,
       width: h.width,
@@ -484,6 +523,7 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
     plainTextDraft: scene.plainTextDraft,
     captions: caption,
   })
+  if (isBlockedStockImageUrl(hit?.url, title)) return -500
   const portrait = scoreImageCandidate(hit?.url, hit?.width, hit?.height)
   // Caption tokens in the title (tactics / England / celebrate) get a small extra nudge.
   let captionBoost = 0
@@ -493,7 +533,9 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
   }
   // URL-only era cues (titles already scored inside scoreImageRelevance).
   const urlRole = scoreImageRoleIntentMatch(intent, String(hit?.url || ''))
-  return relevance * 12 + Math.max(-20, Math.min(40, portrait)) + captionBoost + urlRole
+  const vision = Number(hit?.visionScore)
+  const visionBoost = Number.isFinite(vision) ? (vision - 5) * 8 : 0
+  return relevance * 12 + Math.max(-20, Math.min(40, portrait)) + captionBoost + urlRole + visionBoost
 }
 
 /**

@@ -291,22 +291,33 @@ export async function fetchEofSceneImage({
   }
 
   // SerpAPI / Oxylabs job pool: consume shared hits only — NEVER fire a new query per scene.
-  // The job runner spends exactly 1 credit for the whole Short.
+  // Lead pool = 1 credit; optional secondary pool (+1) when the script names two people.
   if (oxyPool && Array.isArray(oxyPool.hits) && oxyPool.hits.length) {
     const poolSource = oxyPool.source === 'serpapi' ? 'serpapi' : 'oxylabs'
+    const secondarySubject = String(oxyPool.secondarySubject || '').trim()
+    const qLower = String(anchoredQuery || '').toLowerCase()
+    const useSecondary =
+      secondarySubject &&
+      Array.isArray(oxyPool.secondaryHits) &&
+      oxyPool.secondaryHits.length &&
+      qLower.includes(secondarySubject.split(/\s+/).filter(Boolean).pop()?.toLowerCase() || '___')
+    const activeHits = useSecondary ? oxyPool.secondaryHits : oxyPool.hits
+    const activeClaimed = useSecondary
+      ? oxyPool.secondaryClaimed || (oxyPool.secondaryClaimed = new Set())
+      : oxyPool.claimed || (oxyPool.claimed = new Set())
     const maxDownloadTries = 5
     for (let t = 0; t < maxDownloadTries; t += 1) {
       const claimed = claimOxylabsPoolHit({
-        hits: oxyPool.hits,
-        claimed: oxyPool.claimed || (oxyPool.claimed = new Set()),
+        hits: activeHits,
+        claimed: activeClaimed,
         avoidKeys: avoid,
         index: index + attempt + t,
-        topic,
+        topic: useSecondary ? secondarySubject : topic,
         imageQuery: anchoredQuery,
         caption,
         plainTextDraft: draft,
-        intent: roleIntent,
-        keyPrefix: poolSource,
+        intent: useSecondary ? 'coach' : roleIntent,
+        keyPrefix: useSecondary ? `${poolSource}-sec` : poolSource,
       })
       if (!claimed) break
       // Score the TITLE for the scene — job query alone must not rubber-stamp weak stills.
@@ -316,15 +327,15 @@ export async function fetchEofSceneImage({
         anchoredQuery || caption || '',
         { plainTextDraft: draft, captions: caption, intent: roleIntent },
       )
-      if (score < 2 && claimed.title) {
-        // Release so another scene can try a better-titled hit.
-        oxyPool.claimed?.delete?.(claimed.key)
+      if (score < 2 && claimed.title && !(Number(claimed.sceneScore) > 40)) {
+        // Release so another scene can try a better-titled hit (vision-scored rows can keep weak titles).
+        activeClaimed.delete?.(claimed.key)
         continue
       }
       if (await downloadImageToFile(claimed.imgUrl, outPath)) {
         return {
           path: outPath,
-          source: poolSource,
+          source: useSecondary ? `${poolSource}-secondary` : poolSource,
           imageQuery: anchoredQuery || oxyPool.query || imageQuery,
           imageTitle: claimed.title,
           relevance: score,
@@ -333,6 +344,34 @@ export async function fetchEofSceneImage({
         }
       }
       // Keep claimed on download failure — don't burn retries on a dead URL.
+    }
+    // Secondary pool empty/failed → fall back to lead pool once.
+    if (useSecondary && Array.isArray(oxyPool.hits)) {
+      for (let t = 0; t < 3; t += 1) {
+        const claimed = claimOxylabsPoolHit({
+          hits: oxyPool.hits,
+          claimed: oxyPool.claimed || (oxyPool.claimed = new Set()),
+          avoidKeys: avoid,
+          index: index + attempt + t,
+          topic,
+          imageQuery: anchoredQuery,
+          caption,
+          plainTextDraft: draft,
+          intent: roleIntent,
+          keyPrefix: poolSource,
+        })
+        if (!claimed) break
+        if (await downloadImageToFile(claimed.imgUrl, outPath)) {
+          return {
+            path: outPath,
+            source: poolSource,
+            imageQuery: anchoredQuery || oxyPool.query || imageQuery,
+            imageTitle: claimed.title,
+            imageKey: claimed.key,
+            sceneScore: claimed.sceneScore,
+          }
+        }
+      }
     }
   }
 

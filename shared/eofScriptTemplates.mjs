@@ -309,9 +309,18 @@ export function normalizeEofScript(script, topicFallback = '') {
       if (!caption) return null
       const imageQuery = anchorSceneImageQuery({
         topic,
-        imageQuery: s?.imageQuery || s?.image_query || defaultSceneImageQuery(topic, i),
+        imageQuery:
+          s?.imageQuery ||
+          s?.image_query ||
+          defaultSceneImageQuery(topic, i, {
+            caption,
+            plainTextDraft,
+            sceneCount: scenesIn.length,
+          }),
         caption,
         sceneIndex: i,
+        plainTextDraft,
+        sceneCount: scenesIn.length,
       })
       return createEofScene({
         id: s?.id,

@@ -15,8 +15,25 @@ import {
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mjs'
 import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
-import { isEofOxylabsConfigured, fetchEofOxylabsJobPool } from './eofOxylabsImages.mjs'
-import { isEofSerpApiConfigured, fetchEofSerpApiJobPool } from './eofSerpApiImages.mjs'
+import {
+  isEofOxylabsConfigured,
+  fetchEofOxylabsJobPool,
+  fetchEofOxylabsSecondaryPool,
+} from './eofOxylabsImages.mjs'
+import {
+  isEofSerpApiConfigured,
+  fetchEofSerpApiJobPool,
+  fetchEofSerpApiSecondaryPool,
+} from './eofSerpApiImages.mjs'
+import {
+  isEofImageVisionConfigured,
+  rankEofPoolHitsWithVision,
+  applyVisionScoresToHits,
+} from './eofImageVision.mjs'
+import {
+  resolveImageSubject,
+  listSecondaryImageSubjects,
+} from '../../../shared/eofSceneImageQueries.mjs'
 import {
   getEofImageProviderSettings,
   normalizeEofImageProvider,
@@ -198,6 +215,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 source: 'serpapi',
                 plainTextDraft: imageContext.plainTextDraft,
                 intent: pool.intent || null,
+                subject: pool.subject || resolveImageSubject(job.topic) || null,
               }
             }
           } catch (e) {
@@ -221,6 +239,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 source: 'oxylabs',
                 plainTextDraft: imageContext.plainTextDraft,
                 intent: pool.intent || null,
+                subject: pool.subject || resolveImageSubject(job.topic) || null,
               }
             }
           } catch (e) {
@@ -228,10 +247,69 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           }
         }
       }
+
+      // Second credit only when the script names another person (Rooney + Tuchel).
+      const secondaryPeople = listSecondaryImageSubjects(
+        job.topic,
+        imageContext.plainTextDraft,
+      )
+      if (oxyPool?.hits?.length && secondaryPeople.length) {
+        try {
+          const sec =
+            oxyPool.source === 'serpapi'
+              ? await fetchEofSerpApiSecondaryPool({
+                  topic: job.topic,
+                  plainTextDraft: imageContext.plainTextDraft,
+                })
+              : await fetchEofOxylabsSecondaryPool({
+                  topic: job.topic,
+                  plainTextDraft: imageContext.plainTextDraft,
+                })
+          if (sec?.hits?.length) {
+            oxyPool.secondaryHits = sec.hits
+            oxyPool.secondarySubject = sec.subject
+            oxyPool.secondaryQuery = sec.query
+            oxyPool.secondaryClaimed = new Set()
+          }
+        } catch (e) {
+          console.warn('[eof-video] secondary image pool failed', e instanceof Error ? e.message : e)
+        }
+      }
+
+      // Grok vision: look at the stills (not just titles) — drop watermark / wrong era / wrong face.
+      if (oxyPool?.hits?.length && isEofImageVisionConfigured()) {
+        try {
+          const visionScores = await rankEofPoolHitsWithVision({
+            hits: oxyPool.hits,
+            subject: oxyPool.subject || resolveImageSubject(job.topic) || job.topic,
+            intent: oxyPool.intent || 'neutral',
+            secondarySubjects: secondaryPeople,
+            maxImages: Math.min(8, oxyPool.hits.length),
+          })
+          if (visionScores.size) {
+            oxyPool.hits = applyVisionScoresToHits(oxyPool.hits, visionScores)
+          }
+          if (oxyPool.secondaryHits?.length) {
+            const secScores = await rankEofPoolHitsWithVision({
+              hits: oxyPool.secondaryHits,
+              subject: oxyPool.secondarySubject || secondaryPeople[0],
+              intent: 'coach',
+              maxImages: Math.min(6, oxyPool.secondaryHits.length),
+            })
+            if (secScores.size) {
+              oxyPool.secondaryHits = applyVisionScoresToHits(oxyPool.secondaryHits, secScores)
+            }
+          }
+        } catch (e) {
+          console.warn('[eof-video] vision re-rank skipped', e instanceof Error ? e.message : e)
+        }
+      }
+
       console.info(
         '[eof-video] google images pool',
         oxyPool?.source || 'none',
         oxyPool?.hits?.length ? `${oxyPool.hits.length} hits` : '0 hits',
+        oxyPool?.secondaryHits?.length ? `+${oxyPool.secondaryHits.length} secondary` : '',
         oxyPool?.query ? `q=${String(oxyPool.query).slice(0, 80)}` : '',
       )
       if (!oxyPool?.hits?.length) {

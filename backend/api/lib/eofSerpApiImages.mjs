@@ -1,8 +1,8 @@
 /**
  * SerpAPI Google Images for EOF Shorts scene photos (cheaper Oxylabs alternative).
  *
- * Billing rule: at most ONE Google Images query per Short rebuild. All scenes
- * share that SERP pool (6–7 stills ≠ 6–7 credits) — same spirit as Oxylabs.
+ * Billing: 1 Google Images query for the lead subject pool (+ optional 1 for a
+ * secondary person). Scenes share pools — not one credit per scene.
  *
  * Docs: https://serpapi.com/google-images-api
  * Key: https://serpapi.com/manage-api-key
@@ -18,14 +18,20 @@ import {
   scoreImageCandidate,
   claimOxylabsPoolHit,
 } from './eofOxylabsImages.mjs'
-import { detectImageRoleIntent } from '../../../shared/eofSceneImageQueries.mjs'
+import {
+  detectImageRoleIntent,
+  resolveImageSubject,
+  listSecondaryImageSubjects,
+  topicLooksLikeCoach,
+} from '../../../shared/eofSceneImageQueries.mjs'
+import { filterBlockedStockImages, isBlockedStockImageUrl } from '../../../shared/eofStockImageFilter.mjs'
 
 const SERPAPI_SEARCH_URL = 'https://serpapi.com/search.json'
 const SERPAPI_ACCOUNT_URL = 'https://serpapi.com/account.json'
 const DEFAULT_TIMEOUT_MS = 45_000
 const DEFAULT_LIMIT = 12
 /** Hard cap on billable Google Images queries per production job / rebuild. */
-export const EOF_SERPAPI_MAX_QUERIES_PER_JOB = 1
+export const EOF_SERPAPI_MAX_QUERIES_PER_JOB = 2
 
 function envTrim(name) {
   return String(process.env[name] || '').trim()
@@ -107,14 +113,16 @@ export function extractSerpApiImageRows(payload) {
       }
     }
     if (!best || bestScore < -50 || seen.has(best.url)) continue
+    if (isBlockedStockImageUrl(best.url, best.title)) continue
     seen.add(best.url)
     rows.push(best)
   }
 
-  rows.sort(
+  const filtered = filterBlockedStockImages(rows)
+  filtered.sort(
     (a, b) => scoreImageCandidate(b.url, b.width, b.height) - scoreImageCandidate(a.url, a.width, a.height),
   )
-  return rows
+  return filtered
 }
 
 /**
@@ -211,26 +219,61 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
   const intent = detectImageRoleIntent({ topic: opts.topic, ...context })
   const query = buildOxylabsJobQuery(opts.topic || '', attempt, context)
 
-  const need = Math.max(1, sceneCount + 1)
-  const fetchLimit = Math.min(40, Math.max(16, need * 3))
-  const hits = await searchSerpApiGoogleImages(query, {
-    limit: fetchLimit,
-    signal: opts.signal,
-  })
-  const kept = hits.slice(0, Math.max(need, Math.min(hits.length, need + 4)))
+  const need = Math.max(3, sceneCount + 1)
+  const fetchLimit = Math.min(24, Math.max(10, need * 2))
+  const hits = filterBlockedStockImages(
+    await searchSerpApiGoogleImages(query, {
+      limit: fetchLimit,
+      signal: opts.signal,
+    }),
+  )
+  const kept = hits.slice(0, Math.min(hits.length, need + 2))
   console.info(
     '[eof-serpapi] job pool',
     query.slice(0, 60),
     `intent=${intent}`,
     `scenes=${sceneCount}`,
     `kept=${kept.length}/${fetchLimit}`,
-    `(${EOF_SERPAPI_MAX_QUERIES_PER_JOB} query/Short — not per scene)`,
+    `(≤${EOF_SERPAPI_MAX_QUERIES_PER_JOB} queries/Short — not per scene)`,
   )
   return {
     query,
     intent,
     source: 'serpapi',
+    subject: resolveImageSubject(opts.topic || '') || null,
     hits: kept.map((h) => ({
+      url: h.url,
+      title: h.title || null,
+      width: h.width,
+      height: h.height,
+    })),
+  }
+}
+
+/**
+ * Optional second SerpAPI credit for a secondary person (e.g. Tuchel).
+ * @param {{ topic?: string, plainTextDraft?: string, signal?: AbortSignal }} opts
+ */
+export async function fetchEofSerpApiSecondaryPool(opts = {}) {
+  const secondary = listSecondaryImageSubjects(opts.topic || '', opts.plainTextDraft || '')
+  const person = secondary[0]
+  if (!person) return null
+  const intent = topicLooksLikeCoach(person) ? 'coach' : 'neutral'
+  const query =
+    intent === 'coach'
+      ? `"${person}" manager sideline`
+      : `"${person}" football portrait`
+  const hits = filterBlockedStockImages(
+    await searchSerpApiGoogleImages(query, { limit: 8, signal: opts.signal }),
+  ).slice(0, 5)
+  console.info('[eof-serpapi] secondary pool', person, `kept=${hits.length}`, '(+1 credit)')
+  if (!hits.length) return null
+  return {
+    subject: person,
+    query,
+    intent,
+    source: 'serpapi',
+    hits: hits.map((h) => ({
       url: h.url,
       title: h.title || null,
       width: h.width,

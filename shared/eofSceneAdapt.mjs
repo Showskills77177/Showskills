@@ -1,6 +1,20 @@
 import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
 import { EOF_MAX_SCENES, normalizeEofScript } from './eofScriptTemplates.mjs'
 
+/**
+ * Short scripts do not need 7 stills — prefer 3–5 beats.
+ * @param {string} draft
+ * @returns {{ min: number, max: number }}
+ */
+export function targetSceneCountForDraft(draft) {
+  const words = wordCount(draft)
+  const sentences = splitDraftIntoSentences(draft).length
+  if (words < 70 || sentences <= 3) return { min: 3, max: 4 }
+  if (words < 105 || sentences <= 4) return { min: 3, max: 5 }
+  // Cap auto-adapt at 5 — more scenes = more same-face stills and wasted SERP picks
+  return { min: 4, max: 5 }
+}
+
 /** Words in a phrase. */
 function wordCount(s) {
   return String(s || '')
@@ -169,16 +183,25 @@ export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, form
   const sentences = splitDraftIntoSentences(draft)
   if (sentences.length < 2) return null
 
-  const units = balanceSceneUnits(sentences, { min: 4, max: EOF_MAX_SCENES, capWords: 16 })
+  const { min, max } = targetSceneCountForDraft(draft)
+  const units = balanceSceneUnits(sentences, {
+    min,
+    max: Math.min(max, EOF_MAX_SCENES),
+    capWords: 16,
+  })
   if (units.length < 3) return null
 
+  const sceneCount = units.length
   const scenes = units.map((unit, i) => {
     const caption = tidyCaption(unit)
     return {
       caption,
-      // Anchor image search to the topic's player/club only — caption text has other proper
-      // nouns (opponents, managers, clubs) that would otherwise hijack the photo search.
-      imageQuery: defaultSceneImageQuery(t, i),
+      // Lead subject for most scenes; secondary (e.g. Tuchel) when the caption names them.
+      imageQuery: defaultSceneImageQuery(t, i, {
+        caption,
+        plainTextDraft: draft,
+        sceneCount,
+      }),
       role: i === 0 ? 'hook' : i === units.length - 1 ? 'cta' : 'body',
     }
   })

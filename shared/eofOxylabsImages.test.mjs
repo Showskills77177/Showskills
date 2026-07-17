@@ -186,8 +186,8 @@ describe('eofOxylabsImages', () => {
     assert.equal(overflow.reused, true)
   })
 
-  it('caps billable Google Images queries to 1 per Short job', () => {
-    assert.equal(EOF_OXYLABS_MAX_QUERIES_PER_JOB, 1)
+  it('caps billable Google Images queries to ≤2 per Short (lead + optional secondary)', () => {
+    assert.equal(EOF_OXYLABS_MAX_QUERIES_PER_JOB, 2)
   })
 
   it('claims unique pool URLs across 7 concurrent scenes (one SERP, seven stills)', () => {
