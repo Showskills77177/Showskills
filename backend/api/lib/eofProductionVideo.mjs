@@ -30,6 +30,10 @@ import {
   resolveEofOverlayMoments,
 } from '../../../shared/eofOverlayMoments.mjs'
 import {
+  stillNeedsNewsAgencyLogoBlur,
+  buildNewsAgencyLogoBlurFilterFragment,
+} from '../../../shared/eofNewsAgencyLogoBlur.mjs'
+import {
   normalizeEofVideoEffects,
   videoEffectsFilterChain,
   eofVideoEffectIds,
@@ -175,23 +179,41 @@ export function assertEofCleanPlateImagePath(imagePath) {
  * - Landscape match stills → only X is cropped → keep horizontal center
  * - Tall / portrait stills → Y is cropped → bias toward the upper band so heads stay in frame
  *   (dead-center was chopping Tuchel/faces; glued-to-top was chopping pitch awkwardly)
+ *
+ * News/agency plates optionally get corner boxblur (Fox/Sky bugs, Getty watermarks) after crop.
+ * Returns a filtergraph string (may include `;` when logo blur is active).
  */
-function buildSceneBaseFilters({ frames, lookFilters = [], kenBurns = false }) {
-  const base = [
+function buildSceneBaseFilters({
+  frames,
+  lookFilters = [],
+  kenBurns = false,
+  logoBlur = false,
+  logoBlurLabelPrefix = 'mlb',
+}) {
+  const head = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
     'crop=1080:1920:(iw-ow)/2:max(0\\,min((ih-oh)*0.20\\,ih-oh))',
     'setsar=1',
   ]
-  if (lookFilters?.length) base.push(...lookFilters)
+  if (lookFilters?.length) head.push(...lookFilters)
+
+  let chain = head.join(',')
+  if (logoBlur) {
+    const blur = buildNewsAgencyLogoBlurFilterFragment({
+      frameW: 1080,
+      frameH: 1920,
+      labelPrefix: logoBlurLabelPrefix,
+    })
+    if (blur) chain = `${chain},${blur}`
+  }
+
   if (kenBurns) {
     // Mild zoom, anchored upper-center so the push-in doesn't cut faces off the top.
-    base.push(
-      `zoompan=z='min(zoom+0.0012\\,1.14)':x='iw/2-(iw/zoom/2)':y='max(0\\,min(ih-ih/zoom\\,(ih-ih/zoom)*0.22))':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`,
-    )
+    chain += `,zoompan=z='min(zoom+0.0012\\,1.14)':x='iw/2-(iw/zoom/2)':y='max(0\\,min(ih-ih/zoom\\,(ih-ih/zoom)*0.22))':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`
   } else {
-    base.push(`fps=${VIDEO_FPS}`)
+    chain += `,fps=${VIDEO_FPS}`
   }
-  return base
+  return chain
 }
 
 /**
@@ -259,9 +281,10 @@ function buildSceneVideoFilter({
   effectFilters = [],
   kenBurns = false,
   textDir,
+  logoBlur = false,
 }) {
-  return [
-    ...buildSceneBaseFilters({ frames, lookFilters, kenBurns }),
+  const base = buildSceneBaseFilters({ frames, lookFilters, kenBurns, logoBlur })
+  const tail = [
     ...(effectFilters?.length ? effectFilters : []),
     ...buildSceneCaptionFilters({
       caption,
@@ -272,7 +295,8 @@ function buildSceneVideoFilter({
       burnCaptions,
       textDir,
     }),
-  ].join(',')
+  ]
+  return tail.length ? `${base},${tail.join(',')}` : base
 }
 
 /**
@@ -292,11 +316,20 @@ function buildSceneOverlayFilterComplex({
   textDir,
   overlayMoment,
   stickers = null,
+  logoBlur = false,
+  overlayLogoBlur = false,
 }) {
-  const baseChain = buildSceneBaseFilters({ frames, lookFilters, kenBurns }).join(',')
+  const baseChain = buildSceneBaseFilters({
+    frames,
+    lookFilters,
+    kenBurns,
+    logoBlur,
+    logoBlurLabelPrefix: 'mlb',
+  })
   const pop = buildOverlayPopFilterFragments({
     startSec: overlayMoment.startSec,
     endSec: overlayMoment.endSec,
+    agencyLogoBlur: overlayLogoBlur,
   })
   const fxChain = effectFilters?.length ? effectFilters.join(',') : ''
   const captionChain = buildSceneCaptionFilters({
@@ -359,8 +392,15 @@ function buildSceneStickerFilterComplex({
   kenBurns = false,
   textDir,
   stickers = null,
+  logoBlur = false,
 }) {
-  const baseChain = buildSceneBaseFilters({ frames, lookFilters, kenBurns }).join(',')
+  const baseChain = buildSceneBaseFilters({
+    frames,
+    lookFilters,
+    kenBurns,
+    logoBlur,
+    logoBlurLabelPrefix: 'mlb',
+  })
   const fxChain = effectFilters?.length ? effectFilters.join(',') : ''
   const captionChain = buildSceneCaptionFilters({
     caption,
@@ -382,6 +422,16 @@ function buildSceneStickerFilterComplex({
     console.warn('[eof-video] sticker assets missing', chained.missing.join(','))
   }
   return `${graph};${chained.filter}`
+}
+
+function sceneStillLogoBlurMeta(scene) {
+  return {
+    imageUrl: scene?.imageUrl || null,
+    imageKey: scene?.imageKey || null,
+    imageTitle: scene?.imageTitle || null,
+    sourcePage: scene?.sourcePage || null,
+    imageSource: scene?.imageSource || null,
+  }
 }
 
 async function encodeSceneClip({
@@ -406,6 +456,16 @@ async function encodeSceneClip({
   const textDir = join(workDir, `caption-text-${scene.index + 1}`)
   mkdirSync(textDir, { recursive: true })
   const useStickers = eofStickersActive(stickers)
+  const logoBlur = stillNeedsNewsAgencyLogoBlur(sceneStillLogoBlurMeta(scene))
+  const overlayLogoBlur = Boolean(overlayMoment?.overlayLogoBlur)
+  if (logoBlur || overlayLogoBlur) {
+    console.info(
+      '[eof-video] news-agency logo blur',
+      `scene=${scene.index + 1}`,
+      logoBlur ? 'base' : '',
+      overlayLogoBlur ? 'pop' : '',
+    )
+  }
 
   const overlayPath = overlayMoment?.overlayImagePath
   const useOverlay =
@@ -429,6 +489,8 @@ async function encodeSceneClip({
       textDir,
       overlayMoment,
       stickers,
+      logoBlur,
+      overlayLogoBlur,
     })
     try {
       await runFfmpeg(
@@ -486,6 +548,7 @@ async function encodeSceneClip({
       kenBurns,
       textDir,
       stickers,
+      logoBlur,
     })
     await runFfmpeg(
       [
@@ -530,6 +593,7 @@ async function encodeSceneClip({
     effectFilters,
     kenBurns,
     textDir,
+    logoBlur,
   })
 
   await runFfmpeg(
@@ -732,6 +796,7 @@ export async function renderEofProductionVideo({
     overlayByScene.set(m.sceneIndex, {
       ...m,
       overlayImagePath: overlayScene.imagePath,
+      overlayLogoBlur: stillNeedsNewsAgencyLogoBlur(sceneStillLogoBlurMeta(overlayScene)),
     })
   }
 

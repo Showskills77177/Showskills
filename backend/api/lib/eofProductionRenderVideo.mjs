@@ -503,8 +503,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         assertEofCleanPlateImagePath(restored)
         resolvedImagePath = restored
         imageMeta = {
-          source: 'cache',
+          source: prior?.imageSource || 'cache',
           imageQuery: row.imageQuery,
+          imageTitle: prior?.imageTitle || null,
+          imageUrl: prior?.imageUrl || null,
+          sourcePage: prior?.sourcePage || null,
         }
       } else {
         const attempt = hadPriorImage ? imageAttempt + 1 : 0
@@ -542,7 +545,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageKey,
         imageAttempt,
         imageKeyHistory,
-        imageTitle: imageMeta.imageTitle || imageMeta.pinTitle || null,
+        imageTitle: imageMeta.imageTitle || imageMeta.pinTitle || prior?.imageTitle || null,
+        imageUrl: imageMeta.imageUrl || prior?.imageUrl || null,
+        sourcePage: imageMeta.sourcePage || prior?.sourcePage || null,
         imageYear: imageMeta.imageYear || null,
       }
     })
@@ -581,6 +586,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       imageSource: s.imageSource || null,
       imageKey: s.imageKey || null,
       imageTitle: s.imageTitle || null,
+      imageUrl: s.imageUrl || null,
+      sourcePage: s.sourcePage || null,
       imageQuery: s.imageQueryUsed || s.imageQuery || null,
       imageQueryUsed: s.imageQueryUsed || null,
     }))
@@ -631,6 +638,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageAttempt: videoScene?.imageAttempt ?? 0,
         imageKeyHistory: Array.isArray(videoScene?.imageKeyHistory) ? videoScene.imageKeyHistory : [],
         imageTitle: videoScene?.imageTitle || null,
+        imageUrl: videoScene?.imageUrl || null,
+        sourcePage: videoScene?.sourcePage || null,
         imageYear: videoScene?.imageYear || null,
       }
     })

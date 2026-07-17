@@ -116,6 +116,18 @@ describe('eofOverlayMoments', () => {
     assert.ok(f.overlayXy.includes(`y=H*${Number(f.yFrac).toFixed(3)}`))
   })
 
+  it('blurs news-agency corner logos on pop insets when requested', () => {
+    const plain = buildOverlayPopFilterFragments({ startSec: 0.4, endSec: 2.8 })
+    assert.equal(plain.overlayPrep.includes('boxblur='), false)
+    const blurred = buildOverlayPopFilterFragments({
+      startSec: 0.4,
+      endSec: 2.8,
+      agencyLogoBlur: true,
+    })
+    assert.match(blurred.overlayPrep, /boxblur=\d+:\d+/)
+    assert.match(blurred.overlayPrep, /\[plb_br\]/)
+  })
+
   it('rejects captioned / clickbait stills as pop inset sources', () => {
     assert.equal(
       isBadEofOverlayStill({

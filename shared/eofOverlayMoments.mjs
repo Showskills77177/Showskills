@@ -8,6 +8,7 @@
  */
 
 import { isCaptionContaminatedStill } from './eofStockImageFilter.mjs'
+import { buildNewsAgencyLogoBlurFilterFragment } from './eofNewsAgencyLogoBlur.mjs'
 
 /** @typedef {'off' | 'auto' | 'always'} EofOverlayMomentsMode */
 
@@ -345,9 +346,14 @@ function isDistinctStill(a, b) {
 /**
  * ffmpeg scale+overlay expr helpers for a pop-up card (eval=frame on overlay stream).
  * Cover-crops into a rounded soft-masked card (CapCut mask look) — no hard white border.
- * @param {{ startSec: number, endSec: number, frameW?: number }} opts
+ * @param {{ startSec: number, endSec: number, frameW?: number, agencyLogoBlur?: boolean }} opts
  */
-export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080 }) {
+export function buildOverlayPopFilterFragments({
+  startSec,
+  endSec,
+  frameW = 1080,
+  agencyLogoBlur = false,
+}) {
   const start = Math.max(0, Number(startSec) || 0)
   const end = Math.max(start + 0.4, Number(endSec) || start + 1.2)
   const pop = EOF_OVERLAY_LAYOUT.popInSec
@@ -372,6 +378,31 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
   const fadeInSt = start.toFixed(3)
   const fadeOutSt = Math.max(start, end - fadeOut).toFixed(3)
 
+  const head = [
+    // Cover-crop into the card — face-safe Y (upper bias) so heads aren't chopped.
+    `scale=${maxW}:${maxH}:force_original_aspect_ratio=increase`,
+    `crop=${maxW}:${maxH}:(iw-ow)/2:max(0\\,min((ih-oh)*0.18\\,ih-oh))`,
+    'setsar=1',
+  ].join(',')
+  const logoBlur = agencyLogoBlur
+    ? buildNewsAgencyLogoBlurFilterFragment({
+        frameW: maxW,
+        frameH: maxH,
+        labelPrefix: 'plb',
+      })
+    : ''
+  const cropped = logoBlur ? `${head},${logoBlur}` : head
+  const overlayPrep = [
+    cropped,
+    'format=rgba',
+    `geq=r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)':${softAlpha}`,
+    // Keep full chroma on the soft edge — yuva420p fringes look greenish on pitch stills.
+    'format=yuva444p',
+    overlayScale,
+    `fade=t=in:st=${fadeInSt}:d=0.12:alpha=1`,
+    `fade=t=out:st=${fadeOutSt}:d=${fadeOut.toFixed(3)}:alpha=1`,
+  ].join(',')
+
   return {
     maxW,
     maxH,
@@ -380,19 +411,7 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
     shadowOffsetY: EOF_OVERLAY_LAYOUT.shadowOffsetY,
     shadowBlur: EOF_OVERLAY_LAYOUT.shadowBlur,
     shadowAlpha: EOF_OVERLAY_LAYOUT.shadowAlpha,
-    overlayPrep: [
-      // Cover-crop into the card — face-safe Y (upper bias) so heads aren't chopped.
-      `scale=${maxW}:${maxH}:force_original_aspect_ratio=increase`,
-      `crop=${maxW}:${maxH}:(iw-ow)/2:max(0\\,min((ih-oh)*0.18\\,ih-oh))`,
-      'setsar=1',
-      'format=rgba',
-      `geq=r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)':${softAlpha}`,
-      // Keep full chroma on the soft edge — yuva420p fringes look greenish on pitch stills.
-      'format=yuva444p',
-      overlayScale,
-      `fade=t=in:st=${fadeInSt}:d=0.12:alpha=1`,
-      `fade=t=out:st=${fadeOutSt}:d=${fadeOut.toFixed(3)}:alpha=1`,
-    ].join(','),
+    overlayPrep,
     /** Soft black under-shadow from the masked card (CapCut-style depth). */
     shadowPrep: [
       `format=rgba`,
