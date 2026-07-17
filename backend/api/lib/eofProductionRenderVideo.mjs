@@ -422,6 +422,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       scenes: scenesForVideo,
       mixedAudioPath: mixedPath,
       captionStyle: job.captionStyle,
+      captionLayout: job.captionLayout || job.script?.captionLayout || null,
       zapcapTemplateId: job.zapcapTemplateId,
       transitionStyle: job.transitionStyle,
       colorGrade: job.colorGrade,

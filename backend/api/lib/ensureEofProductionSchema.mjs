@@ -105,6 +105,7 @@ async function addEofProductionJobColumns() {
     'transition_style',
     'color_grade',
     'enhance_style',
+    'caption_layout_json',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {

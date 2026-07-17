@@ -24,6 +24,14 @@ import {
 import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
 import { EOF_DEFAULT_CAPTION_STYLE, isZapcapCaptionStyle } from '../../../../shared/eofCaptionStyles.mjs'
 import {
+  defaultEofCaptionLayout,
+  normalizeEofCaptionLayout,
+  EOF_CAPTION_LAYOUT_Y_MIN,
+  EOF_CAPTION_LAYOUT_Y_MAX,
+  EOF_CAPTION_LAYOUT_SCALE_MIN,
+  EOF_CAPTION_LAYOUT_SCALE_MAX,
+} from '../../../../shared/eofCaptionLayout.mjs'
+import {
   EOF_DEFAULT_TRANSITION_STYLE,
   EOF_DEFAULT_COLOR_GRADE,
   EOF_DEFAULT_ENHANCE_STYLE,
@@ -396,6 +404,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
   const [captionStyles, setCaptionStyles] = useState([])
   const [captionStyle, setCaptionStyle] = useState(EOF_DEFAULT_CAPTION_STYLE)
+  const [captionLayout, setCaptionLayout] = useState(() => defaultEofCaptionLayout(EOF_DEFAULT_CAPTION_STYLE))
+  const [activeCaptionScene, setActiveCaptionScene] = useState(0)
+  const [captionEditOpen, setCaptionEditOpen] = useState(false)
+  const videoRef = useRef(null)
   const [transitionStyles, setTransitionStyles] = useState([])
   const [transitionStyle, setTransitionStyle] = useState(EOF_DEFAULT_TRANSITION_STYLE)
   const [colorGrades, setColorGrades] = useState([])
@@ -663,6 +675,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.script?.format) setFormat(job.script.format)
     if (job.voicePreset) setVoicePreset(job.voicePreset)
     if (job.captionStyle) setCaptionStyle(job.captionStyle)
+    if (job.captionLayout || job.captionStyle) {
+      setCaptionLayout(normalizeEofCaptionLayout(job.captionLayout, job.captionStyle || captionStyle))
+    }
     if (job.transitionStyle) setTransitionStyle(job.transitionStyle)
     if (job.colorGrade) setColorGrade(job.colorGrade)
     if (job.enhanceStyle) setEnhanceStyle(job.enhanceStyle)
@@ -1035,6 +1050,76 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setTimeout(() => {
         resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
+  /** Post-build: re-burn captions only (style / text / position / size) — keeps stills + VO. */
+  async function replaceCaptions() {
+    if (!selectedId || !draftScript?.scenes?.length) return
+    setBusy(true)
+    setErr('')
+    setSuccess('Replacing captions (keeping images + voiceover)…')
+    setRenderPhase('rendering-video')
+    setVideoPreviewUrl('')
+
+    try {
+      const estSec = Math.max(40, (draftScript.scenes.length || 4) * 12)
+      setRenderProgress({
+        percent: 5,
+        message: 'Replacing captions…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript.scenes.length,
+        stage: 'video',
+        pipeline: 'video',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'replace-captions',
+          jobId: selectedId,
+          captionStyle,
+          captionLayout: normalizeEofCaptionLayout(captionLayout, captionStyle),
+          zapcapTemplateId: isZapcapCaptionStyle(captionStyle) ? zapcapTemplateId || null : null,
+          sceneCaptions: draftScript.scenes.map((s, i) => ({
+            index: i,
+            caption: String(s.caption || s.narration || '').trim().slice(0, 140),
+          })),
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Caption replace failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForVideoComplete(selectedId)
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Caption replace did not finish with a video')
+      }
+
+      await loadVideoPreview()
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('Captions replaced — images and voiceover kept.')
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
       setRenderPhase('failed')
       setRenderProgress(null)
@@ -2761,14 +2846,77 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   </div>
                 </div>
                 {videoPreviewUrl ? (
-                  <video
-                    controls
-                    playsInline
-                    className="mt-4 max-h-[min(70vh,640px)] w-full rounded-xl bg-black"
-                    src={videoPreviewUrl}
-                  >
-                    Your browser does not support video playback.
-                  </video>
+                  <div className="mt-4">
+                    <div className="relative mx-auto max-h-[min(70vh,640px)] w-full max-w-[360px] overflow-hidden rounded-xl bg-black">
+                      <video
+                        ref={videoRef}
+                        controls
+                        playsInline
+                        className="max-h-[min(70vh,640px)] w-full cursor-pointer bg-black"
+                        src={videoPreviewUrl}
+                        onClick={() => {
+                          setCaptionEditOpen(true)
+                          const v = videoRef.current
+                          if (!v || !draftScript?.scenes?.length) return
+                          let t = v.currentTime || 0
+                          let acc = 0
+                          let idx = 0
+                          for (let i = 0; i < draftScript.scenes.length; i += 1) {
+                            const d = Math.max(1.5, Number(draftScript.scenes[i].durationSec) || 3)
+                            if (t < acc + d) {
+                              idx = i
+                              break
+                            }
+                            acc += d
+                            idx = i
+                          }
+                          setActiveCaptionScene(idx)
+                        }}
+                        onTimeUpdate={() => {
+                          const v = videoRef.current
+                          if (!v || !draftScript?.scenes?.length) return
+                          let t = v.currentTime || 0
+                          let acc = 0
+                          for (let i = 0; i < draftScript.scenes.length; i += 1) {
+                            const d = Math.max(1.5, Number(draftScript.scenes[i].durationSec) || 3)
+                            if (t < acc + d) {
+                              if (activeCaptionScene !== i) setActiveCaptionScene(i)
+                              break
+                            }
+                            acc += d
+                          }
+                        }}
+                      >
+                        Your browser does not support video playback.
+                      </video>
+                      {captionStyle !== 'off' ? (
+                        <div
+                          className="pointer-events-none absolute inset-x-0 flex justify-center px-3"
+                          style={{
+                            top: `${Math.round(captionLayout.yNorm * 100)}%`,
+                            transform: 'translateY(-50%)',
+                          }}
+                        >
+                          <p
+                            className="max-w-[92%] text-center font-bold uppercase leading-tight text-white"
+                            style={{
+                              fontSize: `${Math.round(18 * captionLayout.fontScale)}px`,
+                              textShadow: '0 2px 0 #000, 0 0 8px #000',
+                            }}
+                          >
+                            {String(
+                              draftScript?.scenes?.[activeCaptionScene]?.caption ||
+                                draftScript?.scenes?.[activeCaptionScene]?.narration ||
+                                'Caption preview',
+                            ).slice(0, 80)}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                    <p className={`mt-2 text-center text-[11px] ${PX.muted}`}>
+                      Click the video to edit the caption for the current beat. Yellow overlay = position/size preview (not burned until Replace captions).
+                    </p>
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -2778,12 +2926,175 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     Load preview
                   </button>
                 )}
+
+                {(selected.status === 'video_rendered' || videoPreviewUrl) && draftScript?.scenes?.length ? (
+                  <div className="mt-5 rounded-xl border border-[#303030] bg-[#161616] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
+                          Captions · replace
+                        </p>
+                        <p className={`mt-1 text-xs ${PX.muted}`}>
+                          Change style, edit text, move up/down, resize — then Replace captions. Keeps images + voiceover (no Serp/Oxylabs).
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy || isRendering}
+                        onClick={replaceCaptions}
+                        className={PX.btnPrimary}
+                      >
+                        {busy && renderPhase === 'rendering-video' ? 'Replacing…' : 'Replace captions'}
+                      </button>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="block text-xs text-[#aaa]">
+                        Vertical position
+                        <input
+                          type="range"
+                          min={EOF_CAPTION_LAYOUT_Y_MIN}
+                          max={EOF_CAPTION_LAYOUT_Y_MAX}
+                          step={0.01}
+                          value={captionLayout.yNorm}
+                          onChange={(e) =>
+                            setCaptionLayout((prev) =>
+                              normalizeEofCaptionLayout(
+                                { ...prev, yNorm: Number(e.target.value) },
+                                captionStyle,
+                              ),
+                            )
+                          }
+                          disabled={busy || isRendering}
+                          className="mt-2 w-full accent-white"
+                        />
+                        <span className="mt-0.5 block tabular-nums text-[10px] text-[#717171]">
+                          {Math.round(captionLayout.yNorm * 100)}% from top
+                        </span>
+                      </label>
+                      <label className="block text-xs text-[#aaa]">
+                        Caption size
+                        <input
+                          type="range"
+                          min={EOF_CAPTION_LAYOUT_SCALE_MIN}
+                          max={EOF_CAPTION_LAYOUT_SCALE_MAX}
+                          step={0.05}
+                          value={captionLayout.fontScale}
+                          onChange={(e) =>
+                            setCaptionLayout((prev) =>
+                              normalizeEofCaptionLayout(
+                                { ...prev, fontScale: Number(e.target.value) },
+                                captionStyle,
+                              ),
+                            )
+                          }
+                          disabled={busy || isRendering}
+                          className="mt-2 w-full accent-white"
+                        />
+                        <span className="mt-0.5 block tabular-nums text-[10px] text-[#717171]">
+                          {Math.round(captionLayout.fontScale * 100)}%
+                        </span>
+                      </label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className={PX.btnGhost}
+                        disabled={busy}
+                        onClick={() =>
+                          setCaptionLayout((prev) =>
+                            normalizeEofCaptionLayout(
+                              { ...prev, yNorm: Math.max(EOF_CAPTION_LAYOUT_Y_MIN, prev.yNorm - 0.03) },
+                              captionStyle,
+                            ),
+                          )
+                        }
+                      >
+                        Move up
+                      </button>
+                      <button
+                        type="button"
+                        className={PX.btnGhost}
+                        disabled={busy}
+                        onClick={() =>
+                          setCaptionLayout((prev) =>
+                            normalizeEofCaptionLayout(
+                              { ...prev, yNorm: Math.min(EOF_CAPTION_LAYOUT_Y_MAX, prev.yNorm + 0.03) },
+                              captionStyle,
+                            ),
+                          )
+                        }
+                      >
+                        Move down
+                      </button>
+                      <button
+                        type="button"
+                        className={PX.btnGhost}
+                        disabled={busy}
+                        onClick={() => setCaptionLayout(defaultEofCaptionLayout(captionStyle))}
+                      >
+                        Reset position
+                      </button>
+                      <button
+                        type="button"
+                        className={PX.btnSoft}
+                        disabled={busy}
+                        onClick={() => setCaptionEditOpen((o) => !o)}
+                      >
+                        {captionEditOpen ? 'Hide text editor' : 'Edit caption text'}
+                      </button>
+                    </div>
+                    {captionEditOpen ? (
+                      <div className="mt-3 space-y-2">
+                        {draftScript.scenes.map((scene, i) => (
+                          <label
+                            key={scene.id || i}
+                            className={`block rounded-lg border p-2 text-xs ${
+                              i === activeCaptionScene
+                                ? 'border-[#fbbf24]/60 bg-[#1f1a10]'
+                                : 'border-[#303030] bg-[#121212]'
+                            }`}
+                          >
+                            <span className="text-[10px] uppercase tracking-wide text-[#717171]">
+                              Scene {i + 1}
+                              {i === activeCaptionScene ? ' · playing' : ''}
+                            </span>
+                            <textarea
+                              rows={2}
+                              className={`${inputCls} mt-1`}
+                              value={scene.caption || scene.narration || ''}
+                              onChange={(e) => {
+                                const caption = e.target.value.slice(0, 140)
+                                setDraftScript((prev) => {
+                                  if (!prev?.scenes) return prev
+                                  const scenes = prev.scenes.map((s, idx) =>
+                                    idx === i ? { ...s, caption, narration: caption } : s,
+                                  )
+                                  return { ...prev, scenes }
+                                })
+                                setActiveCaptionScene(i)
+                              }}
+                              onFocus={() => setActiveCaptionScene(i)}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {selected.narrationManifest?.length ? (
                   <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {selected.narrationManifest.map((scene, i) => (
-                      <div
+                      <button
+                        type="button"
                         key={scene.sceneId || i}
-                        className="overflow-hidden rounded-lg border border-[#303030] bg-[#121212]"
+                        className={`overflow-hidden rounded-lg border bg-[#121212] text-left ${
+                          i === activeCaptionScene ? 'border-[#fbbf24]' : 'border-[#303030]'
+                        }`}
+                        onClick={() => {
+                          setActiveCaptionScene(i)
+                          setCaptionEditOpen(true)
+                        }}
                       >
                         <img
                           alt=""
@@ -2795,9 +3106,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           }}
                         />
                         <p className="line-clamp-2 p-1.5 text-[9px] text-[#aaa]">
-                          {scene.caption || draftScript.scenes?.[i]?.caption}
+                          {draftScript?.scenes?.[i]?.caption || scene.caption}
                         </p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : null}

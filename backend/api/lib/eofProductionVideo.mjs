@@ -14,6 +14,7 @@ import {
   isZapcapCaptionStyle,
   resolveFreeLocalBurnStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
+import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
 import {
   autoTuneVideoLook,
   buildXfadeFilterComplex,
@@ -108,6 +109,7 @@ function buildSceneVideoFilter({
   durationSec,
   captionFont,
   captionStyle,
+  captionLayout,
   burnCaptions,
   lookFilters = [],
   kenBurns = false,
@@ -131,16 +133,23 @@ function buildSceneVideoFilter({
   }
 
   if (burnCaptions) {
+    const lay = normalizeEofCaptionLayout(captionLayout, captionStyle)
     if (isBottomBarCaptionStyle(captionStyle)) {
-      // live / punch — readable lower-third plate above Subscribe CTA
+      // live / punch — plate follows the editable Y position
       const bottom = resolveEofCaptionStyle(captionStyle)
-      const y = bottom === 'punch' ? 0.68 : 0.72
-      base.push(`drawbox=x=0:y=ih*${y}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
+      const boxY = Math.max(0.35, lay.yNorm - 0.06)
+      base.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
       if (bottom === 'punch') {
-        base.push('drawbox=x=iw*0.12:y=ih*0.815:w=iw*0.76:h=5:color=0xFFE566@0.95:t=fill')
+        const barY = Math.min(0.92, lay.yNorm + 0.08)
+        base.push(
+          `drawbox=x=iw*0.12:y=ih*${barY.toFixed(3)}:w=iw*0.76:h=5:color=0xFFE566@0.95:t=fill`,
+        )
       }
     } else {
-      base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
+      const boxY = Math.max(0.2, lay.yNorm - 0.12)
+      base.push(
+        `drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.28:color=black@0.28:t=fill`,
+      )
     }
     if (captionFont) {
       base.push(
@@ -150,6 +159,7 @@ function buildSceneVideoFilter({
           captionFont,
           style: captionStyle,
           textDir,
+          layout: lay,
         }),
       )
     }
@@ -163,6 +173,7 @@ async function encodeSceneClip({
   workDir,
   captionFont,
   captionStyle,
+  captionLayout,
   burnCaptions,
   lookFilters,
   kenBurns,
@@ -182,6 +193,7 @@ async function encodeSceneClip({
     durationSec: contentDur,
     captionFont,
     captionStyle,
+    captionLayout,
     burnCaptions,
     lookFilters,
     kenBurns,
@@ -315,6 +327,7 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
  *   mixedAudioPath?: string | null,
  *   outputPath?: string,
  *   captionStyle?: string,
+ *   captionLayout?: object | null,
  *   zapcapTemplateId?: string | null,
  *   transitionStyle?: string,
  *   colorGrade?: string,
@@ -330,6 +343,7 @@ export async function renderEofProductionVideo({
   mixedAudioPath = null,
   outputPath,
   captionStyle,
+  captionLayout = null,
   zapcapTemplateId: preferredZapcapTemplateId,
   transitionStyle,
   colorGrade,
@@ -421,6 +435,7 @@ export async function renderEofProductionVideo({
       workDir,
       captionFont,
       captionStyle: style,
+      captionLayout,
       burnCaptions,
       lookFilters,
       kenBurns,
@@ -459,6 +474,7 @@ export async function renderEofProductionVideo({
             workDir,
             captionFont,
             captionStyle: style,
+            captionLayout,
             burnCaptions,
             lookFilters,
             kenBurns,

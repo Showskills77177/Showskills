@@ -18,6 +18,7 @@ import {
   normalizeZapcapTemplateId,
   isZapcapCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
+import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
 import {
   EOF_DEFAULT_TRANSITION_STYLE,
   EOF_DEFAULT_COLOR_GRADE,
@@ -42,7 +43,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 /** Job metadata only — never pull durable media base64 into list/detail payloads. */
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
-  caption_style, caption_engine, zapcap_template_id, transition_style, color_grade, enhance_style,
+  caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
   narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
@@ -91,6 +92,15 @@ function rowToJob(row) {
     scriptSource: row.script_source || null,
     captionStyle: resolveEofCaptionStyle(row.caption_style || EOF_DEFAULT_CAPTION_STYLE),
     captionEngine: row.caption_engine || null,
+    captionLayout: (() => {
+      const style = resolveEofCaptionStyle(row.caption_style || EOF_DEFAULT_CAPTION_STYLE)
+      if (!row.caption_layout_json) return normalizeEofCaptionLayout(null, style)
+      try {
+        return normalizeEofCaptionLayout(JSON.parse(row.caption_layout_json), style)
+      } catch {
+        return normalizeEofCaptionLayout(null, style)
+      }
+    })(),
     zapcapTemplateId: row.zapcap_template_id || null,
     transitionStyle: resolveEofTransitionStyle(row.transition_style || EOF_DEFAULT_TRANSITION_STYLE),
     colorGrade: resolveEofColorGrade(row.color_grade || EOF_DEFAULT_COLOR_GRADE),
@@ -399,6 +409,10 @@ export async function updateEofProductionJob(id, patch) {
     patch.enhanceStyle !== undefined
       ? resolveEofEnhanceStyle(patch.enhanceStyle)
       : resolveEofEnhanceStyle(job.enhanceStyle)
+  const captionLayout = normalizeEofCaptionLayout(
+    patch.captionLayout !== undefined ? patch.captionLayout : job.captionLayout,
+    captionStyle,
+  )
 
   await query(
     `UPDATE eof_production_jobs
@@ -424,6 +438,7 @@ export async function updateEofProductionJob(id, patch) {
          transition_style = $21,
          color_grade = $22,
          enhance_style = $23,
+         caption_layout_json = $24,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -450,6 +465,7 @@ export async function updateEofProductionJob(id, patch) {
       transitionStyle,
       colorGrade,
       enhanceStyle,
+      JSON.stringify(captionLayout),
     ],
   )
 

@@ -13,6 +13,11 @@ import {
   getEofCaptionStyle,
   resolveEofCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
+import {
+  captionLayoutFontSize,
+  captionLayoutYExpr,
+  normalizeEofCaptionLayout,
+} from '../../../shared/eofCaptionLayout.mjs'
 
 /** Escape font/file paths for drawtext single-quoted values (not filter-text escaping). */
 export function escapeFilterPath(value) {
@@ -134,10 +139,14 @@ function fontExpr(escapedFont) {
 /**
  * Pop / Hormozi — 1–2 words flash yellow then hold white with bounce.
  */
-function buildPopFilters({ beats, captionFont, displayWords, textDir }) {
+function buildPopFilters({ beats, captionFont, displayWords, textDir, layout }) {
   const escapedFont = escapeFilterPath(captionFont)
   const filters = []
   const n = Math.max(1, Math.min(3, displayWords || 2))
+  const y = captionLayoutYExpr(layout)
+  const hold = captionLayoutFontSize(92, layout)
+  const peak = captionLayoutFontSize(108, layout)
+  const startFs = captionLayoutFontSize(72, layout)
 
   // Group into n-word chunks using word beats
   const groups = []
@@ -157,16 +166,15 @@ function buildPopFilters({ beats, captionFont, displayWords, textDir }) {
     const start = Math.max(0, beat.start)
     const end = Math.max(start + 0.15, beat.end)
     const local = `t-${start.toFixed(3)}`
-    const fontsize = `if(lt(${local}\\,0.09)\\,72+${local}*380\\,if(lt(${local}\\,0.16)\\,108\\,92))`
+    const fontsize = `if(lt(${local}\\,0.09)\\,${startFs}+${local}*380\\,if(lt(${local}\\,0.16)\\,${peak}\\,${hold}))`
     const alpha = `if(lt(${local}\\,0.05)\\,${local}/0.05\\,if(gt(t\\,${(end - 0.07).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.07\\,1))`
     const flashEnd = Math.min(end, start + 0.14)
-    const y = '(h-text_h)/2+90'
 
     filters.push(
       `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize='${fontsize}':fontcolor=0xFFE566:borderw=14:bordercolor=black@0.92:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${flashEnd.toFixed(3)})'`,
     )
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=92:fontcolor=white:borderw=12:bordercolor=black@0.94:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${hold}:fontcolor=white:borderw=12:bordercolor=black@0.94:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -176,13 +184,14 @@ function buildPopFilters({ beats, captionFont, displayWords, textDir }) {
  * Karaoke — phrase window; active word yellow + larger, others white.
  * Approximate horizontal layout via character-width estimate.
  */
-function buildKaraokeFilters({ beats, captionFont, displayWords, textDir }) {
+function buildKaraokeFilters({ beats, captionFont, displayWords, textDir, layout }) {
   const escapedFont = escapeFilterPath(captionFont)
   const filters = []
   const windowSize = Math.max(3, Math.min(5, displayWords || 4))
-  const baseSize = 78
-  const activeSize = 92
+  const baseSize = captionLayoutFontSize(78, layout)
+  const activeSize = captionLayoutFontSize(92, layout)
   const charW = 0.58 // fraction of fontsize for Latin bold
+  const y = captionLayoutYExpr(layout)
 
   for (let i = 0; i < beats.length; i++) {
     const active = beats[i]
@@ -213,7 +222,6 @@ function buildKaraokeFilters({ beats, captionFont, displayWords, textDir }) {
       const wEst = widths[j]
       // Center the window, place each word
       const x = `(w-${totalW.toFixed(1)})/2+${offset.toFixed(1)}`
-      const y = '(h-text_h)/2+100'
       const color = p.active ? '0xFFE566' : '0xF5F5F5'
       const border = p.active ? 13 : 10
       const alpha = `if(lt(t-${start.toFixed(3)}\\,0.04)\\,(t-${start.toFixed(3)})/0.04\\,1)`
@@ -229,9 +237,13 @@ function buildKaraokeFilters({ beats, captionFont, displayWords, textDir }) {
 /**
  * Beast bounce — one huge word at a time, neon yellow with cyan flash.
  */
-function buildBeastFilters({ beats, captionFont, textDir }) {
+function buildBeastFilters({ beats, captionFont, textDir, layout }) {
   const escapedFont = escapeFilterPath(captionFont)
   const filters = []
+  const y = captionLayoutYExpr(layout)
+  const hold = captionLayoutFontSize(118, layout)
+  const peak = captionLayoutFontSize(136, layout)
+  const startFs = captionLayoutFontSize(90, layout)
 
   for (let bi = 0; bi < beats.length; bi++) {
     const beat = beats[bi]
@@ -240,10 +252,9 @@ function buildBeastFilters({ beats, captionFont, textDir }) {
     const start = Math.max(0, beat.start)
     const end = Math.max(start + 0.15, beat.end)
     const local = `t-${start.toFixed(3)}`
-    const fontsize = `if(lt(${local}\\,0.08)\\,90+${local}*520\\,if(lt(${local}\\,0.15)\\,136\\,118))`
+    const fontsize = `if(lt(${local}\\,0.08)\\,${startFs}+${local}*520\\,if(lt(${local}\\,0.15)\\,${peak}\\,${hold}))`
     const alpha = `if(lt(${local}\\,0.04)\\,${local}/0.04\\,if(gt(t\\,${(end - 0.06).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.06\\,1))`
     const flashEnd = Math.min(end, start + 0.11)
-    const y = '(h-text_h)/2+70'
 
     // Cyan neon flash
     filters.push(
@@ -251,7 +262,7 @@ function buildBeastFilters({ beats, captionFont, textDir }) {
     )
     // Hold yellow beast look
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=118:fontcolor=0xFFE566:borderw=15:bordercolor=black@0.95:shadowcolor=black@0.6:shadowx=0:shadowy=6:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${hold}:fontcolor=0xFFE566:borderw=15:bordercolor=black@0.95:shadowcolor=black@0.6:shadowx=0:shadowy=6:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -261,10 +272,12 @@ function buildBeastFilters({ beats, captionFont, textDir }) {
  * Free live-style subtitles: short phrases along the bottom safe zone
  * (above Subscribe watermark), white + heavy stroke — TV / YouTube CC.
  */
-export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5, textDir }) {
+export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5, textDir, layout }) {
   if (!captionFont || !beats?.length) return []
   const escapedFont = escapeFilterPath(captionFont)
   const chunk = Math.max(3, Math.min(7, Number(displayWords) || 5))
+  const y = captionLayoutYExpr(layout)
+  const fs = captionLayoutFontSize(54, layout)
   const filters = []
   for (let i = 0, gi = 0; i < beats.length; i += chunk, gi++) {
     const group = beats.slice(i, i + chunk)
@@ -273,9 +286,8 @@ export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5,
     const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `live-${gi}` })
     const start = group[0].start
     const end = group[group.length - 1].end
-    // Bottom third, leave room for Subscribe CTA (~bottom 12%)
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=54:fontcolor=white:borderw=7:bordercolor=black@0.94:shadowcolor=black@0.65:shadowx=0:shadowy=4:x=(w-text_w)/2:y=h*0.76:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=white:borderw=7:bordercolor=black@0.94:shadowcolor=black@0.65:shadowx=0:shadowy=4:x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -284,10 +296,12 @@ export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5,
 /**
  * Free sports “match bar”: uppercase lower-third in stadium yellow — football Shorts graphic.
  */
-export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4, textDir }) {
+export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4, textDir, layout }) {
   if (!captionFont || !beats?.length) return []
   const escapedFont = escapeFilterPath(captionFont)
   const chunk = Math.max(2, Math.min(5, Number(displayWords) || 4))
+  const y = captionLayoutYExpr(layout)
+  const fs = captionLayoutFontSize(56, layout)
   const filters = []
   for (let i = 0, gi = 0; i < beats.length; i += chunk, gi++) {
     const group = beats.slice(i, i + chunk)
@@ -302,7 +316,7 @@ export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4
     const local = `t-${start.toFixed(3)}`
     const alpha = `if(lt(${local}\\,0.06)\\,${local}/0.06\\,if(gt(t\\,${(end - 0.08).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.08\\,1))`
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=56:fontcolor=0xFFE566:borderw=9:bordercolor=black@0.96:shadowcolor=black@0.7:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=h*0.73:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=0xFFE566:borderw=9:bordercolor=black@0.96:shadowcolor=black@0.7:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -310,14 +324,22 @@ export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4
 
 /**
  * Build drawtext filters for a caption style.
- * @param {{ caption: string, durationSec: number, captionFont: string, style?: string, textDir?: string }} opts
+ * @param {{ caption: string, durationSec: number, captionFont: string, style?: string, textDir?: string, layout?: object }} opts
  */
-export function buildCaptionDrawtextFilters({ caption, durationSec, captionFont, style, textDir }) {
+export function buildCaptionDrawtextFilters({
+  caption,
+  durationSec,
+  captionFont,
+  style,
+  textDir,
+  layout,
+}) {
   if (!captionFont) return []
   const styleId = resolveEofCaptionStyle(style)
   const meta = getEofCaptionStyle(styleId)
   const beats = buildWordBeats(caption, durationSec)
   if (!beats.length) return []
+  const lay = normalizeEofCaptionLayout(layout, styleId)
 
   if (styleId === 'live') {
     return buildLiveSubtitleFilters({
@@ -325,6 +347,7 @@ export function buildCaptionDrawtextFilters({ caption, durationSec, captionFont,
       captionFont,
       displayWords: meta.displayWords,
       textDir,
+      layout: lay,
     })
   }
   if (styleId === 'punch') {
@@ -333,15 +356,28 @@ export function buildCaptionDrawtextFilters({ caption, durationSec, captionFont,
       captionFont,
       displayWords: meta.displayWords,
       textDir,
+      layout: lay,
     })
   }
   if (styleId === 'karaoke') {
-    return buildKaraokeFilters({ beats, captionFont, displayWords: meta.displayWords, textDir })
+    return buildKaraokeFilters({
+      beats,
+      captionFont,
+      displayWords: meta.displayWords,
+      textDir,
+      layout: lay,
+    })
   }
   if (styleId === 'beast') {
-    return buildBeastFilters({ beats, captionFont, textDir })
+    return buildBeastFilters({ beats, captionFont, textDir, layout: lay })
   }
-  return buildPopFilters({ beats, captionFont, displayWords: meta.displayWords, textDir })
+  return buildPopFilters({
+    beats,
+    captionFont,
+    displayWords: meta.displayWords,
+    textDir,
+    layout: lay,
+  })
 }
 
 /** Back-compat alias used by older callers. */

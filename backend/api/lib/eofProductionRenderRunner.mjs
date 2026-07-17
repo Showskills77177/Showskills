@@ -262,6 +262,81 @@ export async function startApplyEofProductionZapcapBackground(jobId) {
 }
 
 /**
+ * Replace captions only: reuse stills + voiceover, re-burn free captions with new style/layout/text.
+ * @param {string} jobId
+ */
+export async function renderEofProductionCaptionReplace(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+
+  const flags = await getEofArtifactFlags(jobId)
+  const canRemux =
+    flags.hasDurableSceneImages ||
+    flags.hasDurableVideo ||
+    job.status === EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED ||
+    Boolean(job.renderOutputPath)
+  if (!canRemux) {
+    throw new Error('Build the Short once before replacing captions.')
+  }
+
+  try {
+    return await renderEofProductionVideoJob(jobId, {
+      includeAudioIfPresent: true,
+      reuseSceneImages: true,
+      captionMode: 'free',
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Caption replace failed'
+    await markEofProductionJobFailed(jobId, message)
+    throw e
+  }
+}
+
+/** @param {string} jobId */
+export async function startEofProductionCaptionReplaceBackground(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+
+  const sceneCount = job.script?.scenes?.length || 5
+  const startedAt = new Date().toISOString()
+
+  await updateEofProductionJob(jobId, {
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+    errorMessage: null,
+  })
+  await updateEofProductionRenderProgress(
+    jobId,
+    buildEofRenderProgress({
+      stage: 'video',
+      sceneIndex: 0,
+      sceneCount,
+      startedAt,
+      estimatedTotalSec: Math.max(40, sceneCount * 12),
+      pipeline: 'video',
+      message: 'Replacing captions (keeping images + voiceover)…',
+    }),
+  )
+
+  const run = () =>
+    renderEofProductionCaptionReplace(jobId).catch((e) => {
+      console.error('[eof-production] caption replace failed', jobId, e)
+    })
+
+  if (process.env.VERCEL) {
+    try {
+      const { waitUntil } = await import('@vercel/functions')
+      waitUntil(run())
+      return
+    } catch (e) {
+      console.warn('[eof-production] waitUntil unavailable for caption replace', e)
+    }
+  }
+
+  void run()
+}
+
+/**
  * Post-build music bed remix: re-mix narration under a default/safe bed, remux Short
  * (reuse scene stills — no Oxylabs / TTS when scene MP3s are warm).
  * @param {string} jobId

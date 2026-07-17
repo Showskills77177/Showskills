@@ -19,7 +19,9 @@ import {
   startEofProductionVoiceoverRegenerationBackground,
   startApplyEofProductionZapcapBackground,
   startEofProductionMusicRemixBackground,
+  startEofProductionCaptionReplaceBackground,
 } from '../lib/eofProductionRenderRunner.mjs'
+import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import {
@@ -404,6 +406,60 @@ export default async function handler(req, res) {
           return json(res, 202, { ok: true, accepted: true, job })
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Music remix failed' })
+        }
+      }
+
+      if (action === 'replace-captions') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (!(existing.script?.scenes?.length >= 1)) {
+          return json(res, 400, { error: 'Job has no script scenes.' })
+        }
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          return json(res, 202, { ok: true, accepted: true, job: existing })
+        }
+
+        try {
+          let script = existing.script
+          if (Array.isArray(body.sceneCaptions) && body.sceneCaptions.length) {
+            const byIndex = new Map(
+              body.sceneCaptions.map((row) => [
+                Number(row?.index),
+                String(row?.caption || '').trim().slice(0, 140),
+              ]),
+            )
+            script = {
+              ...script,
+              scenes: (script.scenes || []).map((scene, i) => {
+                const idx = scene.index != null ? Number(scene.index) : i
+                const next = byIndex.has(idx) ? byIndex.get(idx) : byIndex.has(i) ? byIndex.get(i) : null
+                if (!next) return scene
+                return { ...scene, caption: next, narration: next }
+              }),
+            }
+          }
+          await updateEofProductionJob(jobId, {
+            script,
+            captionStyle:
+              body.captionStyle !== undefined ? String(body.captionStyle) : undefined,
+            captionLayout:
+              body.captionLayout !== undefined
+                ? normalizeEofCaptionLayout(body.captionLayout, body.captionStyle || existing.captionStyle)
+                : undefined,
+            zapcapTemplateId:
+              body.zapcapTemplateId !== undefined
+                ? body.zapcapTemplateId
+                : undefined,
+          })
+          await startEofProductionCaptionReplaceBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, {
+            error: e instanceof Error ? e.message : 'Caption replace failed',
+          })
         }
       }
 
