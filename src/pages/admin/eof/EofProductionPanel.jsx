@@ -2508,7 +2508,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full max-w-none space-y-8">
       {loading ? <p className={`text-sm ${PX.muted}`}>Loading…</p> : null}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
