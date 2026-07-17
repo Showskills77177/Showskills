@@ -162,7 +162,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       const imageSettings = await getEofImageProviderSettings().catch(() => ({
         imageProvider: 'auto',
       }))
-      // Per-rebuild override (Production UI) wins over the saved admin default.
+      // Per-build override (Production UI Build / Rebuild) wins over the saved admin default.
       const preferredProvider = imageProviderOverride || imageSettings.imageProvider || 'auto'
       const providerOrder = resolveEofImageProviderAttemptOrder(preferredProvider, {
         serpapi: isEofSerpApiConfigured(),
@@ -171,9 +171,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       console.info(
         '[eof-video] image provider',
         preferredProvider,
-        imageProviderOverride ? '(rebuild override)' : '(saved default)',
+        imageProviderOverride ? '(build override)' : '(saved default)',
         '→',
         providerOrder.join(' → ') || '(none keyed)',
+        `| topic=${String(job.topic || '').slice(0, 80)}`,
       )
       for (const provider of providerOrder) {
         if (oxyPool?.hits?.length) break
@@ -217,6 +218,12 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           }
         }
       }
+      console.info(
+        '[eof-video] google images pool',
+        oxyPool?.source || 'none',
+        oxyPool?.hits?.length ? `${oxyPool.hits.length} hits` : '0 hits',
+        oxyPool?.query ? `q=${String(oxyPool.query).slice(0, 80)}` : '',
+      )
       if (!oxyPool?.hits?.length) {
         // Wikidata only when no Google Images job pool is available.
         try {

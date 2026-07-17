@@ -468,7 +468,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     { id: 'serpapi', label: 'SerpAPI', configured: false },
     { id: 'oxylabs', label: 'Oxylabs', configured: false },
   ])
-  /** Per-rebuild override for Google Images (defaults to the saved admin preference). */
+  /** Per-build override for Google Images on Build / Rebuild (defaults to the saved admin preference). */
   const [rebuildImageProvider, setRebuildImageProvider] = useState('auto')
   const [imageProviderBusy, setImageProviderBusy] = useState(false)
   const [pinterestStatus, setPinterestStatus] = useState(null)
@@ -971,9 +971,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
   async function buildShort() {
     if (!selectedId || !draftScript) return
+    const imagesVia = rebuildImageProvider || imageProvider || 'auto'
+    const imagesViaLabel =
+      imagesVia === 'serpapi' ? 'SerpAPI' : imagesVia === 'oxylabs' ? 'Oxylabs' : 'Auto'
     setBusy(true)
     setErr('')
-    setSuccess('Building Short — voiceover, photos, captions…')
+    setSuccess(`Building Short — voiceover, photos via ${imagesViaLabel}, captions…`)
     setRenderPhase('rendering')
     setVideoPreviewUrl('')
 
@@ -1005,7 +1008,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         body: JSON.stringify({
           action: 'build-short',
           jobId: selectedId,
-          imageProvider: rebuildImageProvider || imageProvider || 'auto',
+          imageProvider: imagesVia,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -1024,7 +1027,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
       await loadVideoPreview()
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
-      setSuccess('Your Short is ready — voiceover, images, and captions.')
+      setSuccess(`Your Short is ready — voiceover, images via ${imagesViaLabel}, and captions.`)
       upsertJob(finishedJob)
       hydratedJobIdRef.current = selectedId
       hydrateDraftFromJob(finishedJob)
@@ -2640,7 +2643,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 >
                   Save
                 </button>
-                {selected.status === 'video_rendered' ? (
+                {sceneCount >= 1 ? (
                   <label className="mt-4 text-[10px] text-[#aaa]">
                     Images
                     <select
@@ -2648,7 +2651,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       onChange={(e) => setRebuildImageProvider(e.target.value)}
                       disabled={busy || isRendering}
                       className={`${inputCls} mt-0.5 min-w-[140px] py-1.5 text-xs`}
-                      title="Google Images provider for Rebuild / full rebuild"
+                      title="Google Images provider for Build / Rebuild (overrides the Setup default for this run)"
                     >
                       {imageProviderOptions.map((p) => (
                         <option
@@ -2672,7 +2675,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   title={
                     selected.status === 'video_rendered'
                       ? `Refreshes images via ${rebuildImageProvider} + transitions with free captions — no ElevenLabs or ZapCap charges`
-                      : 'Generates voiceover + images + video (free captions until you Apply ZapCap)'
+                      : `Generates voiceover + images via ${rebuildImageProvider} + video (free captions until you Apply ZapCap)`
                   }
                 >
                   {selected.status === 'video_rendered' ? 'Rebuild video' : 'Build'}
@@ -3179,109 +3182,117 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               )}
 
               {sceneCount >= 1 ? (
-                selected.status === 'video_rendered' ? (
-                  <div className="mt-4 space-y-3 border-t border-[#303030] pt-4">
-                    <label className="block max-w-xs text-[10px] text-[#aaa]">
-                      Images for this rebuild
-                      <select
-                        value={rebuildImageProvider}
-                        onChange={(e) => setRebuildImageProvider(e.target.value)}
-                        disabled={busy || (isRendering && !isRenderStuck)}
-                        className={`${inputCls} mt-0.5 py-1.5 text-xs`}
-                        title="Override Google Images provider for this rebuild only"
-                      >
-                        {imageProviderOptions.map((p) => (
-                          <option
-                            key={p.id}
-                            value={p.id}
-                            disabled={p.id !== 'auto' && !p.configured}
-                            title={p.detail}
-                          >
-                            {p.label}
-                            {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {rebuildImageProvider === 'serpapi' && !imageSources.serpapi ? (
-                      <p className="text-[11px] text-[#ff9b95]">
-                        SerpAPI selected but SERPAPI_API_KEY is missing on the server — add it and redeploy,
-                        or pick Auto / Oxylabs.
-                      </p>
-                    ) : null}
-                    {rebuildImageProvider === 'oxylabs' && !imageSources.oxylabs ? (
-                      <p className="text-[11px] text-[#ff9b95]">
-                        Oxylabs selected but credentials are missing — add OXYLABS_USERNAME +
-                        OXYLABS_PASSWORD and redeploy, or pick Auto / SerpAPI.
-                      </p>
-                    ) : null}
-                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-                      <button
-                        type="button"
-                        disabled={busy || (isRendering && !isRenderStuck)}
-                        onClick={rebuildVideo}
-                        className={`w-full ${PX.btnPrimary} sm:w-auto`}
-                      >
-                        {busy || isRendering ? 'Rebuilding…' : 'Rebuild video'}
-                      </button>
-                      <span className="text-[11px] text-[#8a8a8a]">
-                        Refreshes images + applies transitions &amp; filters with{' '}
-                        <span className="text-[#7ee787]">free captions</span> — no ElevenLabs or ZapCap
-                        charges. Click again until photos look right.
-                      </span>
-                    </div>
-                    {captionEngine.zapcap && isZapcapCaptionStyle(captionStyle) ? (
+                <div className="mt-4 space-y-3 border-t border-[#303030] pt-4">
+                  <label className="block max-w-xs text-[10px] text-[#aaa]">
+                    {selected.status === 'video_rendered' ? 'Images for this rebuild' : 'Images for this build'}
+                    <select
+                      value={rebuildImageProvider}
+                      onChange={(e) => setRebuildImageProvider(e.target.value)}
+                      disabled={busy || (isRendering && !isRenderStuck)}
+                      className={`${inputCls} mt-0.5 py-1.5 text-xs`}
+                      title="Override Google Images provider for this Build / Rebuild only"
+                    >
+                      {imageProviderOptions.map((p) => (
+                        <option
+                          key={p.id}
+                          value={p.id}
+                          disabled={p.id !== 'auto' && !p.configured}
+                          title={p.detail}
+                        >
+                          {p.label}
+                          {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {rebuildImageProvider === 'serpapi' && !imageSources.serpapi ? (
+                    <p className="text-[11px] text-[#ff9b95]">
+                      SerpAPI selected but SERPAPI_API_KEY is missing on the server — add it and redeploy,
+                      or pick Auto / Oxylabs.
+                    </p>
+                  ) : null}
+                  {rebuildImageProvider === 'oxylabs' && !imageSources.oxylabs ? (
+                    <p className="text-[11px] text-[#ff9b95]">
+                      Oxylabs selected but credentials are missing — add OXYLABS_USERNAME +
+                      OXYLABS_PASSWORD and redeploy, or pick Auto / SerpAPI.
+                    </p>
+                  ) : null}
+                  {selected.status === 'video_rendered' ? (
+                    <>
                       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                         <button
                           type="button"
                           disabled={busy || (isRendering && !isRenderStuck)}
-                          onClick={applyZapcapCaptions}
-                          title="Burns the selected ZapCap template onto the current video"
-                          className={`w-full ${PX.btnSoft} sm:w-auto`}
+                          onClick={rebuildVideo}
+                          className={`w-full ${PX.btnPrimary} sm:w-auto`}
                         >
-                          {busy || isRendering ? '…' : 'Apply ZapCap captions'}
+                          {busy || isRendering ? 'Rebuilding…' : 'Rebuild video'}
                         </button>
                         <span className="text-[11px] text-[#8a8a8a]">
-                          When images &amp; transitions look good, apply the CapCut-style animated captions once —{' '}
-                          <span className="text-[#fbbf24]">uses ZapCap credits</span>.
+                          Refreshes images + applies transitions &amp; filters with{' '}
+                          <span className="text-[#7ee787]">free captions</span> — no ElevenLabs or ZapCap
+                          charges. Click again until photos look right.
                         </span>
                       </div>
-                    ) : null}
+                      {captionEngine.zapcap && isZapcapCaptionStyle(captionStyle) ? (
+                        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                          <button
+                            type="button"
+                            disabled={busy || (isRendering && !isRenderStuck)}
+                            onClick={applyZapcapCaptions}
+                            title="Burns the selected ZapCap template onto the current video"
+                            className={`w-full ${PX.btnSoft} sm:w-auto`}
+                          >
+                            {busy || isRendering ? '…' : 'Apply ZapCap captions'}
+                          </button>
+                          <span className="text-[11px] text-[#8a8a8a]">
+                            When images &amp; transitions look good, apply the CapCut-style animated captions
+                            once — <span className="text-[#fbbf24]">uses ZapCap credits</span>.
+                          </span>
+                        </div>
+                      ) : null}
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                        <button
+                          type="button"
+                          disabled={busy || (isRendering && !isRenderStuck)}
+                          onClick={buildShort}
+                          title="Regenerates the voiceover from scratch, then images + video"
+                          className={`w-full ${PX.btnGhost} sm:w-auto`}
+                        >
+                          {busy || isRendering ? '…' : 'Full rebuild (new voiceover)'}
+                        </button>
+                        <span className="text-[11px] text-[#8a8a8a]">
+                          Regenerates the voiceover
+                          {voicePreset === 'brian' ? (
+                            <>
+                              {' '}
+                              — <span className="text-[#fbbf24]">uses ElevenLabs credits</span>
+                            </>
+                          ) : (
+                            ' (free Edge voice — British / calm / American)'
+                          )}
+                          . Uses the Images picker above for Google Images.
+                        </span>
+                      </div>
+                    </>
+                  ) : (
                     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                       <button
                         type="button"
                         disabled={busy || (isRendering && !isRenderStuck)}
                         onClick={buildShort}
-                        title="Regenerates the voiceover from scratch, then images + video"
-                        className={`w-full ${PX.btnGhost} sm:w-auto`}
+                        title={`Generates voiceover, images via ${rebuildImageProvider}, and video`}
+                        className={`w-full ${PX.btnPrimary} sm:w-auto`}
                       >
-                        {busy || isRendering ? '…' : 'Full rebuild (new voiceover)'}
+                        {busy || isRendering ? 'Building…' : 'Next: Build Short →'}
                       </button>
                       <span className="text-[11px] text-[#8a8a8a]">
-                        Regenerates the voiceover
-                        {voicePreset === 'brian' ? (
-                          <>
-                            {' '}
-                            — <span className="text-[#fbbf24]">uses ElevenLabs credits</span>
-                          </>
-                        ) : (
-                          ' (free Edge voice — British / calm / American)'
-                        )}
-                        . Uses the Images picker above for Google Images.
+                        Voice + photos via the Images picker above + free captions. Override wins over the
+                        Setup default for this run only.
                       </span>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={busy || (isRendering && !isRenderStuck)}
-                    onClick={buildShort}
-                    title="Generates voiceover, images and video"
-                    className={`mt-4 w-full ${PX.btnPrimary} sm:w-auto`}
-                  >
-                    {busy || isRendering ? 'Building…' : 'Next: Build Short →'}
-                  </button>
-                )
+                  )}
+                </div>
               ) : null}
             </section>
 
