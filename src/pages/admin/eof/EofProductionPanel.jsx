@@ -207,6 +207,37 @@ function ZapCapTemplateCell({ template, active, onSelect }) {
   const btnRef = useRef(null)
   const [hovering, setHovering] = useState(false)
   const [flyoutPos, setFlyoutPos] = useState(null)
+  const closeTimerRef = useRef(null)
+
+  function clearCloseTimer() {
+    if (closeTimerRef.current != null) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
+  function openFlyout() {
+    clearCloseTimer()
+    setHovering(true)
+  }
+
+  function scheduleClose() {
+    clearCloseTimer()
+    // Brief delay avoids flicker when the thumb remounts its <video> on hover.
+    closeTimerRef.current = setTimeout(() => {
+      setHovering(false)
+      setFlyoutPos(null)
+      closeTimerRef.current = null
+    }, 60)
+  }
+
+  function closeFlyoutNow() {
+    clearCloseTimer()
+    setHovering(false)
+    setFlyoutPos(null)
+  }
+
+  useEffect(() => () => clearCloseTimer(), [])
 
   useEffect(() => {
     if (!hovering || !btnRef.current) {
@@ -220,7 +251,6 @@ function ZapCapTemplateCell({ template, active, onSelect }) {
       const flyoutH = 140
       let left = r.left + r.width / 2
       let top = r.top - 8
-      // Keep inside viewport
       left = Math.min(Math.max(flyoutW / 2 + 8, left), window.innerWidth - flyoutW / 2 - 8)
       const showBelow = top - flyoutH < 8
       setFlyoutPos({
@@ -230,11 +260,26 @@ function ZapCapTemplateCell({ template, active, onSelect }) {
       })
     }
     place()
-    window.addEventListener('scroll', place, true)
-    window.addEventListener('resize', place)
+    const onScrollOrResize = () => closeFlyoutNow()
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+    // Failsafe: if pointer is no longer over this cell, force-close.
+    const onPointerMove = (e) => {
+      const el = btnRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const inside =
+        e.clientX >= r.left &&
+        e.clientX <= r.right &&
+        e.clientY >= r.top &&
+        e.clientY <= r.bottom
+      if (!inside) scheduleClose()
+    }
+    window.addEventListener('pointermove', onPointerMove)
     return () => {
-      window.removeEventListener('scroll', place, true)
-      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+      window.removeEventListener('pointermove', onPointerMove)
     }
   }, [hovering])
 
@@ -243,11 +288,12 @@ function ZapCapTemplateCell({ template, active, onSelect }) {
       <button
         ref={btnRef}
         type="button"
-        onClick={onSelect}
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
-        onFocus={() => setHovering(true)}
-        onBlur={() => setHovering(false)}
+        onClick={() => {
+          closeFlyoutNow()
+          onSelect?.()
+        }}
+        onPointerEnter={openFlyout}
+        onPointerLeave={scheduleClose}
         className={`relative overflow-hidden rounded-md border text-left transition ${
           active
             ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
