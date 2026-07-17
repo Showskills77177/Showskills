@@ -3280,7 +3280,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 animated template (~$0.10/min).
               </p>
             )}
-            <div className="mt-3 grid gap-1.5 grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-11">
+            <div className="mt-2 grid gap-1 grid-cols-4 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 2xl:grid-cols-11">
               {[
                 { id: 'live', label: 'Live subs', vibe: 'Bottom TV / CC', preview: 'live', free: true },
                 { id: 'classic', label: 'Classic subs', vibe: 'Netflix / YouTube', preview: 'classic', free: true },
@@ -3304,89 +3304,74 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       setZapcapTemplateId('')
                       markDraftDirty()
                     }}
-                    className={`overflow-hidden rounded-lg border text-left transition ${
+                    className={`overflow-hidden rounded-md border text-left transition ${
                       active
                         ? 'border-white/35 bg-[#272727] ring-1 ring-white/20'
                         : 'border-[#303030] bg-[#121212] hover:border-[#555] hover:bg-[#1c1c1c]'
                     }`}
-                    title={s.label}
+                    title={`${s.label} — ${s.vibe}`}
                   >
-                    <div className="relative mx-auto aspect-[9/16] w-full max-w-[34px] overflow-hidden bg-gradient-to-b from-[#1a2a1a] to-[#0f1a30]">
+                    {/* CapCut-like chip: short strip showing caption look only (not tall 9:16 frame) */}
+                    <div className="relative flex h-10 w-full items-center justify-center overflow-hidden bg-gradient-to-b from-[#1a2a1a] to-[#0f1a30]">
                       {s.preview === 'live' ? (
-                        <div className="absolute inset-x-0 bottom-[10%] bg-black/60 px-0.5 py-0.5 text-center">
-                          <span className="text-[5px] font-bold leading-tight text-white">Tuchel</span>
+                        <div className="w-full bg-black/60 px-0.5 py-0.5 text-center">
+                          <span className="text-[7px] font-bold leading-none text-white">Tuchel</span>
                         </div>
                       ) : s.preview === 'classic' ? (
-                        <div className="absolute inset-x-[6%] bottom-[10%] text-center">
-                          <span className="text-[5px] font-semibold leading-tight text-white [text-shadow:0_1px_1px_#000]">
-                            still running
-                          </span>
-                        </div>
+                        <span className="px-0.5 text-[7px] font-semibold leading-none text-white [text-shadow:0_1px_1px_#000]">
+                          still running
+                        </span>
                       ) : s.preview === 'softbar' ? (
-                        <div className="absolute inset-x-[8%] bottom-[10%] flex justify-center">
-                          <span className="rounded-[2px] bg-black/65 px-0.5 py-px text-[4.5px] font-semibold text-white">
-                            Spain beat
-                          </span>
-                        </div>
+                        <span className="rounded-[2px] bg-black/65 px-1 py-px text-[6.5px] font-semibold text-white">
+                          Spain beat
+                        </span>
                       ) : s.preview === 'broadcast' ? (
-                        <div className="absolute inset-x-[6%] bottom-[10%] text-center">
-                          <span className="text-[5px] font-bold text-white [text-shadow:-0.5px_0_#000,0.5px_0_#000]">
-                            Full-time
-                          </span>
-                        </div>
+                        <span className="text-[7px] font-bold text-white [text-shadow:-0.5px_0_#000,0.5px_0_#000]">
+                          Full-time
+                        </span>
                       ) : s.preview === 'desk' ? (
-                        <div className="absolute inset-x-[4%] bottom-[11%] bg-black/35 px-0.5 py-0.5 text-center">
-                          <span className="text-[5.5px] font-bold text-white">Rooney</span>
+                        <div className="w-[90%] bg-black/35 px-0.5 py-0.5 text-center">
+                          <span className="text-[7.5px] font-bold text-white">Rooney</span>
                         </div>
                       ) : s.preview === 'elegant' ? (
-                        <div className="absolute inset-x-[6%] bottom-[10%] text-center">
-                          <span className="text-[5px] font-semibold text-[#F5E6C8] [text-shadow:0_1px_2px_#000]">
-                            remember
-                          </span>
-                        </div>
+                        <span className="text-[7px] font-semibold text-[#F5E6C8] [text-shadow:0_1px_2px_#000]">
+                          remember
+                        </span>
                       ) : s.preview === 'punch' ? (
-                        <div className="absolute inset-x-0 bottom-[12%] px-0.5 text-center">
-                          <div className="rounded-[1px] bg-black/55 px-0.5 py-0.5">
-                            <span className="text-[5px] font-black uppercase text-[#FFE566]">Spain</span>
-                            <div className="mx-auto mt-px h-px w-2/3 bg-[#FFE566]" />
-                          </div>
+                        <div className="rounded-[1px] bg-black/55 px-1 py-0.5 text-center">
+                          <span className="text-[6.5px] font-black uppercase leading-none text-[#FFE566]">Spain</span>
+                          <div className="mx-auto mt-px h-px w-3/4 bg-[#FFE566]" />
                         </div>
                       ) : s.preview === 'pop' ? (
-                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
-                          <span className="inline-block rounded-[2px] bg-[#FFE566] px-0.5 text-[7px] font-black uppercase text-black">
-                            SPAIN
-                          </span>
-                        </div>
+                        <span className="rounded-[2px] bg-[#FFE566] px-1 text-[9px] font-black uppercase leading-none text-black">
+                          SPAIN
+                        </span>
                       ) : s.preview === 'karaoke' ? (
-                        <div className="absolute inset-x-0.5 top-1/2 -translate-y-1/2 text-center leading-none">
-                          <span className="text-[5px] font-extrabold uppercase text-white/70">spain </span>
-                          <span className="text-[5.5px] font-black uppercase text-[#FFE566]">beat</span>
-                        </div>
+                        <span className="leading-none">
+                          <span className="text-[7px] font-extrabold uppercase text-white/70">spain </span>
+                          <span className="text-[7.5px] font-black uppercase text-[#FFE566]">beat</span>
+                        </span>
                       ) : s.preview === 'beast' ? (
-                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
-                          <span className="text-[9px] font-black uppercase text-[#FFE566] drop-shadow">
-                            GOAL
-                          </span>
-                        </div>
+                        <span className="text-[11px] font-black uppercase leading-none text-[#FFE566] drop-shadow">
+                          GOAL
+                        </span>
                       ) : (
-                        <div className="absolute inset-x-0 bottom-[10%] text-center">
-                          <span className="text-[4.5px] uppercase tracking-wide text-white/40">off</span>
-                        </div>
+                        <span className="text-[6px] uppercase tracking-wide text-white/40">off</span>
                       )}
-                      <span className="absolute left-0.5 top-0.5 rounded bg-emerald-500/80 px-0.5 text-[6px] font-bold uppercase leading-none text-black">
-                        Free
-                      </span>
                       {active ? (
-                        <span className="absolute right-0.5 top-0.5 rounded bg-white px-0.5 text-[6px] font-semibold leading-none text-black">
+                        <span className="absolute right-0.5 top-0.5 rounded bg-white px-0.5 text-[5px] font-semibold leading-none text-black">
                           ✓
                         </span>
                       ) : null}
                     </div>
-                    <div className="px-1 py-1">
-                      <span className={`block truncate text-[10px] font-medium leading-tight ${active ? 'text-white' : 'text-[#e5e5e5]'}`}>
+                    <div className="px-1 py-0.5">
+                      <span
+                        className={`block truncate text-[9px] font-medium leading-tight ${
+                          active ? 'text-white' : 'text-[#e5e5e5]'
+                        }`}
+                      >
                         {s.label}
                       </span>
-                      <span className="mt-0.5 block truncate text-[9px] text-[#888]">{s.vibe}</span>
                     </div>
                   </button>
                 )
