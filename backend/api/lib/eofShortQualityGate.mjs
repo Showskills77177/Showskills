@@ -22,6 +22,7 @@ import {
   resolveEofOverlayMoments,
   planEofOverlayMoments,
   EOF_OVERLAY_LAYOUT,
+  eofOverlayCardRect,
   eofOverlayCoversFaceZone,
   eofOverlayLayoutIsFaceSafe,
   isBadEofOverlayStill,
@@ -512,13 +513,15 @@ export function collectEofShortQualityHeuristicChecks(job, renderMeta = {}) {
     }
 
     // Hard fail: pop geometry that covers the subject’s face (staging screenshot regression).
+    // Uses computed overlay rect so a reverted yFrac still blocks autos.
     if (count > 0 || overlayMode === 'always' || overlayMode === 'auto') {
+      const rect = eofOverlayCardRect(EOF_OVERLAY_LAYOUT)
       if (eofOverlayCoversFaceZone(EOF_OVERLAY_LAYOUT) || !eofOverlayLayoutIsFaceSafe(EOF_OVERLAY_LAYOUT)) {
         checks.push({
           id: 'overlay_covers_face',
           severity: 'fail',
           message: 'Pop inset layout covers the subject face zone (must sit mid/lower, not over eyes)',
-          detail: `yFrac=${EOF_OVERLAY_LAYOUT.yFrac} heightFrac=${EOF_OVERLAY_LAYOUT.heightFrac}`,
+          detail: `x=${rect.x.toFixed(3)} y=${rect.y.toFixed(3)} w=${rect.w.toFixed(3)} h=${rect.h.toFixed(3)} bottom=${rect.bottom.toFixed(3)}`,
         })
       }
     }
