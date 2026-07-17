@@ -24,6 +24,10 @@ import {
 import { EOF_PRODUCTION_JOB_STATUS } from '../../../shared/eofProduction.mjs'
 import { applyShortsDescription } from '../../../shared/eofYoutubeMeta.mjs'
 import { formatUtcClock, isEofSchedulerHourMatch } from '../../../shared/eofSchedulerTime.mjs'
+import {
+  applyEofShortQualityGateToJob,
+  formatEofQualityGateBlockMessage,
+} from './eofShortQualityGateApply.mjs'
 
 function alreadyRanToday(lastRunAt) {
   if (!lastRunAt) return false
@@ -104,6 +108,34 @@ export async function runEofDailyShortPipeline(opts = {}) {
     const rendered = await getEofProductionJob(jobId)
     if (!rendered || rendered.status !== EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED) {
       throw new Error(rendered?.errorMessage || 'Daily Short build did not finish with a video')
+    }
+
+    // Quality gate already ran after render; stamp auto mode and block publish on fail.
+    let gate = rendered.qualityGate
+    if (!gate) {
+      ;({ gate } = await applyEofShortQualityGateToJob(jobId, {
+        mode: 'auto',
+        blockOnFail: true,
+        setErrorMessageOnFail: true,
+        renderMeta: { captionEngine: rendered.captionEngine || null },
+      }))
+    } else {
+      const stamped = {
+        ...gate,
+        mode: 'auto',
+        blocked: !gate.pass,
+        checkedAt: new Date().toISOString(),
+      }
+      await updateEofProductionJob(jobId, {
+        qualityGate: stamped,
+        ...(stamped.blocked
+          ? { errorMessage: formatEofQualityGateBlockMessage(stamped) }
+          : {}),
+      })
+      gate = stamped
+    }
+    if (!gate.pass || gate.blocked) {
+      throw new Error(formatEofQualityGateBlockMessage(gate))
     }
 
     const meta = await composeEofStudioMeta({

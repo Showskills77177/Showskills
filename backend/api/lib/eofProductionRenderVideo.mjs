@@ -38,6 +38,7 @@ import {
   isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import { resolveEofOverlayMoments } from '../../../shared/eofOverlayMoments.mjs'
+import { applyEofShortQualityGateToJob } from './eofShortQualityGateApply.mjs'
 import {
   getEofImageProviderSettings,
   normalizeEofImageProvider,
@@ -129,6 +130,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   await updateEofProductionJob(jobId, {
     status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
     errorMessage: null,
+    qualityGate: null,
   })
 
   const throttledProgress = createThrottledWriter(
@@ -617,7 +619,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
 
     // Only mark video_rendered after durable base64 is stored (assert above throws otherwise).
-    return updateEofProductionJob(jobId, {
+    const saved = await updateEofProductionJob(jobId, {
       status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED,
       renderOutputPath: relPath,
       narrationManifest: updatedManifest,
@@ -629,7 +631,30 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           ? rendered.zapcapTemplateId
           : job.zapcapTemplateId || null,
       errorMessage: null,
+      qualityGate: null,
     })
+
+    // Heuristic (+ optional vision) QA — report always; auto-publish blocks separately.
+    try {
+      const { job: gated } = await applyEofShortQualityGateToJob(jobId, {
+        mode: 'manual',
+        renderMeta: {
+          overlayCount: rendered.videoLook?.overlayCount ?? rendered.overlayMoments?.length ?? 0,
+          overlayMoments: rendered.overlayMoments || [],
+          hasSecondarySubject: secondaryPeople.length > 0,
+          secondarySceneIndex,
+          captionEngine: rendered.captionEngine || null,
+        },
+      })
+      return gated || saved
+    } catch (qe) {
+      console.warn(
+        '[eof-video] quality gate skipped',
+        jobId,
+        qe instanceof Error ? qe.message : qe,
+      )
+      return saved
+    }
   } catch (e) {
     await markEofProductionJobFailed(jobId, e instanceof Error ? e.message : 'Video render failed')
     throw e

@@ -4814,6 +4814,47 @@ export default function EofProductionPanel({
                 Build failed: {selected.errorMessage}
               </p>
             ) : null}
+
+            {selected.qualityGate && selected.qualityGate.mode !== 'off' ? (
+              <div
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  selected.qualityGate.pass
+                    ? 'border-[#2f5d3a]/50 bg-[#142018] text-[#9dcea8]'
+                    : 'border-[#c48a2a]/45 bg-[#2a2110] text-[#f0d39a]'
+                }`}
+              >
+                <p className="font-medium">
+                  {selected.qualityGate.pass
+                    ? selected.qualityGate.warnings?.length
+                      ? `Quality gate passed (${selected.qualityGate.warnings.length} warning${
+                          selected.qualityGate.warnings.length === 1 ? '' : 's'
+                        })`
+                      : 'Quality gate passed'
+                    : selected.qualityGate.blocked
+                      ? 'Quality gate blocked publish'
+                      : 'Quality gate found issues'}
+                </p>
+                {selected.qualityGate.reasons?.length ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-[#f0d39a]">
+                    {selected.qualityGate.reasons.slice(0, 8).map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {selected.qualityGate.pass && selected.qualityGate.warnings?.length ? (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-[#b8c9bc]">
+                    {selected.qualityGate.warnings.slice(0, 6).map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {selected.errorMessage &&
+                /quality gate/i.test(String(selected.errorMessage)) &&
+                selected.status === 'video_rendered' ? (
+                  <p className="mt-2 text-[11px] text-[#c9b48a]">{selected.errorMessage}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
             <aside
