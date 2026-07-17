@@ -2997,7 +2997,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           Captions · replace
                         </p>
                         <p className={`mt-1 text-xs ${PX.muted}`}>
-                          Change style, edit text, move up/down, resize — then Replace captions. Keeps images + voiceover (no Serp/Oxylabs).
+                          Change style, edit text, move up/down, resize — then Replace captions. Keeps images +
+                          voiceover (no new photos). If a still already has meme/quote text in the picture, use
+                          Rebuild video instead.
                         </p>
                       </div>
                       <button
