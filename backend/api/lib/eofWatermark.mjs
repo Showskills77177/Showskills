@@ -7,6 +7,7 @@
  *   EOF_WATERMARK=1|0
  *   EOF_WATERMARK_PATH / EOF_WATERMARK_SIZE / EOF_WATERMARK_POSITION / EOF_WATERMARK_X / EOF_WATERMARK_Y
  *     POSITION: top-left (default) | top-center | top-right | bottom-left | bottom-center | bottom-right | center
+ *   EOF_WATERMARK_OPACITY  0–1 alpha multiply (default 1 = fully opaque)
  *   EOF_SUBSCRIBE=1|0  (default off)
  *   EOF_SUBSCRIBE_PATH / EOF_SUBSCRIBE_WIDTH
  */
@@ -15,6 +16,18 @@ import { rename, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runFfmpeg, runFfprobe } from './eofFfmpeg.mjs'
+
+/** Defaults for the top-left brand badge (tunable via env). */
+export const EOF_WATERMARK_DEFAULTS = {
+  /** Square badge width/height in px */
+  size: 200,
+  /** Inward inset from the anchored edge (matches original top-left padding). */
+  x: 28,
+  y: 52,
+  /** Alpha multiply — 1 = solid; lower = more see-through. */
+  opacity: 1,
+  position: 'top-left',
+}
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -69,7 +82,7 @@ export function resolveEofSubscribePath() {
  * @param {number} my
  */
 export function watermarkOverlayXY(position, mx = 0, my = 0) {
-  const pos = String(position || 'bottom-center').trim().toLowerCase()
+  const pos = String(position || EOF_WATERMARK_DEFAULTS.position).trim().toLowerCase()
   const left = `${mx}`
   const right = `W-w-${mx}`
   const centerX = `(W-w)/2+${mx}`
@@ -93,6 +106,34 @@ export function watermarkOverlayXY(position, mx = 0, my = 0) {
     default:
       return { x: centerX, y: bottom }
   }
+}
+
+/**
+ * Resolve badge size / inset / opacity / anchor from env (with defaults).
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function resolveEofWatermarkLayout(env = process.env) {
+  const cornerW = Math.max(
+    120,
+    Math.min(420, Number(env.EOF_WATERMARK_SIZE) || EOF_WATERMARK_DEFAULTS.size),
+  )
+  const markX = Math.max(
+    0,
+    Math.min(400, Number(env.EOF_WATERMARK_X ?? EOF_WATERMARK_DEFAULTS.x)),
+  )
+  const markY = Math.max(
+    0,
+    Math.min(400, Number(env.EOF_WATERMARK_Y ?? EOF_WATERMARK_DEFAULTS.y)),
+  )
+  // Default 1 (solid). Clamp so a “~10% more opaque” bump from a softer env value stays in range.
+  const opacity = Math.max(
+    0.05,
+    Math.min(1, Number(env.EOF_WATERMARK_OPACITY ?? EOF_WATERMARK_DEFAULTS.opacity)),
+  )
+  const position = String(env.EOF_WATERMARK_POSITION || EOF_WATERMARK_DEFAULTS.position)
+    .trim()
+    .toLowerCase()
+  return { cornerW, markX, markY, opacity, position }
 }
 
 async function probeDurationSec(videoPath) {
@@ -131,18 +172,14 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
 
   const probed = await probeDurationSec(videoPath)
   const total = Math.max(4, Number(durationSec) || probed || 20)
-  // Badge sized to cover ZapCap’s free watermark. Confirmed on real renders: ZapCap burns its
-  // mark in the TOP-LEFT corner, so default the anchor there and hug the corner (X=0, Y=0) so the
-  // badge overlaps the mark instead of floating away. Everything is env-tunable without a code change:
+  // Badge sized to cover ZapCap’s free watermark (top-left). Inset from the frame edges so the
+  // circle doesn’t sit flush on the crop — same padding convention as the original top-left burn
+  // (x=28, y=52). Everything remains env-tunable:
   //   EOF_WATERMARK_POSITION  anchor: top-left|top-center|top-right|bottom-left|bottom-center|bottom-right|center
   //   EOF_WATERMARK_SIZE      badge width/height in px (square)
   //   EOF_WATERMARK_X / _Y    nudge from the anchor (px): inward from the anchored edge/corner
-  const cornerW = Math.max(120, Math.min(420, Number(process.env.EOF_WATERMARK_SIZE) || 230))
-  const markX = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_X ?? 0)))
-  const markY = Math.max(0, Math.min(400, Number(process.env.EOF_WATERMARK_Y ?? 0)))
-  const position = String(process.env.EOF_WATERMARK_POSITION || 'top-left')
-    .trim()
-    .toLowerCase()
+  //   EOF_WATERMARK_OPACITY   0–1 alpha multiply (default 1)
+  const { cornerW, markX, markY, opacity, position } = resolveEofWatermarkLayout()
   const subW = Math.max(200, Math.min(520, Number(process.env.EOF_SUBSCRIBE_WIDTH) || 340))
 
   const inputs = ['-y', '-i', videoPath]
@@ -157,7 +194,11 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
     const i = inputIdx
     inputIdx += 1
     const { x: overlayX, y: overlayY } = watermarkOverlayXY(position, markX, markY)
-    filterParts.push(`[${i}:v]format=rgba,scale=${cornerW}:${cornerW}[wm]`)
+    // colorchannelmixer aa= multiplies the PNG alpha (1 = solid; <1 = more see-through).
+    const aa = opacity.toFixed(3)
+    filterParts.push(
+      `[${i}:v]format=rgba,scale=${cornerW}:${cornerW},colorchannelmixer=aa=${aa}[wm]`,
+    )
     filterParts.push(`[${lastLabel}][wm]overlay=x=${overlayX}:y=${overlayY}:format=auto[v_wm]`)
     lastLabel = 'v_wm'
   }
@@ -211,6 +252,7 @@ export async function applyEofWatermark({ videoPath, durationSec } = {}) {
       cornerW,
       markX,
       markY,
+      opacity,
       position,
       subW,
       static: true,
