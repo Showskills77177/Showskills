@@ -8,7 +8,11 @@
     },
     {
       "path": "/api/eof-script-maker-cron",
-      "schedule": "0 0,23 * * *"
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/eof-script-maker-cron",
+      "schedule": "0 0 * * *"
     }
   ],
   "functions": {

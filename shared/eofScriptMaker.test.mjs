@@ -80,12 +80,15 @@ describe('eof Script Maker UK midnight schedule', () => {
     assert.equal(sameLondonCalendarDay(runAt, new Date('2026-07-17T08:00:00.000Z')), false)
   })
 
-  it('vercel cron schedule hits both UTC midnight windows', () => {
+  it('vercel cron uses two once-daily UTC entries (Hobby-safe)', () => {
     const root = dirname(fileURLToPath(import.meta.url))
     const vercel = JSON.parse(readFileSync(join(root, '..', 'vercel.json'), 'utf8'))
-    const cron = (vercel.crons || []).find((c) => c.path === '/api/eof-script-maker-cron')
-    assert.ok(cron, 'eof-script-maker-cron entry missing')
-    assert.equal(cron.schedule, '0 0,23 * * *')
+    const crons = (vercel.crons || []).filter((c) => c.path === '/api/eof-script-maker-cron')
+    assert.equal(crons.length, 2, 'need separate 23:00 and 00:00 UTC cron entries')
+    const schedules = new Set(crons.map((c) => c.schedule))
+    assert.deepEqual(schedules, new Set(['0 23 * * *', '0 0 * * *']))
+    // A single "0 0,23 * * *" expression runs twice/day and fails Hobby deploys
+    assert.ok(!crons.some((c) => String(c.schedule).includes(',')))
   })
 })
 
