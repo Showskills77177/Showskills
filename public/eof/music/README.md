@@ -5,7 +5,6 @@ Default Shorts bed registry lives in `backend/api/lib/eofMusicTracks.mjs` (`EOF_
 | Slot | File | Status |
 |------|------|--------|
 | Neutral (default) | `default-neutral.mp3` | Placeholder stub |
-| Dramatic | `default-dramatic.mp3` | Placeholder stub |
 | Upbeat / Calm | `default-upbeat.mp3` / `default-calm.mp3` | Empty optional slots |
 | Champions Rise | `champions-rise.mp3` | Platform bed |
 | Build Different (Inst) | `build-different-inst.mp3` | Platform bed |

@@ -13,16 +13,18 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
  *
  * Drop cleared YouTube Audio Library (or other licensed) MP3s into `public/eof/music/`:
  *   - default-neutral.mp3   — general narration bed (ships as soft placeholder stub)
- *   - default-dramatic.mp3  — facts / records / hype (ships as soft placeholder stub)
  *   - default-upbeat.mp3    — empty slot — add your cleared upbeat bed later
  *   - default-calm.mp3      — empty slot — add your cleared calm bed later
- *   - champions-rise.mp3    — Champions Rise (custom bed)
+ *   - plus platform beds (Champions Rise, My Lane, …)
  *
  * Do NOT register Spotify/YouTube chart tracks. Placeholders are for pipeline testing only.
  * Env override: EOF_MUSIC_BEDS_JSON = JSON array of { title, mood, publicUrl, isDefault?, licenseNote? }
  */
 const PLATFORM_LICENSE =
   'Platform music bed — confirm you have rights to use on YouTube before publishing.'
+
+/** Retired URLs — deactivated on seed so they disappear from the mixer. */
+const EOF_RETIRED_MUSIC_PUBLIC_URLS = ['/eof/music/default-dramatic.mp3']
 
 export const EOF_DEFAULT_MUSIC_BEDS = [
   {
@@ -35,17 +37,6 @@ export const EOF_DEFAULT_MUSIC_BEDS = [
     required: true,
     licenseNote:
       'Placeholder stub for pipeline testing. Replace with a cleared YouTube Audio Library (or other licensed) MP3 before publishing.',
-  },
-  {
-    id: 'dramatic',
-    title: 'Dramatic bed',
-    mood: 'dramatic',
-    publicUrl: '/eof/music/default-dramatic.mp3',
-    fileName: 'default-dramatic.mp3',
-    isDefault: false,
-    required: true,
-    licenseNote:
-      'Placeholder stub for pipeline testing. Replace with a cleared dramatic bed before publishing.',
   },
   {
     id: 'upbeat',
@@ -269,6 +260,19 @@ function rowToTrack(row) {
 /** Register placeholder catalog rows when the Music tab has never been set up. */
 export async function ensureEofMusicCatalogSeeded() {
   await ensureEofProductionSchema()
+
+  // Drop retired placeholder beds (e.g. Dramatic bed) from the mixer.
+  for (const url of EOF_RETIRED_MUSIC_PUBLIC_URLS) {
+    await query(
+      `UPDATE eof_music_tracks SET active = 0, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE public_url = $1`,
+      [url],
+    ).catch(() => {})
+    await query(
+      `UPDATE eof_music_tracks SET active = 0, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE title = $1`,
+      ['Dramatic bed'],
+    ).catch(() => {})
+  }
+
   const existing = await listEofMusicTracks({ activeOnly: false })
   const byUrl = new Map(existing.map((t) => [t.publicUrl, t]))
 
