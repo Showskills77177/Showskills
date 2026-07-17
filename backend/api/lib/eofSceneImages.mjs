@@ -8,6 +8,8 @@ import {
   scoreImageRelevance,
   resolveImageSubject,
   anchorSceneImageQuery,
+  hitMentionsSubject,
+  isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import {
   isPinterestPinUrl,
@@ -312,6 +314,7 @@ export async function fetchEofSceneImage({
   if (oxyPool && Array.isArray(oxyPool.hits) && oxyPool.hits.length) {
     const poolSource = oxyPool.source === 'serpapi' ? 'serpapi' : 'oxylabs'
     const secondarySubject = String(oxyPool.secondarySubject || '').trim()
+    const leadPoolSubject = String(oxyPool.subject || topic || '').trim()
     const qLower = String(anchoredQuery || '').toLowerCase()
     const useSecondary =
       secondarySubject &&
@@ -322,6 +325,7 @@ export async function fetchEofSceneImage({
     const activeClaimed = useSecondary
       ? oxyPool.secondaryClaimed || (oxyPool.secondaryClaimed = new Set())
       : oxyPool.claimed || (oxyPool.claimed = new Set())
+    const activeSubject = useSecondary ? secondarySubject : leadPoolSubject
     const maxDownloadTries = 5
     for (let t = 0; t < maxDownloadTries; t += 1) {
       const claimed = claimOxylabsPoolHit({
@@ -329,7 +333,8 @@ export async function fetchEofSceneImage({
         claimed: activeClaimed,
         avoidKeys: avoid,
         index: index + attempt + t,
-        topic: useSecondary ? secondarySubject : topic,
+        topic: activeSubject || topic,
+        subject: activeSubject || topic,
         imageQuery: anchoredQuery,
         caption,
         plainTextDraft: draft,
@@ -337,9 +342,24 @@ export async function fetchEofSceneImage({
         keyPrefix: useSecondary ? `${poolSource}-sec` : poolSource,
       })
       if (!claimed) break
+      // Named subject: refuse stills that never mention them (titles lie less often than pixels, but still a gate).
+      if (
+        isNamedFootballSubject(activeSubject) &&
+        claimed.hitSource !== 'grok-imagine' &&
+        claimed.hitSource !== 'free-gen' &&
+        !hitMentionsSubject(activeSubject, claimed.title || '', claimed.imgUrl || '')
+      ) {
+        console.info(
+          '[eof-scene-images] reject claimed still — no subject cue',
+          String(activeSubject).slice(0, 40),
+          String(claimed.title || claimed.imgUrl || '').slice(0, 90),
+        )
+        activeClaimed.delete?.(claimed.key)
+        continue
+      }
       // Score the TITLE for the scene — job query alone must not rubber-stamp weak stills.
       const score = scoreImageRelevance(
-        topic || anchoredQuery || '',
+        activeSubject || topic || anchoredQuery || '',
         claimed.title || '',
         anchoredQuery || caption || '',
         { plainTextDraft: draft, captions: caption, intent: roleIntent },
@@ -368,7 +388,7 @@ export async function fetchEofSceneImage({
       }
       // Keep claimed on download failure — don't burn retries on a dead URL.
     }
-    // Secondary pool empty/failed → fall back to lead pool once.
+    // Secondary pool empty/failed → fall back to lead pool once (still must match lead subject).
     if (useSecondary && Array.isArray(oxyPool.hits)) {
       for (let t = 0; t < 3; t += 1) {
         const claimed = claimOxylabsPoolHit({
@@ -376,7 +396,8 @@ export async function fetchEofSceneImage({
           claimed: oxyPool.claimed || (oxyPool.claimed = new Set()),
           avoidKeys: avoid,
           index: index + attempt + t,
-          topic,
+          topic: leadPoolSubject || topic,
+          subject: leadPoolSubject || topic,
           imageQuery: anchoredQuery,
           caption,
           plainTextDraft: draft,
@@ -384,6 +405,15 @@ export async function fetchEofSceneImage({
           keyPrefix: poolSource,
         })
         if (!claimed) break
+        if (
+          isNamedFootballSubject(leadPoolSubject) &&
+          claimed.hitSource !== 'grok-imagine' &&
+          claimed.hitSource !== 'free-gen' &&
+          !hitMentionsSubject(leadPoolSubject, claimed.title || '', claimed.imgUrl || '')
+        ) {
+          oxyPool.claimed.delete?.(claimed.key)
+          continue
+        }
         if (await materializeClaimedHit(claimed, outPath)) {
           return {
             path: outPath,

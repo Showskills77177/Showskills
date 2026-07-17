@@ -19,6 +19,11 @@ import {
   scoreImageRoleIntentMatch,
   listSecondaryImageSubjects,
   topicLooksLikeCoach,
+  hitMentionsSubject,
+  isNamedFootballSubject,
+  looksLikeGroupPhotoCue,
+  looksLikeSoloPortraitCue,
+  MIN_EOF_VISION_SCORE,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import { isBlockedStockImageUrl, filterBlockedStockImages } from '../../../shared/eofStockImageFilter.mjs'
 
@@ -511,6 +516,10 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
   const topic = String(scene.topic || '').trim()
   const imageQuery = String(scene.imageQuery || '').trim()
   const caption = String(scene.caption || '').trim()
+  // Always resolve mononyms / "Rooney on Ronaldo" → Wayne Rooney (never surname=Ronaldo).
+  const subject =
+    resolveImageSubject(scene.subject || topic) ||
+    String(scene.subject || topic || '').trim()
   const intent = detectImageRoleIntent({
     topic,
     imageQuery,
@@ -518,6 +527,23 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
     plainTextDraft: scene.plainTextDraft,
     intent: scene.intent,
   })
+  const url = String(hit?.url || hit?.localPath || '')
+  const src = String(hit?.source || '')
+  const isGen = src === 'grok-imagine' || src === 'free-gen'
+  const vision = Number(hit?.visionScore)
+
+  // Named subject (Rooney / Tuchel / …): title/URL must name them, OR vision already verified.
+  if (isNamedFootballSubject(subject) && !isGen) {
+    const visionOk = Number.isFinite(vision) && vision >= MIN_EOF_VISION_SCORE
+    if (!visionOk && !hitMentionsSubject(subject, title, url)) {
+      return -500
+    }
+    // Vision already rejected this face — never claim.
+    if (Number.isFinite(vision) && vision < MIN_EOF_VISION_SCORE) {
+      return -500
+    }
+  }
+
   const relevance = scoreImageRelevance(topic || imageQuery || caption, title, imageQuery || caption, {
     intent,
     plainTextDraft: scene.plainTextDraft,
@@ -527,15 +553,30 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
   const portrait = scoreImageCandidate(hit?.url, hit?.width, hit?.height)
   // Caption tokens in the title (tactics / England / celebrate) get a small extra nudge.
   let captionBoost = 0
-  const hay = `${title} ${hit?.url || ''}`.toLowerCase()
+  const hay = `${title} ${url}`.toLowerCase()
   for (const tok of caption.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 5)) {
     if (hay.includes(tok)) captionBoost += 3
   }
   // URL-only era cues (titles already scored inside scoreImageRelevance).
   const urlRole = scoreImageRoleIntentMatch(intent, String(hit?.url || ''))
-  const vision = Number(hit?.visionScore)
   const visionBoost = Number.isFinite(vision) ? (vision - 5) * 8 : 0
-  return relevance * 12 + Math.max(-20, Math.min(40, portrait)) + captionBoost + urlRole + visionBoost
+
+  // Prefer solo/clear face stills; demote duo/group posing titles unless vision scored high.
+  let groupPenalty = 0
+  if (looksLikeGroupPhotoCue(title, url) && !(Number.isFinite(vision) && vision >= 8)) {
+    groupPenalty = -60
+  } else if (looksLikeSoloPortraitCue(title, url)) {
+    groupPenalty = 12
+  }
+
+  return (
+    relevance * 12 +
+    Math.max(-20, Math.min(40, portrait)) +
+    captionBoost +
+    urlRole +
+    visionBoost +
+    groupPenalty
+  )
 }
 
 /**
@@ -559,24 +600,40 @@ export function claimOxylabsPoolHit(opts = {}) {
 
   const scene = {
     topic: opts.topic,
+    subject: opts.subject || resolveImageSubject(opts.topic) || opts.topic,
     imageQuery: opts.imageQuery,
     caption: opts.caption,
     plainTextDraft: opts.plainTextDraft,
     intent: opts.intent,
   }
+  const subject =
+    resolveImageSubject(scene.subject || scene.topic) || String(scene.subject || '').trim()
   const ranked = hits
     .map((hit, i) => {
       const hitSource = String(hit?.source || '').trim()
       const usePrefix =
         hitSource === 'grok-imagine' || hitSource === 'free-gen' ? hitSource : prefix
       const identity = String(hit?.localPath || hit?.url || '').trim()
+      const score = scoreOxylabsHitForScene(hit, scene)
+      if (
+        score <= -400 &&
+        isNamedFootballSubject(subject) &&
+        !hitMentionsSubject(subject, hit?.title || '', identity)
+      ) {
+        console.info(
+          '[eof-images] reject claim candidate',
+          subject.slice(0, 40),
+          `score=${score}`,
+          String(hit?.title || hit?.url || '').slice(0, 90),
+        )
+      }
       return {
         hit,
         url: String(hit?.url || hit?.localPath || '').trim(),
         localPath: hit?.localPath ? String(hit.localPath).trim() : null,
         hitSource: hitSource || null,
         key: `${usePrefix}:${identity}`,
-        score: scoreOxylabsHitForScene(hit, scene),
+        score,
         // Tiny index bias so rebuilds still diversify when scores tie.
         // Prefer scrape over AI gen when title scores are equal.
         genPenalty: hitSource === 'grok-imagine' || hitSource === 'free-gen' ? 1 : 0,
@@ -586,12 +643,21 @@ export function claimOxylabsPoolHit(opts = {}) {
     .filter((row) => row.url)
     .sort((a, b) => b.score - a.score || a.genPenalty - b.genPenalty || a.tie - b.tie)
 
-  // Never claim Getty/meme/quote-card hits (score ≤ -100 from stock/caption filters).
+  // Never claim Getty/meme/quote-card / wrong-subject hits (score ≤ -100).
   const usable = ranked.filter((row) => row.score > -100)
   let fallback = null
   for (const row of usable) {
     if (claimed.has(row.key)) continue
     if (avoid.has(row.url) || avoid.has(row.key) || (row.localPath && avoid.has(row.localPath))) {
+      // Avoid-history reuse is OK only when the still still names the subject.
+      if (
+        isNamedFootballSubject(subject) &&
+        !hitMentionsSubject(subject, row.hit?.title || '', row.url) &&
+        row.hitSource !== 'grok-imagine' &&
+        row.hitSource !== 'free-gen'
+      ) {
+        continue
+      }
       if (!fallback) fallback = { ...row, reused: true }
       continue
     }
@@ -609,6 +675,20 @@ export function claimOxylabsPoolHit(opts = {}) {
     }
   }
   if (!fallback) return null
+  // Named-subject Shorts: never fall back to a still that does not name the person.
+  if (
+    isNamedFootballSubject(subject) &&
+    fallback.hitSource !== 'grok-imagine' &&
+    fallback.hitSource !== 'free-gen' &&
+    !hitMentionsSubject(subject, fallback.hit?.title || '', fallback.url)
+  ) {
+    console.info(
+      '[eof-images] refuse fallback without subject cue',
+      subject.slice(0, 40),
+      String(fallback.hit?.title || fallback.url).slice(0, 90),
+    )
+    return null
+  }
   claimed.add(fallback.key)
   return {
     imgUrl: fallback.url,

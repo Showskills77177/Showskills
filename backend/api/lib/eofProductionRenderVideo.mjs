@@ -34,6 +34,8 @@ import {
   resolveImageSubject,
   listSecondaryImageSubjects,
   detectImageRoleIntent,
+  filterHitsRequiringSubjectNameCue,
+  isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import { resolveEofOverlayMoments } from '../../../shared/eofOverlayMoments.mjs'
 import {
@@ -355,6 +357,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
 
       // Grok vision: look at the stills (not just titles) — drop watermark / wrong era / wrong face.
       // Prefer real scrape photos when vision scores tie (applyVisionScoresToHits).
+      // When vision is off/failed: NEVER take the first Google hit for a celebrity — require name cues.
       if (oxyPool?.hits?.length && isEofImageVisionConfigured()) {
         try {
           const visionScores = await rankEofPoolHitsWithVision({
@@ -366,6 +369,22 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           })
           if (visionScores.size) {
             oxyPool.hits = applyVisionScoresToHits(oxyPool.hits, visionScores)
+            console.info(
+              '[eof-video] vision kept',
+              oxyPool.hits.length,
+              'stills for',
+              String(oxyPool.subject || leadSubject || '').slice(0, 40),
+            )
+          } else if (isNamedFootballSubject(leadSubject)) {
+            console.warn(
+              '[eof-video] vision returned no scores — strict subject-name filter for',
+              String(leadSubject).slice(0, 40),
+            )
+            oxyPool.hits = filterHitsRequiringSubjectNameCue(
+              oxyPool.hits,
+              oxyPool.subject || leadSubject,
+            )
+            oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
           } else {
             oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
           }
@@ -378,13 +397,40 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             })
             if (secScores.size) {
               oxyPool.secondaryHits = applyVisionScoresToHits(oxyPool.secondaryHits, secScores)
+            } else if (isNamedFootballSubject(oxyPool.secondarySubject || secondaryPeople[0])) {
+              oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
+                oxyPool.secondaryHits,
+                oxyPool.secondarySubject || secondaryPeople[0],
+              )
             }
           }
         } catch (e) {
           console.warn('[eof-video] vision re-rank skipped', e instanceof Error ? e.message : e)
+          if (isNamedFootballSubject(leadSubject)) {
+            oxyPool.hits = filterHitsRequiringSubjectNameCue(
+              oxyPool.hits,
+              oxyPool.subject || leadSubject,
+            )
+          }
           oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
         }
       } else if (oxyPool?.hits?.length) {
+        if (isNamedFootballSubject(leadSubject)) {
+          console.warn(
+            '[eof-video] vision not configured — strict subject-name filter for',
+            String(leadSubject).slice(0, 40),
+          )
+          oxyPool.hits = filterHitsRequiringSubjectNameCue(
+            oxyPool.hits,
+            oxyPool.subject || leadSubject,
+          )
+          if (oxyPool.secondaryHits?.length && oxyPool.secondarySubject) {
+            oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
+              oxyPool.secondaryHits,
+              oxyPool.secondarySubject,
+            )
+          }
+        }
         oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
       }
 

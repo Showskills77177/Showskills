@@ -3,6 +3,9 @@
  * Prefer the PERSON / club named in the topic (Messi, Tuchel, …) — never generic World Cup stock.
  */
 
+/** Vision re-rank: stills below this score are dropped (correct face or fail). */
+export const MIN_EOF_VISION_SCORE = 6
+
 const STOP = new Set([
   'a',
   'an',
@@ -255,6 +258,143 @@ function personMentionedInText(person, text) {
   const surname = parts[parts.length - 1]
   if (!surname) return false
   return new RegExp(`\\b${surname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(String(text || ''))
+}
+
+/** Escape a token for word-boundary RegExp matching. */
+function escapeRe(token) {
+  return String(token || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Surname / full-name cues for a subject (Wayne Rooney → { full, surname, tokens }).
+ * Used to gate SERP stills so “two random guys” never pass on a Rooney Short.
+ * @param {string} subject
+ * @returns {{ full: string, surname: string, tokens: string[] }}
+ */
+export function subjectNameCues(subject) {
+  const full = String(subject || '').trim()
+  const tokens = full
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-ZÀ-ÿ'-]/g, ''))
+    .filter((w) => w.length >= 3 && !STOP.has(w.toLowerCase()) && !NAME_BREAK_RE.test(w))
+  const surname = tokens.length ? tokens[tokens.length - 1] : ''
+  return { full, surname, tokens }
+}
+
+/**
+ * True when title/URL/person-label clearly names the subject (surname ≥4 chars, or full name).
+ * AI-gen stills may use `source` grok-imagine/free-gen — those are trusted by title we set.
+ * @param {string} subject
+ * @param {string} [title]
+ * @param {string} [url]
+ */
+export function hitMentionsSubject(subject, title = '', url = '') {
+  // "Wayne Rooney on Ronaldo" → check Wayne Rooney, not surname=Ronaldo.
+  const resolved = resolveImageSubject(subject) || String(subject || '').trim()
+  const { full, surname, tokens } = subjectNameCues(resolved)
+  if (!full && !surname) return false
+  const hay = `${title || ''} ${url || ''}`.toLowerCase()
+  if (!hay.trim()) return false
+  if (full && hay.includes(full.toLowerCase())) return true
+  if (surname.length >= 4 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(hay)) return true
+  // Two given-name tokens (e.g. "kylian mbappe" in slug) without relying on short surnames alone.
+  if (tokens.length >= 2) {
+    const joined = tokens.map((t) => t.toLowerCase())
+    if (joined.every((t) => hay.includes(t))) return true
+  }
+  return false
+}
+
+/**
+ * Named football person/coach we must not mis-assign stills for.
+ * @param {string} subject
+ */
+export function isNamedFootballSubject(subject) {
+  const resolved = resolveImageSubject(subject) || String(subject || '').trim()
+  if (!resolved || /^football$/i.test(resolved)) return false
+  const { surname } = subjectNameCues(resolved)
+  if (expandPlayerFullName(surname) || expandPlayerFullName(resolved)) return true
+  if (KNOWN_PLAYER_RE.test(resolved) || KNOWN_COACH_RE.test(resolved)) return true
+  if (topicLooksLikeCoach(resolved)) return true
+  // Multi-word proper name from topic resolution (e.g. "Wayne Rooney")
+  return subjectNameCues(resolved).tokens.length >= 2 && surname.length >= 4
+}
+
+/** Title/URL cues that scream group / duo / unrelated couple posing. */
+const GROUP_PHOTO_CUE_RE =
+  /\b(two\s+(guys|men|players|friends)|duo|couple|posing\s+with|with\s+friends|group\s+photo|team\s+mates|teammates|alongside|and\s+wife|and\s+girlfriend|bros?|mates\s+pose)\b/i
+
+/** Solo / clear portrait cues — prefer these when vision is unavailable. */
+const SOLO_PORTRAIT_CUE_RE =
+  /\b(portrait|headshot|close[- ]?up|press\s+photo|solo|alone|profile\s+shot|mugshot)\b/i
+
+/**
+ * @param {string} [title]
+ * @param {string} [url]
+ */
+export function looksLikeGroupPhotoCue(title = '', url = '') {
+  return GROUP_PHOTO_CUE_RE.test(`${title || ''} ${url || ''}`)
+}
+
+/**
+ * @param {string} [title]
+ * @param {string} [url]
+ */
+export function looksLikeSoloPortraitCue(title = '', url = '') {
+  return SOLO_PORTRAIT_CUE_RE.test(`${title || ''} ${url || ''}`)
+}
+
+/**
+ * Filter pool hits for a named subject when vision is unavailable or empty.
+ * Drops stills that never mention the subject; demotes group-photo titles.
+ * Gen hits (title we stamped with the subject) pass.
+ * @template {{ url?: string, title?: string|null, source?: string, localPath?: string }} T
+ * @param {T[]} hits
+ * @param {string} subject
+ * @param {{ log?: boolean }} [opts]
+ * @returns {T[]}
+ */
+export function filterHitsRequiringSubjectNameCue(hits, subject, opts = {}) {
+  if (!Array.isArray(hits) || !hits.length) return []
+  if (!isNamedFootballSubject(subject)) return hits
+  const kept = []
+  for (const hit of hits) {
+    const src = String(hit?.source || '')
+    const isGen = src === 'grok-imagine' || src === 'free-gen'
+    const title = String(hit?.title || '')
+    const url = String(hit?.url || hit?.localPath || '')
+    if (isGen && hitMentionsSubject(subject, title, url)) {
+      kept.push(hit)
+      continue
+    }
+    if (!hitMentionsSubject(subject, title, url)) {
+      if (opts.log !== false) {
+        console.info(
+          '[eof-images] reject no subject cue',
+          String(subject).slice(0, 40),
+          (title || url).slice(0, 90),
+        )
+      }
+      continue
+    }
+    if (looksLikeGroupPhotoCue(title, url) && !looksLikeSoloPortraitCue(title, url)) {
+      if (opts.log !== false) {
+        console.info(
+          '[eof-images] reject group-photo cue (no vision)',
+          String(subject).slice(0, 40),
+          title.slice(0, 90),
+        )
+      }
+      continue
+    }
+    kept.push(hit)
+  }
+  // Prefer solo portrait titles first when vision could not re-rank faces.
+  return kept.sort((a, b) => {
+    const sa = looksLikeSoloPortraitCue(a?.title, a?.url) ? 1 : 0
+    const sb = looksLikeSoloPortraitCue(b?.title, b?.url) ? 1 : 0
+    return sb - sa
+  })
 }
 
 /**

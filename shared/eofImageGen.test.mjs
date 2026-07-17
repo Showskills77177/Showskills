@@ -132,8 +132,8 @@ describe('merge + prefer scrape on tie', () => {
 
   it('applyVisionScoresToHits prefers scrape on equal scores', () => {
     const scores = new Map([
-      ['https://scrape.test/a.jpg', 6],
-      ['https://gen.test/b.jpg', 6],
+      ['https://scrape.test/a.jpg', 7],
+      ['https://gen.test/b.jpg', 7],
     ])
     const ranked = applyVisionScoresToHits(
       [
@@ -144,6 +144,22 @@ describe('merge + prefer scrape on tie', () => {
     )
     assert.equal(ranked[0].source, 'serpapi')
     assert.equal(ranked[1].source, 'grok-imagine')
+  })
+
+  it('applyVisionScoresToHits drops borderline score 4 (wrong-face risk)', () => {
+    const scores = new Map([
+      ['https://ok.test/a.jpg', 7],
+      ['https://border.test/b.jpg', 4],
+    ])
+    const ranked = applyVisionScoresToHits(
+      [
+        { url: 'https://border.test/b.jpg', source: 'serpapi', title: 'Maybe Rooney' },
+        { url: 'https://ok.test/a.jpg', source: 'serpapi', title: 'Wayne Rooney' },
+      ],
+      scores,
+    )
+    assert.equal(ranked.length, 1)
+    assert.equal(ranked[0].url, 'https://ok.test/a.jpg')
   })
 })
 
