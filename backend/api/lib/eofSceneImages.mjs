@@ -1,5 +1,5 @@
 import { mkdirSync, existsSync, unlinkSync, readdirSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { writeFile, copyFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runFfmpeg } from './eofFfmpeg.mjs'
@@ -25,6 +25,8 @@ import {
 } from './eofApImages.mjs'
 import { isEofOxylabsConfigured, claimOxylabsPoolHit } from './eofOxylabsImages.mjs'
 import { isEofSerpApiConfigured } from './eofSerpApiImages.mjs'
+import { isEofGrokImagineConfigured } from './eofGrokImagineImages.mjs'
+import { isEofFreeGenConfigured } from './eofFreeGenImages.mjs'
 import {
   normalizeEofImageProvider,
   eofImageProviderConfigurationNote,
@@ -46,6 +48,8 @@ export function eofImageSourceStatus() {
     pinterestApi: isEofPinterestApiConfigured(),
     pinterestPinUrl: true,
     wikimedia: true,
+    grokImagine: isEofGrokImagineConfigured(),
+    freeGen: isEofFreeGenConfigured(),
   }
 }
 
@@ -127,6 +131,19 @@ async function downloadImageToFile(imgUrl, outPath) {
     if (original !== url) return tryOnce(original)
   }
   return false
+}
+
+/** Prefer local AI-gen stills; otherwise download remote URL (skip file://). */
+async function materializeClaimedHit(claimed, outPath) {
+  const local = String(claimed?.localPath || '').trim()
+  if (local && existsSync(local)) {
+    mkdirSync(dirname(outPath), { recursive: true })
+    await copyFile(local, outPath)
+    return true
+  }
+  const url = String(claimed?.imgUrl || '').trim()
+  if (!url || url.startsWith('file://')) return false
+  return downloadImageToFile(url, outPath)
 }
 
 async function searchPexelsPhoto(query, index, key) {
@@ -332,10 +349,16 @@ export async function fetchEofSceneImage({
         activeClaimed.delete?.(claimed.key)
         continue
       }
-      if (await downloadImageToFile(claimed.imgUrl, outPath)) {
+      const sceneSource =
+        claimed.hitSource === 'grok-imagine' || claimed.hitSource === 'free-gen'
+          ? claimed.hitSource
+          : useSecondary
+            ? `${poolSource}-secondary`
+            : poolSource
+      if (await materializeClaimedHit(claimed, outPath)) {
         return {
           path: outPath,
-          source: useSecondary ? `${poolSource}-secondary` : poolSource,
+          source: sceneSource,
           imageQuery: anchoredQuery || oxyPool.query || imageQuery,
           imageTitle: claimed.title,
           relevance: score,
@@ -361,10 +384,13 @@ export async function fetchEofSceneImage({
           keyPrefix: poolSource,
         })
         if (!claimed) break
-        if (await downloadImageToFile(claimed.imgUrl, outPath)) {
+        if (await materializeClaimedHit(claimed, outPath)) {
           return {
             path: outPath,
-            source: poolSource,
+            source:
+              claimed.hitSource === 'grok-imagine' || claimed.hitSource === 'free-gen'
+                ? claimed.hitSource
+                : poolSource,
             imageQuery: anchoredQuery || oxyPool.query || imageQuery,
             imageTitle: claimed.title,
             imageKey: claimed.key,

@@ -129,12 +129,17 @@ Score every index 1–${hits.length}.`,
 
 /**
  * Merge vision scores onto hit objects (mutates copies).
- * @param {Array<{ url: string, title?: string|null, width?: number, height?: number, visionScore?: number }>} hits
+ * On equal vision scores, prefer real scrape photos over AI gen stills.
+ * @param {Array<{ url: string, title?: string|null, width?: number, height?: number, source?: string, visionScore?: number }>} hits
  * @param {Map<string, number>} visionScores
  */
 export function applyVisionScoresToHits(hits, visionScores) {
   if (!Array.isArray(hits) || !(visionScores instanceof Map) || !visionScores.size) {
     return Array.isArray(hits) ? hits : []
+  }
+  const isGen = (h) => {
+    const s = String(h?.source || '')
+    return s === 'grok-imagine' || s === 'free-gen'
   }
   return hits
     .map((h) => {
@@ -145,5 +150,9 @@ export function applyVisionScoresToHits(hits, visionScores) {
       }
     })
     .filter((h) => h.visionScore == null || h.visionScore >= 3)
-    .sort((a, b) => (b.visionScore ?? 5) - (a.visionScore ?? 5))
+    .sort((a, b) => {
+      const diff = (b.visionScore ?? 5) - (a.visionScore ?? 5)
+      if (diff !== 0) return diff
+      return (isGen(a) ? 1 : 0) - (isGen(b) ? 1 : 0)
+    })
 }

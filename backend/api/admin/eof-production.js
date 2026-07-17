@@ -21,6 +21,7 @@ import {
   startEofProductionMusicRemixBackground,
   startEofProductionCaptionReplaceBackground,
   startEofProductionEffectsApplyBackground,
+  startEofProductionStickersApplyBackground,
 } from '../lib/eofProductionRenderRunner.mjs'
 import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
@@ -30,6 +31,11 @@ import {
   updateEofImageProviderSettings,
   listEofImageProviderOptions,
   normalizeEofImageProvider,
+  listEofImageGenModeOptions,
+  listEofImageGenProviderOptions,
+  eofImageGenConfigurationNote,
+  normalizeEofImageGenMode,
+  normalizeEofImageGenProvider,
 } from '../lib/eofImageProviderSettings.mjs'
 import {
   EOF_VOICE_PRESETS,
@@ -75,6 +81,15 @@ import {
   EOF_LIGHT_EFFECTS,
   EOF_COLOUR_EFFECTS,
 } from '../../../shared/eofVideoEffects.mjs'
+import {
+  EOF_DEFAULT_STICKERS,
+  EOF_STICKERS_STACKING_RULE,
+  EOF_MAX_STICKERS,
+  listEofStickersCatalog,
+  listEofStickerPositions,
+  listEofStickersByCategory,
+  normalizeEofStickers,
+} from '../../../shared/eofStickersElements.mjs'
 import {
   ensureEofMusicCatalogSeeded,
   listEofMusicTracks,
@@ -176,6 +191,8 @@ export default async function handler(req, res) {
 
       const imageProviderSettings = await getEofImageProviderSettings().catch(() => ({
         imageProvider: 'auto',
+        imageGenMode: 'auto',
+        imageGenProvider: 'auto',
         updatedAt: null,
       }))
 
@@ -230,6 +247,15 @@ export default async function handler(req, res) {
         })),
         defaultVideoEffects: EOF_DEFAULT_VIDEO_EFFECTS,
         videoEffectsStackingRule: EOF_EFFECT_STACKING_RULE,
+        stickersCatalog: listEofStickersCatalog(),
+        stickersButtons: listEofStickersByCategory('buttons'),
+        stickersShapes: listEofStickersByCategory('shapes'),
+        stickersArrows: listEofStickersByCategory('arrows'),
+        stickersExtras: listEofStickersByCategory('stickers'),
+        stickerPositions: listEofStickerPositions(),
+        defaultStickers: EOF_DEFAULT_STICKERS,
+        stickersStackingRule: EOF_STICKERS_STACKING_RULE,
+        stickersMax: EOF_MAX_STICKERS,
         captionEngine: eofCaptionEngineStatus(),
         zapcapTemplates: zapcapCatalog.templates,
         zapcapTemplatesError: zapcapCatalog.error,
@@ -273,7 +299,15 @@ export default async function handler(req, res) {
         imageProvider: imageProviderSettings.imageProvider || 'auto',
         imageProviderOptions: listEofImageProviderOptions(),
         imageProviderUpdatedAt: imageProviderSettings.updatedAt || null,
+        imageGenMode: imageProviderSettings.imageGenMode || 'auto',
+        imageGenProvider: imageProviderSettings.imageGenProvider || 'auto',
+        imageGenModeOptions: listEofImageGenModeOptions(),
+        imageGenProviderOptions: listEofImageGenProviderOptions(),
         imagesNote: eofImagesConfigurationNote(imageProviderSettings.imageProvider),
+        imageGenNote: eofImageGenConfigurationNote({
+          mode: imageProviderSettings.imageGenMode,
+          provider: imageProviderSettings.imageGenProvider,
+        }),
         pinterest: pinterestProbe,
         serpapi: serpapiProbe,
         oxylabs: oxylabsProbe,
@@ -309,8 +343,52 @@ export default async function handler(req, res) {
           ok: true,
           settings,
           imageProvider: settings.imageProvider,
+          imageGenMode: settings.imageGenMode,
+          imageGenProvider: settings.imageGenProvider,
           imageProviderOptions: listEofImageProviderOptions(),
+          imageGenModeOptions: listEofImageGenModeOptions(),
+          imageGenProviderOptions: listEofImageGenProviderOptions(),
           imagesNote: eofImagesConfigurationNote(settings.imageProvider),
+          imageGenNote: eofImageGenConfigurationNote({
+            mode: settings.imageGenMode,
+            provider: settings.imageGenProvider,
+          }),
+        })
+      }
+
+      if (action === 'update-image-gen' || action === 'image-gen') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, {
+            error: 'Only the channel owner can change image generation settings.',
+          })
+        }
+        const patch = {}
+        if (body.imageGenMode !== undefined) {
+          patch.imageGenMode = normalizeEofImageGenMode(body.imageGenMode)
+        }
+        if (body.imageGenProvider !== undefined) {
+          patch.imageGenProvider = normalizeEofImageGenProvider(body.imageGenProvider)
+        }
+        if (!Object.keys(patch).length) {
+          return json(res, 400, {
+            error: 'imageGenMode (off|auto|always) and/or imageGenProvider (auto|grok|free) required.',
+          })
+        }
+        const settings = await updateEofImageProviderSettings(patch)
+        return json(res, 200, {
+          ok: true,
+          settings,
+          imageProvider: settings.imageProvider,
+          imageGenMode: settings.imageGenMode,
+          imageGenProvider: settings.imageGenProvider,
+          imageGenModeOptions: listEofImageGenModeOptions(),
+          imageGenProviderOptions: listEofImageGenProviderOptions(),
+          imageGenNote: eofImageGenConfigurationNote({
+            mode: settings.imageGenMode,
+            provider: settings.imageGenProvider,
+          }),
         })
       }
 
@@ -481,6 +559,36 @@ export default async function handler(req, res) {
         } catch (e) {
           return json(res, 500, {
             error: e instanceof Error ? e.message : 'Apply effects failed',
+          })
+        }
+      }
+
+      if (action === 'apply-stickers') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (!(existing.script?.scenes?.length >= 1)) {
+          return json(res, 400, { error: 'Job has no script scenes.' })
+        }
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          return json(res, 409, {
+            error:
+              'This Short is already rendering. Wait until it finishes, then click Apply stickers again.',
+          })
+        }
+
+        try {
+          await updateEofProductionJob(jobId, {
+            stickers:
+              body.stickers !== undefined ? normalizeEofStickers(body.stickers) : undefined,
+          })
+          await startEofProductionStickersApplyBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, {
+            error: e instanceof Error ? e.message : 'Apply stickers failed',
           })
         }
       }
@@ -682,6 +790,9 @@ export default async function handler(req, res) {
       const videoEffects = normalizeEofVideoEffects(
         body.videoEffects !== undefined ? body.videoEffects : EOF_DEFAULT_VIDEO_EFFECTS,
       )
+      const stickers = normalizeEofStickers(
+        body.stickers !== undefined ? body.stickers : EOF_DEFAULT_STICKERS,
+      )
       try {
         const job = await createEofProductionJob({
           topic,
@@ -696,6 +807,7 @@ export default async function handler(req, res) {
           enhanceStyle,
           overlayMoments,
           videoEffects,
+          stickers,
         })
         return json(res, 201, {
           ok: true,
@@ -744,6 +856,7 @@ export default async function handler(req, res) {
             : undefined,
         videoEffects:
           body.videoEffects !== undefined ? normalizeEofVideoEffects(body.videoEffects) : undefined,
+        stickers: body.stickers !== undefined ? normalizeEofStickers(body.stickers) : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

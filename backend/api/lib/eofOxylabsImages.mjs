@@ -565,29 +565,41 @@ export function claimOxylabsPoolHit(opts = {}) {
     intent: opts.intent,
   }
   const ranked = hits
-    .map((hit, i) => ({
-      hit,
-      url: String(hit?.url || '').trim(),
-      key: `${prefixTag}${String(hit?.url || '').trim()}`,
-      score: scoreOxylabsHitForScene(hit, scene),
-      // Tiny index bias so rebuilds still diversify when scores tie.
-      tie: (i + Math.max(0, Number(opts.index) || 0)) % Math.max(1, hits.length),
-    }))
+    .map((hit, i) => {
+      const hitSource = String(hit?.source || '').trim()
+      const usePrefix =
+        hitSource === 'grok-imagine' || hitSource === 'free-gen' ? hitSource : prefix
+      const identity = String(hit?.localPath || hit?.url || '').trim()
+      return {
+        hit,
+        url: String(hit?.url || hit?.localPath || '').trim(),
+        localPath: hit?.localPath ? String(hit.localPath).trim() : null,
+        hitSource: hitSource || null,
+        key: `${usePrefix}:${identity}`,
+        score: scoreOxylabsHitForScene(hit, scene),
+        // Tiny index bias so rebuilds still diversify when scores tie.
+        // Prefer scrape over AI gen when title scores are equal.
+        genPenalty: hitSource === 'grok-imagine' || hitSource === 'free-gen' ? 1 : 0,
+        tie: (i + Math.max(0, Number(opts.index) || 0)) % Math.max(1, hits.length),
+      }
+    })
     .filter((row) => row.url)
-    .sort((a, b) => b.score - a.score || a.tie - b.tie)
+    .sort((a, b) => b.score - a.score || a.genPenalty - b.genPenalty || a.tie - b.tie)
 
   // Never claim Getty/meme/quote-card hits (score ≤ -100 from stock/caption filters).
   const usable = ranked.filter((row) => row.score > -100)
   let fallback = null
   for (const row of usable) {
     if (claimed.has(row.key)) continue
-    if (avoid.has(row.url) || avoid.has(row.key)) {
+    if (avoid.has(row.url) || avoid.has(row.key) || (row.localPath && avoid.has(row.localPath))) {
       if (!fallback) fallback = { ...row, reused: true }
       continue
     }
     claimed.add(row.key)
     return {
       imgUrl: row.url,
+      localPath: row.localPath,
+      hitSource: row.hitSource,
       title: row.hit.title || null,
       width: row.hit.width,
       height: row.hit.height,
@@ -600,6 +612,8 @@ export function claimOxylabsPoolHit(opts = {}) {
   claimed.add(fallback.key)
   return {
     imgUrl: fallback.url,
+    localPath: fallback.localPath,
+    hitSource: fallback.hitSource,
     title: fallback.hit.title || null,
     width: fallback.hit.width,
     height: fallback.hit.height,

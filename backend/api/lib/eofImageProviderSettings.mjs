@@ -1,11 +1,19 @@
 /**
- * EOF Google Images provider preference (SerpAPI vs Oxylabs).
- * Credentials stay in env; only the preferred provider id is persisted.
+ * EOF Google Images provider preference (SerpAPI vs Oxylabs)
+ * + AI image gen mode / provider (Grok Imagine vs free Pollinations).
+ * Credentials stay in env; only preference ids are persisted.
  */
 import { query, dbIsPostgres } from './db.mjs'
 import { ensureEofProductionSchema } from './ensureEofProductionSchema.mjs'
 import { isEofSerpApiConfigured } from './eofSerpApiImages.mjs'
 import { isEofOxylabsConfigured } from './eofOxylabsImages.mjs'
+import {
+  normalizeEofImageGenMode,
+  normalizeEofImageGenProvider,
+  listEofImageGenModeOptions,
+  listEofImageGenProviderOptions,
+  eofImageGenConfigurationNote,
+} from './eofImageGen.mjs'
 
 const ROW_ID = 'default'
 export const EOF_IMAGE_PROVIDER_IDS = new Set(['auto', 'serpapi', 'oxylabs'])
@@ -108,6 +116,26 @@ export function eofImageProviderConfigurationNote(preferred = 'auto') {
   return null
 }
 
+async function ensureImageGenColumns() {
+  // Additive columns for AI gen toggles (safe on existing DBs).
+  if (dbIsPostgres()) {
+    await query(
+      `ALTER TABLE eof_image_provider_settings ADD COLUMN IF NOT EXISTS image_gen_mode TEXT NOT NULL DEFAULT 'auto'`,
+    ).catch(() => {})
+    await query(
+      `ALTER TABLE eof_image_provider_settings ADD COLUMN IF NOT EXISTS image_gen_provider TEXT NOT NULL DEFAULT 'auto'`,
+    ).catch(() => {})
+    return
+  }
+  // SQLite: ADD COLUMN fails if already present — ignore.
+  await query(
+    `ALTER TABLE eof_image_provider_settings ADD COLUMN image_gen_mode TEXT NOT NULL DEFAULT 'auto'`,
+  ).catch(() => {})
+  await query(
+    `ALTER TABLE eof_image_provider_settings ADD COLUMN image_gen_provider TEXT NOT NULL DEFAULT 'auto'`,
+  ).catch(() => {})
+}
+
 export async function ensureEofImageProviderSchema() {
   await ensureEofProductionSchema()
   if (ensured) return
@@ -117,6 +145,8 @@ export async function ensureEofImageProviderSchema() {
       CREATE TABLE IF NOT EXISTS eof_image_provider_settings (
         id TEXT PRIMARY KEY DEFAULT 'default',
         image_provider TEXT NOT NULL DEFAULT 'auto',
+        image_gen_mode TEXT NOT NULL DEFAULT 'auto',
+        image_gen_provider TEXT NOT NULL DEFAULT 'auto',
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `)
@@ -125,16 +155,21 @@ export async function ensureEofImageProviderSchema() {
       CREATE TABLE IF NOT EXISTS eof_image_provider_settings (
         id TEXT PRIMARY KEY DEFAULT 'default',
         image_provider TEXT NOT NULL DEFAULT 'auto',
+        image_gen_mode TEXT NOT NULL DEFAULT 'auto',
+        image_gen_provider TEXT NOT NULL DEFAULT 'auto',
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `)
   }
 
+  await ensureImageGenColumns()
+
   const { rows } = await query(`SELECT id FROM eof_image_provider_settings WHERE id = $1`, [ROW_ID])
   if (!rows[0]) {
-    await query(`INSERT INTO eof_image_provider_settings (id, image_provider) VALUES ($1, 'auto')`, [
-      ROW_ID,
-    ])
+    await query(
+      `INSERT INTO eof_image_provider_settings (id, image_provider, image_gen_mode, image_gen_provider) VALUES ($1, 'auto', 'auto', 'auto')`,
+      [ROW_ID],
+    )
   }
   ensured = true
 }
@@ -144,6 +179,8 @@ function rowToSettings(row) {
   return {
     id: row.id || ROW_ID,
     imageProvider: normalizeEofImageProvider(row.image_provider),
+    imageGenMode: normalizeEofImageGenMode(row.image_gen_mode),
+    imageGenProvider: normalizeEofImageGenProvider(row.image_gen_provider),
     updatedAt: row.updated_at || null,
   }
 }
@@ -155,6 +192,8 @@ export async function getEofImageProviderSettings() {
     rowToSettings(rows[0]) || {
       id: ROW_ID,
       imageProvider: 'auto',
+      imageGenMode: 'auto',
+      imageGenProvider: 'auto',
       updatedAt: null,
     }
   )
@@ -167,14 +206,32 @@ export async function updateEofImageProviderSettings(patch = {}) {
     patch.imageProvider !== undefined
       ? normalizeEofImageProvider(patch.imageProvider)
       : current.imageProvider
+  const imageGenMode =
+    patch.imageGenMode !== undefined
+      ? normalizeEofImageGenMode(patch.imageGenMode)
+      : current.imageGenMode
+  const imageGenProvider =
+    patch.imageGenProvider !== undefined
+      ? normalizeEofImageGenProvider(patch.imageGenProvider)
+      : current.imageGenProvider
 
   const nowSql = dbIsPostgres() ? 'now()' : `datetime('now')`
   await query(
     `UPDATE eof_image_provider_settings
      SET image_provider = $2,
+         image_gen_mode = $3,
+         image_gen_provider = $4,
          updated_at = ${nowSql}
      WHERE id = $1`,
-    [ROW_ID, imageProvider],
+    [ROW_ID, imageProvider, imageGenMode, imageGenProvider],
   )
   return getEofImageProviderSettings()
+}
+
+export {
+  listEofImageGenModeOptions,
+  listEofImageGenProviderOptions,
+  eofImageGenConfigurationNote,
+  normalizeEofImageGenMode,
+  normalizeEofImageGenProvider,
 }

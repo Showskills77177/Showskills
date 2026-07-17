@@ -142,6 +142,8 @@ describe('eof image provider settings DB read/write', () => {
   it('defaults to auto and persists serpapi / oxylabs preference (no API keys in DB)', async () => {
     const initial = await getEofImageProviderSettings()
     assert.equal(initial.imageProvider, 'auto')
+    assert.equal(initial.imageGenMode, 'auto')
+    assert.equal(initial.imageGenProvider, 'auto')
 
     const serp = await updateEofImageProviderSettings({ imageProvider: 'serpapi' })
     assert.equal(serp.imageProvider, 'serpapi')
@@ -150,10 +152,20 @@ describe('eof image provider settings DB read/write', () => {
     const oxy = await updateEofImageProviderSettings({ imageProvider: 'oxylabs' })
     assert.equal(oxy.imageProvider, 'oxylabs')
 
+    const gen = await updateEofImageProviderSettings({
+      imageGenMode: 'always',
+      imageGenProvider: 'grok',
+    })
+    assert.equal(gen.imageGenMode, 'always')
+    assert.equal(gen.imageGenProvider, 'grok')
+
     // Settings payload must never include credential fields
     assert.equal(oxy.apiKey, undefined)
     assert.equal(oxy.serpapiKey, undefined)
     assert.equal(oxy.password, undefined)
-    assert.deepEqual(Object.keys(oxy).sort(), ['id', 'imageProvider', 'updatedAt'].sort())
+    assert.deepEqual(
+      Object.keys(gen).sort(),
+      ['id', 'imageProvider', 'imageGenMode', 'imageGenProvider', 'updatedAt'].sort(),
+    )
   })
 })

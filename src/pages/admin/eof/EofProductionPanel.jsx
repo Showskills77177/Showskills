@@ -59,6 +59,18 @@ import {
   pickEofVideoEffect,
   summarizeEofVideoEffects,
 } from '../../../../shared/eofVideoEffects.mjs'
+import {
+  EOF_DEFAULT_STICKERS,
+  EOF_MAX_STICKERS,
+  EOF_STICKERS_STACKING_RULE,
+  EOF_STICKERS_CATALOG,
+  EOF_STICKER_POSITIONS,
+  normalizeEofStickers,
+  pickEofSticker,
+  setEofStickerPosition,
+  summarizeEofStickers,
+  listEofStickersByCategory,
+} from '../../../../shared/eofStickersElements.mjs'
 
 /** Clean Production chrome — keep Studio gray panels so cards don’t blend into page black. */
 const PX = {
@@ -501,6 +513,115 @@ function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled }) {
   )
 }
 
+/** CapCut-like sticker/element thumb (CSS — original shapes, not CapCut assets). */
+function StickerCardPreview({ stickerId, className = '' }) {
+  const id = String(stickerId || '')
+  return (
+    <div className={`relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#0c0c0c] ${className}`}>
+      <div className="absolute inset-0 opacity-40">
+        <SampleMiniFrame variant="a" />
+      </div>
+      {id === 'btn_subscribe_yt' ? (
+        <div className="absolute inset-x-[10%] top-[18%] flex justify-center">
+          <span className="rounded-md bg-[#ff0000] px-2 py-1 text-[8px] font-black tracking-wide text-white">
+            SUBSCRIBE
+          </span>
+        </div>
+      ) : null}
+      {id === 'btn_follow_tt' ? (
+        <div className="absolute inset-x-[12%] top-[20%] flex justify-center">
+          <span className="rounded-full border-l-2 border-[#25F4EE] bg-black/90 px-2.5 py-1 text-[9px] font-bold text-white">
+            Follow
+          </span>
+        </div>
+      ) : null}
+      {id.startsWith('arrow_') ? (
+        <div className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white drop-shadow">
+          {id === 'arrow_left' ? '←' : id === 'arrow_right' ? '→' : id === 'arrow_up' ? '↑' : '↓'}
+        </div>
+      ) : null}
+      {id === 'shape_square' ? (
+        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 bg-white/90" />
+      ) : null}
+      {id === 'shape_square_outline' ? (
+        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 border-[3px] border-white" />
+      ) : null}
+      {id === 'shape_circle' ? (
+        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 rounded-full bg-white/90" />
+      ) : null}
+      {id === 'shape_circle_outline' ? (
+        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 rounded-full border-[3px] border-white" />
+      ) : null}
+      {id === 'shape_rounded' ? (
+        <div className="absolute inset-x-[14%] top-[28%] h-5 rounded-lg bg-white/85" />
+      ) : null}
+      {id === 'shape_line' ? (
+        <div className="absolute inset-x-[12%] top-[36%] h-1 rounded-full bg-[#FFE566]" />
+      ) : null}
+      {id === 'sticker_fire' ? (
+        <div className="absolute left-1/2 top-[20%] h-10 w-7 -translate-x-1/2 rounded-t-full bg-gradient-to-t from-orange-600 to-yellow-300" />
+      ) : null}
+      {id === 'sticker_new' ? (
+        <div className="absolute inset-x-[16%] top-[22%] rounded border-2 border-[#FFE566] bg-black/85 px-1 py-1 text-center text-[9px] font-black text-[#FFE566]">
+          NEW
+        </div>
+      ) : null}
+      {id === 'sticker_tap' ? (
+        <div className="absolute left-[42%] top-[24%] h-8 w-3 rounded-full bg-white/90" />
+      ) : null}
+    </div>
+  )
+}
+
+function StickerPickerGrid({ title, hint, items, selectedIds, onPick, disabled }) {
+  return (
+    <div>
+      <p className="text-[12px] font-medium text-[#d4d4d4]">{title}</p>
+      {hint ? <p className={`mt-0.5 text-[11px] ${PX.muted}`}>{hint}</p> : null}
+      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+        {items.map((item) => {
+          const active = selectedIds.includes(item.id)
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onPick(item.id)}
+              className={`overflow-hidden rounded-lg border text-left transition disabled:opacity-40 ${
+                active
+                  ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                  : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+              }`}
+              title={item.detail || item.label}
+            >
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                <StickerCardPreview stickerId={item.id} className="h-full w-full" />
+                {active ? (
+                  <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                    ✓
+                  </span>
+                ) : null}
+              </div>
+              <div className="px-1.5 py-1">
+                <span
+                  className={`block truncate text-[11px] font-medium leading-tight ${
+                    active ? 'text-white' : 'text-[#e5e5e5]'
+                  }`}
+                >
+                  {item.label}
+                </span>
+                {item.vibe ? (
+                  <span className="mt-0.5 block truncate text-[10px] text-[#888]">{item.vibe}</span>
+                ) : null}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 
 function readStoredScriptProvider() {
@@ -584,6 +705,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [videoEffectsColour, setVideoEffectsColour] = useState([])
   const [videoEffectPresets, setVideoEffectPresets] = useState([])
   const [videoEffectsStackingRule, setVideoEffectsStackingRule] = useState(EOF_EFFECT_STACKING_RULE)
+  const [stickers, setStickers] = useState(() => ({ items: [] }))
+  const [stickersButtons, setStickersButtons] = useState([])
+  const [stickersShapes, setStickersShapes] = useState([])
+  const [stickersArrows, setStickersArrows] = useState([])
+  const [stickersExtras, setStickersExtras] = useState([])
+  const [stickerPositions, setStickerPositions] = useState([])
+  const [stickersStackingRule, setStickersStackingRule] = useState(EOF_STICKERS_STACKING_RULE)
+  const [stickersMax, setStickersMax] = useState(EOF_MAX_STICKERS)
+  const [activeStickerId, setActiveStickerId] = useState('')
   const [musicTracks, setMusicTracks] = useState([])
   const [defaultMusicBeds, setDefaultMusicBeds] = useState([])
   const [musicTrackId, setMusicTrackId] = useState('')
@@ -653,6 +783,20 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   /** Per-build override for Google Images on Build / Rebuild (defaults to the saved admin preference). */
   const [rebuildImageProvider, setRebuildImageProvider] = useState('auto')
   const [imageProviderBusy, setImageProviderBusy] = useState(false)
+  const [imageGenMode, setImageGenMode] = useState('auto')
+  const [imageGenProvider, setImageGenProvider] = useState('auto')
+  const [imageGenModeOptions, setImageGenModeOptions] = useState([
+    { id: 'off', label: 'Off' },
+    { id: 'auto', label: 'Auto (gapfill)' },
+    { id: 'always', label: 'Always' },
+  ])
+  const [imageGenProviderOptions, setImageGenProviderOptions] = useState([
+    { id: 'auto', label: 'Auto (Grok → Free)', configured: true },
+    { id: 'grok', label: 'Grok Imagine', configured: false },
+    { id: 'free', label: 'Free (Pollinations)', configured: true },
+  ])
+  const [imageGenNote, setImageGenNote] = useState('')
+  const [imageGenBusy, setImageGenBusy] = useState(false)
   const [pinterestStatus, setPinterestStatus] = useState(null)
   const [serpapiStatus, setSerpapiStatus] = useState(null)
   const [oxylabsStatus, setOxylabsStatus] = useState(null)
@@ -710,6 +854,18 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             : normalizeEofVideoEffects(j.defaultVideoEffects),
         )
       }
+      setStickersButtons(Array.isArray(j.stickersButtons) ? j.stickersButtons : [])
+      setStickersShapes(Array.isArray(j.stickersShapes) ? j.stickersShapes : [])
+      setStickersArrows(Array.isArray(j.stickersArrows) ? j.stickersArrows : [])
+      setStickersExtras(Array.isArray(j.stickersExtras) ? j.stickersExtras : [])
+      setStickerPositions(Array.isArray(j.stickerPositions) ? j.stickerPositions : [])
+      if (typeof j.stickersStackingRule === 'string' && j.stickersStackingRule) {
+        setStickersStackingRule(j.stickersStackingRule)
+      }
+      if (Number.isFinite(Number(j.stickersMax))) setStickersMax(Number(j.stickersMax))
+      if (j.defaultStickers && !(stickers?.items?.length > 0)) {
+        setStickers(normalizeEofStickers(j.defaultStickers))
+      }
       setColorGrades(Array.isArray(j.colorGrades) ? j.colorGrades : [])
       if (j.defaultColorGrade) setColorGrade((prev) => prev || j.defaultColorGrade)
       setEnhanceStyles(Array.isArray(j.enhanceStyles) ? j.enhanceStyles : [])
@@ -762,6 +918,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (Array.isArray(j.imageProviderOptions) && j.imageProviderOptions.length) {
         setImageProviderOptions(j.imageProviderOptions)
       }
+      if (typeof j.imageGenMode === 'string' && j.imageGenMode.trim()) {
+        setImageGenMode(j.imageGenMode.trim().toLowerCase())
+      }
+      if (typeof j.imageGenProvider === 'string' && j.imageGenProvider.trim()) {
+        setImageGenProvider(j.imageGenProvider.trim().toLowerCase())
+      }
+      if (Array.isArray(j.imageGenModeOptions) && j.imageGenModeOptions.length) {
+        setImageGenModeOptions(j.imageGenModeOptions)
+      }
+      if (Array.isArray(j.imageGenProviderOptions) && j.imageGenProviderOptions.length) {
+        setImageGenProviderOptions(j.imageGenProviderOptions)
+      }
+      setImageGenNote(typeof j.imageGenNote === 'string' ? j.imageGenNote : '')
       setPinterestStatus(j.pinterest && typeof j.pinterest === 'object' ? j.pinterest : null)
       setSerpapiStatus(j.serpapi && typeof j.serpapi === 'object' ? j.serpapi : null)
       setOxylabsStatus(j.oxylabs && typeof j.oxylabs === 'object' ? j.oxylabs : null)
@@ -821,6 +990,53 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     [imageProvider],
   )
 
+  const saveImageGenSettings = useCallback(
+    async (patch) => {
+      const nextMode =
+        patch.imageGenMode !== undefined
+          ? String(patch.imageGenMode || '').trim().toLowerCase()
+          : imageGenMode
+      const nextProvider =
+        patch.imageGenProvider !== undefined
+          ? String(patch.imageGenProvider || '').trim().toLowerCase()
+          : imageGenProvider
+      if (nextMode === imageGenMode && nextProvider === imageGenProvider) return
+      const prevMode = imageGenMode
+      const prevProvider = imageGenProvider
+      setImageGenMode(nextMode)
+      setImageGenProvider(nextProvider)
+      setImageGenBusy(true)
+      setErr('')
+      try {
+        const res = await apiFetch('/api/admin/eof-production', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update-image-gen',
+            imageGenMode: nextMode,
+            imageGenProvider: nextProvider,
+          }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error || 'Could not save image gen settings')
+        if (typeof j.imageGenMode === 'string') setImageGenMode(j.imageGenMode)
+        if (typeof j.imageGenProvider === 'string') setImageGenProvider(j.imageGenProvider)
+        if (Array.isArray(j.imageGenModeOptions)) setImageGenModeOptions(j.imageGenModeOptions)
+        if (Array.isArray(j.imageGenProviderOptions)) setImageGenProviderOptions(j.imageGenProviderOptions)
+        if (typeof j.imageGenNote === 'string') setImageGenNote(j.imageGenNote)
+        setSuccess(
+          `Image gen: ${j.imageGenMode || nextMode} / ${j.imageGenProvider || nextProvider}`,
+        )
+      } catch (e) {
+        setImageGenMode(prevMode)
+        setImageGenProvider(prevProvider)
+        setErr(e instanceof Error ? e.message : 'Could not save image gen settings')
+      } finally {
+        setImageGenBusy(false)
+      }
+    },
+    [imageGenMode, imageGenProvider],
+  )
 
   useEffect(() => {
     load()
@@ -2253,6 +2469,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 imageSources.google && 'Google',
                 imageSources.pexels && 'Pexels',
                 imageSources.pinterestApi && 'Pinterest',
+                imageSources.grokImagine && 'Grok Imagine',
+                imageSources.freeGen && 'Free gen (Pollinations)',
                 'Wikimedia',
               ]
                 .filter(Boolean)
@@ -2279,7 +2497,42 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ))}
               </select>
             </label>
-
+            <label className="block space-y-1">
+              <span className="text-[#aaaaaa]">Image gen</span>
+              <select
+                value={imageGenMode}
+                disabled={imageGenBusy}
+                onChange={(e) => saveImageGenSettings({ imageGenMode: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[#303030] bg-[#121212] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#555] disabled:opacity-50"
+              >
+                {imageGenModeOptions.map((p) => (
+                  <option key={p.id} value={p.id} title={p.detail}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="text-[#aaaaaa]">Image gen provider</span>
+              <select
+                value={imageGenProvider}
+                disabled={imageGenBusy || imageGenMode === 'off'}
+                onChange={(e) => saveImageGenSettings({ imageGenProvider: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[#303030] bg-[#121212] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#555] disabled:opacity-50"
+              >
+                {imageGenProviderOptions.map((p) => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    disabled={p.id !== 'auto' && !p.configured}
+                    title={p.detail}
+                  >
+                    {p.label}
+                    {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             {imageProvider === 'serpapi' && !imageSources.serpapi ? (
               <p className="text-[#ff9b95]">SerpAPI selected but SERPAPI_API_KEY is not configured.</p>
@@ -2289,7 +2542,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 Oxylabs selected but OXYLABS_USERNAME / OXYLABS_PASSWORD are not configured.
               </p>
             ) : null}
+            {imageGenProvider === 'grok' && !imageSources.grokImagine ? (
+              <p className="text-[#ff9b95]">Grok Imagine selected but XAI_API_KEY is not configured.</p>
+            ) : null}
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
+            {imageGenNote ? <p className="text-[#8ab4f8]">{imageGenNote}</p> : null}
             {serpapiStatus?.configured ? (
               <p className={serpapiStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
                 SerpAPI:{' '}
@@ -2442,7 +2699,42 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ))}
               </select>
             </label>
-
+            <label className={PX.label}>
+              Image gen
+              <select
+                value={imageGenMode}
+                disabled={imageGenBusy}
+                onChange={(e) => saveImageGenSettings({ imageGenMode: e.target.value })}
+                className={inputCls}
+              >
+                {imageGenModeOptions.map((p) => (
+                  <option key={p.id} value={p.id} title={p.detail}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={PX.label}>
+              Gen provider
+              <select
+                value={imageGenProvider}
+                disabled={imageGenBusy || imageGenMode === 'off'}
+                onChange={(e) => saveImageGenSettings({ imageGenProvider: e.target.value })}
+                className={inputCls}
+              >
+                {imageGenProviderOptions.map((p) => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    disabled={p.id !== 'auto' && !p.configured}
+                    title={p.detail}
+                  >
+                    {p.label}
+                    {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             <label className={PX.label}>
               Voice
@@ -2469,6 +2761,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               SerpAPI / Auto.
             </p>
           ) : null}
+          {imageGenProvider === 'grok' && !imageSources.grokImagine ? (
+            <p className={`text-xs ${PX.muted} text-[#ff9b95]`}>
+              Grok Imagine needs XAI_API_KEY — add it on Vercel staging and redeploy, or pick Free / Auto.
+            </p>
+          ) : null}
+          {imageGenNote ? <p className={`text-xs ${PX.muted} text-[#8ab4f8]`}>{imageGenNote}</p> : null}
           <div className="grid gap-5 lg:grid-cols-2">
             <div>
               <p className={PX.label}>Transitions</p>

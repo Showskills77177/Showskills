@@ -33,6 +33,7 @@ import {
 import {
   resolveImageSubject,
   listSecondaryImageSubjects,
+  detectImageRoleIntent,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import { resolveEofOverlayMoments } from '../../../shared/eofOverlayMoments.mjs'
 import {
@@ -40,6 +41,13 @@ import {
   normalizeEofImageProvider,
   resolveEofImageProviderAttemptOrder,
 } from './eofImageProviderSettings.mjs'
+import {
+  normalizeEofImageGenMode,
+  normalizeEofImageGenProvider,
+  mergeEofScrapeAndGenHits,
+  runEofImageGenAlongsideScrape,
+  sortEofPoolHitsPreferScrape,
+} from './eofImageGen.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache, assertEofCleanPlateImagePath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
@@ -182,9 +190,17 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       )
       const imageSettings = await getEofImageProviderSettings().catch(() => ({
         imageProvider: 'auto',
+        imageGenMode: 'auto',
+        imageGenProvider: 'auto',
       }))
       // Per-build override (Production UI Build / Rebuild) wins over the saved admin default.
       const preferredProvider = imageProviderOverride || imageSettings.imageProvider || 'auto'
+      const imageGenMode = normalizeEofImageGenMode(
+        process.env.EOF_IMAGE_GEN_MODE || imageSettings.imageGenMode || 'auto',
+      )
+      const imageGenProvider = normalizeEofImageGenProvider(
+        process.env.EOF_IMAGE_GEN_PROVIDER || imageSettings.imageGenProvider || 'auto',
+      )
       const providerOrder = resolveEofImageProviderAttemptOrder(preferredProvider, {
         serpapi: isEofSerpApiConfigured(),
         oxylabs: isEofOxylabsConfigured(),
@@ -195,61 +211,111 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageProviderOverride ? '(build override)' : '(saved default)',
         '→',
         providerOrder.join(' → ') || '(none keyed)',
+        `| gen=${imageGenMode}/${imageGenProvider}`,
         `| topic=${String(job.topic || '').slice(0, 80)}`,
       )
       const imageContext = {
         plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
         captions: rows.map((r) => r.caption).filter(Boolean),
       }
-      for (const provider of providerOrder) {
-        if (oxyPool?.hits?.length) break
-        if (provider === 'serpapi') {
-          try {
-            const pool = await fetchEofSerpApiJobPool({
-              topic: job.topic,
-              sceneCount: rows.length,
-              attempt: maxAttempt,
-              ...imageContext,
-            })
-            if (pool.hits?.length) {
-              oxyPool = {
-                query: pool.query,
-                hits: pool.hits,
-                claimed: new Set(),
-                source: 'serpapi',
-                plainTextDraft: imageContext.plainTextDraft,
-                intent: pool.intent || null,
-                subject: pool.subject || resolveImageSubject(job.topic) || null,
+      const leadSubject = resolveImageSubject(job.topic) || String(job.topic || '').trim()
+      const leadIntent = detectImageRoleIntent({
+        topic: job.topic,
+        plainTextDraft: imageContext.plainTextDraft,
+        captions: imageContext.captions,
+      })
+
+      async function fetchScrapeJobPool() {
+        let pool = null
+        for (const provider of providerOrder) {
+          if (pool?.hits?.length) break
+          if (provider === 'serpapi') {
+            try {
+              const scraped = await fetchEofSerpApiJobPool({
+                topic: job.topic,
+                sceneCount: rows.length,
+                attempt: maxAttempt,
+                ...imageContext,
+              })
+              if (scraped.hits?.length) {
+                pool = {
+                  query: scraped.query,
+                  hits: scraped.hits.map((h) => ({ ...h, source: h.source || 'serpapi' })),
+                  claimed: new Set(),
+                  source: 'serpapi',
+                  plainTextDraft: imageContext.plainTextDraft,
+                  intent: scraped.intent || leadIntent || null,
+                  subject: scraped.subject || leadSubject || null,
+                }
               }
+            } catch (e) {
+              console.warn('[eof-video] serpapi job pool failed', e instanceof Error ? e.message : e)
             }
-          } catch (e) {
-            console.warn('[eof-video] serpapi job pool failed', e instanceof Error ? e.message : e)
+            continue
           }
-          continue
-        }
-        if (provider === 'oxylabs') {
-          try {
-            const pool = await fetchEofOxylabsJobPool({
-              topic: job.topic,
-              sceneCount: rows.length,
-              attempt: maxAttempt,
-              ...imageContext,
-            })
-            if (pool.hits?.length) {
-              oxyPool = {
-                query: pool.query,
-                hits: pool.hits,
-                claimed: new Set(),
-                source: 'oxylabs',
-                plainTextDraft: imageContext.plainTextDraft,
-                intent: pool.intent || null,
-                subject: pool.subject || resolveImageSubject(job.topic) || null,
+          if (provider === 'oxylabs') {
+            try {
+              const scraped = await fetchEofOxylabsJobPool({
+                topic: job.topic,
+                sceneCount: rows.length,
+                attempt: maxAttempt,
+                ...imageContext,
+              })
+              if (scraped.hits?.length) {
+                pool = {
+                  query: scraped.query,
+                  hits: scraped.hits.map((h) => ({ ...h, source: h.source || 'oxylabs' })),
+                  claimed: new Set(),
+                  source: 'oxylabs',
+                  plainTextDraft: imageContext.plainTextDraft,
+                  intent: scraped.intent || leadIntent || null,
+                  subject: scraped.subject || leadSubject || null,
+                }
               }
+            } catch (e) {
+              console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
             }
-          } catch (e) {
-            console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
           }
         }
+        return pool
+      }
+
+      const scrapePromise = fetchScrapeJobPool()
+      const genPromise = runEofImageGenAlongsideScrape({
+        mode: imageGenMode,
+        provider: imageGenProvider,
+        scrapePromise,
+        subject: leadSubject,
+        intent: leadIntent,
+        topic: job.topic,
+        workDir,
+        sceneCount: rows.length,
+        plainTextDraft: imageContext.plainTextDraft,
+      })
+
+      const [scrapePool, genHits] = await Promise.all([scrapePromise, genPromise])
+      oxyPool = scrapePool
+
+      if (Array.isArray(genHits) && genHits.length) {
+        if (oxyPool?.hits?.length) {
+          oxyPool.hits = mergeEofScrapeAndGenHits(oxyPool.hits, genHits)
+        } else {
+          oxyPool = {
+            query: `ai-gen:${leadSubject}`,
+            hits: mergeEofScrapeAndGenHits([], genHits),
+            claimed: new Set(),
+            source: genHits[0]?.source || 'grok-imagine',
+            plainTextDraft: imageContext.plainTextDraft,
+            intent: leadIntent || null,
+            subject: leadSubject || null,
+          }
+        }
+        console.info(
+          '[eof-video] image gen merged',
+          `${genHits.length} gen hits`,
+          `pool=${oxyPool.hits.length}`,
+          `mode=${imageGenMode}`,
+        )
       }
 
       // Second credit only when the script names another person (Rooney + Tuchel).
@@ -257,7 +323,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         job.topic,
         imageContext.plainTextDraft,
       )
-      if (oxyPool?.hits?.length && secondaryPeople.length) {
+      if (
+        oxyPool?.hits?.length &&
+        secondaryPeople.length &&
+        (oxyPool.source === 'serpapi' || oxyPool.source === 'oxylabs')
+      ) {
         try {
           const sec =
             oxyPool.source === 'serpapi'
@@ -270,7 +340,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                   plainTextDraft: imageContext.plainTextDraft,
                 })
           if (sec?.hits?.length) {
-            oxyPool.secondaryHits = sec.hits
+            oxyPool.secondaryHits = sec.hits.map((h) => ({
+              ...h,
+              source: h.source || oxyPool.source,
+            }))
             oxyPool.secondarySubject = sec.subject
             oxyPool.secondaryQuery = sec.query
             oxyPool.secondaryClaimed = new Set()
@@ -281,17 +354,20 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       }
 
       // Grok vision: look at the stills (not just titles) — drop watermark / wrong era / wrong face.
+      // Prefer real scrape photos when vision scores tie (applyVisionScoresToHits).
       if (oxyPool?.hits?.length && isEofImageVisionConfigured()) {
         try {
           const visionScores = await rankEofPoolHitsWithVision({
             hits: oxyPool.hits,
-            subject: oxyPool.subject || resolveImageSubject(job.topic) || job.topic,
-            intent: oxyPool.intent || 'neutral',
+            subject: oxyPool.subject || leadSubject || job.topic,
+            intent: oxyPool.intent || leadIntent || 'neutral',
             secondarySubjects: secondaryPeople,
             maxImages: Math.min(8, oxyPool.hits.length),
           })
           if (visionScores.size) {
             oxyPool.hits = applyVisionScoresToHits(oxyPool.hits, visionScores)
+          } else {
+            oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
           }
           if (oxyPool.secondaryHits?.length) {
             const secScores = await rankEofPoolHitsWithVision({
@@ -306,7 +382,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           }
         } catch (e) {
           console.warn('[eof-video] vision re-rank skipped', e instanceof Error ? e.message : e)
+          oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
         }
+      } else if (oxyPool?.hits?.length) {
+        oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
       }
 
       console.info(
@@ -444,6 +523,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       captionMode,
       overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
       videoEffects: job.videoEffects,
+      stickers: job.stickers,
       hasSecondarySubject: secondaryPeople.length > 0,
       secondarySceneIndex,
       onSceneProgress: async (done) => report('video', done),
