@@ -443,10 +443,10 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         <h2 className="text-base font-semibold text-white">Script Maker</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           {note ||
-            'Overnight draft preparedness only: ~5 judged voiceover scripts (news/quote). No video build, no YouTube post. Review in the morning, then Adapt / Rebuild / post yourself.'}
+            'Overnight hot-take prep: ~5 polished voiceovers (quote rows + debate news angles). Full scripts shown below. No video, no YouTube. Review in the morning → Adapt / Build / post yourself.'}
         </p>
         <p className="mt-2 rounded-lg border border-[#3ea6ff]/25 bg-[#15202b] px-3 py-2 text-xs text-[#9ecbff]">
-          Drafts only — never auto-publishes. Uses the existing writer + second-tier judge (`scriptProvider: auto`).
+          Pipeline: research (timely) → draft → polish → hot-take refine → second-tier judge. Refuses canned templates and soft article paste.
         </p>
 
         {success ? (
@@ -575,28 +575,45 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
             Refresh
           </button>
         </div>
-        <p className={`mt-1 text-xs ${EOF.muted}`}>Open a job in Production to review the voiceover, Adapt scenes, then build/post manually.</p>
+        <p className={`mt-1 text-xs ${EOF.muted}`}>
+          Full polished voiceovers below (research → draft → polish → hot-take refine → judge). Open in Production to Adapt / Build / post.
+        </p>
         {drafts.length ? (
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 space-y-4">
             {drafts.map((d) => (
-              <li key={d.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-[#303030] bg-[#0d0d0d] p-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-white">{d.title || d.topic}</p>
-                  <p className="mt-1 text-[10px] text-[#717171]">
-                    {(d.format || '—').toString()} · {d.status || '—'} · judge {judgeLabel(d.judge)}
-                    {d.createdAt ? ` · ${new Date(d.createdAt).toLocaleString()}` : ''}
-                  </p>
-                  {d.plainTextDraft ? (
-                    <p className={`mt-2 line-clamp-3 text-xs ${EOF.muted}`}>{d.plainTextDraft}</p>
-                  ) : null}
+              <li key={d.id} className="rounded-lg border border-[#303030] bg-[#0d0d0d] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white">{d.title || d.topic}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-[#717171]">
+                      {(d.format || '—').toString()} · {d.status || '—'} · {d.source || 'ai'} · judge{' '}
+                      {judgeLabel(d.judge)}
+                      {d.createdAt ? ` · ${new Date(d.createdAt).toLocaleString()}` : ''}
+                    </p>
+                    {Array.isArray(d.stages) && d.stages.length ? (
+                      <p className="mt-1 text-[10px] text-[#8a8a8a]">Stages: {d.stages.join(' → ')}</p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${EOF.btnSecondary}`}
+                    onClick={() => typeof onOpenJob === 'function' && onOpenJob(d.id)}
+                  >
+                    Open job
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${EOF.btnSecondary}`}
-                  onClick={() => typeof onOpenJob === 'function' && onOpenJob(d.id)}
-                >
-                  Open job
-                </button>
+                {d.plainTextDraft ? (
+                  <div className="mt-3 rounded-md border border-[#3a3a3a] bg-[#121212] p-3">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[#fbbf24]">
+                      Full script
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#e8e8e8]">
+                      {d.plainTextDraft}
+                    </p>
+                  </div>
+                ) : (
+                  <p className={`mt-2 text-xs ${EOF.muted}`}>No script text stored on this draft.</p>
+                )}
               </li>
             ))}
           </ul>

@@ -34,11 +34,17 @@ export function topicKey(topic) {
     .slice(0, 80)
 }
 
-/** Pure quota for news vs quote angles in a Script Maker batch. */
+/** Pure quota for news vs quote / debate hot-take angles in a Script Maker batch. */
 export function scriptMakerFormatQuota(count = 5, formatMix = 'mixed') {
   const n = Math.min(12, Math.max(1, Number(count) || 5))
-  const mix = ['mixed', 'news', 'quote'].includes(formatMix) ? formatMix : 'mixed'
-  const wantQuotes = mix === 'quote' ? n : mix === 'news' ? 0 : Math.max(1, Math.floor(n / 2))
+  const mix = ['mixed', 'news', 'quote', 'debate'].includes(formatMix) ? formatMix : 'mixed'
+  // Mixed = hot-take heavy: ~half quote rows, rest news written as debate takes.
+  const wantQuotes =
+    mix === 'quote'
+      ? n
+      : mix === 'news' || mix === 'debate'
+        ? 0
+        : Math.min(n, Math.max(1, Math.ceil(n / 2)))
   const wantNews = n - wantQuotes
   return { n, formatMix: mix, wantQuotes, wantNews }
 }
@@ -61,8 +67,16 @@ export async function pickScriptMakerTopics({ count = 5, formatMix = 'mixed' } =
         if (!headline) continue
         out.push({
           topic: headline,
-          format: 'news',
-          context: [t.angle, t.whyNow, (t.desks || []).join(', ')].filter(Boolean).join('\n'),
+          // News angles become debate-format hot takes (not wire rewrites).
+          format: formatMix === 'news' ? 'news' : 'debate',
+          context: [
+            'HOT TAKE BRIEF — write a sharp desk argument, not an article paste.',
+            t.angle,
+            t.whyNow,
+            (t.desks || []).join(', '),
+          ]
+            .filter(Boolean)
+            .join('\n'),
           source: source || 'news',
           headline,
         })
@@ -105,8 +119,14 @@ export async function pickScriptMakerTopics({ count = 5, formatMix = 'mixed' } =
         if (out.some((x) => topicKey(x.topic) === topicKey(headline))) continue
         out.push({
           topic: headline,
-          format: 'news',
-          context: [t.angle, t.whyNow].filter(Boolean).join('\n'),
+          format: formatMix === 'news' ? 'news' : 'debate',
+          context: [
+            'HOT TAKE BRIEF — write a sharp desk argument, not an article paste.',
+            t.angle,
+            t.whyNow,
+          ]
+            .filter(Boolean)
+            .join('\n'),
           source: source || 'news',
           headline,
         })
@@ -174,7 +194,8 @@ export async function runEofScriptMakerPipeline(opts = {}) {
       continue
     }
     try {
-      // Draft only + auto writer→judge→escalate (directness gate). No adapt/video/YouTube.
+      // Draft only + auto writer→polish→hot-take refine→judge→escalate. No adapt/video/YouTube.
+      // qualityBar=production refuses canned templates and soft article paste.
       const job = await createEofProductionJob({
         topic: item.topic,
         createdBy,
@@ -183,7 +204,11 @@ export async function runEofScriptMakerPipeline(opts = {}) {
         scriptProvider: 'auto',
         context: item.context,
         voicePreset: 'british',
+        qualityBar: 'production',
       })
+      if (job.scriptSource === 'template') {
+        throw new Error('Refused template fallback — not production quality')
+      }
       recentKeys.add(topicKey(item.topic))
       jobs.push({
         id: job.id,
@@ -194,6 +219,8 @@ export async function runEofScriptMakerPipeline(opts = {}) {
         judge: job.script?.judge || null,
         source: job.scriptSource || item.source,
         plainTextDraft: job.script?.plainTextDraft || '',
+        stages: job.script?.stages || null,
+        qualityBar: job.script?.qualityBar || 'production',
       })
     } catch (e) {
       errors.push(`${item.topic.slice(0, 40)}: ${e instanceof Error ? e.message : e}`)
@@ -245,6 +272,9 @@ export async function listEofScriptMakerDrafts(limit = 12) {
       plainTextDraft: j.script?.plainTextDraft || '',
       judge: j.script?.judge || null,
       scriptSource: j.scriptSource || null,
+      source: j.scriptSource || j.script?.draftSource || null,
+      stages: j.script?.stages || null,
+      qualityBar: j.script?.qualityBar || null,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
     }))

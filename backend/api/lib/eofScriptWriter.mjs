@@ -1,13 +1,15 @@
 /**
  * Script writer for EOF image Shorts — multi-pass flow:
- *   0) Desk research (RSS headlines + editor brief)
- *   1) Shorts voiceover draft (spoken, not a book chapter)
+ *   0) Desk research (RSS headlines + editor brief) — check it is actual / now
+ *   1) Hot-take Shorts voiceover draft (spoken argument, not article paste)
  *   2) Polish pass (cut fluff, tighten hook/CTA)
- *   3) Adapt draft → Short scenes (captions + image queries)
+ *   3) Hot-take refine pass (bite + stake + agree/disagree CTA)
+ *   4) Second-tier judge (merit / interest / value / directness / hotTake) → rewrite/escalate
+ *   5) Adapt draft → Short scenes (captions + image queries)
  *
  * Auto provider order when configured: Groq (free) → OpenAI → xAI Grok.
  * UI can force a provider via scriptProvider (groq | xai | openai | auto).
- * Falls back to structured templates when none work.
+ * Script Maker uses qualityBar=production and refuses canned templates.
  *
  * Scope: football worldwide (World Cup, all leagues) — call it football, never soccer.
  * Never American football / NFL.
@@ -50,6 +52,10 @@ import {
   EOF_SHORTS_DIRECT_VOICE,
   scoreDraftDirectness,
 } from '../../../shared/eofScriptDirectness.mjs'
+import {
+  EOF_SHORTS_HOT_TAKE_VOICE,
+  scoreDraftHotTake,
+} from '../../../shared/eofScriptHotTake.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -128,18 +134,24 @@ export function isAutoScriptMode(scriptProvider) {
 }
 
 /** Format-aware temps + excellence bar for Auto quality mode. */
-export function autoTuneDraftSettings({ format, regenerate = false, directorNote = '' } = {}) {
+export function autoTuneDraftSettings({
+  format,
+  regenerate = false,
+  directorNote = '',
+  qualityBar = 'standard',
+} = {}) {
   const fmt = resolveFormat(format)
   const directed = Boolean(String(directorNote || '').trim())
+  const production = qualityBar === 'production' || qualityBar === 'script-maker'
   let draftTemperature = 0.42
   let polishTemperature = 0.28
   // News/quotes: cooler = fewer invented facts. Debate/hooks: warmer punch.
   if (fmt === 'news' || fmt === 'quote') {
-    draftTemperature = 0.36
-    polishTemperature = 0.22
+    draftTemperature = 0.38
+    polishTemperature = 0.24
   } else if (fmt === 'debate' || fmt === 'hook_reveal') {
-    draftTemperature = 0.55
-    polishTemperature = 0.3
+    draftTemperature = 0.58
+    polishTemperature = 0.32
   } else if (fmt === 'listicle' || fmt === 'timeline') {
     draftTemperature = 0.46
     polishTemperature = 0.26
@@ -148,11 +160,18 @@ export function autoTuneDraftSettings({ format, regenerate = false, directorNote
     draftTemperature = Math.min(0.78, draftTemperature + 0.2)
     polishTemperature = 0.24
   }
-  const excellentMin = Number(envKey('EOF_SCRIPT_AUTO_EXCELLENT') || 7.5)
+  if (production) {
+    // Slightly warmer for sharper takes; higher excellence bar for overnight batch.
+    draftTemperature = Math.min(0.7, draftTemperature + 0.06)
+    polishTemperature = Math.min(0.36, polishTemperature + 0.04)
+  }
+  const excellentDefault = production ? 8 : 7.5
+  const excellentMin = Number(envKey('EOF_SCRIPT_AUTO_EXCELLENT') || excellentDefault)
   return {
     draftTemperature,
     polishTemperature,
-    excellentMin: Number.isFinite(excellentMin) ? Math.min(9.5, Math.max(6, excellentMin)) : 7.5,
+    excellentMin: Number.isFinite(excellentMin) ? Math.min(9.5, Math.max(6, excellentMin)) : excellentDefault,
+    production,
   }
 }
 
@@ -236,18 +255,27 @@ function draftFormatGuide(format) {
     hook_reveal:
       'Structure: bold claim → one origin beat → turning point → payoff → CTA. Tension, then pay it off. Spoken, not literary.',
     debate:
-      'Structure: hot take → critic case (1 beat) → fan case (1 beat) → verdict → pick-a-side CTA. Fair but punchy.',
+      'HOT TAKE Short: named claim in line 1 → why it bites (tactics/selection/pride) → the pushback → your sharp verdict → pick-a-side CTA. Never soft “both sides” waffle.',
     timeline:
-      'Structure: start → breakthrough → peak → legacy → CTA. One era per beat. Real clubs/nations only.',
+      'Structure: start → breakthrough → peak → legacy → CTA. One era per beat. Real clubs/nations only. Still punchy — not a Wikipedia read.',
     news:
-      'Structure: BREAKING lead (who/what) → what happened → why it matters now → what happens next → CTA. Desk TV copy, not longform journalism.',
+      'BREAKING desk take — not a wire rewrite. Who/what in line 1 → the stake (result/selection/pride) → what it means next → fight CTA. Transform the brief; do not paste the article.',
   }[format]
 }
 
 /**
  * Shell script object for draft-only jobs (no scenes yet).
  */
-export function buildEofDraftShell({ topic, format, plainTextDraft, title, source, judge = null }) {
+export function buildEofDraftShell({
+  topic,
+  format,
+  plainTextDraft,
+  title,
+  source,
+  judge = null,
+  stages = null,
+  qualityBar = null,
+} = {}) {
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
   const draft = String(plainTextDraft || '').trim()
@@ -261,31 +289,25 @@ export function buildEofDraftShell({ topic, format, plainTextDraft, title, sourc
     scenes: [],
     draftSource: source || null,
     judge: judge && !judge.skipped ? judge : null,
+    stages: Array.isArray(stages) ? stages : null,
+    qualityBar: qualityBar || null,
   }
 }
 
 function templatePlainTextDraft(topic, format) {
+  // Last-resort only — Script Maker / production qualityBar refuse this path.
   const name = String(topic || '').trim() || 'This football story'
   const clean = name.replace(/\s+/g, ' ')
   if (format === 'quote' || /["“].+["”]|:\s*"/.test(clean)) {
-    return `${clean} — and that line is already splitting football fans. It was said in public, not in a group chat, so the stakes are real: reputation, selection, and who gets the blame. Strip the noise and you still have a clear football argument. Agree or disagree with that quote? Comment.`
-  }
-  if (format === 'news' || /\bworld cup|transfer|injury|manager|final|derby\b/i.test(clean)) {
-    if (/spain/i.test(clean) && /belgium/i.test(clean)) {
-      return `Spain just sent a World Cup message — they beat Belgium with control, not chaos. For Belgium, another tournament night ends with the same question: talent without a ruthless edge. Spain now look like a side that can manage big games, not just dominate possession. Are Spain genuine contenders from here, or was this one good night? Comment.`
-    }
-    if (/england/i.test(clean) && /\bworld cup\b/i.test(clean)) {
-      return `England are living on the edge again at the World Cup — the talent is obvious, the calm under pressure is not. One soft moment and the whole nation debate restarts: system, selections, and nerve. Tournament football does not care about friendly form. Can England close a big game the ugly way when it matters? Drop your take.`
-    }
-    return `${clean} — that is the football story fans are arguing about right now. The result changes the table talk, the dressing-room pressure, and what comes next in the competition. Ignore the noise: tournament and club football are decided by who handles the big moments, not who wins the highlight reel. Who comes out of this looking stronger — and who is in trouble? Comment below.`
+    return `${clean} That line was public. Reputation, selection, and blame are on the table. Who do you back in that row — and who looks soft? Comment.`
   }
   if (format === 'debate') {
-    return `${clean} splits football opinion for a reason. One side sees proven quality on the biggest nights; the other sees gaps that get exposed when the game turns ugly. Strip away the tribal noise and you still have a real football argument about levels, roles, and clutch moments. Which side are you on — and why? Comment.`
+    return `${clean} One side says the tactics and selections are costing big nights. The other says the talent is still there and the noise is unfair. Pick a side with a reason. Comment.`
   }
   if (format === 'timeline') {
-    return `${clean} did not arrive fully formed. The early years built the habits, the breakthrough season changed the ceiling, and the peak nights locked in the reputation. Late-career chapters always reopen the same debate: was the peak even better than fans remember? Which era defines ${clean} for you? Comment below.`
+    return `${clean}: breakthrough years, the peak nights, then the debate about which era was real. Which chapter defines them for you? Comment.`
   }
-  return `${clean} still divides football fans for a reason. The early club years built the foundation, the big-stage move raised the stakes, and the rivalry nights made the legend stick. Which era was the real peak? Comment below.`
+  return `${clean} — name the stake: result, selection, or pride. Soft summaries do not belong on Shorts. What is your take right now? Comment.`
 }
 
 /** Human-readable warning when AI script writing fell back to templates. */
@@ -619,6 +641,7 @@ export async function writeEofPlainTextDraft({
   regenerate = false,
   previousDraft = '',
   directorNote = '',
+  qualityBar = 'standard',
 } = {}) {
   const rawTopic = String(topic || '').trim()
   if (rawTopic.length < 2) throw new Error('Topic is required (min 2 characters).')
@@ -626,11 +649,17 @@ export async function writeEofPlainTextDraft({
   const prev = String(previousDraft || '').trim()
   const note = String(directorNote || '').trim().slice(0, 1200)
   const autoMode = isAutoScriptMode(scriptProvider)
-  const tuned = autoTuneDraftSettings({ format: fmt, regenerate, directorNote: note })
+  const tuned = autoTuneDraftSettings({
+    format: fmt,
+    regenerate,
+    directorNote: note,
+    qualityBar,
+  })
   const draftTemperature = tuned.draftTemperature
   const polishTemperature = tuned.polishTemperature
   const excellentMin = tuned.excellentMin
-  if (autoMode) {
+  const productionBar = tuned.production
+  if (autoMode || productionBar) {
     console.info(
       '[eof-script] auto tune',
       fmt,
@@ -638,6 +667,7 @@ export async function writeEofPlainTextDraft({
       draftTemperature,
       'excellent≥',
       excellentMin,
+      productionBar ? 'qualityBar=production' : '',
     )
   }
 
@@ -741,6 +771,7 @@ export async function writeEofPlainTextDraft({
             previousDraft: prev,
             regenerate: regenerate || Boolean(note),
             directorNote: note,
+            forceHotTakeRefine: productionBar || autoMode,
           }),
       })
     }
@@ -817,8 +848,9 @@ export async function writeEofPlainTextDraft({
         directorNote: note
           ? `${note}\n\nAlso fix the editor judge feedback above.`
           : autoMode
-            ? 'Auto quality pass: DIRECT desk VO — name who said what / who hit back, cut waffle, short sentences, sharper CTA. Stay inside the desk brief.'
+            ? 'Auto quality pass: HOT TAKE desk VO — name who said what / who hit back, concrete stake (tactics/selection/pride/result), cut waffle, sharper CTA. Stay inside the desk brief. No article paste.'
             : '',
+        forceHotTakeRefine: true,
       }),
       90000,
       `${writerId} quality-rewrite`,
@@ -972,6 +1004,7 @@ export async function writeEofPlainTextDraft({
             previousDraft: prev,
             regenerate: true,
             directorNote: note,
+            forceHotTakeRefine: productionBar || autoMode,
           }),
           90000,
           `${id} auto-fallback draft`,
@@ -987,7 +1020,20 @@ export async function writeEofPlainTextDraft({
   }
 
   if (softBest) {
-    return { ...softBest, deskSources: softBest.deskSources || deskSources }
+    const hot = scoreDraftHotTake(softBest.plainTextDraft, { format: fmt, topic: t })
+    const direct = scoreDraftDirectness(softBest.plainTextDraft, { format: fmt, topic: t })
+    if (productionBar && (!hot.pass || !direct.pass || softBest.source === 'template')) {
+      // Overnight Script Maker must not ship glue templates / soft waffle.
+      throw new Error(
+        `Script Maker rejected soft draft for “${t.slice(0, 60)}”: ${(hot.reasons[0] || direct.reasons[0] || 'failed hot-take bar')}. ${failures.slice(0, 2).join(' · ')}`,
+      )
+    }
+    return {
+      ...softBest,
+      deskSources: softBest.deskSources || deskSources,
+      qualityBar: productionBar ? 'production' : 'standard',
+      stages: ['research', 'draft', 'polish', 'hot-take-refine', 'judge'],
+    }
   }
 
   // Directed rewrite failed: keep the previous draft instead of wiping it with a canned template
@@ -1003,6 +1049,12 @@ export async function writeEofPlainTextDraft({
         : 'AI rewrite failed — kept your previous draft',
       keptPrevious: true,
     }
+  }
+
+  if (productionBar) {
+    throw new Error(
+      `Script Maker could not write a hot-take script for “${t.slice(0, 60)}” (refusing canned template). ${failures.slice(0, 3).join(' · ') || 'No AI provider returned a usable draft.'}`,
+    )
   }
 
   return {
@@ -1096,7 +1148,7 @@ function buildDraftPrompt({ topic, format, context, previousDraft = '', regenera
   const prev = String(previousDraft || '').trim()
   const desk = String(context || '').trim().slice(0, 1600)
 
-  const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT essays.
+  const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT news wire paste.
 
 HARD SCOPE:
 ${EOF_FOOTBALL_SCOPE}
@@ -1105,19 +1157,22 @@ OUTPUT = ONE continuous spoken script. Plain prose only. No JSON, bullets, scene
 
 ${EOF_SHORTS_DIRECT_VOICE}
 
+${EOF_SHORTS_HOT_TAKE_VOICE}
+
 SHORTS LENGTH:
 - 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
 - Short sentences. Average under 16 words. Max one clause per beat.
-- Sound like Sky Sports News / BBC Sport desk at 10pm — not a podcast monologue.
-- FIRST SENTENCE must name the player/coach AND the claim or event.
+- Sound like Sky Sports News / BBC Sport desk at 10pm — hot, sharp, direct.
+- FIRST SENTENCE must name the player/coach AND the claim or conflict.
 - FACT LOCK: Use ONLY names, scores, clubs, and claims in the DESK BRIEF / current draft. Do NOT invent scores, fees, or fake quotes.
+- Transform the desk brief into a spoken ARGUMENT. Never copy-paste an article.
 - If PRODUCER DIRECTION is provided, follow it closely while keeping Shorts length and fact lock.
 - Structure for format "${format}": ${draftFormatGuide(format)}
-- End with ONE sharp comment CTA.
+- End with ONE sharp agree/disagree CTA.
 
 BANNED forever:
-"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", "raises questions", "speaks volumes", "a reminder that", "the narrative", "the journey", literary metaphors, long subordinate clauses.
-Never reply with meta chat ("Sure", "I'll rewrite", "Here is a plan"). Output the voiceover only.`
+"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", "raises questions", "speaks volumes", "a reminder that", "the narrative", "the journey", "fans are arguing about right now", "ignore the noise", "strip the noise", "that is the football story", literary metaphors, long subordinate clauses.
+Never reply with meta chat ("Sure", "I'll rewrite", "Here is a plan"). Output the FULL voiceover only.`
 
   // Directed rewrite: keep the prompt lean so Groq free tier actually returns a full VO
   if (note) {
@@ -1153,27 +1208,59 @@ Write the spoken Shorts voiceover only. No preamble.`
 function buildPolishPrompt({ topic, format, draft }) {
   const system = `You are a ruthless YouTube Shorts editor for Eyes Of Football.
 
-Rewrite the draft into a DIRECT spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
+Rewrite the draft into a DIRECT hot-take spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
 
 ${EOF_SHORTS_DIRECT_VOICE}
 
+${EOF_SHORTS_HOT_TAKE_VOICE}
+
 Rules:
-- 90–130 words. Cut every soft phrase and career waffle.
-- First line: names + the claim/event (who hit back / what happened).
+- 90–130 words. Cut every soft phrase, career waffle, and article glue.
+- First line: names + the conflict (who hit back / what cost the win / what was just said).
+- Add or sharpen ONE concrete stake: tactics, selection, pride, result, or quote row.
 - Short spoken sentences. No book language.
 - Always football, never soccer. Never NFL.
-- Keep one CTA question at the end.
+- Keep one fight CTA question at the end.
 - Format intent: ${format}. ${draftFormatGuide(format)}
-- Output plain prose only.`
+- Output the FULL improved voiceover only.`
 
   const user = `Topic: ${topic}
 
-Draft to tighten:
+Draft to tighten into a hot take:
 """
 ${draft}
 """
 
-Return only the improved voiceover.`
+Return only the improved FULL voiceover.`
+
+  return { system, user }
+}
+
+function buildHotTakeRefinePrompt({ topic, format, draft }) {
+  const system = `Final Eyes Of Football pass — HOT TAKE refine only.
+
+You receive a draft that already passed a polish. Make it bite harder WITHOUT inventing facts.
+
+${EOF_SHORTS_HOT_TAKE_VOICE}
+
+Rules:
+- Keep every verified name/score/club/claim from the draft.
+- Line 1 must punch: who + conflict.
+- Ensure a concrete stake (tactics / selection / pride / result / quote).
+- Ensure a “now” signal (just / after / according to / hit back…).
+- Kill any remaining template glue.
+- 90–130 words. One CTA question.
+- Format: ${format}.
+- Output the FULL voiceover only.`
+
+  const user = `Topic: ${topic}
+
+Draft:
+"""
+${draft}
+"""
+
+Return the sharper FULL voiceover.`
 
   return { system, user }
 }
@@ -1194,6 +1281,7 @@ async function writeDraftPipeline({
   previousDraft = '',
   regenerate = false,
   directorNote = '',
+  forceHotTakeRefine = false,
 }) {
   let workingTopic = topic
   let researchCtx = context
@@ -1237,7 +1325,9 @@ async function writeDraftPipeline({
     directorNote,
   })
   let text = draftResult.plainTextDraft
+  // Production / Auto: always polish (including Groq) so we don't ship raw first drafts.
   const allowPolish =
+    forceHotTakeRefine ||
     !isGroq ||
     String(process.env.EOF_GROQ_POLISH || '')
       .trim()
@@ -1267,10 +1357,39 @@ async function writeDraftPipeline({
     }
   }
 
+  // Stage 3 — hot-take refine (Auto / Script Maker / explicit)
+  if (forceHotTakeRefine) {
+    try {
+      const refined = await hotTakeRefineWithProvider({
+        provider,
+        topic: workingTopic,
+        format,
+        draft: text,
+        temperature: Math.min(0.4, polishTemperature + 0.08),
+      })
+      const refinedWords = wordCount(refined)
+      const baseWords = wordCount(text)
+      if (
+        refined &&
+        refinedWords >= 45 &&
+        refinedWords >= Math.floor(baseWords * 0.7) &&
+        scoreDraftHotTake(refined, { format, topic: workingTopic }).score >=
+          scoreDraftHotTake(text, { format, topic: workingTopic }).score
+      ) {
+        text = refined
+      }
+    } catch (e) {
+      console.warn('[eof-script] hot-take refine skipped', provider, e instanceof Error ? e.message : e)
+    }
+  }
+
   return {
     plainTextDraft: text,
     title: titleFromDraft(workingTopic, text),
     source: provider,
+    stages: forceHotTakeRefine
+      ? ['research', 'draft', 'polish', 'hot-take-refine']
+      : ['research', 'draft', allowPolish ? 'polish' : null].filter(Boolean),
   }
 }
 
@@ -1322,6 +1441,36 @@ async function writeDraftWithProvider({
   }
   if (provider === 'groq') {
     return writeDraftWithGroq({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
+  }
+  throw new Error(`unknown provider ${provider}`)
+}
+
+async function hotTakeRefineWithProvider({ provider, topic, format, draft, temperature = 0.32 }) {
+  const { system, user } = buildHotTakeRefinePrompt({ topic, format, draft })
+  if (provider === 'xai') {
+    return cleanDraftText(await xaiTextCompletion({ system, user, temperature }))
+  }
+  if (provider === 'openai') {
+    const key = envKey('OPENAI_API_KEY')
+    const model = envKey('OPENAI_MODEL', 'EOF_OPENAI_MODEL') || 'gpt-4o'
+    return cleanDraftText(
+      await chatTextCompletion({
+        url: 'https://api.openai.com/v1/chat/completions',
+        headers: { Authorization: `Bearer ${key}` },
+        body: {
+          model,
+          temperature,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        },
+        timeoutMs: 45000,
+      }),
+    )
+  }
+  if (provider === 'groq') {
+    return cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 45000 }))
   }
   throw new Error(`unknown provider ${provider}`)
 }

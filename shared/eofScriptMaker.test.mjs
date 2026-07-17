@@ -8,11 +8,11 @@ import { buildEofDraftShell } from '../backend/api/lib/eofScriptWriter.mjs'
 import { routes } from '../lib/vercelApiDispatch.mjs'
 
 describe('eof Script Maker quotas', () => {
-  it('splits mixed batches toward news + at least one quote', () => {
+  it('splits mixed batches hot-take heavy (≈half quotes)', () => {
     const q = scriptMakerFormatQuota(5, 'mixed')
     assert.equal(q.n, 5)
-    assert.equal(q.wantQuotes, 2)
-    assert.equal(q.wantNews, 3)
+    assert.equal(q.wantQuotes, 3)
+    assert.equal(q.wantNews, 2)
   })
 
   it('honours news-only and quote-only mixes', () => {

@@ -14,6 +14,11 @@ import {
   scoreDraftDirectness,
   mergeDirectnessIntoVerdict,
 } from '../../../shared/eofScriptDirectness.mjs'
+import {
+  EOF_SHORTS_HOT_TAKE_VOICE,
+  scoreDraftHotTake,
+  mergeHotTakeIntoVerdict,
+} from '../../../shared/eofScriptHotTake.mjs'
 
 function envKey(...names) {
   for (const name of names) {
@@ -96,12 +101,17 @@ function normalizeVerdict(raw, judgeProvider) {
   const interest = clampScore(raw?.interest ?? raw?.interestScore)
   const value = clampScore(raw?.value ?? raw?.valuableInfo ?? raw?.valueScore)
   const directness = clampScore(raw?.directness ?? raw?.directnessScore ?? raw?.punch)
+  const hotTake = clampScore(raw?.hotTake ?? raw?.bite ?? raw?.punchiness)
   const overall =
     clampScore(raw?.overall ?? raw?.score) ||
     Number(
       (
-        (merit + interest + value + (directness || (merit + interest + value) / 3)) /
-        (directness ? 4 : 3)
+        (merit +
+          interest +
+          value +
+          (directness || (merit + interest + value) / 3) +
+          (hotTake || (merit + interest + value) / 3)) /
+        (directness || hotTake ? 5 : 3)
       ).toFixed(1),
     )
 
@@ -128,12 +138,15 @@ function normalizeVerdict(raw, judgeProvider) {
     merit >= min - 1 &&
     interest >= min - 1 &&
     value >= min - 1 &&
-    (directness === 0 || directness >= min - 1)
+    (directness === 0 || directness >= min - 1) &&
+    (hotTake === 0 || hotTake >= min - 1.5)
   const pass =
     explicitFail
       ? false
       : explicitPass
-        ? overall >= min - 0.5 && (directness === 0 || directness >= min - 1.5)
+        ? overall >= min - 0.5 &&
+          (directness === 0 || directness >= min - 1.5) &&
+          (hotTake === 0 || hotTake >= min - 2)
         : overall >= min && dimsOk
 
   return {
@@ -143,6 +156,7 @@ function normalizeVerdict(raw, judgeProvider) {
     interest,
     value,
     directness,
+    hotTake,
     reasons,
     rewriteHints,
     judgeProvider,
@@ -164,17 +178,22 @@ ${EOF_FOOTBALL_SCOPE}
 
 ${EOF_SHORTS_DIRECT_VOICE}
 
+${EOF_SHORTS_HOT_TAKE_VOICE}
+
 Score 0–10 on:
 - merit: factual substance, names/events clear, no invented scores/quotes beyond the desk brief
-- interest: would a football fan stop scrolling? hook + opinion + stakes
-- value: truly valuable info (news/insight/angle) vs empty fluff / career waffle
+- interest: would a football fan STOP scrolling? hot take + opinion + stakes (not a news paste)
+- value: truly valuable angle (tactics/selection/pride/quote row) vs empty fluff / career waffle
 - directness: punchy desk copy with concrete claims/responses — NOT soft storytelling
+- hotTake: bite + "now" energy — would people argue in comments?
 
 HARD FAIL (pass=false) if:
 - vague / bookish / "journey/narrative/chapter" tone
 - quote/claim topics that never say who said what / who hit back
 - soccer/NFL language
-- zero concrete football claim
+- zero concrete football claim / stake
+- canned template glue ("fans are arguing about right now", "ignore the noise")
+- article copy-paste with no sharp take
 
 Return JSON only:
 {
@@ -184,6 +203,7 @@ Return JSON only:
   "interest": number,
   "value": number,
   "directness": number,
+  "hotTake": number,
   "reasons": string[],
   "rewriteHints": string[]
 }`
@@ -199,7 +219,7 @@ SCRIPT TO JUDGE:
 ${String(draft || '').trim().slice(0, 1800)}
 """
 
-Judge merit, interest, value, AND directness. Fail soft waffle even if names appear.`
+Judge merit, interest, value, directness, AND hotTake. Fail soft waffle and news paste even if names appear.`
 
   return { system, user }
 }
@@ -287,26 +307,35 @@ export async function judgeEofScriptDraft(input = {}) {
   }
 
   const local = scoreDraftDirectness(draft, { format: input.format, topic: input.topic })
+  const hot = scoreDraftHotTake(draft, { format: input.format, topic: input.topic })
   const judgeProvider = resolveScriptJudgeProvider(input.writerProvider)
   if (!judgeProvider) {
-    // Still enforce local directness so automation cannot ship waffle without a second API.
-    return mergeDirectnessIntoVerdict(
-      {
-        pass: local.pass,
-        overall: local.score,
-        merit: local.score,
-        interest: local.score,
-        value: local.score,
-        reasons: local.pass
-          ? ['Second model unavailable — local directness gate only']
-          : local.reasons,
-        rewriteHints: local.rewriteHints,
-        judgeProvider: 'local-directness',
-        threshold: passThreshold(),
-        skipped: false,
-      },
-      local,
+    // Local directness + hot-take gates still block waffle without a second API.
+    const merged = mergeHotTakeIntoVerdict(
+      mergeDirectnessIntoVerdict(
+        {
+          pass: local.pass && hot.pass,
+          overall: Math.min(local.score, hot.score),
+          merit: local.score,
+          interest: hot.score,
+          value: local.score,
+          reasons: [
+            ...(local.pass && hot.pass
+              ? ['Second model unavailable — local directness + hot-take gates only']
+              : []),
+            ...local.reasons,
+            ...hot.reasons,
+          ].slice(0, 6),
+          rewriteHints: [...local.rewriteHints, ...hot.rewriteHints].slice(0, 5),
+          judgeProvider: 'local-directness+hot-take',
+          threshold: passThreshold(),
+          skipped: false,
+        },
+        local,
+      ),
+      hot,
     )
+    return merged
   }
 
   const { system, user } = buildJudgePrompts({
@@ -326,7 +355,10 @@ export async function judgeEofScriptDraft(input = {}) {
   }
 
   const modelVerdict = normalizeVerdict(raw, judgeProvider)
-  const verdict = mergeDirectnessIntoVerdict({ ...modelVerdict, skipped: false }, local)
+  const verdict = mergeHotTakeIntoVerdict(
+    mergeDirectnessIntoVerdict({ ...modelVerdict, skipped: false }, local),
+    hot,
+  )
   console.info(
     '[eof-script-judge]',
     judgeProvider,
@@ -342,6 +374,8 @@ export async function judgeEofScriptDraft(input = {}) {
     verdict.value,
     'directness',
     verdict.directness,
+    'hotTake',
+    verdict.hotTake,
   )
   return { ...verdict, skipped: false }
 }
@@ -353,7 +387,10 @@ export function appendJudgeFeedbackToContext(context, verdict) {
   if (verdict.reasons?.length) bits.push(`Judge rejected: ${verdict.reasons.join('; ')}`)
   if (verdict.rewriteHints?.length) bits.push(`Fix: ${verdict.rewriteHints.join('; ')}`)
   bits.push(
-    `Scores — merit ${verdict.merit}/10, interest ${verdict.interest}/10, value ${verdict.value}/10 (need ≥${verdict.threshold}).`,
+    `Scores — merit ${verdict.merit}/10, interest ${verdict.interest}/10, value ${verdict.value}/10, hotTake ${verdict.hotTake ?? '—'}/10 (need ≥${verdict.threshold}).`,
+  )
+  bits.push(
+    'Rewrite as a HOT TAKE: named conflict, concrete stake (tactics/selection/pride/result/quote), timely now-signal, sharp agree/disagree CTA. No article paste.',
   )
   return [context, 'EDITOR JUDGE FEEDBACK (must address):\n' + bits.join('\n')].filter(Boolean).join('\n\n')
 }

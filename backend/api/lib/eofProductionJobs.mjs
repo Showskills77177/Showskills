@@ -144,6 +144,8 @@ export async function createEofProductionJob({
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
+  /** 'standard' | 'production' — Script Maker uses production (hot-take bar, no templates) */
+  qualityBar = 'standard',
 }) {
   await ensureEofProductionSchema()
   let t = String(topic || '').trim()
@@ -175,7 +177,13 @@ export async function createEofProductionJob({
     failureDetail = written.failureDetail || ''
     if (written.script?.topic) t = String(written.script.topic).trim() || t
   } else {
-    const draft = await writeEofPlainTextDraft({ topic: t, format, context, scriptProvider })
+    const draft = await writeEofPlainTextDraft({
+      topic: t,
+      format,
+      context,
+      scriptProvider,
+      qualityBar,
+    })
     const resolvedTopic = draft.resolvedTopic || t
     t = resolvedTopic
     script = buildEofDraftShell({
@@ -185,6 +193,8 @@ export async function createEofProductionJob({
       title: draft.title || resolvedTopic,
       source: draft.source,
       judge: draft.judge || null,
+      stages: draft.stages || null,
+      qualityBar: draft.qualityBar || qualityBar,
     })
     scriptSource = draft.source || 'template'
     status = EOF_PRODUCTION_JOB_STATUS.DRAFT
