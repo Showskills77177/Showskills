@@ -1975,18 +1975,26 @@ export default function EofProductionPanel({
     }
   }
 
-  /** Clear the selected bed so a different song can be picked before Build / Remix. */
+  /** Clear the selected bed; on a built Short, remux VO-only (no image/TTS rebuild). */
   async function clearSelectedMusicBed() {
     if (!selectedId || !musicTrackId) return
     const prevTrackId = musicTrackId
     const prevStart = musicStartSec
     const prevEnd = musicEndSec
+    const jobSnap = jobs.find((j) => j.id === selectedId) || selected
+    const canRemuxAudio =
+      jobSnap?.status === 'video_rendered' ||
+      Boolean(jobSnap?.renderOutputPath) ||
+      Boolean(jobSnap?.mixedAudioPath) ||
+      Boolean(jobSnap?.narrationManifest?.length)
+
     setBusy(true)
     setErr('')
     setSuccess('')
     setMusicTrackId('')
     setMusicStartSec(0)
     setMusicEndSec(null)
+    let clearedOnServer = false
     try {
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'PATCH',
@@ -2000,19 +2008,93 @@ export default function EofProductionPanel({
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not clear song')
+      clearedOnServer = true
       if (j.job) {
         upsertJob(j.job)
         hydratedJobIdRef.current = selectedId
         hydrateDraftFromJob(j.job)
       }
-      setSuccess('Song cleared — pick another bed, then Build or Remix.')
+
+      // No built mix/video yet — field clear is enough.
+      if (!canRemuxAudio) {
+        setSuccess('Song cleared — pick another bed, then Build or Remix.')
+        return
+      }
+
+      // Strip bed from mixed audio + remux existing Short (reuse stills / VO takes).
+      setSuccess('Removing song from Short…')
+      setRenderPhase('rendering')
+      if (videoPreviewUrl) {
+        try {
+          URL.revokeObjectURL(videoPreviewUrl)
+        } catch {
+          /* ignore */
+        }
+      }
+      setVideoPreviewUrl('')
+
+      const estSec = Math.max(40, Math.round(estimateEofVoiceoverRemuxDurationSec(draftScript) * 0.7))
+      setRenderProgress({
+        percent: 5,
+        message: 'Stripping music bed…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript?.scenes?.length || 5,
+        stage: 'mix',
+        pipeline: 'audio',
+      })
+
+      const remixRes = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'remix-music',
+          jobId: selectedId,
+          musicTrackId: null,
+          musicVolume,
+          musicStartSec: 0,
+          musicEndSec: null,
+        }),
+      })
+      const remixJson = await remixRes.json().catch(() => ({}))
+      if (!remixRes.ok && remixRes.status !== 202) {
+        throw new Error(remixJson.error || `Remove song remux failed to start (HTTP ${remixRes.status})`)
+      }
+      if (remixJson.job) {
+        upsertJob(remixJson.job)
+        if (remixJson.job.renderProgress) setRenderProgress(remixJson.job.renderProgress)
+      }
+
+      const finishedJob = await waitForJobComplete(selectedId, ['video_rendered', 'rendered'])
+      if (finishedJob.status !== 'video_rendered' && finishedJob.status !== 'rendered') {
+        throw new Error(finishedJob.errorMessage || 'Remove song did not finish remixing audio')
+      }
+
+      if (finishedJob.status === 'video_rendered') {
+        await loadVideoPreview({ bust: finishedJob.updatedAt || Date.now() })
+      }
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess('Song removed from Short — pick a new bed and Remix to add music.')
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
-      setMusicTrackId(prevTrackId)
-      setMusicStartSec(prevStart)
-      setMusicEndSec(prevEnd)
+      // Keep UI cleared after a successful PATCH so Remix can retry VO-only / a new bed.
+      if (!clearedOnServer) {
+        setMusicTrackId(prevTrackId)
+        setMusicStartSec(prevStart)
+        setMusicEndSec(prevEnd)
+      }
+      setRenderPhase('failed')
+      setRenderProgress(null)
       setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
     } finally {
+      stopRenderPolling()
       setBusy(false)
+      setRenderPhase('')
     }
   }
 
@@ -2065,7 +2147,7 @@ export default function EofProductionPanel({
         throw new Error(finishedJob.errorMessage || 'Music remix did not finish with a video')
       }
 
-      await loadVideoPreview()
+      await loadVideoPreview({ bust: finishedJob.updatedAt || Date.now() })
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
       setSuccess('Music bed remixed under voiceover — preview refreshed.')
       upsertJob(finishedJob)
@@ -4303,7 +4385,8 @@ export default function EofProductionPanel({
               </p>
                   <p className={`mt-1 text-xs ${PX.muted}`}>
                     Pick a platform bed, drag the segment like YouTube (which part of the song), preview, then
-                    Build or Remix. Beds are auto-mastered for balanced Shorts volume — no Master button needed.
+                    Build or Remix. Remove song strips the bed from a built Short without rebuilding images/VO.
+                    Beds are auto-mastered for balanced Shorts volume — no Master button needed.
                   </p>
               <div className="mt-3 flex flex-wrap items-end gap-3">
                 <label className="block min-w-[220px] flex-1 text-xs text-[#aaa]">
@@ -4336,7 +4419,11 @@ export default function EofProductionPanel({
                     disabled={busy || isRendering}
                     onClick={clearSelectedMusicBed}
                     className={PX.btnDanger}
-                    title="Clear the selected bed so you can pick a different song before Build"
+                    title={
+                      selected?.status === 'video_rendered' || selected?.renderOutputPath
+                        ? 'Strip this bed from the built Short (keeps images + voiceover), then pick another and Remix'
+                        : 'Clear the selected bed so you can pick a different song before Build'
+                    }
                   >
                     Remove song
                   </button>

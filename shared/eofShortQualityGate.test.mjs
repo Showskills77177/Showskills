@@ -67,7 +67,7 @@ describe('eofShortQualityGate helpers', () => {
     )
   })
 
-  it('fails on placeholders, missing music, and empty captions', () => {
+  it('fails on placeholders and empty captions; missing music is a warn', () => {
     const checks = collectEofShortQualityHeuristicChecks({
       topic: 'Jude Bellingham',
       captionStyle: 'live',
@@ -94,11 +94,13 @@ describe('eofShortQualityGate helpers', () => {
     const ids = checks.map((c) => c.id)
     assert.ok(ids.includes('stills_placeholder'))
     assert.ok(ids.includes('music_missing_track'))
+    assert.equal(checks.find((c) => c.id === 'music_missing_track')?.severity, 'warn')
     assert.ok(ids.some((id) => id.startsWith('captions_empty')))
     const gate = finalizeEofQualityGate(checks, { mode: 'auto' })
     assert.equal(gate.pass, false)
     assert.equal(gate.blocked, true)
     assert.ok(gate.reasons.length >= 2)
+    assert.ok(gate.warnings.some((w) => /voiceover-only|music bed/i.test(w)))
   })
 
   it('passes a healthy Short snapshot', () => {
@@ -261,7 +263,7 @@ describe('eofShortQualityGate helpers', () => {
     assert.equal(gate.pass, true)
   })
 
-  it('plan preflight fails on missing music and caption mismatch before any stills', () => {
+  it('plan preflight warns on missing music and fails on caption mismatch before any stills', () => {
     const checks = collectEofShortQualityPlanChecks({
       topic: 'Jude Bellingham',
       captionStyle: 'live',

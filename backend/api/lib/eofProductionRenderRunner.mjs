@@ -152,6 +152,8 @@ export async function renderEofProductionVoiceoverOnly(jobId) {
     await renderEofProductionAudio(jobId, {
       preserveSceneImages: true,
       voiceRegenerationMode: true,
+      // Keep intentional VO-only after Remove song (do not re-auto-pick a bed).
+      allowNoMusic: true,
     })
 
     const refreshed = await getEofProductionJob(jobId)
@@ -170,6 +172,7 @@ export async function renderEofProductionVoiceoverOnly(jobId) {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
       captionMode: 'free',
+      skipPlanPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Voiceover regeneration failed'
@@ -536,6 +539,8 @@ export async function renderEofProductionMusicRemix(jobId) {
     await renderEofProductionAudio(jobId, {
       preserveSceneImages: true,
       reuseSceneAudio: true,
+      // Respect cleared musicTrackId (Remove song) — do not re-auto-pick a default bed.
+      allowNoMusic: true,
     })
 
     const refreshed = await getEofProductionJob(jobId)
@@ -554,6 +559,8 @@ export async function renderEofProductionMusicRemix(jobId) {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
       captionMode: 'free',
+      // Post-build audio-only remux — plan checks already passed on the original Build.
+      skipPlanPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Music remix failed'

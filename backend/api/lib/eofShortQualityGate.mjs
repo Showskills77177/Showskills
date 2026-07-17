@@ -369,11 +369,13 @@ export function collectEofShortQualityPlanChecks(job, renderMeta = {}) {
   }
 
   // —— Music ——
+  // Warn (not fail): intentional VO-only after Remove song / remix with no bed is allowed.
+  // Full Build still auto-picks a default bed when musicTrackId is null.
   if (!job?.musicTrackId) {
     checks.push({
       id: 'music_missing_track',
-      severity: 'fail',
-      message: 'No music bed selected — Short expected a bed under the VO',
+      severity: 'warn',
+      message: 'No music bed selected — Short is voiceover-only until you pick a bed and Remix',
       detail: null,
     })
   } else {

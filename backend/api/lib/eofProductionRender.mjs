@@ -59,12 +59,20 @@ export async function readEofMixedAudioInline(jobId) {
 /**
  * Generate per-scene TTS and mix with catalog music bed.
  * @param {string} jobId
- * @param {{ preserveSceneImages?: boolean, voiceRegenerationMode?: boolean, reuseSceneAudio?: boolean }} [opts]
+ * @param {{
+ *   preserveSceneImages?: boolean,
+ *   voiceRegenerationMode?: boolean,
+ *   reuseSceneAudio?: boolean,
+ *   allowNoMusic?: boolean,
+ * }} [opts]
+ * When `allowNoMusic` is true and the job has no `musicTrackId`, mix VO-only
+ * (do not auto-pick a default bed). Used by post-build music remix / Remove song.
  */
 export async function renderEofProductionAudio(jobId, opts = {}) {
   const preserveSceneImages = opts.preserveSceneImages === true
   const voiceRegenerationMode = opts.voiceRegenerationMode === true
   const reuseSceneAudio = opts.reuseSceneAudio === true
+  const allowNoMusic = opts.allowNoMusic === true
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
@@ -185,7 +193,8 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
 
     await reportProgress('mix', sceneCount, { force: true })
 
-    const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
+    const wantNoMusic = allowNoMusic && !job.musicTrackId
+    const track = wantNoMusic ? null : await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
     const musicPath = resolveEofMusicTrackFilePath(track)
     const mixedPath = join(workDir, 'mixed.mp3')
 
@@ -223,7 +232,8 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
       renderOutputPath: null,
       errorMessage: null,
-      musicTrackId: track?.id || job.musicTrackId || null,
+      // Keep intentional VO-only (Remove song); otherwise persist auto-picked bed id.
+      musicTrackId: wantNoMusic ? null : track?.id || job.musicTrackId || null,
       ...regenPatch,
       script: {
         ...job.script,
