@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, unlinkSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -97,6 +97,33 @@ export function eofProductionVideoRelPath(jobId) {
 
 export function eofProductionVideoAbsPath(jobId) {
   return join(eofProductionJobDirPath(jobId), 'short.mp4')
+}
+
+/**
+ * Drop prior scene clips + caption textfiles so a remux cannot stitch or burn
+ * against leftover captioned intermediates from the previous Short.
+ * @param {string} workDir
+ */
+export function clearEofSceneClipCache(workDir) {
+  if (!workDir || !existsSync(workDir)) return
+  try {
+    for (const name of readdirSync(workDir)) {
+      if (/^clip-\d+\.mp4$/i.test(name) || /^caption-text-\d+$/i.test(name)) {
+        const abs = join(workDir, name)
+        try {
+          rmSync(abs, { recursive: true, force: true })
+        } catch {
+          try {
+            unlinkSync(abs)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

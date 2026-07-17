@@ -262,7 +262,8 @@ export async function startApplyEofProductionZapcapBackground(jobId) {
 }
 
 /**
- * Replace captions only: reuse stills + voiceover, re-burn free captions with new style/layout/text.
+ * Replace captions only: rebuild Short from clean scene stills + voiceover, then burn
+ * the new free captions. Never remux from a previously captioned MP4 plate.
  * @param {string} jobId
  */
 export async function renderEofProductionCaptionReplace(jobId) {
@@ -271,13 +272,11 @@ export async function renderEofProductionCaptionReplace(jobId) {
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
   const flags = await getEofArtifactFlags(jobId)
-  const canRemux =
-    flags.hasDurableSceneImages ||
-    flags.hasDurableVideo ||
-    job.status === EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED ||
-    Boolean(job.renderOutputPath)
-  if (!canRemux) {
-    throw new Error('Build the Short once before replacing captions.')
+  // Stills are required — video alone is a captioned plate and must not be the source.
+  if (!flags.hasDurableSceneImages) {
+    throw new Error(
+      'Scene stills are missing. Run Build Short once before replacing captions (needs a clean plate).',
+    )
   }
 
   try {

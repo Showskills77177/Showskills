@@ -656,6 +656,26 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   }, [selectedId])
 
   const selected = jobs.find((j) => j.id === selectedId) || null
+
+  /** Preview overlay only while drafting caption changes — hide once burned so it doesn't stack on the Short. */
+  const showCaptionPreviewOverlay = (() => {
+    if (captionStyle === 'off') return false
+    if (captionEditOpen) return true
+    if (!selected || selected.status !== 'video_rendered') return true
+    if (captionStyle !== (selected.captionStyle || EOF_DEFAULT_CAPTION_STYLE)) return true
+    const jobLay = normalizeEofCaptionLayout(selected.captionLayout, selected.captionStyle || captionStyle)
+    if (Math.abs(jobLay.yNorm - captionLayout.yNorm) > 0.005) return true
+    if (Math.abs(jobLay.fontScale - captionLayout.fontScale) > 0.02) return true
+    const jobScenes = selected.script?.scenes || []
+    const draftScenes = draftScript?.scenes || []
+    if (draftScenes.length !== jobScenes.length) return true
+    for (let i = 0; i < draftScenes.length; i += 1) {
+      const a = String(draftScenes[i]?.caption || draftScenes[i]?.narration || '').trim()
+      const b = String(jobScenes[i]?.caption || jobScenes[i]?.narration || '').trim()
+      if (a !== b) return true
+    }
+    return false
+  })()
   const hasPlainDraft = String(draftScript?.plainTextDraft || '').trim().length >= 40
   const regenerateScriptLabel = scriptBusy === 'draft'
     ? 'Regenerating…'
@@ -2889,16 +2909,16 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       >
                         Your browser does not support video playback.
                       </video>
-                      {captionStyle !== 'off' ? (
+                      {showCaptionPreviewOverlay ? (
                         <div
-                          className="pointer-events-none absolute inset-x-0 flex justify-center px-3"
+                          className="pointer-events-none absolute inset-x-0 flex justify-center px-[10%]"
                           style={{
                             top: `${Math.round(captionLayout.yNorm * 100)}%`,
                             transform: 'translateY(-50%)',
                           }}
                         >
                           <p
-                            className="max-w-[92%] text-center font-bold uppercase leading-tight text-white"
+                            className="max-w-full text-center font-bold uppercase leading-tight text-white"
                             style={{
                               fontSize: `${Math.round(18 * captionLayout.fontScale)}px`,
                               textShadow: '0 2px 0 #000, 0 0 8px #000',
@@ -2914,7 +2934,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       ) : null}
                     </div>
                     <p className={`mt-2 text-center text-[11px] ${PX.muted}`}>
-                      Click the video to edit the caption for the current beat. Yellow overlay = position/size preview (not burned until Replace captions).
+                      Click the video to edit caption text. Overlay preview appears while you change
+                      style/position/size/text — it hides after Replace captions so it won&apos;t stack on the burn.
                     </p>
                   </div>
                 ) : (

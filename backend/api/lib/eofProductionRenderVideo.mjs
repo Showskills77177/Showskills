@@ -39,7 +39,7 @@ import {
   normalizeEofImageProvider,
   resolveEofImageProviderAttemptOrder,
 } from './eofImageProviderSettings.mjs'
-import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
+import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
   ensureEofMixedAudioOnDisk,
@@ -142,11 +142,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   try {
     // Drop prior durable MP4 (and stills when refreshing) so a failed rebuild cannot leave
     // status=video_rendered with an empty/stale video_base64 from a half-written path.
+    // Also wipe clip-*.mp4 + caption-text dirs so remux never reuses a captioned plate.
     if (reuseSceneImages) {
       await clearEofVideoOnlyArtifact(jobId).catch(() => {})
+      clearEofSceneClipCache(workDir)
     } else {
       await clearEofVideoArtifact(jobId).catch(() => {})
       clearEofSceneImageCache(workDir)
+      clearEofSceneClipCache(workDir)
     }
 
     await report(reuseSceneImages ? 'video' : 'images', 0, { force: true })

@@ -133,6 +133,7 @@ describe('caption drawtext builders', () => {
       style: 'live',
     })
     assert.ok(live.some((f) => f.includes('y=h*0.76')))
+    assert.ok(live.every((f) => f.includes('x=max(w*0.10')), 'live must use horizontal safe x')
 
     const punch = buildCaptionDrawtextFilters({
       caption: 'Spain beat Belgium last night in a thriller',
@@ -142,6 +143,20 @@ describe('caption drawtext builders', () => {
     })
     assert.ok(punch.some((f) => f.includes('y=h*0.73')))
     assert.ok(punch.some((f) => f.includes('0xFFE566')), 'match bar uses stadium yellow')
+    assert.ok(punch.every((f) => f.includes('x=max(w*0.10')), 'punch must use horizontal safe x')
+  })
+
+  it('keeps long live phrases inside the safe band via wrap/fit', () => {
+    const filters = buildCaptionDrawtextFilters({
+      caption:
+        'At thirty eight he is still running the show dictating tempo finding space and making every midfielder look ordinary',
+      durationSec: 8,
+      captionFont: '/tmp/font.ttf',
+      style: 'live',
+      layout: { yNorm: 0.76, fontScale: 1.5 },
+    })
+    assert.ok(filters.length >= 2, 'long caption should wrap into multiple phrases')
+    assert.ok(filters.every((f) => f.includes('x=max(w*0.10')))
   })
 
   it('inline live mode escapes commas when no textDir', () => {

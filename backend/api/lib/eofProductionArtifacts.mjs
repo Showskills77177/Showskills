@@ -234,13 +234,19 @@ export async function ensureEofSceneImageOnDisk(jobId, sceneNumber) {
   return existsSync(abs) ? abs : null
 }
 
-/** Clear stored MP4 only — keeps scene stills for voice-only remux. */
+/** Clear stored MP4 only — keeps scene stills for voice-only remux. Also drops on-disk short.mp4. */
 export async function clearEofVideoOnlyArtifact(jobId) {
   await ensureEofProductionSchema()
   await query(
     `UPDATE eof_production_jobs SET video_base64 = NULL, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE id = $1`,
     [jobId],
   )
+  try {
+    const abs = eofProductionVideoAbsPath(jobId)
+    if (abs && existsSync(abs)) unlinkSync(abs)
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Clear video + scene stills (full Short rebuild). */
@@ -250,6 +256,12 @@ export async function clearEofVideoArtifact(jobId) {
     `UPDATE eof_production_jobs SET video_base64 = NULL, scene_images_base64_json = NULL, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE id = $1`,
     [jobId],
   )
+  try {
+    const abs = eofProductionVideoAbsPath(jobId)
+    if (abs && existsSync(abs)) unlinkSync(abs)
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function clearEofMixedAudioArtifact(jobId) {

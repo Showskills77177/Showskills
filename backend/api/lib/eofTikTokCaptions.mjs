@@ -14,8 +14,15 @@ import {
   resolveEofCaptionStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
 import {
+  captionFitFontSize,
   captionLayoutFontSize,
+  captionLayoutXExpr,
   captionLayoutYExpr,
+  captionSafeMaxWidthPx,
+  chunkWordsToSafeWidth,
+  EOF_CAPTION_CHAR_WIDTH,
+  EOF_CAPTION_FRAME_WIDTH,
+  EOF_CAPTION_SAFE_X,
   normalizeEofCaptionLayout,
 } from '../../../shared/eofCaptionLayout.mjs'
 
@@ -144,9 +151,8 @@ function buildPopFilters({ beats, captionFont, displayWords, textDir, layout }) 
   const filters = []
   const n = Math.max(1, Math.min(3, displayWords || 2))
   const y = captionLayoutYExpr(layout)
-  const hold = captionLayoutFontSize(92, layout)
-  const peak = captionLayoutFontSize(108, layout)
-  const startFs = captionLayoutFontSize(72, layout)
+  const x = captionLayoutXExpr()
+  const maxW = captionSafeMaxWidthPx()
 
   // Group into n-word chunks using word beats
   const groups = []
@@ -162,6 +168,9 @@ function buildPopFilters({ beats, captionFont, displayWords, textDir, layout }) 
   for (let gi = 0; gi < groups.length; gi++) {
     const beat = groups[gi]
     const upper = beat.text.toUpperCase()
+    const hold = captionFitFontSize(92, upper, layout, { maxWidth: maxW })
+    const peak = Math.min(captionLayoutFontSize(108, layout), Math.round(hold * 1.15))
+    const startFs = Math.max(28, Math.round(hold * 0.78))
     const textOpt = drawtextTextOption({ text: upper, textDir, fileBase: `pop-${gi}` })
     const start = Math.max(0, beat.start)
     const end = Math.max(start + 0.15, beat.end)
@@ -171,10 +180,10 @@ function buildPopFilters({ beats, captionFont, displayWords, textDir, layout }) 
     const flashEnd = Math.min(end, start + 0.14)
 
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize='${fontsize}':fontcolor=0xFFE566:borderw=14:bordercolor=black@0.92:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${flashEnd.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize='${fontsize}':fontcolor=0xFFE566:borderw=14:bordercolor=black@0.92:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${flashEnd.toFixed(3)})'`,
     )
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${hold}:fontcolor=white:borderw=12:bordercolor=black@0.94:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${hold}:fontcolor=white:borderw=12:bordercolor=black@0.94:shadowcolor=black@0.55:shadowx=0:shadowy=5:alpha='${alpha}':x=${x}:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -190,8 +199,11 @@ function buildKaraokeFilters({ beats, captionFont, displayWords, textDir, layout
   const windowSize = Math.max(3, Math.min(5, displayWords || 4))
   const baseSize = captionLayoutFontSize(78, layout)
   const activeSize = captionLayoutFontSize(92, layout)
-  const charW = 0.58 // fraction of fontsize for Latin bold
+  const charW = EOF_CAPTION_CHAR_WIDTH
   const y = captionLayoutYExpr(layout)
+  const maxW = captionSafeMaxWidthPx()
+  const safeLeft = Math.round(EOF_CAPTION_FRAME_WIDTH * EOF_CAPTION_SAFE_X)
+  const frameW = EOF_CAPTION_FRAME_WIDTH
 
   for (let i = 0; i < beats.length; i++) {
     const active = beats[i]
@@ -206,10 +218,18 @@ function buildKaraokeFilters({ beats, captionFont, displayWords, textDir, layout
       text: b.text.toUpperCase(),
       active: j === activeInWin,
     }))
-    const sizes = parts.map((p) => (p.active ? activeSize : baseSize))
-    const widths = parts.map((p, j) => Math.max(1, p.text.length) * sizes[j] * charW + 18)
-    const totalW = widths.reduce((a, b) => a + b, 0)
+    let sizes = parts.map((p) => (p.active ? activeSize : baseSize))
+    let widths = parts.map((p, j) => Math.max(1, p.text.length) * sizes[j] * charW + 18)
+    let totalW = widths.reduce((a, b) => a + b, 0)
+    if (totalW > maxW && totalW > 0) {
+      const scale = maxW / totalW
+      sizes = sizes.map((s) => Math.max(28, Math.floor(s * scale)))
+      widths = parts.map((p, j) => Math.max(1, p.text.length) * sizes[j] * charW + 18)
+      totalW = widths.reduce((a, b) => a + b, 0)
+    }
 
+    // Center window inside the safe band (never past left/right margins).
+    const origin = Math.max(safeLeft, Math.min((frameW - totalW) / 2, frameW - safeLeft - totalW))
     let offset = 0
     for (let j = 0; j < parts.length; j++) {
       const p = parts[j]
@@ -220,8 +240,7 @@ function buildKaraokeFilters({ beats, captionFont, displayWords, textDir, layout
       })
       const fs = sizes[j]
       const wEst = widths[j]
-      // Center the window, place each word
-      const x = `(w-${totalW.toFixed(1)})/2+${offset.toFixed(1)}`
+      const x = (origin + offset).toFixed(1)
       const color = p.active ? '0xFFE566' : '0xF5F5F5'
       const border = p.active ? 13 : 10
       const alpha = `if(lt(t-${start.toFixed(3)}\\,0.04)\\,(t-${start.toFixed(3)})/0.04\\,1)`
@@ -241,13 +260,15 @@ function buildBeastFilters({ beats, captionFont, textDir, layout }) {
   const escapedFont = escapeFilterPath(captionFont)
   const filters = []
   const y = captionLayoutYExpr(layout)
-  const hold = captionLayoutFontSize(118, layout)
-  const peak = captionLayoutFontSize(136, layout)
-  const startFs = captionLayoutFontSize(90, layout)
+  const x = captionLayoutXExpr()
+  const maxW = captionSafeMaxWidthPx()
 
   for (let bi = 0; bi < beats.length; bi++) {
     const beat = beats[bi]
     const upper = beat.text.toUpperCase()
+    const hold = captionFitFontSize(118, upper, layout, { maxWidth: maxW })
+    const peak = Math.min(captionLayoutFontSize(136, layout), Math.round(hold * 1.15))
+    const startFs = Math.max(28, Math.round(hold * 0.76))
     const textOpt = drawtextTextOption({ text: upper, textDir, fileBase: `beast-${bi}` })
     const start = Math.max(0, beat.start)
     const end = Math.max(start + 0.15, beat.end)
@@ -258,11 +279,11 @@ function buildBeastFilters({ beats, captionFont, textDir, layout }) {
 
     // Cyan neon flash
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize='${fontsize}':fontcolor=0x5CFFF5:borderw=16:bordercolor=black@0.95:shadowcolor=0x5CFFF5@0.35:shadowx=0:shadowy=0:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${flashEnd.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize='${fontsize}':fontcolor=0x5CFFF5:borderw=16:bordercolor=black@0.95:shadowcolor=0x5CFFF5@0.35:shadowx=0:shadowy=0:alpha='${alpha}':x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${flashEnd.toFixed(3)})'`,
     )
     // Hold yellow beast look
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${hold}:fontcolor=0xFFE566:borderw=15:bordercolor=black@0.95:shadowcolor=black@0.6:shadowx=0:shadowy=6:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${hold}:fontcolor=0xFFE566:borderw=15:bordercolor=black@0.95:shadowcolor=black@0.6:shadowx=0:shadowy=6:alpha='${alpha}':x=${x}:y=${y}:enable='between(t\\,${flashEnd.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -275,19 +296,29 @@ function buildBeastFilters({ beats, captionFont, textDir, layout }) {
 export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5, textDir, layout }) {
   if (!captionFont || !beats?.length) return []
   const escapedFont = escapeFilterPath(captionFont)
-  const chunk = Math.max(3, Math.min(7, Number(displayWords) || 5))
+  const maxWords = Math.max(3, Math.min(7, Number(displayWords) || 5))
   const y = captionLayoutYExpr(layout)
-  const fs = captionLayoutFontSize(54, layout)
+  const x = captionLayoutXExpr()
+  const baseFs = captionLayoutFontSize(54, layout)
+  const maxW = captionSafeMaxWidthPx()
+  const words = beats.map((b) => b.text)
+  const phrases = chunkWordsToSafeWidth(words, baseFs, { maxWidth: maxW, maxWords })
+
+  // Map phrases back onto beat timing by consuming words in order.
   const filters = []
-  for (let i = 0, gi = 0; i < beats.length; i += chunk, gi++) {
-    const group = beats.slice(i, i + chunk)
-    const phrase = group.map((b) => b.text).join(' ')
-    if (!phrase) continue
+  let wordIdx = 0
+  for (let gi = 0; gi < phrases.length; gi++) {
+    const phrase = phrases[gi]
+    const phraseWords = phrase.split(/\s+/).filter(Boolean)
+    const slice = beats.slice(wordIdx, wordIdx + phraseWords.length)
+    wordIdx += phraseWords.length
+    if (!slice.length) continue
+    const fs = captionFitFontSize(54, phrase, layout, { maxWidth: maxW })
     const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `live-${gi}` })
-    const start = group[0].start
-    const end = group[group.length - 1].end
+    const start = slice[0].start
+    const end = slice[slice.length - 1].end
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=white:borderw=7:bordercolor=black@0.94:shadowcolor=black@0.65:shadowx=0:shadowy=4:x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=white:borderw=7:bordercolor=black@0.94:shadowcolor=black@0.65:shadowx=0:shadowy=4:x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -299,24 +330,30 @@ export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5,
 export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4, textDir, layout }) {
   if (!captionFont || !beats?.length) return []
   const escapedFont = escapeFilterPath(captionFont)
-  const chunk = Math.max(2, Math.min(5, Number(displayWords) || 4))
+  const maxWords = Math.max(2, Math.min(5, Number(displayWords) || 4))
   const y = captionLayoutYExpr(layout)
-  const fs = captionLayoutFontSize(56, layout)
+  const x = captionLayoutXExpr()
+  const baseFs = captionLayoutFontSize(56, layout)
+  const maxW = captionSafeMaxWidthPx()
+  const words = beats.map((b) => b.text)
+  const phrases = chunkWordsToSafeWidth(words, baseFs, { maxWidth: maxW, maxWords })
+
   const filters = []
-  for (let i = 0, gi = 0; i < beats.length; i += chunk, gi++) {
-    const group = beats.slice(i, i + chunk)
-    const phrase = group
-      .map((b) => b.text)
-      .join(' ')
-      .toUpperCase()
-    if (!phrase) continue
+  let wordIdx = 0
+  for (let gi = 0; gi < phrases.length; gi++) {
+    const phrase = phrases[gi].toUpperCase()
+    const phraseWords = phrases[gi].split(/\s+/).filter(Boolean)
+    const slice = beats.slice(wordIdx, wordIdx + phraseWords.length)
+    wordIdx += phraseWords.length
+    if (!slice.length) continue
+    const fs = captionFitFontSize(56, phrase, layout, { maxWidth: maxW })
     const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `punch-${gi}` })
-    const start = group[0].start
-    const end = group[group.length - 1].end
+    const start = slice[0].start
+    const end = slice[slice.length - 1].end
     const local = `t-${start.toFixed(3)}`
     const alpha = `if(lt(${local}\\,0.06)\\,${local}/0.06\\,if(gt(t\\,${(end - 0.08).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.08\\,1))`
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=0xFFE566:borderw=9:bordercolor=black@0.96:shadowcolor=black@0.7:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=0xFFE566:borderw=9:bordercolor=black@0.96:shadowcolor=black@0.7:shadowx=0:shadowy=5:alpha='${alpha}':x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
