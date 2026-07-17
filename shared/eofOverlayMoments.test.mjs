@@ -112,6 +112,6 @@ describe('eofOverlayMoments', () => {
     assert.ok(f.overlayPrep.includes('format=rgba'), 'rgba before soft mask')
     assert.ok(f.shadowPrep.includes('boxblur'), 'CapCut-style under-shadow')
     assert.ok(f.shadowXy.includes('y=H*'), 'shadow sits under card')
-    assert.ok(f.maxH > 100 && f.maxH < f.maxW, 'landscape-leaning photo card')
+    assert.ok(f.maxH > 100 && f.maxH < f.maxW * 1.05, 'photo card keeps readable proportions')
   })
 })

@@ -57,9 +57,8 @@ export async function adaptEofShortThumbnail({
   const h = EOF_YT_THUMB_HEIGHT
   const vf = [
     `scale=${w}:${h}:force_original_aspect_ratio=increase`,
-    `crop=${w}:${h}:(iw-ow)/2:(ih-oh)/2`,
-    `crop=${Math.max(2, w - 4)}:${Math.max(2, h - 4)}:2:2`,
-    `scale=${w}:${h}`,
+    // Face-safe when source is tall (portrait still → 16:9 thumb): keep heads.
+    `crop=${w}:${h}:(iw-ow)/2:max(0\\,min((ih-oh)*0.20\\,ih-oh))`,
     'setsar=1',
   ]
 

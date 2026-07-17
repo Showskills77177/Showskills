@@ -170,21 +170,24 @@ export function assertEofCleanPlateImagePath(imagePath) {
 
 /**
  * Cover-scale + look (+ optional Ken Burns). Captions applied separately so overlays can sit under text.
+ *
+ * Face-safe crop (not dead-center):
+ * - Landscape match stills → only X is cropped → keep horizontal center
+ * - Tall / portrait stills → Y is cropped → bias toward the upper band so heads stay in frame
+ *   (dead-center was chopping Tuchel/faces; glued-to-top was chopping pitch awkwardly)
  */
 function buildSceneBaseFilters({ frames, lookFilters = [], kenBurns = false }) {
-  // True center cover-crop for 9:16. Top-biased crops were slicing match plates
-  // (Tuchel / pitch greens) into awkward green bands; center keeps faces + action.
-  // Tiny inward crop kills yuv420 green/magenta fringe on hard edges.
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
-    'crop=1080:1920:(iw-ow)/2:(ih-oh)/2',
-    'crop=1076:1916:2:2',
-    'scale=1080:1920',
+    'crop=1080:1920:(iw-ow)/2:max(0\\,min((ih-oh)*0.20\\,ih-oh))',
     'setsar=1',
   ]
   if (lookFilters?.length) base.push(...lookFilters)
   if (kenBurns) {
-    base.push(`zoompan=z='min(zoom+0.0018,1.28)':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`)
+    // Mild zoom, anchored upper-center so the push-in doesn't cut faces off the top.
+    base.push(
+      `zoompan=z='min(zoom+0.0012\\,1.14)':x='iw/2-(iw/zoom/2)':y='max(0\\,min(ih-ih/zoom\\,(ih-ih/zoom)*0.22))':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`,
+    )
   } else {
     base.push(`fps=${VIDEO_FPS}`)
   }

@@ -50,8 +50,8 @@ export function listEofOverlayMomentsOptions() {
 export const EOF_OVERLAY_LAYOUT = {
   /** Max inset width as fraction of 1080 */
   widthFrac: 0.68,
-  /** Card height as fraction of card width (landscape-leaning photo card) */
-  heightFrac: 0.62,
+  /** Card height as fraction of card width — taller so faces aren't chopped in the pop */
+  heightFrac: 0.72,
   /** Top of card as fraction of frame height */
   yFrac: 0.13,
   /** CapCut-like rounded corner radius (px at card size, before pop scale) */
@@ -272,9 +272,9 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
     shadowBlur: EOF_OVERLAY_LAYOUT.shadowBlur,
     shadowAlpha: EOF_OVERLAY_LAYOUT.shadowAlpha,
     overlayPrep: [
-      // Cover-crop into the card so match stills / gen plates fill cleanly (no letterbox bars).
+      // Cover-crop into the card — face-safe Y (upper bias) so heads aren't chopped.
       `scale=${maxW}:${maxH}:force_original_aspect_ratio=increase`,
-      `crop=${maxW}:${maxH}:(iw-ow)/2:(ih-oh)/2`,
+      `crop=${maxW}:${maxH}:(iw-ow)/2:max(0\\,min((ih-oh)*0.18\\,ih-oh))`,
       'setsar=1',
       'format=rgba',
       `geq=r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)':${softAlpha}`,
