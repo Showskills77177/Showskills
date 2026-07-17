@@ -60,15 +60,21 @@ async function resolveFfprobePath() {
     return envPath
   }
 
+  // Do NOT import `ffprobe-static` — it ships ~300MB of multi-arch binaries and
+  // Vercel NFT pulls it into every api/* function that statically imports EOF
+  // video code (including /api/admin/login), causing FUNCTION_INVOCATION_FAILED.
+  // Prefer PATH ffprobe, or the same dir as ffmpeg-static when present.
   try {
-    const mod = await import('ffprobe-static')
-    const bundled = mod.path || mod.default?.path || mod.default
-    if (bundled && existsSync(bundled)) {
-      ffprobePathCache = bundled
-      return bundled
+    const ffmpegBin = await resolveFfmpegPath()
+    if (ffmpegBin && ffmpegBin !== 'ffmpeg') {
+      const sibling = String(ffmpegBin).replace(/ffmpeg(\.exe)?$/i, (_, ext) => `ffprobe${ext || ''}`)
+      if (sibling !== ffmpegBin && existsSync(sibling)) {
+        ffprobePathCache = sibling
+        return sibling
+      }
     }
   } catch {
-    // optional dependency — fall back to PATH
+    /* fall through */
   }
 
   ffprobePathCache = 'ffprobe'

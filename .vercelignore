@@ -9,3 +9,7 @@ uploads/
 playwright-report/
 test-results/
 .cursor/
+
+# Multi-arch ffprobe binaries (~300MB) — must never ship in serverless bundles.
+# eofFfmpeg resolves PATH ffprobe / ffmpeg -i instead (see backend/api/lib/eofFfmpeg.mjs).
+node_modules/ffprobe-static/**

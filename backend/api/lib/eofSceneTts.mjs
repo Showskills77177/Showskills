@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { EdgeTTS } from 'node-edge-tts'
 import { EOF_VOICE_PRESETS, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
-import { runFfprobe } from './eofFfmpeg.mjs'
+import { runFfmpeg, runFfprobe } from './eofFfmpeg.mjs'
 import { isEofElevenLabsConfigured, synthesizeElevenLabsSpeech } from './eofElevenLabsTts.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -112,10 +112,26 @@ async function synthesizeWithEdgeTts({ text, preset, outPath }) {
  * @param {string} audioPath
  */
 export async function probeAudioDurationSec(audioPath) {
-  const { stdout } = await runFfprobe(
-    ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', audioPath],
-    { maxBuffer: 1024 * 1024 },
-  )
-  const n = Number.parseFloat(String(stdout).trim())
-  return Number.isFinite(n) ? n : 0
+  try {
+    const { stdout } = await runFfprobe(
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', audioPath],
+      { maxBuffer: 1024 * 1024 },
+    )
+    const n = Number.parseFloat(String(stdout).trim())
+    if (Number.isFinite(n) && n > 0) return n
+  } catch {
+    /* fall through — Vercel often has ffmpeg-static but no ffprobe binary */
+  }
+
+  try {
+    await runFfmpeg(['-i', audioPath], { maxBuffer: 2 * 1024 * 1024 })
+  } catch (err) {
+    const blob = `${err?.stderr || ''}\n${err?.message || ''}`
+    const m = blob.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/i)
+    if (m) {
+      const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number.parseFloat(m[3])
+      if (Number.isFinite(sec) && sec > 0) return sec
+    }
+  }
+  return 0
 }
