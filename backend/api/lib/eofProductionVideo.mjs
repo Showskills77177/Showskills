@@ -817,9 +817,10 @@ export async function renderEofProductionVideo({
       const sfxOut = join(workDir, 'mixed-with-overlay-sfx.mp3')
       const events = []
       for (const m of overlayByScene.values()) {
-        events.push({ atSec: m.sfxAtSec, volume: 0.55 })
+        // Soft CapCut-style swish — keep under VO (old 0.55 read as a harsh click)
+        events.push({ atSec: m.sfxAtSec, volume: 0.28 })
         if (m.sfxOutAtSec != null && m.sfxOutAtSec > m.sfxAtSec + 0.4) {
-          events.push({ atSec: m.sfxOutAtSec, volume: 0.32 })
+          events.push({ atSec: m.sfxOutAtSec, volume: 0.16 })
         }
       }
       try {

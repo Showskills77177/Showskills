@@ -2991,7 +2991,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               <div className="lg:col-span-2">
               <p className={PX.label}>Image over image</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                Optional CapCut-style pop-up inset (upper third) with a swipe whoosh. Auto uses one middle
+                Optional CapCut-style pop-up inset (upper third) with a soft UI swish. Auto uses one middle
                 beat when a secondary still exists (e.g. Tuchel over Rooney) — not every scene. Save, then
                 Rebuild Short.
               </p>

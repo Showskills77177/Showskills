@@ -12,7 +12,7 @@ const BUNDLED_WHOOSH_SFX = join(
   '../assets/sfx/whoosh.wav',
 )
 
-/** Royalty-free swipe/whoosh for image-over-image moments (bundled PCM wav). */
+/** Soft CapCut-style UI swish for image-over-image pops (bundled PCM wav). */
 export function resolveEofWhooshSfxPath() {
   const envPath = process.env.EOF_OVERLAY_WHOOSH_PATH
   if (envPath && existsSync(envPath)) return envPath
@@ -111,7 +111,7 @@ export async function mixOverlaySfxIntoAudio({ mixedAudioPath, sfxPath, events, 
   const timed = (Array.isArray(events) ? events : [])
     .map((e) => ({
       atSec: Math.max(0, Number(e?.atSec) || 0),
-      volume: Math.max(0.05, Math.min(1, Number(e?.volume) || 0.5)),
+      volume: Math.max(0.05, Math.min(1, Number(e?.volume) || 0.28)),
     }))
     .filter((e) => Number.isFinite(e.atSec))
     .slice(0, 6)
