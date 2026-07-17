@@ -1975,6 +1975,47 @@ export default function EofProductionPanel({
     }
   }
 
+  /** Clear the selected bed so a different song can be picked before Build / Remix. */
+  async function clearSelectedMusicBed() {
+    if (!selectedId || !musicTrackId) return
+    const prevTrackId = musicTrackId
+    const prevStart = musicStartSec
+    const prevEnd = musicEndSec
+    setBusy(true)
+    setErr('')
+    setSuccess('')
+    setMusicTrackId('')
+    setMusicStartSec(0)
+    setMusicEndSec(null)
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: selectedId,
+          musicTrackId: null,
+          musicStartSec: 0,
+          musicEndSec: null,
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not clear song')
+      if (j.job) {
+        upsertJob(j.job)
+        hydratedJobIdRef.current = selectedId
+        hydrateDraftFromJob(j.job)
+      }
+      setSuccess('Song cleared — pick another bed, then Build or Remix.')
+    } catch (e) {
+      setMusicTrackId(prevTrackId)
+      setMusicStartSec(prevStart)
+      setMusicEndSec(prevEnd)
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   /** Post-build: swap default/safe music bed under existing VO, remux Short (no image refetch). */
   async function remixMusicBed() {
     if (!selectedId) return
@@ -4319,6 +4360,17 @@ export default function EofProductionPanel({
                 >
                   {busy && renderPhase === 'rendering' ? 'Remixing…' : 'Remix music bed'}
                 </button>
+                {musicTrackId ? (
+                  <button
+                    type="button"
+                    disabled={busy || isRendering}
+                    onClick={clearSelectedMusicBed}
+                    className={PX.btnDanger}
+                    title="Clear the selected bed so you can pick a different song before Build"
+                  >
+                    Remove song
+                  </button>
+                ) : null}
               </div>
               <EofMusicSegmentMixer
                 key={musicTrackId || 'no-track'}

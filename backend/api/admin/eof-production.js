@@ -841,7 +841,12 @@ export default async function handler(req, res) {
         script: body.script,
         title: body.title,
         topic: body.topic,
-        musicTrackId: body.musicTrackId,
+        musicTrackId:
+          body.musicTrackId !== undefined
+            ? body.musicTrackId === null || body.musicTrackId === ''
+              ? null
+              : String(body.musicTrackId)
+            : undefined,
         musicVolume: body.musicVolume,
         musicStartSec: body.musicStartSec !== undefined ? Number(body.musicStartSec) : undefined,
         musicEndSec:
