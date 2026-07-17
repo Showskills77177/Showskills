@@ -103,7 +103,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'YT · red',
     asset: 'subscribe-yt.png',
     defaultPosition: 'top_right',
-    widthPx: 168,
+    widthPx: 96,
     render: 'png',
   },
   {
@@ -114,7 +114,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'TT · chip',
     asset: 'follow-tt.png',
     defaultPosition: 'top_right',
-    widthPx: 148,
+    widthPx: 86,
     render: 'png',
   },
   // —— Arrows ——
@@ -126,7 +126,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: '←',
     asset: 'arrow-left.png',
     defaultPosition: 'upper_third',
-    widthPx: 88,
+    widthPx: 48,
     render: 'png',
   },
   {
@@ -137,7 +137,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: '→',
     asset: 'arrow-right.png',
     defaultPosition: 'upper_third',
-    widthPx: 88,
+    widthPx: 48,
     render: 'png',
   },
   {
@@ -148,7 +148,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: '↑',
     asset: 'arrow-up.png',
     defaultPosition: 'top',
-    widthPx: 80,
+    widthPx: 44,
     render: 'png',
   },
   {
@@ -159,7 +159,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: '↓',
     asset: 'arrow-down.png',
     defaultPosition: 'lower_third_safe',
-    widthPx: 80,
+    widthPx: 44,
     render: 'png',
   },
   // —— Shapes ——
@@ -171,7 +171,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Solid',
     asset: 'shape-square.png',
     defaultPosition: 'upper_third',
-    widthPx: 72,
+    widthPx: 40,
     render: 'png',
   },
   {
@@ -182,7 +182,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Outline',
     asset: 'shape-square-outline.png',
     defaultPosition: 'upper_third',
-    widthPx: 80,
+    widthPx: 44,
     render: 'png',
   },
   {
@@ -193,7 +193,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Solid',
     asset: 'shape-circle.png',
     defaultPosition: 'upper_third',
-    widthPx: 72,
+    widthPx: 40,
     render: 'png',
   },
   {
@@ -204,7 +204,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Outline',
     asset: 'shape-circle-outline.png',
     defaultPosition: 'upper_third',
-    widthPx: 80,
+    widthPx: 44,
     render: 'png',
   },
   {
@@ -215,7 +215,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Soft',
     asset: 'shape-rounded.png',
     defaultPosition: 'lower_third_safe',
-    widthPx: 150,
+    widthPx: 90,
     render: 'png',
   },
   {
@@ -226,7 +226,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Bar',
     asset: 'shape-line.png',
     defaultPosition: 'lower_third_safe',
-    widthPx: 200,
+    widthPx: 120,
     render: 'png',
   },
   // —— Stickers / extras ——
@@ -238,7 +238,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Hype',
     asset: 'fire-accent.png',
     defaultPosition: 'top_left',
-    widthPx: 72,
+    widthPx: 42,
     render: 'png',
   },
   {
@@ -249,7 +249,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'Badge',
     asset: 'badge-new.png',
     defaultPosition: 'top_left',
-    widthPx: 96,
+    widthPx: 56,
     render: 'png',
   },
   {
@@ -260,7 +260,7 @@ export const EOF_STICKERS_CATALOG = [
     vibe: 'CTA',
     asset: 'tap-hand.png',
     defaultPosition: 'lower_third_safe',
-    widthPx: 78,
+    widthPx: 44,
     render: 'png',
   },
 ]
@@ -516,7 +516,7 @@ export function planEofStickerOverlays(raw) {
       id: catalog.id,
       category: catalog.category,
       asset: catalog.asset,
-      widthPx: Math.max(40, Math.min(220, Number(catalog.widthPx) || 96)),
+      widthPx: Math.max(28, Math.min(130, Number(catalog.widthPx) || 48)),
       position: item.position,
       x,
       y,
