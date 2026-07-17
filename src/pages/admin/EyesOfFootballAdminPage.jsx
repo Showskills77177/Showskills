@@ -160,7 +160,7 @@ export default function EyesOfFootballAdminPage() {
                 <EofAnalyticsPanel analytics={data.analytics} />
               </div>
 
-              <div hidden={view !== 'production'} className="mt-6">
+              <div hidden={view !== 'production'} className="mt-6 w-full max-w-none">
                 <EofProductionPanel
                   isOwner={isOwner}
                   active={view === 'production'}

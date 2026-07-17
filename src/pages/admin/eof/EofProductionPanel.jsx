@@ -104,6 +104,8 @@ function CaptionTemplatePreview({
   className = '',
   muted = 'text-[#888]',
   playMode = 'hover',
+  /** Zoom into caption band so sample text reads larger vs empty frame. */
+  emphasizeCaptions = false,
 }) {
   const url = template?.previewUrl || ''
   const type =
@@ -119,6 +121,9 @@ function CaptionTemplatePreview({
   const isVideo = Boolean(url) && type === 'video'
   const isImage = Boolean(url) && type === 'image'
   const poster = template?.posterUrl || (isImage ? url : '')
+  const mediaCls = emphasizeCaptions
+    ? 'h-full w-full origin-bottom scale-[1.75] object-cover object-bottom'
+    : 'h-full w-full object-cover'
 
   const [hovered, setHovered] = useState(false)
   const videoRef = useRef(null)
@@ -141,20 +146,20 @@ function CaptionTemplatePreview({
 
   if (isVideo) {
     const idleFallback = poster ? (
-      <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover" />
+      <img src={poster} alt="" loading="lazy" className={mediaCls} />
     ) : (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-[#0d0d12] px-2">
-        <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-black shadow">
+      <div className="flex h-full w-full flex-col items-center justify-end gap-1 bg-[#0d0d12] px-1.5 pb-2">
+        <span className="rounded bg-yellow-400 px-2 py-1 text-[12px] font-black uppercase tracking-wide text-black shadow">
           {String(template?.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
         </span>
         {playMode !== 'always' ? (
-          <span className={`text-center text-[10px] font-semibold ${muted}`}>Hover to play</span>
+          <span className={`text-center text-[9px] font-semibold ${muted}`}>Hover</span>
         ) : null}
       </div>
     )
     return (
       <div
-        className={`relative ${className}`}
+        className={`relative overflow-hidden ${className}`}
         onMouseEnter={playMode === 'hover' ? () => setHovered(true) : undefined}
         onMouseLeave={playMode === 'hover' ? () => setHovered(false) : undefined}
         onFocus={playMode === 'hover' ? () => setHovered(true) : undefined}
@@ -165,7 +170,7 @@ function CaptionTemplatePreview({
             ref={videoRef}
             src={url}
             poster={poster || undefined}
-            className="h-full w-full object-cover"
+            className={mediaCls}
             autoPlay
             loop
             muted
@@ -179,14 +184,18 @@ function CaptionTemplatePreview({
     )
   }
   if (isImage) {
-    return <img src={url} alt="" loading="lazy" className={className} />
+    return (
+      <div className={`relative overflow-hidden ${className}`}>
+        <img src={url} alt="" loading="lazy" className={mediaCls} />
+      </div>
+    )
   }
   return (
-    <div className={`flex flex-col items-center justify-center gap-1.5 bg-[#0d0d12] px-2 ${className}`}>
-      <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-black shadow">
+    <div className={`flex flex-col items-center justify-end gap-1 bg-[#0d0d12] px-1.5 pb-2 ${className}`}>
+      <span className="rounded bg-yellow-400 px-2 py-1 text-[12px] font-black uppercase tracking-wide text-black shadow">
         {String(template?.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
       </span>
-      <span className={`text-center text-[11px] font-bold ${muted}`}>Preview soon</span>
+      <span className={`text-center text-[10px] font-bold ${muted}`}>Preview soon</span>
     </div>
   )
 }
@@ -469,12 +478,42 @@ function EffectCardPreview({ effectId, className = '' }) {
   )
 }
 
-function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled }) {
+/** Compact colour/HDR chip — shows the grade, not a tall phone frame. */
+const EFFECT_COLOUR_SWATCH = {
+  none: { background: '#3a3a3a' },
+  cold: { background: 'linear-gradient(135deg,#1e3a5f 0%,#3b82f6 100%)' },
+  warm: { background: 'linear-gradient(135deg,#92400e 0%,#fbbf24 55%,#fde68a 100%)' },
+  contrast_punch: {
+    background: 'linear-gradient(135deg,#000 0%,#fff 45%,#000 100%)',
+  },
+  noir: { background: 'linear-gradient(135deg,#0a0a0a 0%,#6b7280 50%,#111 100%)' },
+  teal_orange: { background: 'linear-gradient(135deg,#0f766e 0%,#14b8a6 40%,#f97316 100%)' },
+  hdr_pop: { background: 'linear-gradient(135deg,#f8fafc 0%,#38bdf8 40%,#0f172a 100%)' },
+  hdr_glow: { background: 'radial-gradient(circle at 40% 30%,#fef9c3 0%,#f59e0b 45%,#78350f 100%)' },
+  hdr_crisp: { background: 'linear-gradient(135deg,#e2e8f0 0%,#7dd3fc 50%,#0ea5e9 100%)' },
+}
+
+function EffectColourSwatch({ effectId, className = 'h-3.5 w-3.5' }) {
+  const style = EFFECT_COLOUR_SWATCH[effectId] || EFFECT_COLOUR_SWATCH.none
+  return (
+    <span
+      className={`inline-block shrink-0 rounded-sm border border-white/15 ${className}`}
+      style={style}
+      aria-hidden
+    />
+  )
+}
+
+/**
+ * Compact CapCut-style effect picker.
+ * mode: "motion" = tiny preview · "swatch" = colour chip · "label" = text-only (presets/lights)
+ */
+function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled, mode = 'label' }) {
   return (
     <div>
-      <p className="text-[12px] font-medium text-[#d4d4d4]">{title}</p>
-      {hint ? <p className={`mt-0.5 text-[11px] ${PX.muted}`}>{hint}</p> : null}
-      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+      <p className="text-[11px] font-medium text-[#d4d4d4]">{title}</p>
+      {hint ? <p className={`mt-0.5 text-[10px] leading-snug ${PX.muted}`}>{hint}</p> : null}
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
         {(Array.isArray(items) ? items : []).map((fx) => {
           const active = Boolean(activeId) && activeId === fx.id
           return (
@@ -483,33 +522,31 @@ function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled }) {
               type="button"
               disabled={disabled}
               onClick={() => onPick(fx.id)}
-              className={`overflow-hidden rounded-lg border text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                 active
                   ? 'border-white/50 bg-[#2a2a2a] ring-1 ring-white/25'
                   : 'border-[#333] bg-[#161616] hover:border-[#666] hover:bg-[#1c1c1c]'
               }`}
               title={fx.detail || fx.label}
             >
-              <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
-                <EffectCardPreview effectId={fx.id} className="h-full w-full" />
-                {active ? (
-                  <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
-                    ✓
-                  </span>
-                ) : null}
-              </div>
-              <div className="px-1.5 py-1">
-                <span
-                  className={`block truncate text-[11px] font-medium leading-tight ${
-                    active ? 'text-white' : 'text-[#e5e5e5]'
-                  }`}
-                >
-                  {fx.label}
+              {mode === 'motion' ? (
+                <span className="relative h-6 w-6 shrink-0 overflow-hidden rounded-sm bg-black">
+                  <EffectCardPreview effectId={fx.id} className="h-full w-full" />
                 </span>
-                {fx.vibe ? (
-                  <span className="mt-0.5 block truncate text-[10px] text-[#888]">{fx.vibe}</span>
-                ) : null}
-              </div>
+              ) : null}
+              {mode === 'swatch' ? <EffectColourSwatch effectId={fx.id} /> : null}
+              <span
+                className={`text-[11px] font-medium leading-tight ${
+                  active ? 'text-white' : 'text-[#e5e5e5]'
+                }`}
+              >
+                {fx.label}
+              </span>
+              {active ? (
+                <span className="rounded bg-white px-1 py-px text-[8px] font-semibold leading-none text-black">
+                  ✓
+                </span>
+              ) : null}
             </button>
           )
         })}
@@ -518,62 +555,45 @@ function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled }) {
   )
 }
 
-/** CapCut-like sticker/element thumb (CSS — original shapes, not CapCut assets). */
+/** Compact sticker/element icon — no decorative stadium/phone background. */
 function StickerCardPreview({ stickerId, className = '' }) {
   const id = String(stickerId || '')
   return (
-    <div className={`relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-[#0c0c0c] ${className}`}>
-      <div className="absolute inset-0 opacity-40">
-        <SampleMiniFrame variant="a" />
-      </div>
+    <div className={`relative flex items-center justify-center bg-transparent ${className}`}>
       {id === 'btn_subscribe_yt' ? (
-        <div className="absolute inset-x-[10%] top-[18%] flex justify-center">
-          <span className="rounded-md bg-[#ff0000] px-2 py-1 text-[8px] font-black tracking-wide text-white">
-            SUBSCRIBE
-          </span>
-        </div>
+        <span className="rounded-[3px] bg-[#ff0000] px-1 py-0.5 text-[7px] font-black tracking-wide text-white">
+          SUB
+        </span>
       ) : null}
       {id === 'btn_follow_tt' ? (
-        <div className="absolute inset-x-[12%] top-[20%] flex justify-center">
-          <span className="rounded-full border-l-2 border-[#25F4EE] bg-black/90 px-2.5 py-1 text-[9px] font-bold text-white">
-            Follow
-          </span>
-        </div>
+        <span className="rounded-full border-l-2 border-[#25F4EE] bg-black px-1.5 py-0.5 text-[8px] font-bold text-white">
+          Follow
+        </span>
       ) : null}
       {id.startsWith('arrow_') ? (
-        <div className="absolute inset-0 flex items-center justify-center text-2xl font-black text-white drop-shadow">
+        <span className="text-base font-black leading-none text-white">
           {id === 'arrow_left' ? '←' : id === 'arrow_right' ? '→' : id === 'arrow_up' ? '↑' : '↓'}
-        </div>
+        </span>
       ) : null}
-      {id === 'shape_square' ? (
-        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 bg-white/90" />
-      ) : null}
+      {id === 'shape_square' ? <span className="h-3.5 w-3.5 bg-white/90" /> : null}
       {id === 'shape_square_outline' ? (
-        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 border-[3px] border-white" />
+        <span className="h-3.5 w-3.5 border-2 border-white" />
       ) : null}
-      {id === 'shape_circle' ? (
-        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 rounded-full bg-white/90" />
-      ) : null}
+      {id === 'shape_circle' ? <span className="h-3.5 w-3.5 rounded-full bg-white/90" /> : null}
       {id === 'shape_circle_outline' ? (
-        <div className="absolute left-1/2 top-[22%] h-8 w-8 -translate-x-1/2 rounded-full border-[3px] border-white" />
+        <span className="h-3.5 w-3.5 rounded-full border-2 border-white" />
       ) : null}
-      {id === 'shape_rounded' ? (
-        <div className="absolute inset-x-[14%] top-[28%] h-5 rounded-lg bg-white/85" />
-      ) : null}
-      {id === 'shape_line' ? (
-        <div className="absolute inset-x-[12%] top-[36%] h-1 rounded-full bg-[#FFE566]" />
-      ) : null}
+      {id === 'shape_rounded' ? <span className="h-2.5 w-5 rounded-md bg-white/85" /> : null}
+      {id === 'shape_line' ? <span className="h-0.5 w-5 rounded-full bg-[#FFE566]" /> : null}
       {id === 'sticker_fire' ? (
-        <div className="absolute left-1/2 top-[20%] h-10 w-7 -translate-x-1/2 rounded-t-full bg-gradient-to-t from-orange-600 to-yellow-300" />
+        <span className="h-4 w-3 rounded-t-full bg-gradient-to-t from-orange-600 to-yellow-300" />
       ) : null}
       {id === 'sticker_new' ? (
-        <div className="absolute inset-x-[16%] top-[22%] rounded border-2 border-[#FFE566] bg-black/85 px-1 py-1 text-center text-[9px] font-black text-[#FFE566]">
+        <span className="rounded border border-[#FFE566] bg-black px-1 py-px text-[7px] font-black text-[#FFE566]">
           NEW
-        </div>
+        </span>
       ) : null}
-      {id === 'sticker_tap' ? (
-        <div className="absolute left-[42%] top-[24%] h-8 w-3 rounded-full bg-white/90" />
-      ) : null}
+      {id === 'sticker_tap' ? <span className="h-4 w-1.5 rounded-full bg-white/90" /> : null}
     </div>
   )
 }
@@ -581,9 +601,9 @@ function StickerCardPreview({ stickerId, className = '' }) {
 function StickerPickerGrid({ title, hint, items, selectedIds, onPick, disabled }) {
   return (
     <div>
-      <p className="text-[12px] font-medium text-[#d4d4d4]">{title}</p>
-      {hint ? <p className={`mt-0.5 text-[11px] ${PX.muted}`}>{hint}</p> : null}
-      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+      <p className="text-[11px] font-medium text-[#d4d4d4]">{title}</p>
+      {hint ? <p className={`mt-0.5 text-[10px] leading-snug ${PX.muted}`}>{hint}</p> : null}
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
         {items.map((item) => {
           const active = selectedIds.includes(item.id)
           return (
@@ -592,33 +612,23 @@ function StickerPickerGrid({ title, hint, items, selectedIds, onPick, disabled }
               type="button"
               disabled={disabled}
               onClick={() => onPick(item.id)}
-              className={`overflow-hidden rounded-lg border text-left transition disabled:opacity-40 ${
+              className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-1 transition disabled:opacity-40 ${
                 active
                   ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
                   : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
               }`}
               title={item.detail || item.label}
             >
-              <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0e0e0e]">
                 <StickerCardPreview stickerId={item.id} className="h-full w-full" />
-                {active ? (
-                  <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
-                    ✓
-                  </span>
-                ) : null}
-              </div>
-              <div className="px-1.5 py-1">
-                <span
-                  className={`block truncate text-[11px] font-medium leading-tight ${
-                    active ? 'text-white' : 'text-[#e5e5e5]'
-                  }`}
-                >
-                  {item.label}
-                </span>
-                {item.vibe ? (
-                  <span className="mt-0.5 block truncate text-[10px] text-[#888]">{item.vibe}</span>
-                ) : null}
-              </div>
+              </span>
+              <span
+                className={`max-w-[4.5rem] truncate text-[10px] font-medium leading-tight ${
+                  active ? 'text-white' : 'text-[#e5e5e5]'
+                }`}
+              >
+                {item.label}
+              </span>
             </button>
           )
         })}
@@ -2854,6 +2864,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             </p>
           ) : null}
           {imageGenNote ? <p className={`text-xs ${PX.muted} text-[#8ab4f8]`}>{imageGenNote}</p> : null}
+          <div
+            className={
+              selected
+                ? 'space-y-5'
+                : 'xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)] xl:items-start xl:gap-5'
+            }
+          >
+            <div className="min-w-0 space-y-5">
           <div className="grid gap-5 lg:grid-cols-2">
             <div>
               <p className={PX.label}>Transitions</p>
@@ -2861,7 +2879,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 See the motion between scenes, then pick one. Auto picks CapCut fades / slides / wipes from
                 the format.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {(transitionStyles.length ? transitionStyles : EOF_TRANSITION_STYLES).map((t) => {
                   const active = transitionStyle === t.id
                   return (
@@ -2869,33 +2887,23 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       key={t.id}
                       type="button"
                       onClick={() => setTransitionStyle(t.id)}
-                      className={`overflow-hidden rounded-lg border text-left transition ${
+                      className={`inline-flex items-center gap-1.5 overflow-hidden rounded-md border px-1.5 py-1 text-left transition ${
                         active
                           ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
                           : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
                       }`}
                       title={t.detail || t.label}
                     >
-                      <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                      <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-sm bg-black">
                         <TransitionPreview styleId={t.id} className="h-full w-full" />
-                        {active ? (
-                          <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
-                            ✓
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="px-1.5 py-1">
-                        <span
-                          className={`block truncate text-[11px] font-medium leading-tight ${
-                            active ? 'text-white' : 'text-[#e5e5e5]'
-                          }`}
-                        >
-                          {t.label}
-                        </span>
-                        {t.vibe ? (
-                          <span className="mt-0.5 block truncate text-[10px] text-[#888]">{t.vibe}</span>
-                        ) : null}
-                      </div>
+                      </span>
+                      <span
+                        className={`text-[11px] font-medium leading-tight ${
+                          active ? 'text-white' : 'text-[#e5e5e5]'
+                        }`}
+                      >
+                        {t.label}
+                      </span>
                     </button>
                   )
                 })}
@@ -2907,7 +2915,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 Preview the grade, then pick one. Auto grades every scene so mixed stock stills look like one
                 edit.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {(colorGrades.length ? colorGrades : EOF_COLOR_GRADES).map((g) => {
                   const active = colorGrade === g.id
                   return (
@@ -2915,33 +2923,23 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       key={g.id}
                       type="button"
                       onClick={() => setColorGrade(g.id)}
-                      className={`overflow-hidden rounded-lg border text-left transition ${
+                      className={`inline-flex items-center gap-1.5 overflow-hidden rounded-md border px-1.5 py-1 text-left transition ${
                         active
                           ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
                           : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
                       }`}
                       title={g.detail || g.label}
                     >
-                      <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                      <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-sm bg-black">
                         <ColorGradePreview gradeId={g.id} className="h-full w-full" />
-                        {active ? (
-                          <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
-                            ✓
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="px-1.5 py-1">
-                        <span
-                          className={`block truncate text-[11px] font-medium leading-tight ${
-                            active ? 'text-white' : 'text-[#e5e5e5]'
-                          }`}
-                        >
-                          {g.label}
-                        </span>
-                        {g.vibe ? (
-                          <span className="mt-0.5 block truncate text-[10px] text-[#888]">{g.vibe}</span>
-                        ) : null}
-                      </div>
+                      </span>
+                      <span
+                        className={`text-[11px] font-medium leading-tight ${
+                          active ? 'text-white' : 'text-[#e5e5e5]'
+                        }`}
+                      >
+                        {g.label}
+                      </span>
                     </button>
                   )
                 })}
@@ -2950,10 +2948,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <div>
               <p className={PX.label}>Enhance / HD</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                CapCut-style clarify after the 9:16 crop — mild denoise + soft sharpen, not plastic AI faces.
-                Stacks with color match. Apply before Rebuild.
+                CapCut-style clarify after the 9:16 crop — mild denoise + soft sharpen. Stacks with color
+                match. Apply before Rebuild.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {(enhanceStyles.length ? enhanceStyles : EOF_ENHANCE_STYLES).map((e) => {
                   const active = enhanceStyle === e.id
                   return (
@@ -2961,46 +2959,35 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       key={e.id}
                       type="button"
                       onClick={() => setEnhanceStyle(e.id)}
-                      className={`overflow-hidden rounded-lg border text-left transition ${
+                      className={`inline-flex items-center gap-1.5 overflow-hidden rounded-md border px-1.5 py-1 text-left transition ${
                         active
                           ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
                           : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
                       }`}
                       title={e.detail || e.label}
                     >
-                      <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                      <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-sm bg-black">
                         <EnhanceStylePreview styleId={e.id} className="h-full w-full" />
-                        {active ? (
-                          <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
-                            ✓
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="px-1.5 py-1">
-                        <span
-                          className={`block truncate text-[11px] font-medium leading-tight ${
-                            active ? 'text-white' : 'text-[#e5e5e5]'
-                          }`}
-                        >
-                          {e.label}
-                        </span>
-                        {e.vibe ? (
-                          <span className="mt-0.5 block truncate text-[10px] text-[#888]">{e.vibe}</span>
-                        ) : null}
-                      </div>
+                      </span>
+                      <span
+                        className={`text-[11px] font-medium leading-tight ${
+                          active ? 'text-white' : 'text-[#e5e5e5]'
+                        }`}
+                      >
+                        {e.label}
+                      </span>
                     </button>
                   )
                 })}
               </div>
             </div>
-              <div className="lg:col-span-2">
+            <div>
               <p className={PX.label}>Image over image</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                Optional CapCut-style pop-up inset (upper third) with a soft UI swish. Auto uses one middle
-                beat when a secondary still exists (e.g. Tuchel over Rooney) — not every scene. Save, then
-                Rebuild Short.
+                Optional CapCut-style pop-up inset (upper third). Auto uses one middle beat when a secondary
+                still exists. Save, then Rebuild Short.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {(overlayMomentsOptions.length
                   ? overlayMomentsOptions
                   : EOF_OVERLAY_MOMENTS_OPTIONS
@@ -3011,7 +2998,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       key={o.id}
                       type="button"
                       onClick={() => setOverlayMoments(o.id)}
-                      className={`min-w-[7.5rem] flex-1 rounded-xl border px-3 py-2.5 text-left transition sm:flex-none ${
+                      className={`rounded-md border px-2.5 py-1.5 text-left transition ${
                         active
                           ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
                           : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
@@ -3019,241 +3006,237 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       title={o.detail || o.label}
                     >
                       <span
-                        className={`block text-[13px] font-medium ${
+                        className={`block text-[12px] font-medium ${
                           active ? 'text-white' : 'text-[#e5e5e5]'
                         }`}
                       >
                         {o.label}
                       </span>
-                      {o.vibe ? (
-                        <span className="mt-0.5 block text-[11px] text-[#888]">{o.vibe}</span>
-                      ) : null}
                     </button>
                   )
                 })}
               </div>
             </div>
-
-            <div className="lg:col-span-2">
-              <p className={PX.label}>Effects</p>
-              <p className={`mt-1 text-xs ${PX.muted}`}>
-                CapCut-style free local FFmpeg effects (shake, blur, lights, waves, colour + HDR).{' '}
-                {videoEffectsStackingRule} Effects burn onto the footage before captions.
-              </p>
-              <p className={`mt-1 text-xs ${PX.muted}`}>
-                <span className="text-[#d4d4d4]">How it works:</span> tap cards to choose (always clickable).
-                That only updates your draft. Then click <span className="text-[#d4d4d4]">Apply effects</span>{' '}
-                on a finished Short to remux — same stills + voiceover, new look. Or include them on the next
-                Build / Rebuild.
-              </p>
-              <p className="mt-2 text-[11px] text-[#8e8e8e]">
-                Active: {summarizeEofVideoEffects(videoEffects)}
-              </p>
-              <div className="mt-3 space-y-4">
-                <EffectPickerGrid
-                  title="Presets"
-                  hint="One-tap bundles — still only fill motion + light + colour."
-                  items={(videoEffectPresets.length ? videoEffectPresets : EOF_EFFECT_PRESETS).map(
-                    (p) => ({
-                      id: p.id,
-                      label: p.label,
-                      detail: p.detail,
-                      vibe: p.vibe,
-                    }),
-                  )}
-                  activeId={videoEffects.preset || 'none'}
-                  onPick={(id) => {
-                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'preset'))
-                    markDraftDirty()
-                  }}
-                />
-                <EffectPickerGrid
-                  title="Motion"
-                  hint="Shake / blur / waves — pick one or Off."
-                  items={videoEffectsMotion.length ? videoEffectsMotion : EOF_MOTION_EFFECTS}
-                  activeId={videoEffects.motion || 'none'}
-                  onPick={(id) => {
-                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'motion'))
-                    markDraftDirty()
-                  }}
-                />
-                <EffectPickerGrid
-                  title="Lights"
-                  hint="Light leak / flash / glow — pick one or Off."
-                  items={videoEffectsLight.length ? videoEffectsLight : EOF_LIGHT_EFFECTS}
-                  activeId={videoEffects.light || 'none'}
-                  onPick={(id) => {
-                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'light'))
-                    markDraftDirty()
-                  }}
-                />
-                <EffectPickerGrid
-                  title="Colour"
-                  hint="Cold / warm / punch / noir / teal–orange — pick one or Off (HDR below shares this slot)."
-                  items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
-                    (e) => e.subgroup !== 'hdr',
-                  )}
-                  activeId={
-                    String(videoEffects.colour || '').startsWith('hdr_')
-                      ? ''
-                      : videoEffects.colour || 'none'
-                  }
-                  onPick={(id) => {
-                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
-                    markDraftDirty()
-                  }}
-                />
-                <EffectPickerGrid
-                  title="HDR looks"
-                  hint="TikTok-style HDR punch (not true HDR10) — counts as the colour slot."
-                  items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
-                    (e) => e.subgroup === 'hdr',
-                  )}
-                  activeId={
-                    String(videoEffects.colour || '').startsWith('hdr_') ? videoEffects.colour : ''
-                  }
-                  onPick={(id) => {
-                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
-                    markDraftDirty()
-                  }}
-                />
-              </div>
+          </div>
             </div>
 
-            <div className="lg:col-span-2">
-              <p className={PX.label}>Stickers &amp; Elements</p>
-              <p className={`mt-1 text-xs ${PX.muted}`}>
-                CapCut-style Subscribe / Follow badges, arrows, shapes, and accents. Up to {stickersMax}{' '}
-                stacked. Burned under captions (after effects). Subscribe defaults to top-right — clears the
-                image-over-image upper card. {stickersStackingRule}
-              </p>
-              <p className="mt-2 text-[11px] text-[#8e8e8e]">
-                Active: {summarizeEofStickers(stickers)}
-              </p>
-              <div className="mt-3 space-y-4">
-                <StickerPickerGrid
-                  title="Buttons"
-                  hint="Subscribe / Follow CTAs — toggle on/off."
-                  items={stickersButtons.length ? stickersButtons : listEofStickersByCategory('buttons')}
-                  selectedIds={stickers.items.map((i) => i.id)}
-                  onPick={(id) => {
-                    const next = pickEofSticker(stickers, id)
-                    setStickers(next)
-                    setActiveStickerId(
-                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
-                    )
-                    markDraftDirty()
-                  }}
-                />
-                <StickerPickerGrid
-                  title="Arrows"
-                  hint="Point left / right / up / down."
-                  items={stickersArrows.length ? stickersArrows : listEofStickersByCategory('arrows')}
-                  selectedIds={stickers.items.map((i) => i.id)}
-                  onPick={(id) => {
-                    const next = pickEofSticker(stickers, id)
-                    setStickers(next)
-                    setActiveStickerId(
-                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
-                    )
-                    markDraftDirty()
-                  }}
-                />
-                <StickerPickerGrid
-                  title="Shapes"
-                  hint="Small accents only — won’t cover the face."
-                  items={stickersShapes.length ? stickersShapes : listEofStickersByCategory('shapes')}
-                  selectedIds={stickers.items.map((i) => i.id)}
-                  onPick={(id) => {
-                    const next = pickEofSticker(stickers, id)
-                    setStickers(next)
-                    setActiveStickerId(
-                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
-                    )
-                    markDraftDirty()
-                  }}
-                />
-                <StickerPickerGrid
-                  title="Stickers"
-                  hint="Fire / NEW / tap — keep compact."
-                  items={stickersExtras.length ? stickersExtras : listEofStickersByCategory('stickers')}
-                  selectedIds={stickers.items.map((i) => i.id)}
-                  onPick={(id) => {
-                    const next = pickEofSticker(stickers, id)
-                    setStickers(next)
-                    setActiveStickerId(
-                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
-                    )
-                    markDraftDirty()
-                  }}
-                />
+            <aside
+              className={`${selected ? 'hidden' : ''} ${PX.surfaceInset} mt-5 space-y-4 p-3 xl:mt-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-1.5rem)] xl:overflow-y-auto`}
+            >
+              <div>
+                <p className={PX.label}>Effects</p>
+                <p className={`mt-1 text-[11px] leading-snug ${PX.muted}`}>
+                  Pick one-by-one (draft only). After a Short is built, use{' '}
+                  <span className="text-[#d4d4d4]">Apply effects</span> beside the preview to remux.
+                </p>
+                <p className="mt-1.5 text-[10px] text-[#8e8e8e]">
+                  Active: {summarizeEofVideoEffects(videoEffects)}
+                </p>
+                <div className="mt-2 space-y-3">
+                  <EffectPickerGrid
+                    title="Presets"
+                    hint="Bundles fill motion + light + colour."
+                    mode="label"
+                    items={(videoEffectPresets.length ? videoEffectPresets : EOF_EFFECT_PRESETS).map(
+                      (p) => ({
+                        id: p.id,
+                        label: p.label,
+                        detail: p.detail,
+                        vibe: p.vibe,
+                      }),
+                    )}
+                    activeId={videoEffects.preset || 'none'}
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'preset'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="Motion"
+                    hint="Tiny preview · pick one or Off."
+                    mode="motion"
+                    items={videoEffectsMotion.length ? videoEffectsMotion : EOF_MOTION_EFFECTS}
+                    activeId={videoEffects.motion || 'none'}
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'motion'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="Lights"
+                    hint="Leak / flash / glow."
+                    mode="label"
+                    items={videoEffectsLight.length ? videoEffectsLight : EOF_LIGHT_EFFECTS}
+                    activeId={videoEffects.light || 'none'}
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'light'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="Colour"
+                    hint="Warm = gold · punch = contrast · teal–orange cinema."
+                    mode="swatch"
+                    items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
+                      (e) => e.subgroup !== 'hdr',
+                    )}
+                    activeId={
+                      String(videoEffects.colour || '').startsWith('hdr_')
+                        ? ''
+                        : videoEffects.colour || 'none'
+                    }
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="HDR"
+                    hint="Counts as colour slot."
+                    mode="swatch"
+                    items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
+                      (e) => e.subgroup === 'hdr',
+                    )}
+                    activeId={
+                      String(videoEffects.colour || '').startsWith('hdr_') ? videoEffects.colour : ''
+                    }
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
+                      markDraftDirty()
+                    }}
+                  />
+                </div>
               </div>
-              {stickers.items.length ? (
-                <div className="mt-4 rounded-xl border border-[#2a2a2a] bg-[#141414] p-3">
-                  <p className="text-[12px] font-medium text-[#d4d4d4]">Position for selected element</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {stickers.items.map((item) => {
-                      const cat = EOF_STICKERS_CATALOG.find((c) => c.id === item.id)
-                      const active = activeStickerId === item.id
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setActiveStickerId(item.id)}
-                          className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
-                            active
-                              ? 'border-white/40 bg-[#272727] text-white'
-                              : 'border-[#333] bg-[#1a1a1a] text-[#bbb]'
-                          }`}
-                        >
-                          {cat?.label || item.id}
-                        </button>
+
+              <div className="border-t border-[#2a2a2a] pt-3">
+                <p className={PX.label}>Stickers</p>
+                <p className={`mt-1 text-[11px] leading-snug ${PX.muted}`}>
+                  Compact chips · up to {stickersMax}. Burned under captions.
+                </p>
+                <p className="mt-1.5 text-[10px] text-[#8e8e8e]">
+                  Active: {summarizeEofStickers(stickers)}
+                </p>
+                <div className="mt-2 space-y-3">
+                  <StickerPickerGrid
+                    title="Buttons"
+                    items={stickersButtons.length ? stickersButtons : listEofStickersByCategory('buttons')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
                       )
-                    })}
-                  </div>
-                  {activeStickerId ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {(stickerPositions.length ? stickerPositions : EOF_STICKER_POSITIONS).map((p) => {
-                        const selectedItem = stickers.items.find((i) => i.id === activeStickerId)
-                        const active = selectedItem?.position === p.id
+                      markDraftDirty()
+                    }}
+                  />
+                  <StickerPickerGrid
+                    title="Arrows"
+                    items={stickersArrows.length ? stickersArrows : listEofStickersByCategory('arrows')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                  <StickerPickerGrid
+                    title="Shapes"
+                    items={stickersShapes.length ? stickersShapes : listEofStickersByCategory('shapes')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                  <StickerPickerGrid
+                    title="Stickers"
+                    items={stickersExtras.length ? stickersExtras : listEofStickersByCategory('stickers')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                </div>
+                {stickers.items.length ? (
+                  <div className="mt-3 rounded-lg border border-[#2a2a2a] bg-[#141414] p-2.5">
+                    <p className="text-[11px] font-medium text-[#d4d4d4]">Position</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {stickers.items.map((item) => {
+                        const cat = EOF_STICKERS_CATALOG.find((c) => c.id === item.id)
+                        const active = activeStickerId === item.id
                         return (
                           <button
-                            key={p.id}
+                            key={item.id}
                             type="button"
                             disabled={busy}
-                            title={p.detail}
-                            onClick={() => {
-                              setStickers(setEofStickerPosition(stickers, activeStickerId, p.id))
-                              markDraftDirty()
-                            }}
-                            className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                            onClick={() => setActiveStickerId(item.id)}
+                            className={`rounded-md border px-2 py-1 text-[10px] ${
                               active
                                 ? 'border-white/40 bg-[#272727] text-white'
-                                : 'border-[#333] bg-[#1a1a1a] text-[#bbb] hover:border-[#555]'
+                                : 'border-[#333] bg-[#1a1a1a] text-[#bbb]'
                             }`}
                           >
-                            {p.label}
+                            {cat?.label || item.id}
                           </button>
                         )
                       })}
                     </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className={`mt-3 ${PX.btnGhost}`}
-                    onClick={() => {
-                      setStickers({ items: [] })
-                      setActiveStickerId('')
-                      markDraftDirty()
-                    }}
-                  >
-                    Clear all stickers
-                  </button>
-                </div>
-              ) : null}
-            </div>
+                    {activeStickerId ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(stickerPositions.length ? stickerPositions : EOF_STICKER_POSITIONS).map((p) => {
+                          const selectedItem = stickers.items.find((i) => i.id === activeStickerId)
+                          const active = selectedItem?.position === p.id
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              disabled={busy}
+                              title={p.detail}
+                              onClick={() => {
+                                setStickers(setEofStickerPosition(stickers, activeStickerId, p.id))
+                                markDraftDirty()
+                              }}
+                              className={`rounded-md border px-2 py-1 text-[10px] ${
+                                active
+                                  ? 'border-white/40 bg-[#272727] text-white'
+                                  : 'border-[#333] bg-[#1a1a1a] text-[#bbb] hover:border-[#555]'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={`mt-2 ${PX.btnGhost} !px-2 !py-1 !text-[11px]`}
+                      onClick={() => {
+                        setStickers({ items: [] })
+                        setActiveStickerId('')
+                        markDraftDirty()
+                      }}
+                    >
+                      Clear stickers
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </aside>
           </div>
 
           <div>
@@ -3397,7 +3380,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ) : null}
                 {zapcapTemplates.length ? (
                   <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()
@@ -3430,30 +3413,26 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                               }`}
                               title={t.description || t.name || t.id}
                             >
-                              <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-[#0d0d12]">
+                              <div className="relative mx-auto h-14 w-full max-w-[88px] overflow-hidden rounded-sm bg-[#0d0d12]">
                                 <CaptionTemplatePreview
                                   template={t}
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full"
+                                  emphasizeCaptions
                                 />
                                 {active ? (
-                                  <span className="absolute right-1 top-1 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                                  <span className="absolute right-0.5 top-0.5 rounded bg-white px-1 py-px text-[8px] font-semibold text-black">
                                     ✓
                                   </span>
                                 ) : null}
                               </div>
-                              <div className="px-1.5 py-1">
+                              <div className="px-1 py-0.5">
                                 <span
-                                  className={`block truncate text-[11px] font-medium leading-tight ${
+                                  className={`block truncate text-[10px] font-medium leading-tight ${
                                     active ? 'text-white' : 'text-[#e5e5e5]'
                                   }`}
                                 >
                                   {t.name}
                                 </span>
-                                {t.category ? (
-                                  <span className="mt-0.5 block truncate text-[10px] text-[#888]">
-                                    {t.category}
-                                  </span>
-                                ) : null}
                               </div>
                             </button>
                           )
@@ -3467,11 +3446,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 )}
                 {zapcapTemplateId ? (
                   <div className="flex items-start gap-3 rounded-xl border border-[#303030] bg-[#1a1a1a] p-3">
-                    <div className="h-28 w-16 shrink-0 overflow-hidden rounded-md bg-[#0d0d12]">
+                    <div className="h-16 w-24 shrink-0 overflow-hidden rounded-md bg-[#0d0d12]">
                       <CaptionTemplatePreview
                         template={zapcapTemplates.find((t) => t.id === zapcapTemplateId)}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full"
                         playMode="always"
+                        emphasizeCaptions
                       />
                     </div>
                     <div className="min-w-0">
@@ -3525,7 +3505,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         ) : null}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid w-full max-w-none gap-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:gap-5">
         <aside className={`${PX.surfaceInset} p-3`}>
           <div className="mb-3 flex items-center justify-between px-2">
             <h3 className="text-xs font-medium text-[#aaaaaa]">Shorts</h3>
@@ -3571,7 +3551,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         </aside>
 
         {selected && draftScript ? (
-          <div className="space-y-4">
+          <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)] xl:items-start xl:gap-4">
+          <div className="min-w-0 space-y-4">
             {/* Workspace header + primary CTA */}
             <div className={`${PX.surface} p-5 sm:p-6`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3918,54 +3899,19 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
                 {(selected.status === 'video_rendered' || videoPreviewUrl) && draftScript?.scenes?.length ? (
                   <div className="mt-5 rounded-xl border border-[#303030] bg-[#161616] p-4">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#303030] pb-4">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
-                          Effects · apply
-                        </p>
-                        <p className={`mt-1 text-xs ${PX.muted}`}>
-                          Pick Effects cards above (draft only). This button burns them into the Short —
-                          keeps the same photos + VO, like Replace captions. Does not scrape new images.
-                          Active: {summarizeEofVideoEffects(videoEffects)}.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={busy || isRendering}
-                        onClick={applyEffects}
-                        className={PX.btnPrimary}
-                      >
-                        {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply effects'}
-                      </button>
-                    </div>
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#303030] pb-4">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
-                          Stickers · apply
-                        </p>
-                        <p className={`mt-1 text-xs ${PX.muted}`}>
-                          Change Stickers &amp; Elements above, Save, then Apply stickers. Remuxes from clean
-                          stills + VO — keeps images + voiceover. Active: {summarizeEofStickers(stickers)}.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={busy || isRendering}
-                        onClick={applyStickers}
-                        className={PX.btnPrimary}
-                      >
-                        {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply stickers'}
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className={`mb-3 text-[11px] ${PX.muted}`}>
+                      Effects &amp; stickers: pick + apply in the <span className="text-[#d4d4d4]">side panel</span>
+                      {' '}(active: {summarizeEofVideoEffects(videoEffects)}
+                      {stickers.items.length ? ` · ${summarizeEofStickers(stickers)}` : ''}).
+                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#303030] pt-3">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
                           Captions · replace
                         </p>
                         <p className={`mt-1 text-xs ${PX.muted}`}>
                           Change style, edit text, move up/down, resize — then Replace captions. Keeps images +
-                          voiceover (no new photos). If a still already has meme/quote text in the picture, use
-                          Rebuild video instead. Effects &amp; stickers stay on the job and re-apply on remux.
+                          voiceover (no new photos).
                         </p>
                       </div>
                       <button
@@ -4699,6 +4645,237 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 Build failed: {selected.errorMessage}
               </p>
             ) : null}
+          </div>
+
+            <aside
+              className={`${PX.surfaceInset} space-y-4 p-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-1.5rem)] xl:overflow-y-auto`}
+            >
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className={PX.label}>Effects</p>
+                  <button
+                    type="button"
+                    disabled={busy || isRendering || !(selected.status === 'video_rendered' || videoPreviewUrl)}
+                    onClick={applyEffects}
+                    className={`${PX.btnPrimary} !px-3 !py-1.5 !text-xs`}
+                    title="Remux current Short with selected effects — same stills + VO"
+                  >
+                    {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply effects'}
+                  </button>
+                </div>
+                <p className={`mt-1 text-[11px] leading-snug ${PX.muted}`}>
+                  Try one-by-one after Build. Selection is draft until you Apply (remux).
+                </p>
+                <p className="mt-1.5 rounded-md border border-[#333] bg-[#141414] px-2 py-1.5 text-[10px] text-[#cfcfcf]">
+                  Active: {summarizeEofVideoEffects(videoEffects)}
+                </p>
+                <div className="mt-2 space-y-3">
+                  <EffectPickerGrid
+                    title="Presets"
+                    mode="label"
+                    items={(videoEffectPresets.length ? videoEffectPresets : EOF_EFFECT_PRESETS).map(
+                      (p) => ({
+                        id: p.id,
+                        label: p.label,
+                        detail: p.detail,
+                        vibe: p.vibe,
+                      }),
+                    )}
+                    activeId={videoEffects.preset || 'none'}
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'preset'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="Motion"
+                    mode="motion"
+                    items={videoEffectsMotion.length ? videoEffectsMotion : EOF_MOTION_EFFECTS}
+                    activeId={videoEffects.motion || 'none'}
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'motion'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="Lights"
+                    mode="label"
+                    items={videoEffectsLight.length ? videoEffectsLight : EOF_LIGHT_EFFECTS}
+                    activeId={videoEffects.light || 'none'}
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'light'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="Colour"
+                    mode="swatch"
+                    items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
+                      (e) => e.subgroup !== 'hdr',
+                    )}
+                    activeId={
+                      String(videoEffects.colour || '').startsWith('hdr_')
+                        ? ''
+                        : videoEffects.colour || 'none'
+                    }
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
+                      markDraftDirty()
+                    }}
+                  />
+                  <EffectPickerGrid
+                    title="HDR"
+                    mode="swatch"
+                    items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
+                      (e) => e.subgroup === 'hdr',
+                    )}
+                    activeId={
+                      String(videoEffects.colour || '').startsWith('hdr_') ? videoEffects.colour : ''
+                    }
+                    onPick={(id) => {
+                      setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
+                      markDraftDirty()
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-[#2a2a2a] pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className={PX.label}>Stickers</p>
+                  <button
+                    type="button"
+                    disabled={busy || isRendering || !(selected.status === 'video_rendered' || videoPreviewUrl)}
+                    onClick={applyStickers}
+                    className={`${PX.btnPrimary} !px-3 !py-1.5 !text-xs`}
+                  >
+                    {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply stickers'}
+                  </button>
+                </div>
+                <p className="mt-1.5 rounded-md border border-[#333] bg-[#141414] px-2 py-1.5 text-[10px] text-[#cfcfcf]">
+                  Active: {summarizeEofStickers(stickers)}
+                </p>
+                <div className="mt-2 space-y-3">
+                  <StickerPickerGrid
+                    title="Buttons"
+                    items={stickersButtons.length ? stickersButtons : listEofStickersByCategory('buttons')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                  <StickerPickerGrid
+                    title="Arrows"
+                    items={stickersArrows.length ? stickersArrows : listEofStickersByCategory('arrows')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                  <StickerPickerGrid
+                    title="Shapes"
+                    items={stickersShapes.length ? stickersShapes : listEofStickersByCategory('shapes')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                  <StickerPickerGrid
+                    title="Stickers"
+                    items={stickersExtras.length ? stickersExtras : listEofStickersByCategory('stickers')}
+                    selectedIds={stickers.items.map((i) => i.id)}
+                    onPick={(id) => {
+                      const next = pickEofSticker(stickers, id)
+                      setStickers(next)
+                      setActiveStickerId(
+                        next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                      )
+                      markDraftDirty()
+                    }}
+                  />
+                </div>
+                {stickers.items.length ? (
+                  <div className="mt-3 rounded-lg border border-[#2a2a2a] bg-[#141414] p-2.5">
+                    <p className="text-[11px] font-medium text-[#d4d4d4]">Position</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {stickers.items.map((item) => {
+                        const cat = EOF_STICKERS_CATALOG.find((c) => c.id === item.id)
+                        const active = activeStickerId === item.id
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setActiveStickerId(item.id)}
+                            className={`rounded-md border px-2 py-1 text-[10px] ${
+                              active
+                                ? 'border-white/40 bg-[#272727] text-white'
+                                : 'border-[#333] bg-[#1a1a1a] text-[#bbb]'
+                            }`}
+                          >
+                            {cat?.label || item.id}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {activeStickerId ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(stickerPositions.length ? stickerPositions : EOF_STICKER_POSITIONS).map((p) => {
+                          const selectedItem = stickers.items.find((i) => i.id === activeStickerId)
+                          const active = selectedItem?.position === p.id
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              disabled={busy}
+                              title={p.detail}
+                              onClick={() => {
+                                setStickers(setEofStickerPosition(stickers, activeStickerId, p.id))
+                                markDraftDirty()
+                              }}
+                              className={`rounded-md border px-2 py-1 text-[10px] ${
+                                active
+                                  ? 'border-white/40 bg-[#272727] text-white'
+                                  : 'border-[#333] bg-[#1a1a1a] text-[#bbb] hover:border-[#555]'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={`mt-2 ${PX.btnGhost} !px-2 !py-1 !text-[11px]`}
+                      onClick={() => {
+                        setStickers({ items: [] })
+                        setActiveStickerId('')
+                        markDraftDirty()
+                      }}
+                    >
+                      Clear stickers
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </aside>
           </div>
         ) : (
           <div className={`flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-[#303030] bg-[#121212] p-8`}>
