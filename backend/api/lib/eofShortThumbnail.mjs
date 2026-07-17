@@ -57,7 +57,10 @@ export async function adaptEofShortThumbnail({
   const h = EOF_YT_THUMB_HEIGHT
   const vf = [
     `scale=${w}:${h}:force_original_aspect_ratio=increase`,
-    `crop=${w}:${h}:(iw-ow)/2:max(0\\,min((ih-oh)*0.28\\,ih-oh))`,
+    `crop=${w}:${h}:(iw-ow)/2:(ih-oh)/2`,
+    `crop=${Math.max(2, w - 4)}:${Math.max(2, h - 4)}:2:2`,
+    `scale=${w}:${h}`,
+    'setsar=1',
   ]
 
   const wantTitle = String(process.env.EOF_THUMBNAIL_TITLE || '').trim() === '1'

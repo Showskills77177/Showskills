@@ -20,6 +20,7 @@ export default function EofMusicSegmentMixer({
   disabled = false,
 }) {
   const audioRef = useRef(null)
+  const trimRef = useRef({ startSec: 0, endSec: null, duration: 0 })
   const railRef = useRef(null)
   const dragRef = useRef(null)
   const [duration, setDuration] = useState(
@@ -43,38 +44,67 @@ export default function EofMusicSegmentMixer({
   const effectiveEnd = trim.endSec != null ? trim.endSec : duration || trim.startSec + 30
   const span = Math.max(0.5, (duration || effectiveEnd) - 0)
 
+  trimRef.current = { startSec: trim.startSec, endSec: trim.endSec, duration }
+
+  // Always rebuild the Audio element when the track changes so preview isn't stuck on the last song.
   useEffect(() => {
+    const prev = audioRef.current
+    if (prev) {
+      try {
+        prev.pause()
+        prev.removeAttribute('src')
+        prev.load()
+      } catch {
+        /* ignore */
+      }
+      audioRef.current = null
+    }
+    setPlaying(false)
+    setPlayhead(0)
     setDuration(
       track?.durationSeconds != null && Number(track.durationSeconds) > 0
         ? Number(track.durationSeconds)
         : 0,
     )
-    setPlaying(false)
-    setPlayhead(0)
-    if (audioRef.current) {
-      try {
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [track?.id, track?.publicUrl, track?.durationSeconds])
 
-  useEffect(() => {
     const url = track?.publicUrl
-    if (!url || (duration > 0 && track?.durationSeconds)) return
-    const a = new Audio(url)
+    if (!url) return undefined
+
+    const a = new Audio()
     a.preload = 'metadata'
+    a.src = url
     const onMeta = () => {
       if (Number.isFinite(a.duration) && a.duration > 0) setDuration(a.duration)
     }
+    const onTime = () => {
+      setPlayhead(a.currentTime)
+      const t = trimRef.current
+      const stopAt = t.endSec != null ? t.endSec : t.duration || a.duration
+      if (Number.isFinite(stopAt) && a.currentTime >= stopAt - 0.04) {
+        a.pause()
+        setPlaying(false)
+      }
+    }
+    const onEnded = () => setPlaying(false)
     a.addEventListener('loadedmetadata', onMeta)
+    a.addEventListener('timeupdate', onTime)
+    a.addEventListener('ended', onEnded)
+    audioRef.current = a
+
     return () => {
       a.removeEventListener('loadedmetadata', onMeta)
-      a.src = ''
+      a.removeEventListener('timeupdate', onTime)
+      a.removeEventListener('ended', onEnded)
+      try {
+        a.pause()
+        a.removeAttribute('src')
+        a.load()
+      } catch {
+        /* ignore */
+      }
+      if (audioRef.current === a) audioRef.current = null
     }
-  }, [track?.publicUrl, track?.id, track?.durationSeconds, duration])
+  }, [track?.id, track?.publicUrl, track?.durationSeconds])
 
   function emit(nextStart, nextEnd) {
     if (typeof onChange !== 'function' || disabled) return
@@ -129,20 +159,8 @@ export default function EofMusicSegmentMixer({
 
   async function togglePreview() {
     if (!track?.publicUrl || disabled) return
-    let a = audioRef.current
-    if (!a) {
-      a = new Audio(track.publicUrl)
-      audioRef.current = a
-      a.addEventListener('timeupdate', () => {
-        setPlayhead(a.currentTime)
-        const stopAt = trim.endSec != null ? trim.endSec : duration
-        if (a.currentTime >= stopAt - 0.04) {
-          a.pause()
-          setPlaying(false)
-        }
-      })
-      a.addEventListener('ended', () => setPlaying(false))
-    }
+    const a = audioRef.current
+    if (!a) return
     if (playing) {
       a.pause()
       setPlaying(false)
@@ -201,7 +219,6 @@ export default function EofMusicSegmentMixer({
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
           >
-            {/* dim outside selection */}
             <div
               className="pointer-events-none absolute inset-y-0 left-0 rounded-l-lg bg-black/55"
               style={{ width: `${leftPct}%` }}
@@ -210,14 +227,12 @@ export default function EofMusicSegmentMixer({
               className="pointer-events-none absolute inset-y-0 right-0 rounded-r-lg bg-black/55"
               style={{ width: `${Math.max(0, 100 - leftPct - widthPct)}%` }}
             />
-            {/* selection window */}
             <div
               className="absolute inset-y-1 cursor-grab rounded-md border border-white/40 bg-[#3ea6ff]/25 active:cursor-grabbing"
               style={{ left: `${leftPct}%`, width: `${Math.max(2, widthPct)}%` }}
               onPointerDown={(e) => onPointerDown('move', e)}
               title="Drag to move segment"
             />
-            {/* start handle */}
             <button
               type="button"
               aria-label="Segment start"
@@ -226,7 +241,6 @@ export default function EofMusicSegmentMixer({
               style={{ left: `${leftPct}%` }}
               onPointerDown={(e) => onPointerDown('start', e)}
             />
-            {/* end handle */}
             <button
               type="button"
               aria-label="Segment end"

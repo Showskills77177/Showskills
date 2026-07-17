@@ -172,11 +172,15 @@ export function assertEofCleanPlateImagePath(imagePath) {
  * Cover-scale + look (+ optional Ken Burns). Captions applied separately so overlays can sit under text.
  */
 function buildSceneBaseFilters({ frames, lookFilters = [], kenBurns = false }) {
-  // Cover 9:16 with a mild face/action bias (not glued to the top — that chopped
-  // landscape match plates and Pollinations stills into awkward green-pitch cuts).
+  // True center cover-crop for 9:16. Top-biased crops were slicing match plates
+  // (Tuchel / pitch greens) into awkward green bands; center keeps faces + action.
+  // Tiny inward crop kills yuv420 green/magenta fringe on hard edges.
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
-    'crop=1080:1920:(iw-ow)/2:max(0\\,min((ih-oh)*0.28\\,ih-oh))',
+    'crop=1080:1920:(iw-ow)/2:(ih-oh)/2',
+    'crop=1076:1916:2:2',
+    'scale=1080:1920',
+    'setsar=1',
   ]
   if (lookFilters?.length) base.push(...lookFilters)
   if (kenBurns) {
@@ -302,10 +306,14 @@ function buildSceneOverlayFilterComplex({
     textDir,
   })
   // Effects on whole composed frame, then stickers, then captions on top (sharp text).
+  // CapCut-style: soft under-shadow first, then feathered rounded card (alpha via format=auto).
   const overlay =
     `[0:v]${baseChain}[base];` +
     `[1:v]${pop.overlayPrep}[ov];` +
-    `[base][ov]overlay=${pop.overlayXy}:enable='${pop.enableExpr}'`
+    `[ov]split[ovmain][ovsh];` +
+    `[ovsh]${pop.shadowPrep}[shadow];` +
+    `[base][shadow]overlay=${pop.shadowXy}:format=auto:enable='${pop.enableExpr}'[shbase];` +
+    `[shbase][ovmain]overlay=${pop.overlayXy}:format=auto:enable='${pop.enableExpr}'`
 
   let label = 'comp'
   let graph = `${overlay}[${label}]`

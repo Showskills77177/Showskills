@@ -55,9 +55,16 @@ export const EOF_OVERLAY_LAYOUT = {
   /** Top of card as fraction of frame height */
   yFrac: 0.13,
   /** CapCut-like rounded corner radius (px at card size, before pop scale) */
-  cornerRadiusPx: 36,
+  cornerRadiusPx: 48,
   /** Soft mask feather at edges / corners (px) — blurry mask, not a hard frame */
-  featherPx: 14,
+  featherPx: 22,
+  /** Soft under-shadow offset (px) */
+  shadowOffsetX: 0,
+  shadowOffsetY: 14,
+  /** Soft under-shadow blur */
+  shadowBlur: 18,
+  /** Soft under-shadow alpha (0–1) */
+  shadowAlpha: 0.55,
   /** Pop-in duration (seconds) */
   popInSec: 0.32,
   /** Soft fade-out at end (seconds) */
@@ -260,6 +267,10 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
     maxW,
     maxH,
     yFrac,
+    shadowOffsetX: EOF_OVERLAY_LAYOUT.shadowOffsetX,
+    shadowOffsetY: EOF_OVERLAY_LAYOUT.shadowOffsetY,
+    shadowBlur: EOF_OVERLAY_LAYOUT.shadowBlur,
+    shadowAlpha: EOF_OVERLAY_LAYOUT.shadowAlpha,
     overlayPrep: [
       // Cover-crop into the card so match stills / gen plates fill cleanly (no letterbox bars).
       `scale=${maxW}:${maxH}:force_original_aspect_ratio=increase`,
@@ -273,7 +284,15 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
       `fade=t=in:st=${fadeInSt}:d=0.12:alpha=1`,
       `fade=t=out:st=${fadeOutSt}:d=${fadeOut.toFixed(3)}:alpha=1`,
     ].join(','),
+    /** Soft black under-shadow from the masked card (CapCut-style depth). */
+    shadowPrep: [
+      `format=rgba`,
+      `geq=r='0':g='0':b='0':a='alpha(X\\,Y)*${EOF_OVERLAY_LAYOUT.shadowAlpha}'`,
+      `boxblur=${EOF_OVERLAY_LAYOUT.shadowBlur}:${Math.max(1, Math.round(EOF_OVERLAY_LAYOUT.shadowBlur / 2))}`,
+      'format=yuva444p',
+    ].join(','),
     overlayXy: `x=(W-w)/2:y=H*${yFrac.toFixed(3)}`,
+    shadowXy: `x=(W-w)/2+${EOF_OVERLAY_LAYOUT.shadowOffsetX}:y=H*${yFrac.toFixed(3)}+${EOF_OVERLAY_LAYOUT.shadowOffsetY}`,
     enableExpr: enable,
     startSec: start,
     endSec: end,
