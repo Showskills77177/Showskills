@@ -3211,8 +3211,9 @@ export default function EofProductionPanel({
             <div>
               <p className={PX.label}>Image over image</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                CapCut-style pop inset with soft rounded mask (no hard white frame). Auto uses one middle beat
-                when a secondary still exists. Save, then Rebuild Short / Apply effects to remux.
+                CapCut-style pop inset in the mid/lower safe zone (never over the face), soft rounded
+                mask. Auto uses one middle beat when a secondary still exists. Save, then Rebuild Short
+                / Apply effects to remux.
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {(overlayMomentsOptions.length

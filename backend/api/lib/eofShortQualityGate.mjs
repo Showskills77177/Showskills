@@ -18,7 +18,14 @@ import {
   normalizeEofCaptionLayout,
 } from '../../../shared/eofCaptionLayout.mjs'
 import { resolveEofCaptionStyle } from '../../../shared/eofCaptionStyles.mjs'
-import { resolveEofOverlayMoments, planEofOverlayMoments, EOF_OVERLAY_LAYOUT } from '../../../shared/eofOverlayMoments.mjs'
+import {
+  resolveEofOverlayMoments,
+  planEofOverlayMoments,
+  EOF_OVERLAY_LAYOUT,
+  eofOverlayCoversFaceZone,
+  eofOverlayLayoutIsFaceSafe,
+  isBadEofOverlayStill,
+} from '../../../shared/eofOverlayMoments.mjs'
 import { normalizeEofMusicTrim } from '../../../shared/eofMusicTrim.mjs'
 import { isEofImageVisionConfigured, rankEofPoolHitsWithVision, MIN_EOF_VISION_SCORE } from './eofImageVision.mjs'
 
@@ -481,23 +488,56 @@ export function collectEofShortQualityHeuristicChecks(job, renderMeta = {}) {
           detail: `start=${start} end=${end}`,
         })
       }
+      const overlayIdx = m.overlaySceneIndex
+      if (overlayIdx != null) {
+        const man = manifest.find((row) => row.index === overlayIdx) || manifest[overlayIdx]
+        if (
+          man &&
+          isBadEofOverlayStill({
+            imagePath: man.imageKey || man.imageSource,
+            imageSource: man.imageSource,
+            imageTitle: man.imageTitle,
+            imageQuery: man.imageQueryUsed || man.imageQuery,
+          })
+        ) {
+          checks.push({
+            id: 'overlay_bad_still',
+            severity: 'fail',
+            message:
+              'Pop inset uses a poor/captioned secondary still (baked text / clickbait thumbnail)',
+            detail: String(man.imageTitle || '').slice(0, 80) || null,
+          })
+        }
+      }
     }
 
-    // Static layout sanity — bad sizing looks like a cropped postage stamp or full-frame glitch.
-    if (EOF_OVERLAY_LAYOUT.widthFrac < 0.4 || EOF_OVERLAY_LAYOUT.widthFrac > 0.85) {
+    // Hard fail: pop geometry that covers the subject’s face (staging screenshot regression).
+    if (count > 0 || overlayMode === 'always' || overlayMode === 'auto') {
+      if (eofOverlayCoversFaceZone(EOF_OVERLAY_LAYOUT) || !eofOverlayLayoutIsFaceSafe(EOF_OVERLAY_LAYOUT)) {
+        checks.push({
+          id: 'overlay_covers_face',
+          severity: 'fail',
+          message: 'Pop inset layout covers the subject face zone (must sit mid/lower, not over eyes)',
+          detail: `yFrac=${EOF_OVERLAY_LAYOUT.yFrac} heightFrac=${EOF_OVERLAY_LAYOUT.heightFrac}`,
+        })
+      }
+    }
+
+    // Static layout sanity — postage-stamp or full-frame glitch sizing.
+    if (EOF_OVERLAY_LAYOUT.widthFrac < 0.55 || EOF_OVERLAY_LAYOUT.widthFrac > 0.92) {
       checks.push({
         id: 'overlay_size_width',
         severity: 'fail',
         message: `Pop inset widthFrac looks wrong (${EOF_OVERLAY_LAYOUT.widthFrac})`,
-        detail: null,
+        detail: 'Prefer a large readable card (~0.75–0.85)',
       })
     }
-    if (EOF_OVERLAY_LAYOUT.heightFrac < 0.45 || EOF_OVERLAY_LAYOUT.heightFrac > 0.95) {
+    if (EOF_OVERLAY_LAYOUT.heightFrac < 0.35 || EOF_OVERLAY_LAYOUT.heightFrac > 0.7) {
       checks.push({
         id: 'overlay_size_height',
         severity: 'fail',
         message: `Pop inset heightFrac looks wrong (${EOF_OVERLAY_LAYOUT.heightFrac})`,
-        detail: null,
+        detail: 'Too tall covers faces; too short looks like a glitch',
       })
     }
   }

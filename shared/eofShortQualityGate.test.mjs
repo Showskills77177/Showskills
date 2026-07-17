@@ -171,6 +171,68 @@ describe('eofShortQualityGate helpers', () => {
     assert.ok(checks.some((c) => c.id === 'overlay_missing_always' && c.severity === 'fail'))
   })
 
+  it('fails when pop inset still has baked clickbait text', () => {
+    const checks = collectEofShortQualityHeuristicChecks(
+      {
+        topic: 'Thomas Tuchel',
+        captionStyle: 'off',
+        musicTrackId: 'bed-1',
+        musicVolume: 0.22,
+        mixedAudioPath: 'a.mp3',
+        renderOutputPath: 'v.mp4',
+        overlayMoments: 'auto',
+        script: {
+          scenes: [
+            { narration: 'Tuchel presser.', caption: 'Tuchel presser.', durationSec: 4 },
+            { narration: 'Bananas headline.', caption: 'Bananas headline.', durationSec: 4 },
+            { narration: 'Take your side.', caption: 'Take your side.', durationSec: 4 },
+          ],
+        },
+        narrationManifest: [
+          { index: 0, durationSec: 4, imageSource: 'google', imageKey: 'a', imageTitle: 'Tuchel presser' },
+          {
+            index: 1,
+            durationSec: 4,
+            imageSource: 'google',
+            imageKey: 'b',
+            imageTitle: 'THOMAS TUCHEL IS GOING BANANAS!',
+          },
+          { index: 2, durationSec: 4, imageSource: 'google', imageKey: 'c', imageTitle: 'Studio' },
+        ],
+      },
+      {
+        overlayCount: 1,
+        overlayMoments: [{ sceneIndex: 0, overlaySceneIndex: 1, absoluteStartSec: 0.5, absoluteEndSec: 2.5 }],
+      },
+    )
+    assert.ok(checks.some((c) => c.id === 'overlay_bad_still' && c.severity === 'fail'))
+    const gate = finalizeEofQualityGate(checks, { mode: 'auto' })
+    assert.equal(gate.pass, false)
+    assert.equal(gate.blocked, true)
+  })
+
+  it('current default pop layout does not cover the face zone', () => {
+    const checks = collectEofShortQualityHeuristicChecks(
+      {
+        topic: 'Tuchel',
+        captionStyle: 'off',
+        musicTrackId: 'bed-1',
+        musicVolume: 0.22,
+        mixedAudioPath: 'a.mp3',
+        renderOutputPath: 'v.mp4',
+        overlayMoments: 'auto',
+        script: { scenes: [{ narration: 'a', caption: 'a', durationSec: 4 }] },
+        narrationManifest: [{ index: 0, durationSec: 4, imageSource: 'google', imageKey: 'a' }],
+      },
+      { overlayCount: 1, overlayMoments: [{ sceneIndex: 0, overlaySceneIndex: 0, absoluteStartSec: 0.5, absoluteEndSec: 2 }] },
+    )
+    assert.equal(
+      checks.some((c) => c.id === 'overlay_covers_face'),
+      false,
+      'default layout must be face-safe after placement fix',
+    )
+  })
+
   it('parses and summarizes gate JSON', () => {
     const raw = JSON.stringify({
       pass: false,

@@ -20,7 +20,10 @@ const MEME_HOST =
  * Rooney staging double-caption: meme still “ROONEY HAS VERY STRONG SPERM!” + beast burn.
  */
 const CAPTION_CONTAMINATED =
-  /\b(meme|mematic|imgflip|make\s*a\s*meme|meme\s*generator|viral\s*quote|quote\s*card|quote\s*graphic|motivational\s*quote|instagram\s*quote|twitter\s*quote|tweet\s*screenshot|has\s+very\s+strong|strong\s+sperm|\bsperm\b|text\s*overlay\s*meme|captioned\s*meme)\b/i
+  /\b(meme|mematic|imgflip|make\s*a\s*meme|meme\s*generator|viral\s*quote|quote\s*card|quote\s*graphic|motivational\s*quote|instagram\s*quote|twitter\s*quote|tweet\s*screenshot|has\s+very\s+strong|strong\s+sperm|\bsperm\b|text\s*overlay\s*meme|captioned\s*meme|going\s+bananas|you\s+won'?t\s+believe|clickbait\s*thumbnail|thumbnail\s*text|with\s+text\s+overlay)\b/i
+
+/** All-caps clickbait / YouTube-thumbnail titles with baked-in headline text. */
+const ALL_CAPS_CLICKBAIT = /^[A-Z0-9][A-Z0-9\s!'?.,-]{18,}[!?]*$/
 
 /**
  * True when the still is a meme/quote graphic likely to already contain burned-in captions.
@@ -34,6 +37,8 @@ export function isCaptionContaminatedStill(url, title = '') {
   if (!hay.trim()) return false
   if (MEME_HOST.test(u)) return true
   if (CAPTION_CONTAMINATED.test(hay)) return true
+  // “THOMAS TUCHEL IS GOING BANANAS!”-style thumbnail plates
+  if (t.length >= 20 && ALL_CAPS_CLICKBAIT.test(t)) return true
   return false
 }
 

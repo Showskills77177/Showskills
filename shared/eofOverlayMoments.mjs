@@ -1,7 +1,13 @@
 /**
  * Image-over-image “moment” overlays for Eyes Of Football Production Shorts.
- * CapCut-like upper pop card + optional whoosh SFX — off | auto | always.
+ * CapCut-like pop card + optional whoosh SFX — off | auto | always.
+ *
+ * Placement rule (critical): never cover the lead subject’s face.
+ * Default sits in the mid/lower safe band — below face/eyes, above bottom captions,
+ * clear of the top-left watermark.
  */
+
+import { isCaptionContaminatedStill } from './eofStockImageFilter.mjs'
 
 /** @typedef {'off' | 'auto' | 'always'} EofOverlayMomentsMode */
 
@@ -18,13 +24,14 @@ export const EOF_OVERLAY_MOMENTS_OPTIONS = [
     id: 'auto',
     label: 'Auto',
     detail:
-      'Occasionally pop a secondary still (e.g. Tuchel over Rooney) on one middle beat when a distinct still exists.',
-    vibe: 'Smart · occasional',
+      'Occasionally pop a secondary still on one middle beat — mid/lower safe zone (never over the face). Skips captioned thumbnails.',
+    vibe: 'Smart · face-safe',
   },
   {
     id: 'always',
     label: 'Always',
-    detail: 'Force one inset moment on a middle scene whenever two distinct stills exist.',
+    detail:
+      'Force one inset moment whenever two distinct clean stills exist — placed mid/lower, not over eyes.',
     vibe: 'Every Short · 1 moment',
   },
 ]
@@ -46,29 +53,113 @@ export function listEofOverlayMomentsOptions() {
   return EOF_OVERLAY_MOMENTS_OPTIONS.map((o) => ({ ...o }))
 }
 
-/** Upper-third pop card — clears default bottom subtitle zone on 9:16. */
+/**
+ * Typical 9:16 portrait face band (eyes / forehead) — pop must not intersect this.
+ * Fractions of frame height.
+ */
+export const EOF_OVERLAY_FACE_ZONE = Object.freeze({
+  yMin: 0.1,
+  yMax: 0.42,
+})
+
+/** Allowed range for the top edge of the pop card (below face, above captions). */
+export const EOF_OVERLAY_SAFE_Y = Object.freeze({
+  min: 0.44,
+  max: 0.58,
+})
+
+/** Caption clearance — pop bottom should stay above this band. */
+export const EOF_OVERLAY_CAPTION_CLEAR_Y = 0.74
+
+/**
+ * Mid/lower pop card — wider + readable, below the face, above bottom captions.
+ * (Previous yFrac 0.13 / widthFrac 0.68 sat on the eyes as a tiny dark plate.)
+ */
 export const EOF_OVERLAY_LAYOUT = {
-  /** Max inset width as fraction of 1080 */
-  widthFrac: 0.68,
-  /** Card height as fraction of card width — taller so faces aren't chopped in the pop */
-  heightFrac: 0.72,
-  /** Top of card as fraction of frame height */
-  yFrac: 0.13,
+  /** Max inset width as fraction of 1080 — larger for readability */
+  widthFrac: 0.78,
+  /** Card height as fraction of card width — fits under face band + above captions */
+  heightFrac: 0.58,
+  /** Top of card as fraction of frame height — lower-third safe zone (not upper-center face) */
+  yFrac: 0.48,
   /** CapCut-like rounded corner radius (px at card size, before pop scale) */
-  cornerRadiusPx: 48,
+  cornerRadiusPx: 44,
   /** Soft mask feather at edges / corners (px) — blurry mask, not a hard frame */
-  featherPx: 22,
+  featherPx: 20,
   /** Soft under-shadow offset (px) */
   shadowOffsetX: 0,
-  shadowOffsetY: 14,
+  shadowOffsetY: 12,
   /** Soft under-shadow blur */
-  shadowBlur: 18,
+  shadowBlur: 16,
   /** Soft under-shadow alpha (0–1) */
-  shadowAlpha: 0.55,
+  shadowAlpha: 0.5,
   /** Pop-in duration (seconds) */
   popInSec: 0.32,
   /** Soft fade-out at end (seconds) */
   fadeOutSec: 0.18,
+}
+
+/**
+ * Axis-aligned pop card rect in normalized frame coords (0–1).
+ * @param {{ widthFrac?: number, heightFrac?: number, yFrac?: number }} [layout]
+ * @param {{ frameW?: number, frameH?: number }} [frame]
+ */
+export function eofOverlayCardRect(layout = EOF_OVERLAY_LAYOUT, frame = {}) {
+  const frameW = Math.max(320, Number(frame.frameW) || 1080)
+  const frameH = Math.max(480, Number(frame.frameH) || 1920)
+  const widthFrac = Number(layout.widthFrac) || EOF_OVERLAY_LAYOUT.widthFrac
+  const heightFrac = Number(layout.heightFrac) || EOF_OVERLAY_LAYOUT.heightFrac
+  const yFrac = Number(layout.yFrac) || EOF_OVERLAY_LAYOUT.yFrac
+  const cardW = frameW * widthFrac
+  const cardH = cardW * heightFrac
+  const x = (1 - widthFrac) / 2
+  const y = yFrac
+  return {
+    x,
+    y,
+    w: widthFrac,
+    h: cardH / frameH,
+    bottom: y + cardH / frameH,
+    frameW,
+    frameH,
+  }
+}
+
+/**
+ * True when the pop card intersects the portrait face/eyes band.
+ * @param {{ widthFrac?: number, heightFrac?: number, yFrac?: number }} [layout]
+ */
+export function eofOverlayCoversFaceZone(layout = EOF_OVERLAY_LAYOUT) {
+  const rect = eofOverlayCardRect(layout)
+  return rect.y < EOF_OVERLAY_FACE_ZONE.yMax && rect.bottom > EOF_OVERLAY_FACE_ZONE.yMin
+}
+
+/**
+ * True when layout keeps the card under the face and above caption clearance.
+ * @param {{ widthFrac?: number, heightFrac?: number, yFrac?: number }} [layout]
+ */
+export function eofOverlayLayoutIsFaceSafe(layout = EOF_OVERLAY_LAYOUT) {
+  const rect = eofOverlayCardRect(layout)
+  if (eofOverlayCoversFaceZone(layout)) return false
+  if (rect.y < EOF_OVERLAY_SAFE_Y.min - 0.02) return false
+  if (rect.bottom > EOF_OVERLAY_CAPTION_CLEAR_Y + 0.04) return false
+  return true
+}
+
+/**
+ * Reject meme / clickbait / baked-caption plates as pop inset sources.
+ * @param {{ imagePath?: string, imageKey?: string | null, imageSource?: string, imageTitle?: string | null, imageQuery?: string | null }} scene
+ */
+export function isBadEofOverlayStill(scene) {
+  if (!scene) return true
+  const src = String(scene.imageSource || '')
+  if (src.startsWith('placeholder')) return true
+  const url = String(scene.imagePath || scene.imageKey || '').trim()
+  const title = String(scene.imageTitle || scene.imageQuery || '').trim()
+  if (isCaptionContaminatedStill(url, title)) return true
+  // Extra clickbait / dark thumbnail cues beyond the stock filter.
+  if (/\b(going\s+bananas|thumbnail|clickbait|with\s+text|text\s+box)\b/i.test(title)) return true
+  return false
 }
 
 /**
@@ -126,10 +217,11 @@ export function sceneTimelineOffsetSec(contentDurations, sceneIndex) {
  * Pick which scene gets the moment and which still is the inset.
  * Auto: only when ≥3 scenes and a distinct overlay still exists (prefer secondary subject beat).
  * Always: one moment when ≥2 distinct stills exist.
+ * Skips caption-contaminated / clickbait plates as the inset source.
  *
  * @param {{
  *   mode?: unknown,
- *   scenes: Array<{ index: number, durationSec?: number, imagePath?: string, imageSource?: string, imageKey?: string | null }>,
+ *   scenes: Array<{ index: number, durationSec?: number, imagePath?: string, imageSource?: string, imageKey?: string | null, imageTitle?: string | null }>,
  *   hasSecondarySubject?: boolean,
  *   secondarySceneIndex?: number | null,
  * }} opts
@@ -180,7 +272,10 @@ export function planEofOverlayMoments(opts = {}) {
       targetIndex = leadIndexes.includes(middle)
         ? middle
         : leadIndexes[Math.floor(leadIndexes.length / 2)]
-      if (isDistinctStill(scenes[targetIndex], scenes[secondaryIdx])) {
+      if (
+        isDistinctStill(scenes[targetIndex], scenes[secondaryIdx]) &&
+        !isBadEofOverlayStill(scenes[secondaryIdx])
+      ) {
         overlayFromIndex = secondaryIdx
       }
     }
@@ -190,7 +285,21 @@ export function planEofOverlayMoments(opts = {}) {
     targetIndex = middle
     for (const cand of [targetIndex + 1, targetIndex - 1, 0, n - 1]) {
       if (cand < 0 || cand >= n || cand === targetIndex) continue
-      if (isDistinctStill(scenes[targetIndex], scenes[cand])) {
+      if (!isDistinctStill(scenes[targetIndex], scenes[cand])) continue
+      if (isBadEofOverlayStill(scenes[cand])) continue
+      overlayFromIndex = cand
+      break
+    }
+  }
+
+  // Last resort: any distinct non-contaminated pair (always mode).
+  if (overlayFromIndex == null && mode === 'always') {
+    for (let base = 0; base < n && overlayFromIndex == null; base += 1) {
+      for (let cand = 0; cand < n; cand += 1) {
+        if (cand === base) continue
+        if (!isDistinctStill(scenes[base], scenes[cand])) continue
+        if (isBadEofOverlayStill(scenes[cand])) continue
+        targetIndex = base
         overlayFromIndex = cand
         break
       }

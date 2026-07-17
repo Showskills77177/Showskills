@@ -276,7 +276,7 @@ function buildSceneVideoFilter({
 }
 
 /**
- * Base still + inset pop card (upper third) via filter_complex; captions burn on top.
+ * Base still + inset pop card (lower-third safe zone) via filter_complex; captions burn on top.
  */
 function buildSceneOverlayFilterComplex({
   frames,

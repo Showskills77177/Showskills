@@ -25,6 +25,13 @@ describe('eofStockImageFilter', () => {
     assert.equal(isCaptionContaminatedStill('https://i.imgflip.com/abc.jpg', 'Rooney meme'), true)
     assert.equal(
       isCaptionContaminatedStill(
+        'https://cdn.example.com/tuchel.jpg',
+        'THOMAS TUCHEL IS GOING BANANAS!',
+      ),
+      true,
+    )
+    assert.equal(
+      isCaptionContaminatedStill(
         'https://cdn.example.com/rooney.jpg',
         'Rooney has very strong sperm Louis van Gaal quote',
       ),
