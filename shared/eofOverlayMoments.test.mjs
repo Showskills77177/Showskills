@@ -102,4 +102,14 @@ describe('eofOverlayMoments', () => {
     assert.ok(f.enableExpr.includes('between(t'))
     assert.ok(f.overlayXy.includes('y=H*'))
   })
+
+  it('pop card uses soft rounded mask instead of a hard white border', () => {
+    const f = buildOverlayPopFilterFragments({ startSec: 0.4, endSec: 2.8 })
+    assert.equal(f.overlayPrep.includes('color=white'), false, 'no white pad frame')
+    assert.equal(f.overlayPrep.includes('pad='), false, 'no hard pad border')
+    assert.ok(f.overlayPrep.includes('force_original_aspect_ratio=increase'), 'cover-crop into card')
+    assert.ok(f.overlayPrep.includes('geq='), 'soft alpha mask via geq')
+    assert.ok(f.overlayPrep.includes('format=rgba'), 'rgba before soft mask')
+    assert.ok(f.maxH > 100 && f.maxH < f.maxW, 'landscape-leaning photo card')
+  })
 })

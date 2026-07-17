@@ -57,7 +57,7 @@ export async function adaptEofShortThumbnail({
   const h = EOF_YT_THUMB_HEIGHT
   const vf = [
     `scale=${w}:${h}:force_original_aspect_ratio=increase`,
-    `crop=${w}:${h}:(iw-ow)/2:min(ih*0.12\\,ih-oh)`,
+    `crop=${w}:${h}:(iw-ow)/2:max(0\\,min((ih-oh)*0.28\\,ih-oh))`,
   ]
 
   const wantTitle = String(process.env.EOF_THUMBNAIL_TITLE || '').trim() === '1'

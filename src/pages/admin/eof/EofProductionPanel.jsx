@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { apiFetch } from '../../../lib/api'
 import {
   productionJobStatusLabel,
@@ -10,6 +11,7 @@ import {
   EOF_DEFAULT_VOICE_PRESET,
   EOF_DEFAULT_MUSIC_VOLUME,
 } from '../../../../shared/eofProduction.mjs'
+import EofMusicSegmentMixer from './EofMusicSegmentMixer'
 import {
   EOF_DEFAULT_SCRIPT_FORMAT,
   createEofScene,
@@ -122,7 +124,7 @@ function CaptionTemplatePreview({
   const isImage = Boolean(url) && type === 'image'
   const poster = template?.posterUrl || (isImage ? url : '')
   const mediaCls = emphasizeCaptions
-    ? 'h-full w-full origin-bottom scale-[1.75] object-cover object-bottom'
+    ? 'h-full w-full origin-bottom scale-[2.35] object-cover object-[center_82%]'
     : 'h-full w-full object-cover'
 
   const [hovered, setHovered] = useState(false)
@@ -197,6 +199,110 @@ function CaptionTemplatePreview({
       </span>
       <span className={`text-center text-[10px] font-bold ${muted}`}>Preview soon</span>
     </div>
+  )
+}
+
+/** Compact ZapCap picker cell: tiny caption-zoomed thumb + hover flyout for animation. */
+function ZapCapTemplateCell({ template, active, onSelect }) {
+  const btnRef = useRef(null)
+  const [hovering, setHovering] = useState(false)
+  const [flyoutPos, setFlyoutPos] = useState(null)
+
+  useEffect(() => {
+    if (!hovering || !btnRef.current) {
+      setFlyoutPos(null)
+      return
+    }
+    const place = () => {
+      const r = btnRef.current?.getBoundingClientRect()
+      if (!r) return
+      const flyoutW = 120
+      const flyoutH = 140
+      let left = r.left + r.width / 2
+      let top = r.top - 8
+      // Keep inside viewport
+      left = Math.min(Math.max(flyoutW / 2 + 8, left), window.innerWidth - flyoutW / 2 - 8)
+      const showBelow = top - flyoutH < 8
+      setFlyoutPos({
+        left,
+        top: showBelow ? r.bottom + 8 : top,
+        place: showBelow ? 'below' : 'above',
+      })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
+  }, [hovering])
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={onSelect}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+        onFocus={() => setHovering(true)}
+        onBlur={() => setHovering(false)}
+        className={`relative overflow-hidden rounded-md border text-left transition ${
+          active
+            ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+            : hovering
+              ? 'border-[#555] bg-[#161616]'
+              : 'border-[#2a2a2a] bg-[#161616]'
+        }`}
+        title={template.description || template.name || template.id}
+      >
+        <div className="relative mx-auto h-10 w-full overflow-hidden rounded-sm bg-[#0d0d12]">
+          <CaptionTemplatePreview template={template} className="h-full w-full" emphasizeCaptions />
+          {active ? (
+            <span className="absolute right-0.5 top-0.5 rounded bg-white px-1 py-px text-[7px] font-semibold text-black">
+              ✓
+            </span>
+          ) : null}
+        </div>
+        <div className="px-0.5 py-0.5">
+          <span
+            className={`block truncate text-[9px] font-medium leading-tight ${
+              active ? 'text-white' : 'text-[#e5e5e5]'
+            }`}
+          >
+            {template.name}
+          </span>
+        </div>
+      </button>
+      {hovering && flyoutPos && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-[200]"
+              style={{
+                left: flyoutPos.left,
+                top: flyoutPos.top,
+                transform:
+                  flyoutPos.place === 'below' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+              }}
+              aria-hidden
+            >
+              <div className="w-[7.5rem] overflow-hidden rounded-md border border-white/25 bg-[#0d0d12] shadow-xl shadow-black/70">
+                <div className="h-[7.25rem] w-full overflow-hidden">
+                  <CaptionTemplatePreview
+                    template={template}
+                    className="h-full w-full"
+                    playMode="always"
+                    emphasizeCaptions
+                  />
+                </div>
+                <p className="truncate px-1.5 py-1 text-[9px] font-medium text-white">{template.name}</p>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   )
 }
 
@@ -739,6 +845,8 @@ export default function EofProductionPanel({
   const [defaultMusicBeds, setDefaultMusicBeds] = useState([])
   const [musicTrackId, setMusicTrackId] = useState('')
   const [musicVolume, setMusicVolume] = useState(EOF_DEFAULT_MUSIC_VOLUME)
+  const [musicStartSec, setMusicStartSec] = useState(0)
+  const [musicEndSec, setMusicEndSec] = useState(null)
   const [zapcapTemplates, setZapcapTemplates] = useState([])
   const [zapcapTemplatesError, setZapcapTemplatesError] = useState('')
   const [zapcapTemplateId, setZapcapTemplateId] = useState('')
@@ -1156,6 +1264,16 @@ export default function EofProductionPanel({
     if (job.musicVolume != null && Number.isFinite(Number(job.musicVolume))) {
       setMusicVolume(Number(job.musicVolume))
     }
+    setMusicStartSec(
+      job.musicStartSec != null && Number.isFinite(Number(job.musicStartSec))
+        ? Number(job.musicStartSec)
+        : 0,
+    )
+    setMusicEndSec(
+      job.musicEndSec != null && Number.isFinite(Number(job.musicEndSec))
+        ? Number(job.musicEndSec)
+        : null,
+    )
     setZapcapTemplateId(job.zapcapTemplateId || '')
     if (job.voiceSettings) {
       setVoiceSettings(normalizeElevenLabsVoiceSettings(job.voiceSettings))
@@ -1805,6 +1923,8 @@ export default function EofProductionPanel({
           jobId: selectedId,
           musicTrackId: musicTrackId || null,
           musicVolume,
+          musicStartSec,
+          musicEndSec,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -2165,6 +2285,8 @@ export default function EofProductionPanel({
           stickers: normalizeEofStickers(stickers),
           musicTrackId: musicTrackId || null,
           musicVolume,
+          musicStartSec,
+          musicEndSec,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
         }),
       })
@@ -2890,7 +3012,7 @@ export default function EofProductionPanel({
             className={
               selected
                 ? 'space-y-5'
-                : 'xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)] xl:items-start xl:gap-5'
+                : 'xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(15rem,17rem)] xl:items-start xl:gap-5'
             }
           >
             <div className="min-w-0 space-y-5">
@@ -3006,8 +3128,8 @@ export default function EofProductionPanel({
             <div>
               <p className={PX.label}>Image over image</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                Optional CapCut-style pop-up inset (upper third). Auto uses one middle beat when a secondary
-                still exists. Save, then Rebuild Short.
+                CapCut-style pop inset with soft rounded mask (no hard white frame). Auto uses one middle beat
+                when a secondary still exists. Save, then Rebuild Short / Apply effects to remux.
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {(overlayMomentsOptions.length
@@ -3401,8 +3523,8 @@ export default function EofProductionPanel({
                   <p className="text-xs text-[#fbbf24]">{zapcapTemplatesError}</p>
                 ) : null}
                 {zapcapTemplates.length ? (
-                  <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
-                    <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+                  <div className="max-h-[16rem] overflow-y-auto overflow-x-visible rounded-xl border border-[#303030] bg-[#121212] p-1.5">
+                    <div className="grid grid-cols-5 gap-1 sm:grid-cols-7 lg:grid-cols-9 xl:grid-cols-11 2xl:grid-cols-[repeat(14,minmax(0,1fr))]">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()
@@ -3421,42 +3543,15 @@ export default function EofProductionPanel({
                               captionStyle === 'beast') &&
                             zapcapTemplateId === t.id
                           return (
-                            <button
+                            <ZapCapTemplateCell
                               key={t.id}
-                              type="button"
-                              onClick={() => {
+                              template={t}
+                              active={active}
+                              onSelect={() => {
                                 setCaptionStyle('zapcap')
                                 setZapcapTemplateId(t.id)
                               }}
-                              className={`overflow-hidden rounded-lg border text-left transition ${
-                                active
-                                  ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
-                                  : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
-                              }`}
-                              title={t.description || t.name || t.id}
-                            >
-                              <div className="relative mx-auto h-14 w-full max-w-[88px] overflow-hidden rounded-sm bg-[#0d0d12]">
-                                <CaptionTemplatePreview
-                                  template={t}
-                                  className="h-full w-full"
-                                  emphasizeCaptions
-                                />
-                                {active ? (
-                                  <span className="absolute right-0.5 top-0.5 rounded bg-white px-1 py-px text-[8px] font-semibold text-black">
-                                    ✓
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div className="px-1 py-0.5">
-                                <span
-                                  className={`block truncate text-[10px] font-medium leading-tight ${
-                                    active ? 'text-white' : 'text-[#e5e5e5]'
-                                  }`}
-                                >
-                                  {t.name}
-                                </span>
-                              </div>
-                            </button>
+                            />
                           )
                         })}
                     </div>
@@ -3467,8 +3562,8 @@ export default function EofProductionPanel({
                   </p>
                 )}
                 {zapcapTemplateId ? (
-                  <div className="flex items-start gap-3 rounded-xl border border-[#303030] bg-[#1a1a1a] p-3">
-                    <div className="h-16 w-24 shrink-0 overflow-hidden rounded-md bg-[#0d0d12]">
+                  <div className="flex items-center gap-2.5 rounded-lg border border-[#303030] bg-[#1a1a1a] px-2.5 py-2">
+                    <div className="h-12 w-[4.5rem] shrink-0 overflow-hidden rounded bg-[#0d0d12]">
                       <CaptionTemplatePreview
                         template={zapcapTemplates.find((t) => t.id === zapcapTemplateId)}
                         className="h-full w-full"
@@ -3477,15 +3572,10 @@ export default function EofProductionPanel({
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs text-[#aaaaaa]">Selected look</p>
-                      <p className="truncate text-sm font-medium text-white">
+                      <p className="text-[10px] text-[#aaaaaa]">Selected look</p>
+                      <p className="truncate text-xs font-medium text-white">
                         {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.name || zapcapTemplateId}
                       </p>
-                      {zapcapTemplates.find((t) => t.id === zapcapTemplateId)?.description ? (
-                        <p className="mt-1 line-clamp-3 text-xs text-[#888]">
-                          {zapcapTemplates.find((t) => t.id === zapcapTemplateId).description}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
                 ) : captionStyle === 'zapcap' ? (
@@ -3527,13 +3617,13 @@ export default function EofProductionPanel({
         ) : null}
       </section>
 
-      <div className="grid w-full max-w-none gap-6 lg:grid-cols-[200px_minmax(0,1fr)] xl:gap-5">
+      <div className="grid w-full max-w-none gap-5 lg:grid-cols-[minmax(13.75rem,16rem)_minmax(0,1fr)] xl:gap-5 2xl:gap-6">
         <aside className={`${PX.surfaceInset} p-3`}>
-          <div className="mb-3 flex items-center justify-between px-2">
+          <div className="mb-2 flex items-center justify-between px-1.5">
             <h3 className="text-xs font-medium text-[#aaaaaa]">Shorts</h3>
             <span className="tabular-nums text-xs text-[#525252]">{jobs.length}</span>
           </div>
-          <ul className="max-h-[min(70vh,640px)] space-y-0.5 overflow-y-auto">
+          <ul className="max-h-[min(82vh,780px)] space-y-0.5 overflow-y-auto">
             {jobs.length === 0 ? (
               <li className={`px-2 py-8 text-center text-sm ${PX.muted}`}>No Shorts yet</li>
             ) : (
@@ -3573,8 +3663,8 @@ export default function EofProductionPanel({
         </aside>
 
         {selected && draftScript ? (
-          <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)] xl:items-start xl:gap-4">
-          <div className="min-w-0 space-y-4">
+          <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(15rem,17rem)] xl:items-start xl:gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(16rem,18rem)] 2xl:gap-6">
+          <div className="min-w-0 space-y-5">
             {/* Workspace header + primary CTA */}
             <div className={`${PX.surface} p-5 sm:p-6`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3836,13 +3926,13 @@ export default function EofProductionPanel({
                 </div>
                 {videoPreviewUrl ? (
                   <div className="mt-4">
-                    <div className="relative mx-auto max-h-[min(70vh,640px)] w-full max-w-[360px] overflow-hidden rounded-xl bg-black">
+                    <div className="relative mx-auto max-h-[min(78vh,760px)] w-full max-w-[min(100%,480px)] overflow-hidden rounded-xl bg-black xl:max-w-[520px] 2xl:max-w-[560px]">
                       <video
                         key={videoPreviewUrl}
                         ref={videoRef}
                         controls
                         playsInline
-                        className="max-h-[min(70vh,640px)] w-full cursor-pointer bg-black"
+                        className="max-h-[min(78vh,760px)] w-full cursor-pointer bg-black"
                         src={videoPreviewUrl}
                         onClick={() => {
                           setCaptionEditOpen(true)
@@ -4118,82 +4208,95 @@ export default function EofProductionPanel({
                     ))}
                   </div>
                 ) : null}
-
-                <div className="mt-5 rounded-xl border border-[#303030] bg-[#161616] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
-                    Music bed · remix
-                  </p>
-                  <p className={`mt-1 text-xs ${PX.muted}`}>
-                    Pick a default/safe bed and remix under the voiceover. Drop cleared tracks in{' '}
-                    <code className="text-[#ccc]">public/eof/music/</code> — no Spotify/YouTube chart
-                    songs.
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-end gap-3">
-                    <label className="block min-w-[200px] flex-1 text-xs text-[#aaa]">
-                      Bed track
-                      <select
-                        className={inputCls}
-                        value={musicTrackId}
-                        onChange={(e) => setMusicTrackId(e.target.value)}
-                        disabled={busy || isRendering}
-                      >
-                        <option value="">Auto (default / mood)</option>
-                        {musicTracks
-                          .filter((t) => t.active !== false)
-                          .map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.title}
-                              {t.isDefault ? ' · default' : ''}
-                              {t.mood ? ` · ${t.mood}` : ''}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    <label className="block w-36 text-xs text-[#aaa]">
-                      Bed volume
-                      <input
-                        type="range"
-                        min={0.08}
-                        max={0.45}
-                        step={0.01}
-                        value={musicVolume}
-                        onChange={(e) => setMusicVolume(Number(e.target.value))}
-                        disabled={busy || isRendering}
-                        className="mt-2 w-full accent-white"
-                      />
-                      <span className="mt-0.5 block tabular-nums text-[10px] text-[#717171]">
-                        {Math.round(musicVolume * 100)}% under VO
-                      </span>
-                    </label>
-                    <button
-                      type="button"
-                      disabled={busy || isRendering || !musicTracks.length}
-                      onClick={remixMusicBed}
-                      className={PX.btnSoft}
-                      title="Re-mix bed under existing voiceover and remux the Short"
-                    >
-                      {busy && renderPhase === 'rendering' ? 'Remixing…' : 'Remix music bed'}
-                    </button>
-                  </div>
-                  {defaultMusicBeds.length ? (
-                    <ul className="mt-3 space-y-1 text-[10px] text-[#717171]">
-                      {defaultMusicBeds.map((bed) => (
-                        <li key={bed.id}>
-                          {bed.title} ({bed.mood}) —{' '}
-                          {bed.filePresent ? 'file ready' : 'empty slot · drop MP3 later'}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {!musicTracks.length ? (
-                    <p className="mt-2 text-xs text-[#fbbf24]">
-                      No beds registered yet — open Music tab or run npm run seed:eof-music after adding
-                      MP3s.
-                    </p>
-                  ) : null}
-                </div>
               </div>
             ) : null}
+
+            {/* Music mixer — always visible for the selected Short (not only after Build) */}
+            <div className={`${PX.surface} p-5 sm:p-6`}>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
+                Music bed · mixer
+              </p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                Pick a platform bed, drag the segment like YouTube (which part of the song), preview, then
+                Build or Remix under the voiceover.
+              </p>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <label className="block min-w-[220px] flex-1 text-xs text-[#aaa]">
+                  Bed track
+                  <select
+                    className={inputCls}
+                    value={musicTrackId}
+                    onChange={(e) => {
+                      setMusicTrackId(e.target.value)
+                      setMusicStartSec(0)
+                      setMusicEndSec(null)
+                    }}
+                    disabled={busy || isRendering}
+                  >
+                    <option value="">Auto (default / mood)</option>
+                    {musicTracks
+                      .filter((t) => t.active !== false)
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                          {t.isDefault ? ' · default' : ''}
+                          {t.mood ? ` · ${t.mood}` : ''}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label className="block w-36 text-xs text-[#aaa]">
+                  Bed volume
+                  <input
+                    type="range"
+                    min={0.08}
+                    max={0.45}
+                    step={0.01}
+                    value={musicVolume}
+                    onChange={(e) => setMusicVolume(Number(e.target.value))}
+                    disabled={busy || isRendering}
+                    className="mt-2 w-full accent-white"
+                  />
+                  <span className="mt-0.5 block tabular-nums text-[10px] text-[#717171]">
+                    {Math.round(musicVolume * 100)}% under VO
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  disabled={
+                    busy ||
+                    isRendering ||
+                    !musicTracks.length ||
+                    !(selected.status === 'video_rendered' || selected.mixedAudioPath || selected.narrationManifest?.length)
+                  }
+                  onClick={remixMusicBed}
+                  className={PX.btnSoft}
+                  title="Re-mix selected song segment under existing voiceover and remux the Short"
+                >
+                  {busy && renderPhase === 'rendering' ? 'Remixing…' : 'Remix music bed'}
+                </button>
+              </div>
+              <EofMusicSegmentMixer
+                track={musicTracks.find((t) => t.id === musicTrackId) || null}
+                startSec={musicStartSec}
+                endSec={musicEndSec}
+                disabled={busy || isRendering}
+                onChange={({ startSec, endSec }) => {
+                  setMusicStartSec(startSec)
+                  setMusicEndSec(endSec)
+                }}
+              />
+              {!musicTracks.length ? (
+                <p className="mt-2 text-xs text-[#fbbf24]">
+                  No beds registered yet — open the Music tab or run npm run seed:eof-music after deploy.
+                </p>
+              ) : (
+                <p className="mt-2 text-[10px] text-[#717171]">
+                  {musicTracks.filter((t) => t.active !== false).length} beds loaded · Save / Build uses your
+                  segment · Remix needs a built voiceover
+                </p>
+              )}
+            </div>
 
             {displayProgress &&
             (selected.status === 'rendering' ||
@@ -4208,7 +4311,7 @@ export default function EofProductionPanel({
             ) : null}
 
             {/* Step 1 — Script */}
-            <section className={`${PX.surfaceInset} p-5 sm:p-6`}>
+            <section className={`${PX.surfaceInset} p-5 sm:p-6 xl:p-7`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">Step 1 · Script</p>
@@ -4282,8 +4385,8 @@ export default function EofProductionPanel({
                   setDraftScript((prev) => (prev ? { ...prev, plainTextDraft } : prev))
                   markDraftDirty()
                 }}
-                rows={7}
-                className={`${inputCls} mt-3 text-[15px] leading-relaxed text-[#ececec]`}
+                rows={16}
+                className={`${inputCls} mt-3 min-h-[26rem] w-full text-[15px] leading-relaxed text-[#ececec]`}
                 placeholder="Write or regenerate a punchy Shorts voiceover here…"
               />
               {hasPlainDraft ? (
@@ -4383,7 +4486,7 @@ export default function EofProductionPanel({
             ) : null}
 
             {/* Step 2 — Scenes */}
-            <section className={`${PX.surface} p-5 sm:p-6`}>
+            <section className={`${PX.surface} p-5 sm:p-6 xl:p-7`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-medium text-[#aaaaaa]">

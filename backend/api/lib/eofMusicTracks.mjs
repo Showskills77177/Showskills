@@ -16,10 +16,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
  *   - default-dramatic.mp3  — facts / records / hype (ships as soft placeholder stub)
  *   - default-upbeat.mp3    — empty slot — add your cleared upbeat bed later
  *   - default-calm.mp3      — empty slot — add your cleared calm bed later
+ *   - champions-rise.mp3    — Champions Rise (custom bed)
  *
  * Do NOT register Spotify/YouTube chart tracks. Placeholders are for pipeline testing only.
  * Env override: EOF_MUSIC_BEDS_JSON = JSON array of { title, mood, publicUrl, isDefault?, licenseNote? }
  */
+const PLATFORM_LICENSE =
+  'Platform music bed — confirm you have rights to use on YouTube before publishing.'
+
 export const EOF_DEFAULT_MUSIC_BEDS = [
   {
     id: 'neutral',
@@ -64,6 +68,136 @@ export const EOF_DEFAULT_MUSIC_BEDS = [
     required: false,
     licenseNote:
       'Empty slot — drop a cleared calm Shorts bed at public/eof/music/default-calm.mp3, then seed/register.',
+  },
+  {
+    id: 'champions-rise',
+    title: 'Champions Rise',
+    mood: 'dramatic',
+    publicUrl: '/eof/music/champions-rise.mp3',
+    fileName: 'champions-rise.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'build-different-inst',
+    title: 'Build Different (Inst)',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/build-different-inst.mp3',
+    fileName: 'build-different-inst.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'built-different-no-vocal',
+    title: 'Built Different (No Lead Vocal)',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/built-different-no-vocal.mp3',
+    fileName: 'built-different-no-vocal.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'champion-mind',
+    title: 'Champion Mind',
+    mood: 'dramatic',
+    publicUrl: '/eof/music/champion-mind.mp3',
+    fileName: 'champion-mind.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'dream-chaser-no-vocal',
+    title: 'Dream Chaser (No Lead Vocal)',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/dream-chaser-no-vocal.mp3',
+    fileName: 'dream-chaser-no-vocal.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'eternal',
+    title: 'Eternal',
+    mood: 'calm',
+    publicUrl: '/eof/music/eternal.mp3',
+    fileName: 'eternal.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'lets-go',
+    title: "Let's Go",
+    mood: 'upbeat',
+    publicUrl: '/eof/music/lets-go.mp3',
+    fileName: 'lets-go.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'my-lane-no-vocal',
+    title: 'My Lane (No Lead Vocal)',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/my-lane-no-vocal.mp3',
+    fileName: 'my-lane-no-vocal.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'my-lane',
+    title: 'My Lane',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/my-lane.mp3',
+    fileName: 'my-lane.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'my-lane-lyrics',
+    title: 'My Lane (Lyrics)',
+    mood: 'upbeat',
+    publicUrl: '/eof/music/my-lane-lyrics.mp3',
+    fileName: 'my-lane-lyrics.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'rise-up',
+    title: 'Rise Up',
+    mood: 'dramatic',
+    publicUrl: '/eof/music/rise-up.mp3',
+    fileName: 'rise-up.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'this-is-my-moment-1',
+    title: 'This Is My Moment 1',
+    mood: 'dramatic',
+    publicUrl: '/eof/music/this-is-my-moment-1.mp3',
+    fileName: 'this-is-my-moment-1.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
+  },
+  {
+    id: 'this-is-my-moment-2',
+    title: 'This Is My Moment 2',
+    mood: 'dramatic',
+    publicUrl: '/eof/music/this-is-my-moment-2.mp3',
+    fileName: 'this-is-my-moment-2.mp3',
+    isDefault: false,
+    required: false,
+    licenseNote: PLATFORM_LICENSE,
   },
 ]
 

@@ -27,11 +27,15 @@ function musicVolumeToDb(volume) {
 
 /**
  * Concatenate scene narration MP3s then mix with background music bed.
+ * Optional musicStartSec / musicEndSec picks a YouTube-style segment of the bed
+ * (that clip is looped under the VO if the Short is longer).
  * @param {{
  *   sceneAudioPaths: string[],
  *   musicFilePath: string | null,
  *   musicVolume: number,
  *   outputPath: string,
+ *   musicStartSec?: number,
+ *   musicEndSec?: number | null,
  * }} opts
  */
 export async function mixEofNarrationWithMusic({
@@ -39,6 +43,8 @@ export async function mixEofNarrationWithMusic({
   musicFilePath,
   musicVolume,
   outputPath,
+  musicStartSec = 0,
+  musicEndSec = null,
 }) {
   const paths = sceneAudioPaths.filter((p) => p && existsSync(p))
   if (!paths.length) throw new Error('No narration audio to mix.')
@@ -62,6 +68,21 @@ export async function mixEofNarrationWithMusic({
     return { outputPath, durationSec: await probeAudioDurationSec(outputPath), hasMusicBed: false }
   }
 
+  let bedPath = musicFilePath
+  const start = Math.max(0, Number(musicStartSec) || 0)
+  const end =
+    musicEndSec != null && Number.isFinite(Number(musicEndSec)) ? Number(musicEndSec) : null
+  if (start > 0.04 || (end != null && end > start + 0.2)) {
+    const trimmed = outputPath.replace(/\.mp3$/i, '.music-trim.mp3')
+    const trimArgs = ['-y', '-ss', start.toFixed(3), '-i', musicFilePath]
+    if (end != null && end > start + 0.2) {
+      trimArgs.push('-t', (end - start).toFixed(3))
+    }
+    trimArgs.push('-c:a', 'libmp3lame', '-q:a', '4', trimmed)
+    await runFfmpeg(trimArgs, { maxBuffer: 16 * 1024 * 1024 })
+    bedPath = trimmed
+  }
+
   const narrDur = await probeAudioDurationSec(narrationOnly)
   const fadeOutStart = Math.max(0, narrDur - 2)
   const musicDb = musicVolumeToDb(musicVolume)
@@ -74,7 +95,7 @@ export async function mixEofNarrationWithMusic({
       '-stream_loop',
       '-1',
       '-i',
-      musicFilePath,
+      bedPath,
       '-filter_complex',
       `[1:a]volume=${musicDb}dB,afade=t=in:st=0:d=1.5,afade=t=out:st=${fadeOutStart}:d=2[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[out]`,
       '-map',

@@ -522,6 +522,14 @@ export default async function handler(req, res) {
                 : undefined,
             musicVolume:
               body.musicVolume !== undefined ? Number(body.musicVolume) : undefined,
+            musicStartSec:
+              body.musicStartSec !== undefined ? Number(body.musicStartSec) : undefined,
+            musicEndSec:
+              body.musicEndSec !== undefined
+                ? body.musicEndSec === null || body.musicEndSec === ''
+                  ? null
+                  : Number(body.musicEndSec)
+                : undefined,
           })
           await startEofProductionMusicRemixBackground(jobId)
           const job = await getEofProductionJob(jobId)
@@ -835,6 +843,13 @@ export default async function handler(req, res) {
         topic: body.topic,
         musicTrackId: body.musicTrackId,
         musicVolume: body.musicVolume,
+        musicStartSec: body.musicStartSec !== undefined ? Number(body.musicStartSec) : undefined,
+        musicEndSec:
+          body.musicEndSec !== undefined
+            ? body.musicEndSec === null || body.musicEndSec === ''
+              ? null
+              : Number(body.musicEndSec)
+            : undefined,
         voicePreset: body.voicePreset,
         captionStyle: body.captionStyle !== undefined ? resolveEofCaptionStyle(body.captionStyle) : undefined,
         zapcapTemplateId:

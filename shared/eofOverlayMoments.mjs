@@ -50,14 +50,39 @@ export function listEofOverlayMomentsOptions() {
 export const EOF_OVERLAY_LAYOUT = {
   /** Max inset width as fraction of 1080 */
   widthFrac: 0.68,
+  /** Card height as fraction of card width (landscape-leaning photo card) */
+  heightFrac: 0.62,
   /** Top of card as fraction of frame height */
   yFrac: 0.13,
-  /** Border pad around inset (px) */
-  borderPx: 10,
+  /** CapCut-like rounded corner radius (px at card size, before pop scale) */
+  cornerRadiusPx: 36,
+  /** Soft mask feather at edges / corners (px) — blurry mask, not a hard frame */
+  featherPx: 14,
   /** Pop-in duration (seconds) */
   popInSec: 0.32,
   /** Soft fade-out at end (seconds) */
   fadeOutSec: 0.18,
+}
+
+/**
+ * ffmpeg geq alpha for a soft rounded-rect mask (CapCut-style).
+ * Signed distance → feathered alpha; no hard white/colored border.
+ * @param {{ radius: number, feather: number }} opts
+ */
+export function softRoundedRectAlphaExpr({ radius, feather }) {
+  const r = Math.max(4, Math.round(Number(radius) || 36))
+  const f = Math.max(2, Math.round(Number(feather) || 14))
+  // Classic rounded-box SDF; alpha falls off over `feather` px near the edge.
+  return [
+    `a='st(0\\,${r})`,
+    `st(1\\,${f})`,
+    `st(2\\,W/2-ld(0))`,
+    `st(3\\,H/2-ld(0))`,
+    `st(4\\,abs(X-W/2)-ld(2))`,
+    `st(5\\,abs(Y-H/2)-ld(3))`,
+    `st(6\\,hypot(max(ld(4)\\,0)\\,max(ld(5)\\,0))+min(max(ld(4)\\,ld(5))\\,0)-ld(0))`,
+    `255*clip((-ld(6))/ld(1)\\,0\\,1)'`,
+  ].join(';')
 }
 
 /**
@@ -203,6 +228,7 @@ function isDistinctStill(a, b) {
 
 /**
  * ffmpeg scale+overlay expr helpers for a pop-up card (eval=frame on overlay stream).
+ * Cover-crops into a rounded soft-masked card (CapCut mask look) — no hard white border.
  * @param {{ startSec: number, endSec: number, frameW?: number }} opts
  */
 export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080 }) {
@@ -211,8 +237,11 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
   const pop = EOF_OVERLAY_LAYOUT.popInSec
   const fadeOut = EOF_OVERLAY_LAYOUT.fadeOutSec
   const maxW = Math.round(frameW * EOF_OVERLAY_LAYOUT.widthFrac)
-  const border = EOF_OVERLAY_LAYOUT.borderPx
+  const maxH = Math.max(120, Math.round(maxW * EOF_OVERLAY_LAYOUT.heightFrac))
   const yFrac = EOF_OVERLAY_LAYOUT.yFrac
+  const radius = EOF_OVERLAY_LAYOUT.cornerRadiusPx
+  const feather = EOF_OVERLAY_LAYOUT.featherPx
+  const softAlpha = softRoundedRectAlphaExpr({ radius, feather })
 
   // Scale: 0.55 → 1.08 → 1.0 over pop window (CapCut overshoot)
   const scaleW = [
@@ -223,19 +252,23 @@ export function buildOverlayPopFilterFragments({ startSec, endSec, frameW = 1080
   ].join('')
 
   const overlayScale = `scale=w='${scaleW}':h=-1:eval=frame`
-  const pad = `pad=iw+${border * 2}:ih+${border * 2}:${border}:${border}:color=white@0.92`
   const enable = `between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})`
   const fadeInSt = start.toFixed(3)
   const fadeOutSt = Math.max(start, end - fadeOut).toFixed(3)
 
   return {
     maxW,
+    maxH,
     yFrac,
     overlayPrep: [
-      `scale=${maxW * 2}:-1:force_original_aspect_ratio=decrease`,
+      // Cover-crop into the card so match stills / gen plates fill cleanly (no letterbox bars).
+      `scale=${maxW}:${maxH}:force_original_aspect_ratio=increase`,
+      `crop=${maxW}:${maxH}:(iw-ow)/2:(ih-oh)/2`,
       'setsar=1',
-      'format=yuva420p',
-      pad,
+      'format=rgba',
+      `geq=r='r(X\\,Y)':g='g(X\\,Y)':b='b(X\\,Y)':${softAlpha}`,
+      // Keep full chroma on the soft edge — yuva420p fringes look greenish on pitch stills.
+      'format=yuva444p',
       overlayScale,
       `fade=t=in:st=${fadeInSt}:d=0.12:alpha=1`,
       `fade=t=out:st=${fadeOutSt}:d=${fadeOut.toFixed(3)}:alpha=1`,

@@ -42,6 +42,7 @@ import {
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
+import { normalizeEofMusicTrim } from '../../../shared/eofMusicTrim.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import {
   writeEofProductionScript,
@@ -54,6 +55,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 /** Job metadata only — never pull durable media base64 into list/detail payloads. */
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
+  music_start_sec, music_end_sec,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
   caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
   overlay_moments, video_effects_json, stickers_json,
@@ -98,6 +100,14 @@ function rowToJob(row) {
     script: parseProductionScript(row.script_json),
     musicTrackId: row.music_track_id || null,
     musicVolume: Number(row.music_volume) || EOF_DEFAULT_MUSIC_VOLUME,
+    musicStartSec:
+      row.music_start_sec != null && Number.isFinite(Number(row.music_start_sec))
+        ? Number(row.music_start_sec)
+        : 0,
+    musicEndSec:
+      row.music_end_sec != null && Number.isFinite(Number(row.music_end_sec))
+        ? Number(row.music_end_sec)
+        : null,
     voicePreset: row.voice_preset || EOF_DEFAULT_VOICE_PRESET,
     voiceSettings: parseVoiceSettingsJson(row.voice_settings_json),
     voiceRegenerationCount: Number(row.voice_regeneration_count) || 0,
@@ -383,6 +393,13 @@ export async function updateEofProductionJob(id, patch) {
   const musicTrackId = patch.musicTrackId !== undefined ? patch.musicTrackId : job.musicTrackId
   const musicVolume =
     patch.musicVolume !== undefined ? Number(patch.musicVolume) : job.musicVolume
+  const musicTrim = normalizeEofMusicTrim({
+    musicStartSec:
+      patch.musicStartSec !== undefined ? patch.musicStartSec : job.musicStartSec,
+    musicEndSec: patch.musicEndSec !== undefined ? patch.musicEndSec : job.musicEndSec,
+  })
+  const musicStartSec = musicTrim.startSec
+  const musicEndSec = musicTrim.endSec
   const voicePreset = patch.voicePreset !== undefined ? patch.voicePreset : job.voicePreset
   let voiceSettings =
     patch.voiceSettings !== undefined ? patch.voiceSettings : job.voiceSettings
@@ -458,25 +475,27 @@ export async function updateEofProductionJob(id, patch) {
          script_source = $6,
          music_track_id = $7,
          music_volume = $8,
-         voice_preset = $9,
-         voice_settings_json = $10,
-         error_message = $11,
-         mixed_audio_path = $12,
-         narration_manifest_json = $13,
-         render_output_path = $14,
-         voice_regeneration_count = $15,
-         voice_narration_hash = $16,
-         youtube_project_id = $17,
-         caption_style = $18,
-         caption_engine = $19,
-         zapcap_template_id = $20,
-         transition_style = $21,
-         color_grade = $22,
-         enhance_style = $23,
-         caption_layout_json = $24,
-         overlay_moments = $25,
-         video_effects_json = $26,
-         stickers_json = $27,
+         music_start_sec = $9,
+         music_end_sec = $10,
+         voice_preset = $11,
+         voice_settings_json = $12,
+         error_message = $13,
+         mixed_audio_path = $14,
+         narration_manifest_json = $15,
+         render_output_path = $16,
+         voice_regeneration_count = $17,
+         voice_narration_hash = $18,
+         youtube_project_id = $19,
+         caption_style = $20,
+         caption_engine = $21,
+         zapcap_template_id = $22,
+         transition_style = $23,
+         color_grade = $24,
+         enhance_style = $25,
+         caption_layout_json = $26,
+         overlay_moments = $27,
+         video_effects_json = $28,
+         stickers_json = $29,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -488,6 +507,8 @@ export async function updateEofProductionJob(id, patch) {
       scriptSource,
       musicTrackId,
       musicVolume,
+      musicStartSec,
+      musicEndSec,
       voicePreset,
       voiceSettings ? JSON.stringify(voiceSettings) : null,
       errorMessage,

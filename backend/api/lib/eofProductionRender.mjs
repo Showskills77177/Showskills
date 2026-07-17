@@ -193,6 +193,8 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
       musicFilePath: musicPath,
       musicVolume: job.musicVolume,
+      musicStartSec: job.musicStartSec,
+      musicEndSec: job.musicEndSec,
       outputPath: mixedPath,
     })
     void mix

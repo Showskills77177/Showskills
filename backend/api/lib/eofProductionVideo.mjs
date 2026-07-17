@@ -172,9 +172,11 @@ export function assertEofCleanPlateImagePath(imagePath) {
  * Cover-scale + look (+ optional Ken Burns). Captions applied separately so overlays can sit under text.
  */
 function buildSceneBaseFilters({ frames, lookFilters = [], kenBurns = false }) {
+  // Cover 9:16 with a mild face/action bias (not glued to the top — that chopped
+  // landscape match plates and Pollinations stills into awkward green-pitch cuts).
   const base = [
     'scale=1080:1920:force_original_aspect_ratio=increase',
-    'crop=1080:1920:(iw-ow)/2:min(ih*0.12\\,ih-oh)',
+    'crop=1080:1920:(iw-ow)/2:max(0\\,min((ih-oh)*0.28\\,ih-oh))',
   ]
   if (lookFilters?.length) base.push(...lookFilters)
   if (kenBurns) {

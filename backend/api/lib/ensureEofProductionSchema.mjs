@@ -86,6 +86,7 @@ export async function ensureEofProductionSchema() {
   }
 
   await addEofProductionJobColumns()
+  await addEofProductionJobRealColumns()
   ensured = true
 }
 
@@ -119,6 +120,27 @@ async function addEofProductionJobColumns() {
   for (const col of columns) {
     try {
       await query(`ALTER TABLE eof_production_jobs ADD COLUMN ${col} TEXT`)
+    } catch {
+      /* column exists */
+    }
+  }
+}
+
+/** YouTube-style music segment: offsets into the selected bed (seconds). */
+async function addEofProductionJobRealColumns() {
+  const realCols = [
+    ['music_start_sec', 'REAL'],
+    ['music_end_sec', 'REAL'],
+  ]
+  if (dbIsPostgres()) {
+    for (const [col, typ] of realCols) {
+      await query(`ALTER TABLE eof_production_jobs ADD COLUMN IF NOT EXISTS ${col} ${typ}`)
+    }
+    return
+  }
+  for (const [col, typ] of realCols) {
+    try {
+      await query(`ALTER TABLE eof_production_jobs ADD COLUMN ${col} ${typ}`)
     } catch {
       /* column exists */
     }
