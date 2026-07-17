@@ -36,7 +36,7 @@ if (resendKey?.startsWith('re_')) {
   console.warn('[email] RESEND_API_KEY not set — purchase/quiz emails and admin OTP are disabled')
 }
 
-const PORT = parseInt(process.env.PORT || '3000', 10)
+const PORT = parseInt(process.env.API_PORT || '3000', 10)
 
 function adapt(handler) {
   return (req, res, next) => {
