@@ -313,6 +313,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
   const [settings, setSettings] = useState(null)
   const [drafts, setDrafts] = useState([])
   const [note, setNote] = useState('')
+  const [scheduleNote, setScheduleNote] = useState('')
   const [previewTopics, setPreviewTopics] = useState([])
   const [err, setErr] = useState('')
   const [success, setSuccess] = useState('')
@@ -329,6 +330,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
       setSettings(j.settings || null)
       setDrafts(Array.isArray(j.drafts) ? j.drafts : [])
       setNote(typeof j.note === 'string' ? j.note : '')
+      setScheduleNote(typeof j.scheduleNote === 'string' ? j.scheduleNote : '')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -353,8 +355,6 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         body: JSON.stringify({
           action: 'update',
           enabled: settings.enabled,
-          hourUtc: settings.hourUtc,
-          minuteUtc: settings.minuteUtc,
           targetCount: settings.targetCount,
           formatMix: settings.formatMix,
         }),
@@ -380,7 +380,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
     }
     setBusy(true)
     setErr('')
-    setSuccess('Preparing overnight-style draft batch — writer + judge, drafts only…')
+    setSuccess('Preparing UK-midnight-style draft batch — writer + judge, drafts only…')
     try {
       const res = await apiFetch('/api/admin/eof-script-maker', {
         method: 'POST',
@@ -443,10 +443,14 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         <h2 className="text-base font-semibold text-white">Script Maker</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           {note ||
-            'Overnight hot-take prep: ~5 polished voiceovers (quote rows + debate news angles). Full scripts shown below. No video, no YouTube. Review in the morning → Adapt / Build / post yourself.'}
+            'UK midnight hot-take prep: polished voiceovers ready when you wake up. No video, no YouTube — Adapt / Build / post yourself.'}
         </p>
         <p className="mt-2 rounded-lg border border-[#3ea6ff]/25 bg-[#15202b] px-3 py-2 text-xs text-[#9ecbff]">
-          Pipeline: research (timely) → draft → polish → hot-take refine → second-tier judge. Refuses canned templates and soft article paste.
+          {scheduleNote ||
+            'Schedule: UK midnight (Europe/London). Cron hits 23:00 UTC in BST and 00:00 UTC in GMT; only the local-midnight window runs.'}
+        </p>
+        <p className={`mt-2 text-xs ${EOF.muted}`}>
+          Pipeline: research → draft → polish → hot-take refine → judge. Refuses canned templates and soft article paste.
         </p>
 
         {success ? (
@@ -464,29 +468,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
                 checked={Boolean(settings.enabled)}
                 onChange={(e) => setSettings((s) => ({ ...s, enabled: e.target.checked }))}
               />
-              Enable overnight Script Maker (22:00 UTC by default via Vercel Cron)
-            </label>
-            <label className="text-xs text-[#aaa]">
-              Hour (UTC)
-              <input
-                type="number"
-                min={0}
-                max={23}
-                value={settings.hourUtc}
-                onChange={(e) => setSettings((s) => ({ ...s, hourUtc: Number(e.target.value) }))}
-                className={inputCls}
-              />
-            </label>
-            <label className="text-xs text-[#aaa]">
-              Minute (UTC)
-              <input
-                type="number"
-                min={0}
-                max={59}
-                value={settings.minuteUtc}
-                onChange={(e) => setSettings((s) => ({ ...s, minuteUtc: Number(e.target.value) }))}
-                className={inputCls}
-              />
+              Enable Script Maker at UK midnight (00:00 Europe/London)
             </label>
             <label className="text-xs text-[#aaa]">
               Target drafts
@@ -548,7 +530,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
 
       {previewTopics.length ? (
         <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
-          <h3 className="text-sm font-semibold text-white">Tonight’s candidate angles</h3>
+          <h3 className="text-sm font-semibold text-white">Candidate angles</h3>
           <ul className="mt-3 space-y-3">
             {previewTopics.map((t, i) => (
               <li key={i} className="rounded-lg border border-[#303030] bg-[#0d0d0d] p-3">
@@ -618,7 +600,9 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
             ))}
           </ul>
         ) : (
-          <p className={`mt-3 text-sm ${EOF.muted}`}>No Script Maker drafts yet. Enable overnight prep or Run now.</p>
+          <p className={`mt-3 text-sm ${EOF.muted}`}>
+            No Script Maker drafts yet. Enable UK midnight prep (or Run now) — drafts appear after midnight UK time.
+          </p>
         )}
       </section>
     </div>

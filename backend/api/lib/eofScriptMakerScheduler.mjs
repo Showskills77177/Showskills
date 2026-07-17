@@ -10,19 +10,13 @@ import {
 import { pickEofEuropeanFootballNewsTopics } from './eofNewsTopics.mjs'
 import { sourceEofFootballQuote, quoteHitToHeadline } from './eofQuoteSourcing.mjs'
 import { EOF_PRODUCTION_JOB_STATUS } from '../../../shared/eofProduction.mjs'
+import { sameLondonCalendarDay } from '../../../shared/eofScriptMakerSchedule.mjs'
 
 const CREATED_BY = 'eof-script-maker'
 
 function alreadyRanToday(lastRunAt) {
   if (!lastRunAt) return false
-  const last = new Date(lastRunAt)
-  if (Number.isNaN(last.getTime())) return false
-  const now = new Date()
-  return (
-    last.getUTCFullYear() === now.getUTCFullYear() &&
-    last.getUTCMonth() === now.getUTCMonth() &&
-    last.getUTCDate() === now.getUTCDate()
-  )
+  return sameLondonCalendarDay(lastRunAt, new Date())
 }
 
 export function topicKey(topic) {
@@ -154,7 +148,7 @@ export async function runEofScriptMakerPipeline(opts = {}) {
     return {
       ok: true,
       skipped: true,
-      reason: 'Script Maker already prepared a batch today (UTC).',
+      reason: 'Script Maker already prepared a batch today (UK calendar day).',
       jobIds: settings.lastJobIds,
     }
   }

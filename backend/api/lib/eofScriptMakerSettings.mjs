@@ -1,6 +1,7 @@
 /**
- * EOF Script Maker scheduler — overnight draft prep (no video / no YouTube).
- * Separate from the daily auto-publish scheduler.
+ * EOF Script Maker scheduler — UK-midnight draft prep (no video / no YouTube).
+ * Schedule is Europe/London midnight (see shared/eofScriptMakerSchedule.mjs).
+ * hour_utc / minute_utc columns are legacy and unused by the cron gate.
  */
 import { query, dbIsPostgres } from './db.mjs'
 import { ensureEofProductionSchema } from './ensureEofProductionSchema.mjs'

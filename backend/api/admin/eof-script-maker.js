@@ -10,6 +10,7 @@ import {
   listEofScriptMakerDrafts,
   pickScriptMakerTopics,
 } from '../lib/eofScriptMakerScheduler.mjs'
+import { isLondonLocalMidnightHour } from '../../../shared/eofScriptMakerSchedule.mjs'
 
 function authorizeCron(req) {
   const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
@@ -39,6 +40,15 @@ export default async function handler(req, res) {
 
   try {
     if (isCron && (req.method === 'GET' || req.method === 'POST')) {
+      // Vercel cron is UTC-only: schedule hits 23:00 + 00:00 UTC; only UK midnight proceeds.
+      if (!isLondonLocalMidnightHour(new Date())) {
+        return json(res, 200, {
+          ok: true,
+          skipped: true,
+          reason:
+            'Not UK midnight (Europe/London). Cron fires at 23:00 and 00:00 UTC; only the matching local-midnight window runs.',
+        })
+      }
       if (process.env.VERCEL) {
         try {
           const { waitUntil } = await import('@vercel/functions')
@@ -50,7 +60,7 @@ export default async function handler(req, res) {
           return json(res, 202, {
             ok: true,
             accepted: true,
-            message: 'Script Maker overnight batch started.',
+            message: 'Script Maker UK-midnight batch started.',
           })
         } catch {
           /* fall through */
@@ -73,7 +83,9 @@ export default async function handler(req, res) {
         settings,
         drafts,
         note:
-          'Script Maker writes judged draft voiceovers overnight (no video, no YouTube). Review in the morning, then Adapt / Rebuild / post yourself.',
+          'Script Maker writes judged draft voiceovers at UK midnight (Europe/London; no video, no YouTube). Drafts are ready when you wake up — Adapt / Rebuild / post yourself.',
+        scheduleNote:
+          'Runs once at UK midnight. Vercel cron fires at 23:00 UTC (BST) and 00:00 UTC (GMT); the handler only proceeds during the Europe/London 00:00 hour.',
       })
     }
 
