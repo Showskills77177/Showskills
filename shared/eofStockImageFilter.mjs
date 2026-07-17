@@ -1,5 +1,7 @@
 /**
- * Block watermarked / banner stock hosts (Getty, Shutterstock, …).
+ * Block watermarked / banner stock hosts (Getty, Shutterstock, …)
+ * and meme/quote graphics that already have captions burned into the pixels
+ * (those stack under our ffmpeg drawtext and look like “doubled captions”).
  * Titles alone lie; host + title cues are the cheap pre-vision gate.
  */
 
@@ -8,6 +10,32 @@ const BLOCKED_HOST =
 
 const BLOCKED_TITLE =
   /\b(getty\s*images?|shutterstock|alamy|iStock|depositphotos|adobe\s*stock|watermark|rights[\s-]?managed|editorial\s*use\s*only\s*banner)\b/i
+
+/** Meme generators + quote-card CDNs — always caption-contaminated. */
+const MEME_HOST =
+  /\b(imgflip\.com|memegenerator\.net|makeameme\.org|memecenter\.com|memeful\.com|quickmeme\.com|livememe\.com|topeleven\.com\/meme)\b/i
+
+/**
+ * Titles/URLs that scream “already has big on-image text” (viral quote cards, memes).
+ * Rooney staging double-caption: meme still “ROONEY HAS VERY STRONG SPERM!” + beast burn.
+ */
+const CAPTION_CONTAMINATED =
+  /\b(meme|mematic|imgflip|make\s*a\s*meme|meme\s*generator|viral\s*quote|quote\s*card|quote\s*graphic|motivational\s*quote|instagram\s*quote|twitter\s*quote|tweet\s*screenshot|has\s+very\s+strong|strong\s+sperm|\bsperm\b|text\s*overlay\s*meme|captioned\s*meme)\b/i
+
+/**
+ * True when the still is a meme/quote graphic likely to already contain burned-in captions.
+ * @param {string} url
+ * @param {string} [title]
+ */
+export function isCaptionContaminatedStill(url, title = '') {
+  const u = String(url || '').trim()
+  const t = String(title || '').trim()
+  const hay = `${u} ${t}`
+  if (!hay.trim()) return false
+  if (MEME_HOST.test(u)) return true
+  if (CAPTION_CONTAMINATED.test(hay)) return true
+  return false
+}
 
 /**
  * @param {string} url
@@ -18,11 +46,13 @@ export function isBlockedStockImageUrl(url, title = '') {
   if (!u) return true
   if (BLOCKED_HOST.test(u)) return true
   if (BLOCKED_TITLE.test(String(title || ''))) return true
+  if (isCaptionContaminatedStill(u, title)) return true
   return false
 }
 
 /**
- * Filter SERP rows; drops Getty/banner stock before we burn download/vision time.
+ * Filter SERP rows; drops Getty/banner stock + caption-contaminated memes
+ * before we burn download/vision time.
  * @template {{ url?: string, title?: string|null }} T
  * @param {T[]} rows
  * @returns {T[]}

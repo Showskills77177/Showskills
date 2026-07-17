@@ -576,8 +576,10 @@ export function claimOxylabsPoolHit(opts = {}) {
     .filter((row) => row.url)
     .sort((a, b) => b.score - a.score || a.tie - b.tie)
 
+  // Never claim Getty/meme/quote-card hits (score ≤ -100 from stock/caption filters).
+  const usable = ranked.filter((row) => row.score > -100)
   let fallback = null
-  for (const row of ranked) {
+  for (const row of usable) {
     if (claimed.has(row.key)) continue
     if (avoid.has(row.url) || avoid.has(row.key)) {
       if (!fallback) fallback = { ...row, reused: true }

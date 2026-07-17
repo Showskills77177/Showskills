@@ -56,11 +56,12 @@ export async function rankEofPoolHitsWithVision(opts = {}) {
     .join('\n')
 
   const system = `You are an Eyes Of Football stills editor. Score Google Image candidates for a vertical Short.
-Return JSON only: { "scores": [ { "index": number, "score": number, "person": string, "era": "pundit"|"playing"|"coach"|"other"|"unknown", "watermark": boolean, "reason": string } ] }
+Return JSON only: { "scores": [ { "index": number, "score": number, "person": string, "era": "pundit"|"playing"|"coach"|"other"|"unknown", "watermark": boolean, "burned_captions": boolean, "reason": string } ] }
 Rules:
-- score 0–10. Prefer clear face of the RIGHT person.
+- score 0–10. Prefer clear face of the RIGHT person (clean photo, not a graphic).
 - For intent "${intent}": pundit = studio/suit/TV now; playing = kit/action; coach = sideline/presser.
 - HARD fail (score ≤2) if watermark/banner/Getty overlay, wrong person, or unusable crop.
+- HARD fail (score ≤2, burned_captions=true) for meme/quote cards, collage graphics, or any still with large burned-in captions/text overlays — we burn our own Shorts captions on top and those stack.
 - If a secondary person is needed (${secondary.join(', ') || 'none'}), note them in person when visible.`
 
   const userContent = [
@@ -114,6 +115,8 @@ Score every index 1–${hits.length}.`,
       let s = Number(row?.score)
       if (!Number.isFinite(s)) continue
       if (row?.watermark === true) s = Math.min(s, 2)
+      // Meme/quote stills with on-image text double under ffmpeg caption burn.
+      if (row?.burned_captions === true) s = Math.min(s, 2)
       s = Math.max(0, Math.min(10, s))
       scores.set(hits[idx].url, s)
     }

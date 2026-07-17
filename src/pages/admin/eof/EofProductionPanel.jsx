@@ -657,12 +657,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
   const selected = jobs.find((j) => j.id === selectedId) || null
 
-  /** Preview overlay only while drafting caption changes — hide once burned so it doesn't stack on the Short. */
+  /** Preview overlay only while drafting caption changes — never stack on a burned Short. */
   const showCaptionPreviewOverlay = (() => {
     if (captionStyle === 'off') return false
-    // Editor open alone must not stack yellow text on an already-burned Short —
-    // only show overlay when draft differs from what is burned on the job.
-    if (!selected || selected.status !== 'video_rendered') return true
+    // No finished Short yet — overlay is the only way to preview captions on a plate.
+    if (!selected || selected.status !== 'video_rendered') return Boolean(videoPreviewUrl)
+    // Burned Short on screen: overlay OFF unless local draft differs from what was burned.
+    // Require an explicit dirty edit so style-picker clicks alone cannot false-positive
+    // and stack a full-line overlay on beast/karaoke word burns.
+    if (!draftDirty) return false
     if (captionStyle !== (selected.captionStyle || EOF_DEFAULT_CAPTION_STYLE)) return true
     const jobLay = normalizeEofCaptionLayout(selected.captionLayout, selected.captionStyle || captionStyle)
     if (Math.abs(jobLay.yNorm - captionLayout.yNorm) > 0.005) return true
@@ -2383,6 +2386,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     onClick={() => {
                       setCaptionStyle(s.id)
                       setZapcapTemplateId('')
+                      markDraftDirty()
                     }}
                     className={`overflow-hidden rounded-xl border text-left transition ${
                       active
@@ -2970,8 +2974,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       ) : null}
                     </div>
                     <p className={`mt-2 text-center text-[11px] ${PX.muted}`}>
-                      Click the video to edit caption text. Overlay preview appears while you change
-                      style/position/size/text — it hides after Replace captions so it won&apos;t stack on the burn.
+                      Click the video to edit caption text. Overlay preview only appears while you
+                      change style/position/size/text — it stays off on a burned Short so it won&apos;t
+                      stack on the burn.
                     </p>
                   </div>
                 ) : (
@@ -3013,14 +3018,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           max={EOF_CAPTION_LAYOUT_Y_MAX}
                           step={0.01}
                           value={captionLayout.yNorm}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setCaptionLayout((prev) =>
                               normalizeEofCaptionLayout(
                                 { ...prev, yNorm: Number(e.target.value) },
                                 captionStyle,
                               ),
                             )
-                          }
+                            markDraftDirty()
+                          }}
                           disabled={busy || isRendering}
                           className="mt-2 w-full accent-white"
                         />
@@ -3036,14 +3042,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           max={EOF_CAPTION_LAYOUT_SCALE_MAX}
                           step={0.05}
                           value={captionLayout.fontScale}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setCaptionLayout((prev) =>
                               normalizeEofCaptionLayout(
                                 { ...prev, fontScale: Number(e.target.value) },
                                 captionStyle,
                               ),
                             )
-                          }
+                            markDraftDirty()
+                          }}
                           disabled={busy || isRendering}
                           className="mt-2 w-full accent-white"
                         />
@@ -3057,14 +3064,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         type="button"
                         className={PX.btnGhost}
                         disabled={busy}
-                        onClick={() =>
+                        onClick={() => {
                           setCaptionLayout((prev) =>
                             normalizeEofCaptionLayout(
                               { ...prev, yNorm: Math.max(EOF_CAPTION_LAYOUT_Y_MIN, prev.yNorm - 0.03) },
                               captionStyle,
                             ),
                           )
-                        }
+                          markDraftDirty()
+                        }}
                       >
                         Move up
                       </button>
@@ -3072,14 +3080,15 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         type="button"
                         className={PX.btnGhost}
                         disabled={busy}
-                        onClick={() =>
+                        onClick={() => {
                           setCaptionLayout((prev) =>
                             normalizeEofCaptionLayout(
                               { ...prev, yNorm: Math.min(EOF_CAPTION_LAYOUT_Y_MAX, prev.yNorm + 0.03) },
                               captionStyle,
                             ),
                           )
-                        }
+                          markDraftDirty()
+                        }}
                       >
                         Move down
                       </button>
@@ -3087,7 +3096,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         type="button"
                         className={PX.btnGhost}
                         disabled={busy}
-                        onClick={() => setCaptionLayout(defaultEofCaptionLayout(captionStyle))}
+                        onClick={() => {
+                          setCaptionLayout(defaultEofCaptionLayout(captionStyle))
+                          markDraftDirty()
+                        }}
                       >
                         Reset position
                       </button>
@@ -3129,6 +3141,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                                   return { ...prev, scenes }
                                 })
                                 setActiveCaptionScene(i)
+                                markDraftDirty()
                               }}
                               onFocus={() => setActiveCaptionScene(i)}
                             />

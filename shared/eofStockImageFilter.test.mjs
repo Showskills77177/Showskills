@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { isBlockedStockImageUrl, filterBlockedStockImages } from './eofStockImageFilter.mjs'
+import {
+  isBlockedStockImageUrl,
+  isCaptionContaminatedStill,
+  filterBlockedStockImages,
+} from './eofStockImageFilter.mjs'
 
 describe('eofStockImageFilter', () => {
   it('blocks Getty / Shutterstock hosts and titles', () => {
@@ -17,10 +21,33 @@ describe('eofStockImageFilter', () => {
     assert.equal(isBlockedStockImageUrl('https://e0.365dm.com/rooney.jpg', 'Rooney on Sky Sports'), false)
   })
 
+  it('blocks meme hosts and caption-contaminated quote cards (Rooney double-caption cause)', () => {
+    assert.equal(isCaptionContaminatedStill('https://i.imgflip.com/abc.jpg', 'Rooney meme'), true)
+    assert.equal(
+      isCaptionContaminatedStill(
+        'https://cdn.example.com/rooney.jpg',
+        'Rooney has very strong sperm Louis van Gaal quote',
+      ),
+      true,
+    )
+    assert.equal(
+      isBlockedStockImageUrl(
+        'https://cdn.example.com/x.jpg',
+        'Viral quote card — Rooney has very strong sperm',
+      ),
+      true,
+    )
+    assert.equal(
+      isBlockedStockImageUrl('https://e0.365dm.com/rooney-studio.jpg', 'Wayne Rooney Sky Sports'),
+      false,
+    )
+  })
+
   it('filters arrays', () => {
     const kept = filterBlockedStockImages([
       { url: 'https://media.gettyimages.com/x.jpg', title: 'x' },
       { url: 'https://cdn.bbc.co.uk/y.jpg', title: 'Rooney' },
+      { url: 'https://cdn.example.com/z.jpg', title: 'Football meme quote card' },
     ])
     assert.equal(kept.length, 1)
     assert.match(kept[0].url, /bbc/)

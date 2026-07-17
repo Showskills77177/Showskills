@@ -693,6 +693,10 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '', opts = {})
   // Generic World Cup / stadium with no person hit already rejected above
   if (COMP_NOISE_RE.test(hay) && !strongHit) score -= 10
   if (!strongHit && tokens.some((t) => t.length >= 5 || t.includes(' '))) score -= 6
+  // Meme/quote graphics already have captions in the pixels — never prefer them.
+  if (/\b(meme|mematic|imgflip|quote\s*card|viral\s*quote|has\s+very\s+strong|\bsperm\b)\b/i.test(hay)) {
+    score -= 40
+  }
   return score
 }
 
