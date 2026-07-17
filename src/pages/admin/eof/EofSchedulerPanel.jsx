@@ -1,8 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '../../../lib/api'
+import {
+  EOF_HOBBY_AUTO_PUBLISH_UTC,
+  estimatePublishAtIso,
+  formatPublishAtLabels,
+  formatUtcClock,
+  isAutoPublishAlignedWithHobbyCron,
+  utcClockToLondonLabel,
+} from '../../../../shared/eofSchedulerTime.mjs'
 import { EOF } from './eofStudioTheme'
 
 const inputCls = `mt-1 w-full rounded-lg border px-3 py-2 text-sm ${EOF.input}`
+
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => h)
+const MINUTE_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
 
 function judgeLabel(judge) {
   if (!judge || judge.skipped) return '—'
@@ -12,8 +23,91 @@ function judgeLabel(judge) {
   return verdict ? `${scoreTxt} · ${verdict}` : String(scoreTxt)
 }
 
+function TimeSelect({ label, value, onChange, options, pad = true }) {
+  return (
+    <label className="text-xs text-[#aaa]">
+      {label}
+      <select
+        value={Number(value) || 0}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputCls}
+      >
+        {options.map((n) => (
+          <option key={n} value={n}>
+            {pad ? String(n).padStart(2, '0') : n}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function ScheduleAlignmentCard({ schedule, settings }) {
+  if (!settings) return null
+  const hour = settings.hourUtc
+  const minute = settings.minuteUtc
+  const aligned =
+    schedule?.alignedWithHobbyCron ?? isAutoPublishAlignedWithHobbyCron(hour, minute)
+  const london = schedule?.autoPublishLondonLabel || utcClockToLondonLabel(hour, minute)
+  const utcLabel = schedule?.autoPublishUtcLabel || formatUtcClock(hour, minute)
+
+  return (
+    <div className="rounded-lg border border-[#3ea6ff]/25 bg-[#15202b] px-3 py-3 text-xs text-[#9ecbff]">
+      <p className="font-semibold text-white">Overnight pipeline (aligned times)</p>
+      <ul className="mt-2 space-y-1.5 text-[#c5d8ea]">
+        <li>
+          <span className="text-[#8eb4d8]">Script Maker</span> — UK midnight (00:00 Europe/London). Hobby cron
+          slot 23:00 UTC in BST; only the London midnight hour runs drafts.
+        </li>
+        <li>
+          <span className="text-[#8eb4d8]">Auto-publish</span> — {utcLabel} (= {london}). Hobby morning slot is{' '}
+          {formatUtcClock(EOF_HOBBY_AUTO_PUBLISH_UTC.hour, EOF_HOBBY_AUTO_PUBLISH_UTC.minute)}.
+        </li>
+        <li>
+          Script Maker:{' '}
+          {schedule?.scriptMakerEnabled ? (
+            <span className="text-[#6ee07d]">enabled</span>
+          ) : (
+            <span className="text-[#fbbf24]">off</span>
+          )}
+          {' · '}
+          Auto-publish:{' '}
+          {settings.enabled ? (
+            <span className="text-[#6ee07d]">enabled</span>
+          ) : (
+            <span className="text-[#fbbf24]">off — enable below so the morning job runs</span>
+          )}
+        </li>
+        {!aligned ? (
+          <li className="text-[#fbbf24]">
+            Hour is not 09:00 UTC — on Hobby the morning cron only fires at 09:00. Set Hour to 09 / Minute to 00
+            so auto-publish actually executes.
+          </li>
+        ) : (
+          <li className="text-[#6ee07d]">Auto-publish hour matches the Hobby 09:00 UTC cron.</li>
+        )}
+      </ul>
+    </div>
+  )
+}
+
+function PublishAtPreview({ delayMinutes }) {
+  const labels = useMemo(() => {
+    const iso = estimatePublishAtIso(delayMinutes)
+    return formatPublishAtLabels(iso)
+  }, [delayMinutes])
+
+  return (
+    <p className={`mt-1 text-[11px] ${EOF.muted}`}>
+      If a Short uploaded now: goes live ~ <span className="text-[#d4d4d4]">{labels.london}</span>
+      <span className="text-[#717171]"> · {labels.utc}</span>
+    </p>
+  )
+}
+
 function AutoPublishTab({ isOwner, onOpenJob }) {
   const [settings, setSettings] = useState(null)
+  const [schedule, setSchedule] = useState(null)
   const [formats, setFormats] = useState([])
   const [voicePresets, setVoicePresets] = useState([])
   const [note, setNote] = useState('')
@@ -32,6 +126,7 @@ function AutoPublishTab({ isOwner, onOpenJob }) {
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not load scheduler')
       setSettings(j.settings || null)
+      setSchedule(j.schedule || null)
       setFormats(Array.isArray(j.formats) ? j.formats : [])
       setVoicePresets(Array.isArray(j.voicePresets) ? j.voicePresets : [])
       setNote(typeof j.note === 'string' ? j.note : '')
@@ -70,11 +165,25 @@ function AutoPublishTab({ isOwner, onOpenJob }) {
       if (!res.ok) throw new Error(j.error || 'Save failed')
       setSettings(j.settings)
       setSuccess('Scheduler settings saved.')
+      await load()
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : 'Error')
     } finally {
       setBusy(false)
     }
+  }
+
+  function matchHobbyMorning() {
+    setSettings((s) =>
+      s
+        ? {
+            ...s,
+            enabled: true,
+            hourUtc: EOF_HOBBY_AUTO_PUBLISH_UTC.hour,
+            minuteUtc: EOF_HOBBY_AUTO_PUBLISH_UTC.minute,
+          }
+        : s,
+    )
   }
 
   async function runNow() {
@@ -158,6 +267,8 @@ function AutoPublishTab({ isOwner, onOpenJob }) {
     return <p className={`text-sm ${EOF.muted}`}>Loading auto-publish…</p>
   }
 
+  const londonHint = settings ? utcClockToLondonLabel(settings.hourUtc, settings.minuteUtc) : ''
+
   return (
     <div className="space-y-6">
       <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
@@ -166,6 +277,10 @@ function AutoPublishTab({ isOwner, onOpenJob }) {
           {note ||
             'Automatically composes a football Short (news or Quote Short), builds it, writes title/hashtags (#shortsfeed), picks a thumbnail, and sends it to YouTube Studio. Set Script format to Quote Short for attributed BBC/Sky/presser quotes.'}
         </p>
+
+        <div className="mt-3">
+          <ScheduleAlignmentCard schedule={schedule} settings={settings} />
+        </div>
 
         {success ? (
           <p className="mt-3 rounded-lg border border-[#2ba640]/40 bg-[#1a2e1f] px-3 py-2 text-sm text-[#6ee07d]" role="status">
@@ -182,30 +297,27 @@ function AutoPublishTab({ isOwner, onOpenJob }) {
                 checked={Boolean(settings.enabled)}
                 onChange={(e) => setSettings((s) => ({ ...s, enabled: e.target.checked }))}
               />
-              Enable daily auto-publish (09:00 UTC by default via Vercel Cron)
+              Enable daily auto-publish (must be on for the morning Hobby cron to run)
             </label>
-            <label className="text-xs text-[#aaa]">
-              Hour (UTC)
-              <input
-                type="number"
-                min={0}
-                max={23}
-                value={settings.hourUtc}
-                onChange={(e) => setSettings((s) => ({ ...s, hourUtc: Number(e.target.value) }))}
-                className={inputCls}
-              />
-            </label>
-            <label className="text-xs text-[#aaa]">
-              Minute (UTC)
-              <input
-                type="number"
-                min={0}
-                max={59}
-                value={settings.minuteUtc}
-                onChange={(e) => setSettings((s) => ({ ...s, minuteUtc: Number(e.target.value) }))}
-                className={inputCls}
-              />
-            </label>
+
+            <TimeSelect
+              label="Hour (UTC)"
+              value={settings.hourUtc}
+              onChange={(hourUtc) => setSettings((s) => ({ ...s, hourUtc }))}
+              options={HOUR_OPTIONS}
+            />
+            <TimeSelect
+              label="Minute (UTC)"
+              value={settings.minuteUtc}
+              onChange={(minuteUtc) => setSettings((s) => ({ ...s, minuteUtc }))}
+              options={MINUTE_OPTIONS}
+            />
+            <p className={`text-[11px] sm:col-span-2 ${EOF.muted}`}>
+              Selected: <span className="text-[#d4d4d4]">{formatUtcClock(settings.hourUtc, settings.minuteUtc)}</span>
+              {' = '}
+              <span className="text-[#d4d4d4]">{londonHint}</span>
+            </p>
+
             <label className="text-xs text-[#aaa]">
               Script format
               <select
@@ -240,14 +352,24 @@ function AutoPublishTab({ isOwner, onOpenJob }) {
                 type="number"
                 min={0}
                 max={1440}
+                step={5}
                 value={settings.publishDelayMinutes}
                 onChange={(e) => setSettings((s) => ({ ...s, publishDelayMinutes: Number(e.target.value) }))}
                 className={inputCls}
               />
+              <PublishAtPreview delayMinutes={settings.publishDelayMinutes} />
             </label>
             <div className="flex flex-wrap gap-2 sm:col-span-2">
               <button type="submit" disabled={busy} className={`rounded-full px-5 py-2 text-sm ${EOF.btnPrimary} disabled:opacity-50`}>
                 Save settings
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={matchHobbyMorning}
+                className="rounded-full border border-[#3ea6ff]/40 px-4 py-2 text-sm text-[#9ecbff] disabled:opacity-50"
+              >
+                Match Hobby 09:00 UTC + enable
               </button>
               <button
                 type="button"
@@ -314,10 +436,12 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
   const [drafts, setDrafts] = useState([])
   const [note, setNote] = useState('')
   const [scheduleNote, setScheduleNote] = useState('')
+  const [schedulerAlignment, setSchedulerAlignment] = useState(null)
   const [previewTopics, setPreviewTopics] = useState([])
   const [err, setErr] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sendingId, setSendingId] = useState('')
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -331,6 +455,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
       setDrafts(Array.isArray(j.drafts) ? j.drafts : [])
       setNote(typeof j.note === 'string' ? j.note : '')
       setScheduleNote(typeof j.scheduleNote === 'string' ? j.scheduleNote : '')
+      setSchedulerAlignment(j.schedulerAlignment || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -362,7 +487,12 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Save failed')
       setSettings(j.settings)
-      setSuccess('Script Maker settings saved.')
+      setSuccess(
+        j.settings?.enabled && !schedulerAlignment?.autoPublishEnabled
+          ? 'Script Maker saved. Tip: enable Auto-publish (09:00 UTC) on the other tab so the morning job runs.'
+          : 'Script Maker settings saved.',
+      )
+      await load()
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : 'Error')
     } finally {
@@ -393,8 +523,6 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         setSuccess(j.reason || 'Skipped.')
       } else {
         setSuccess(j.message || `Prepared ${j.count || 0} judged draft script(s).`)
-        const firstId = Array.isArray(j.jobIds) && j.jobIds[0]
-        if (firstId && typeof onOpenJob === 'function') onOpenJob(firstId)
       }
       await load()
     } catch (e2) {
@@ -429,6 +557,30 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
     }
   }
 
+  async function sendToProduction(draftId) {
+    const id = String(draftId || '').trim()
+    if (!id) return
+    setSendingId(id)
+    setErr('')
+    setSuccess('')
+    try {
+      const res = await apiFetch('/api/admin/eof-script-maker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'open-to-production', draftId: id }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not open Production job')
+      const jobId = j.jobId || id
+      setSuccess(j.message || 'Opened in Production with full script.')
+      if (typeof onOpenJob === 'function') onOpenJob(jobId)
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : 'Error')
+    } finally {
+      setSendingId('')
+    }
+  }
+
   if (!isOwner) {
     return <p className={`text-sm ${EOF.muted}`}>Script Maker is available to the channel owner.</p>
   }
@@ -443,12 +595,25 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         <h2 className="text-base font-semibold text-white">Script Maker</h2>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           {note ||
-            'UK midnight hot-take prep: polished voiceovers ready when you wake up. No video, no YouTube — Adapt / Build / post yourself.'}
+            'UK midnight hot-take prep: polished voiceovers ready when you wake up. Send good drafts to Production to Adapt / Build / post.'}
         </p>
         <p className="mt-2 rounded-lg border border-[#3ea6ff]/25 bg-[#15202b] px-3 py-2 text-xs text-[#9ecbff]">
           {scheduleNote ||
             'Schedule: UK midnight (Europe/London). Hobby cron shares /api/eof-daily-cron at 23:00 UTC (BST); only the local-midnight window runs Script Maker.'}
         </p>
+        {schedulerAlignment ? (
+          <p className={`mt-2 text-xs ${EOF.muted}`}>
+            Paired Auto-publish:{' '}
+            {schedulerAlignment.autoPublishEnabled ? (
+              <span className="text-[#6ee07d]">enabled</span>
+            ) : (
+              <span className="text-[#fbbf24]">disabled — turn on in Auto-publish tab</span>
+            )}{' '}
+            at {formatUtcClock(schedulerAlignment.autoPublishHourUtc, schedulerAlignment.autoPublishMinuteUtc)}{' '}
+            (= {utcClockToLondonLabel(schedulerAlignment.autoPublishHourUtc, schedulerAlignment.autoPublishMinuteUtc)}
+            ).
+          </p>
+        ) : null}
         <p className={`mt-2 text-xs ${EOF.muted}`}>
           Pipeline: research → draft → polish → hot-take refine → judge. Refuses canned templates and soft article paste.
         </p>
@@ -558,7 +723,8 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
           </button>
         </div>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
-          Full polished voiceovers below (research → draft → polish → hot-take refine → judge). Open in Production to Adapt / Build / post.
+          Full polished voiceovers below. Use Send to Production to open that job with the script ready to Adapt /
+          Build.
         </p>
         {drafts.length ? (
           <ul className="mt-3 space-y-4">
@@ -576,13 +742,24 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
                       <p className="mt-1 text-[10px] text-[#8a8a8a]">Stages: {d.stages.join(' → ')}</p>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs ${EOF.btnSecondary}`}
-                    onClick={() => typeof onOpenJob === 'function' && onOpenJob(d.id)}
-                  >
-                    Open job
-                  </button>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={Boolean(sendingId) || busy}
+                      className={`rounded-full px-3 py-1.5 text-xs ${EOF.btnPrimary} disabled:opacity-50`}
+                      onClick={() => sendToProduction(d.id)}
+                    >
+                      {sendingId === d.id ? 'Opening…' : 'Send to Production'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={Boolean(sendingId) || busy}
+                      className={`rounded-full px-3 py-1.5 text-xs ${EOF.btnSecondary} disabled:opacity-50`}
+                      onClick={() => sendToProduction(d.id)}
+                    >
+                      Open job
+                    </button>
+                  </div>
                 </div>
                 {d.plainTextDraft ? (
                   <div className="mt-3 rounded-md border border-[#3a3a3a] bg-[#121212] p-3">

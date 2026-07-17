@@ -2,7 +2,12 @@
  * Overnight Script Maker — pick football angles, write judged drafts only.
  * No video render, no YouTube. Owner reviews jobs in Production next day.
  */
-import { createEofProductionJob, getEofProductionJob, listEofProductionJobs } from './eofProductionJobs.mjs'
+import {
+  createEofProductionJob,
+  getEofProductionJob,
+  listEofProductionJobs,
+  updateEofProductionJob,
+} from './eofProductionJobs.mjs'
 import {
   getEofScriptMakerSettings,
   markEofScriptMakerRun,
@@ -281,4 +286,62 @@ export async function getEofScriptMakerDraft(id) {
     return null
   }
   return job
+}
+
+/**
+ * Approve / open a Script Maker draft in Production so the owner can Adapt + Build.
+ * Drafts are already eof_production_jobs rows — this validates the script and marks approval.
+ *
+ * @param {string} draftId
+ * @param {{ approvedBy?: string }} [opts]
+ */
+export async function openScriptMakerDraftToProduction(draftId, opts = {}) {
+  const id = String(draftId || '').trim()
+  if (!id) {
+    const err = new Error('draftId is required.')
+    err.statusCode = 400
+    throw err
+  }
+
+  const job = await getEofScriptMakerDraft(id)
+  if (!job) {
+    const err = new Error('Script Maker draft not found (or not a Script Maker job).')
+    err.statusCode = 404
+    throw err
+  }
+
+  const plain = String(job.script?.plainTextDraft || '').trim()
+  if (plain.length < 40) {
+    const err = new Error('This draft has no usable script text yet — regenerate it first.')
+    err.statusCode = 400
+    throw err
+  }
+
+  const approvedAt = new Date().toISOString()
+  const approvedBy = String(opts.approvedBy || '').trim() || null
+  const nextScript = {
+    ...job.script,
+    plainTextDraft: plain,
+    scriptMakerApproved: true,
+    scriptMakerApprovedAt: approvedAt,
+    ...(approvedBy ? { scriptMakerApprovedBy: approvedBy } : {}),
+  }
+
+  const updated = await updateEofProductionJob(id, {
+    script: nextScript,
+    title: job.title || job.script?.title || job.topic,
+    // Keep draft / ready_script — do not auto-adapt (owner builds in Production).
+    status: job.status,
+  })
+
+  return {
+    ok: true,
+    jobId: updated.id,
+    job: updated,
+    plainTextDraft: plain,
+    status: updated.status,
+    alreadyProduction: true,
+    message:
+      'Opened in Production with the full Script Maker voiceover. Use Adapt from script, then Build.',
+  }
 }

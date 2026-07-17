@@ -132,3 +132,10 @@ describe('eof Script Maker routes', () => {
     assert.equal(typeof routes['/api/eof-script-maker-cron'], 'function')
   })
 })
+
+describe('eof Script Maker open-to-production export', () => {
+  it('exports openScriptMakerDraftToProduction for Approve / Send to Production', async () => {
+    const mod = await import('../backend/api/lib/eofScriptMakerScheduler.mjs')
+    assert.equal(typeof mod.openScriptMakerDraftToProduction, 'function')
+  })
+})

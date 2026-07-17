@@ -23,6 +23,7 @@ import {
 } from './eofYoutubeProjects.mjs'
 import { EOF_PRODUCTION_JOB_STATUS } from '../../../shared/eofProduction.mjs'
 import { applyShortsDescription } from '../../../shared/eofYoutubeMeta.mjs'
+import { formatUtcClock, isEofSchedulerHourMatch } from '../../../shared/eofSchedulerTime.mjs'
 
 function alreadyRanToday(lastRunAt) {
   if (!lastRunAt) return false
@@ -45,6 +46,16 @@ export async function runEofDailyShortPipeline(opts = {}) {
 
   if (!force && !settings.enabled) {
     return { ok: false, skipped: true, reason: 'Scheduler is disabled.' }
+  }
+
+  // Shared Hobby path also fires at 23:00 UTC for Script Maker — only build/publish
+  // when the owner's configured UTC hour matches (default 09:00).
+  if (!force && !isEofSchedulerHourMatch(new Date(), settings.hourUtc, settings.minuteUtc)) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: `Not the auto-publish hour (${formatUtcClock(settings.hourUtc, settings.minuteUtc)}).`,
+    }
   }
 
   if (!force && alreadyRanToday(settings.lastRunAt) && settings.lastStatus === 'ok') {

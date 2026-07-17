@@ -696,7 +696,13 @@ function EofRenderProgressBar({ progress, stuck, onCancel, cancelBusy }) {
   )
 }
 
-export default function EofProductionPanel({ isOwner, active = true, onSendToStudio }) {
+export default function EofProductionPanel({
+  isOwner,
+  active = true,
+  onSendToStudio,
+  openJobId = null,
+  onOpenJobConsumed,
+}) {
   const [jobs, setJobs] = useState([])
   const [scriptFormats, setScriptFormats] = useState([])
   const [format, setFormat] = useState(EOF_DEFAULT_SCRIPT_FORMAT)
@@ -1056,6 +1062,22 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   useEffect(() => {
     load()
   }, [load])
+
+  /** Script Maker / Scheduler "Open job" / "Send to Production" focuses a concrete job. */
+  useEffect(() => {
+    const id = typeof openJobId === 'string' ? openJobId.trim() : ''
+    if (!id) return
+    setSelectedId(id)
+    hydratedJobIdRef.current = null
+    try {
+      sessionStorage.setItem(SELECTED_JOB_KEY, id)
+    } catch {
+      /* ignore */
+    }
+    if (typeof onOpenJobConsumed === 'function') onOpenJobConsumed()
+    // Refresh list so a freshly approved Script Maker draft is present.
+    load().catch(() => {})
+  }, [openJobId, onOpenJobConsumed, load])
 
   useEffect(() => {
     if (!selectedId) {

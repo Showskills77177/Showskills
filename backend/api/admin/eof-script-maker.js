@@ -9,8 +9,15 @@ import {
   runEofScriptMakerPipeline,
   listEofScriptMakerDrafts,
   pickScriptMakerTopics,
+  openScriptMakerDraftToProduction,
 } from '../lib/eofScriptMakerScheduler.mjs'
 import { isLondonLocalMidnightHour } from '../../../shared/eofScriptMakerSchedule.mjs'
+import {
+  eofOvernightPipelineNote,
+  EOF_HOBBY_AUTO_PUBLISH_UTC,
+  EOF_HOBBY_SCRIPT_MAKER_UTC,
+} from '../../../shared/eofSchedulerTime.mjs'
+import { getEofSchedulerSettings } from '../lib/eofSchedulerSettings.mjs'
 
 function authorizeCron(req) {
   const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
@@ -78,12 +85,26 @@ export default async function handler(req, res) {
       }
       const settings = await getEofScriptMakerSettings()
       const drafts = await listEofScriptMakerDrafts(12)
+      const scheduler = await getEofSchedulerSettings()
+      const pipeline = eofOvernightPipelineNote({
+        hourUtc: scheduler.hourUtc,
+        minuteUtc: scheduler.minuteUtc,
+        autoPublishEnabled: scheduler.enabled,
+      })
       return json(res, 200, {
         ok: true,
         settings,
         drafts,
+        schedulerAlignment: {
+          autoPublishEnabled: Boolean(scheduler.enabled),
+          autoPublishHourUtc: scheduler.hourUtc,
+          autoPublishMinuteUtc: scheduler.minuteUtc,
+          hobbyAutoPublishUtc: EOF_HOBBY_AUTO_PUBLISH_UTC,
+          hobbyScriptMakerUtc: EOF_HOBBY_SCRIPT_MAKER_UTC,
+          ...pipeline,
+        },
         note:
-          'Script Maker writes judged draft voiceovers at UK midnight (Europe/London; no video, no YouTube). Drafts are ready when you wake up — Adapt / Rebuild / post yourself.',
+          'Script Maker writes judged draft voiceovers at UK midnight (Europe/London; no video, no YouTube). Send to Production opens the job with the full script so you can Adapt / Build / post.',
         scheduleNote:
           'Runs at UK midnight via /api/eof-daily-cron (Hobby: ≤2 once-daily jobs). Second slot is 23:00 UTC for BST; swap to 00:00 UTC for GMT winters. Handler only proceeds during Europe/London 00:00 hour.',
       })
@@ -126,6 +147,25 @@ export default async function handler(req, res) {
       if (action === 'list-drafts') {
         const drafts = await listEofScriptMakerDrafts(Number(body.limit) || 12)
         return json(res, 200, { ok: true, drafts })
+      }
+
+      if (
+        action === 'open-to-production' ||
+        action === 'send-to-production' ||
+        action === 'approve-draft'
+      ) {
+        const session = await requireEofSession(req)
+        const info = eofSessionInfo(session)
+        const draftId =
+          typeof body.draftId === 'string'
+            ? body.draftId.trim()
+            : typeof body.jobId === 'string'
+              ? body.jobId.trim()
+              : ''
+        const result = await openScriptMakerDraftToProduction(draftId, {
+          approvedBy: info.username || 'eof-owner',
+        })
+        return json(res, 200, result)
       }
 
       const settings = await updateEofScriptMakerSettings({

@@ -8,6 +8,15 @@ import {
 import { EOF_SCRIPT_FORMATS } from '../../../shared/eofScriptTemplates.mjs'
 import { EOF_VOICE_PRESETS, listEofFreeVoicePresets } from '../../../shared/eofProduction.mjs'
 import { isLondonLocalMidnightHour } from '../../../shared/eofScriptMakerSchedule.mjs'
+import {
+  eofOvernightPipelineNote,
+  EOF_HOBBY_AUTO_PUBLISH_UTC,
+  EOF_HOBBY_SCRIPT_MAKER_UTC,
+  formatUtcClock,
+  utcClockToLondonLabel,
+  isAutoPublishAlignedWithHobbyCron,
+} from '../../../shared/eofSchedulerTime.mjs'
+import { getEofScriptMakerSettings } from '../lib/eofScriptMakerSettings.mjs'
 
 function authorizeCron(req) {
   const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
@@ -90,14 +99,30 @@ export default async function handler(req, res) {
         return json(res, e.statusCode || 401, { error: 'Unauthorized' })
       }
       const settings = await getEofSchedulerSettings()
+      const scriptMaker = await getEofScriptMakerSettings()
+      const pipeline = eofOvernightPipelineNote({
+        hourUtc: settings.hourUtc,
+        minuteUtc: settings.minuteUtc,
+        autoPublishEnabled: settings.enabled,
+      })
       return json(res, 200, {
         ok: true,
         settings,
         formats: EOF_SCRIPT_FORMATS,
         voicePresets: Object.values(EOF_VOICE_PRESETS),
         freeVoicePresets: listEofFreeVoicePresets(),
+        schedule: {
+          autoPublishUtcLabel: formatUtcClock(settings.hourUtc, settings.minuteUtc),
+          autoPublishLondonLabel: utcClockToLondonLabel(settings.hourUtc, settings.minuteUtc),
+          alignedWithHobbyCron: isAutoPublishAlignedWithHobbyCron(settings.hourUtc, settings.minuteUtc),
+          hobbyAutoPublishUtc: EOF_HOBBY_AUTO_PUBLISH_UTC,
+          hobbyScriptMakerUtc: EOF_HOBBY_SCRIPT_MAKER_UTC,
+          scriptMakerEnabled: Boolean(scriptMaker.enabled),
+          scriptMakerNote: pipeline.scriptMaker,
+          autoPublishNote: pipeline.autoPublish,
+        },
         note:
-          'Daily cron (09:00 UTC) composes a football news Short with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube. The same Hobby cron path also fires at 23:00 UTC and runs Script Maker when Europe/London is midnight (BST).',
+          'Daily Short auto-publish (default 09:00 UTC) composes a football Short, builds it, packages #shortsfeed hashtags, picks a thumbnail, and schedules it on YouTube. Script Maker shares the Hobby cron path and runs only at UK midnight (23:00 UTC in BST). Enable both for the overnight draft → morning publish pipeline.',
       })
     }
 

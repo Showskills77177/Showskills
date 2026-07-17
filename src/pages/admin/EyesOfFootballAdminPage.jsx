@@ -42,6 +42,7 @@ export default function EyesOfFootballAdminPage() {
   const [selectedDay, setSelectedDay] = useState(null)
   const [view, setView] = useState(readStoredView)
   const [studioDraft, setStudioDraft] = useState(null)
+  const [focusProductionJobId, setFocusProductionJobId] = useState(null)
 
   const selectView = useCallback((id) => {
     setView(id)
@@ -51,6 +52,22 @@ export default function EyesOfFootballAdminPage() {
       /* ignore */
     }
   }, [])
+
+  const openProductionJob = useCallback(
+    (jobId) => {
+      const id = typeof jobId === 'string' ? jobId.trim() : ''
+      if (id) {
+        try {
+          sessionStorage.setItem('eof_production_selected_job', id)
+        } catch {
+          /* ignore */
+        }
+        setFocusProductionJobId(id)
+      }
+      selectView('production')
+    },
+    [selectView],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -164,6 +181,8 @@ export default function EyesOfFootballAdminPage() {
                 <EofProductionPanel
                   isOwner={isOwner}
                   active={view === 'production'}
+                  openJobId={focusProductionJobId}
+                  onOpenJobConsumed={() => setFocusProductionJobId(null)}
                   onSendToStudio={(draft) => {
                     setStudioDraft(draft)
                     selectView('studio')
@@ -172,10 +191,7 @@ export default function EyesOfFootballAdminPage() {
               </div>
 
               <div hidden={view !== 'scheduler'} className="mt-6">
-                <EofSchedulerPanel
-                  isOwner={isOwner}
-                  onOpenJob={() => selectView('production')}
-                />
+                <EofSchedulerPanel isOwner={isOwner} onOpenJob={openProductionJob} />
               </div>
 
               <div hidden={view !== 'music'} className="mt-6">
