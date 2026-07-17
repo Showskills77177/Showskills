@@ -4330,6 +4330,17 @@ export default function EofProductionPanel({
                       ))}
                   </select>
                 </label>
+                {musicTrackId ? (
+                  <button
+                    type="button"
+                    disabled={busy || isRendering}
+                    onClick={clearSelectedMusicBed}
+                    className={PX.btnDanger}
+                    title="Clear the selected bed so you can pick a different song before Build"
+                  >
+                    Remove song
+                  </button>
+                ) : null}
                 <label className="block w-36 text-xs text-[#aaa]">
                   Bed volume
                   <input
@@ -4360,17 +4371,6 @@ export default function EofProductionPanel({
                 >
                   {busy && renderPhase === 'rendering' ? 'Remixing…' : 'Remix music bed'}
                 </button>
-                {musicTrackId ? (
-                  <button
-                    type="button"
-                    disabled={busy || isRendering}
-                    onClick={clearSelectedMusicBed}
-                    className={PX.btnDanger}
-                    title="Clear the selected bed so you can pick a different song before Build"
-                  >
-                    Remove song
-                  </button>
-                ) : null}
               </div>
               <EofMusicSegmentMixer
                 key={musicTrackId || 'no-track'}
