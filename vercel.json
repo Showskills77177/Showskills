@@ -14,15 +14,6 @@
   "functions": {
     "api/**/*.js": {
       "maxDuration": 300,
-      "excludeFiles": "{node_modules/ffprobe-static/**,**/ffprobe-static/**}"
-    },
-    "api/[[...slug]].js": {
-      "maxDuration": 300,
-      "includeFiles": "assets/fonts/**;assets/eof/**;backend/api/assets/**",
-      "excludeFiles": "{node_modules/ffprobe-static/**,**/ffprobe-static/**}"
-    },
-    "api/admin/[...slug].js": {
-      "maxDuration": 300,
       "includeFiles": "assets/fonts/**;assets/eof/**;backend/api/assets/**",
       "excludeFiles": "{node_modules/ffprobe-static/**,**/ffprobe-static/**}"
     }
