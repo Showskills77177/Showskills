@@ -282,6 +282,7 @@ function buildSceneOverlayFilterComplex({
   kenBurns = false,
   textDir,
   overlayMoment,
+  stickers = null,
 }) {
   const baseChain = buildSceneBaseFilters({ frames, lookFilters, kenBurns }).join(',')
   const pop = buildOverlayPopFilterFragments({
@@ -298,21 +299,76 @@ function buildSceneOverlayFilterComplex({
     burnCaptions,
     textDir,
   })
-  // Effects on whole composed frame, then captions on top (sharp text).
+  // Effects on whole composed frame, then stickers, then captions on top (sharp text).
   const overlay =
     `[0:v]${baseChain}[base];` +
     `[1:v]${pop.overlayPrep}[ov];` +
     `[base][ov]overlay=${pop.overlayXy}:enable='${pop.enableExpr}'`
-  if (fxChain && captionChain.length) {
-    return `${overlay}[comp];[comp]${fxChain}[fx];[fx]${captionChain.join(',')}[vout]`
-  }
+
+  let label = 'comp'
+  let graph = `${overlay}[${label}]`
   if (fxChain) {
-    return `${overlay}[comp];[comp]${fxChain}[vout]`
+    graph += `;[${label}]${fxChain}[vfx]`
+    label = 'vfx'
   }
+
+  if (eofStickersActive(stickers)) {
+    const chained = chainStickersThenCaptions(label, stickers, captionChain)
+    if (chained.missing?.length) {
+      console.warn('[eof-video] sticker assets missing', chained.missing.join(','))
+    }
+    return `${graph};${chained.filter}`
+  }
+
   if (captionChain.length) {
-    return `${overlay}[comp];[comp]${captionChain.join(',')}[vout]`
+    return `${graph};[${label}]${captionChain.join(',')}[vout]`
   }
-  return `${overlay}[vout]`
+  if (label !== 'vout') {
+    return `${graph};[${label}]null[vout]`
+  }
+  return graph
+}
+
+/**
+ * Full-frame scene with stickers (movie overlays) — filter_complex.
+ * Order: base + look → effects → stickers → captions.
+ */
+function buildSceneStickerFilterComplex({
+  frames,
+  caption,
+  durationSec,
+  captionFont,
+  captionStyle,
+  captionLayout,
+  burnCaptions,
+  lookFilters = [],
+  effectFilters = [],
+  kenBurns = false,
+  textDir,
+  stickers = null,
+}) {
+  const baseChain = buildSceneBaseFilters({ frames, lookFilters, kenBurns }).join(',')
+  const fxChain = effectFilters?.length ? effectFilters.join(',') : ''
+  const captionChain = buildSceneCaptionFilters({
+    caption,
+    durationSec,
+    captionFont,
+    captionStyle,
+    captionLayout,
+    burnCaptions,
+    textDir,
+  })
+  let label = 'vbase'
+  let graph = `[0:v]${baseChain}[${label}]`
+  if (fxChain) {
+    graph += `;[${label}]${fxChain}[vfx]`
+    label = 'vfx'
+  }
+  const chained = chainStickersThenCaptions(label, stickers, captionChain)
+  if (chained.missing?.length) {
+    console.warn('[eof-video] sticker assets missing', chained.missing.join(','))
+  }
+  return `${graph};${chained.filter}`
 }
 
 async function encodeSceneClip({
@@ -327,6 +383,7 @@ async function encodeSceneClip({
   kenBurns,
   encodeDurationSec,
   overlayMoment = null,
+  stickers = null,
 }) {
   const contentDur = Math.max(2, Number(scene.durationSec) || 3)
   const dur = Math.max(contentDur, Number(encodeDurationSec) || contentDur)
@@ -335,6 +392,7 @@ async function encodeSceneClip({
   const caption = String(scene.caption || '').trim().slice(0, 140) || `Scene ${scene.index + 1}`
   const textDir = join(workDir, `caption-text-${scene.index + 1}`)
   mkdirSync(textDir, { recursive: true })
+  const useStickers = eofStickersActive(stickers)
 
   const overlayPath = overlayMoment?.overlayImagePath
   const useOverlay =
@@ -357,6 +415,7 @@ async function encodeSceneClip({
       kenBurns,
       textDir,
       overlayMoment,
+      stickers,
     })
     try {
       await runFfmpeg(
@@ -398,6 +457,52 @@ async function encodeSceneClip({
         e instanceof Error ? e.message : e,
       )
     }
+  }
+
+  if (useStickers) {
+    const filterComplex = buildSceneStickerFilterComplex({
+      frames,
+      caption,
+      durationSec: contentDur,
+      captionFont,
+      captionStyle,
+      captionLayout,
+      burnCaptions,
+      lookFilters,
+      effectFilters,
+      kenBurns,
+      textDir,
+      stickers,
+    })
+    await runFfmpeg(
+      [
+        '-y',
+        '-loop',
+        '1',
+        '-i',
+        scene.imagePath,
+        '-filter_complex',
+        filterComplex,
+        '-map',
+        '[vout]',
+        '-t',
+        String(dur),
+        '-c:v',
+        'libx264',
+        '-preset',
+        VIDEO_PRESET,
+        '-crf',
+        VIDEO_CRF,
+        '-threads',
+        '0',
+        '-pix_fmt',
+        'yuv420p',
+        '-an',
+        clipPath,
+      ],
+      { maxBuffer: 16 * 1024 * 1024 },
+    )
+    return clipPath
   }
 
   const vf = buildSceneVideoFilter({
@@ -550,6 +655,7 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
  *   captionMode?: 'auto' | 'free' | 'zapcap-only',
  *   overlayMoments?: 'off' | 'auto' | 'always',
  *   videoEffects?: object | null,
+ *   stickers?: object | null,
  *   hasSecondarySubject?: boolean,
  *   secondarySceneIndex?: number | null,
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
@@ -570,6 +676,7 @@ export async function renderEofProductionVideo({
   captionMode = 'auto',
   overlayMoments: overlayMomentsMode,
   videoEffects: videoEffectsRaw = null,
+  stickers: stickersRaw = null,
   hasSecondarySubject = false,
   secondarySceneIndex = null,
   onSceneProgress,
@@ -595,6 +702,7 @@ export async function renderEofProductionVideo({
   })
   const videoEffects = normalizeEofVideoEffects(videoEffectsRaw)
   const effectFilters = videoEffectsFilterChain(videoEffects)
+  const stickers = normalizeEofStickers(stickersRaw)
   const useXfade = look.perCutTransitions.length > 0 && sorted.length > 1
   const kenBurns = Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1'
   const overlayMode = resolveEofOverlayMoments(overlayMomentsMode)
@@ -633,6 +741,8 @@ export async function renderEofProductionVideo({
     overlayByScene.size ? `n=${overlayByScene.size}` : 'none',
     'effects',
     eofVideoEffectIds(videoEffects).join(',') || 'none',
+    'stickers',
+    eofStickerIds(stickers).join(',') || 'none',
   )
 
   const engine = plan.engine
@@ -688,6 +798,7 @@ export async function renderEofProductionVideo({
       kenBurns,
       encodeDurationSec: encodeDurs[i] ?? contentDurs[i],
       overlayMoment: overlayByScene.get(scene.index) || null,
+      stickers,
     })
     clipsDone += 1
     if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
@@ -759,6 +870,7 @@ export async function renderEofProductionVideo({
             kenBurns,
             encodeDurationSec: contentDurs[i],
             overlayMoment: overlayByScene.get(sorted[i].index) || null,
+            stickers,
           }),
         )
       }
@@ -839,6 +951,8 @@ export async function renderEofProductionVideo({
       overlayCount: overlayByScene.size,
       videoEffects,
       effectIds: eofVideoEffectIds(videoEffects),
+      stickers,
+      stickerIds: eofStickerIds(stickers),
     },
     overlayMoments: [...overlayByScene.values()].map((m) => ({
       sceneIndex: m.sceneIndex,

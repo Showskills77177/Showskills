@@ -108,6 +108,7 @@ async function addEofProductionJobColumns() {
     'caption_layout_json',
     'overlay_moments',
     'video_effects_json',
+    'stickers_json',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {

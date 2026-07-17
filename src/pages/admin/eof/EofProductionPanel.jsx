@@ -863,8 +863,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         setStickersStackingRule(j.stickersStackingRule)
       }
       if (Number.isFinite(Number(j.stickersMax))) setStickersMax(Number(j.stickersMax))
-      if (j.defaultStickers && !(stickers?.items?.length > 0)) {
-        setStickers(normalizeEofStickers(j.defaultStickers))
+      if (j.defaultStickers) {
+        setStickers((prev) => (prev?.items?.length ? prev : normalizeEofStickers(j.defaultStickers)))
       }
       setColorGrades(Array.isArray(j.colorGrades) ? j.colorGrades : [])
       if (j.defaultColorGrade) setColorGrade((prev) => prev || j.defaultColorGrade)
@@ -1110,6 +1110,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.enhanceStyle) setEnhanceStyle(job.enhanceStyle)
     if (job.overlayMoments) setOverlayMoments(job.overlayMoments)
     setVideoEffects(normalizeEofVideoEffects(job.videoEffects || EOF_DEFAULT_VIDEO_EFFECTS))
+    {
+      const nextStickers = normalizeEofStickers(job.stickers || EOF_DEFAULT_STICKERS)
+      setStickers(nextStickers)
+      setActiveStickerId(nextStickers.items[0]?.id || '')
+    }
     setMusicTrackId(job.musicTrackId || '')
     if (job.musicVolume != null && Number.isFinite(Number(job.musicVolume))) {
       setMusicVolume(Number(job.musicVolume))
@@ -1490,6 +1495,81 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setTimeout(() => {
         resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
+  /** Post-build: remux with current CapCut-style stickers — keeps stills + VO (no image re-scrape). */
+  async function applyStickers() {
+    if (!selectedId || !draftScript?.scenes?.length) return
+    setBusy(true)
+    setErr('')
+    setSuccess('Applying stickers (keeping images + voiceover)…')
+    setRenderPhase('rendering-video')
+    if (videoPreviewUrl) {
+      try {
+        URL.revokeObjectURL(videoPreviewUrl)
+      } catch {
+        /* ignore */
+      }
+    }
+    setVideoPreviewUrl('')
+
+    const baselineUpdatedAt = selected?.updatedAt || null
+
+    try {
+      const estSec = Math.max(40, (draftScript.scenes.length || 4) * 12)
+      setRenderProgress({
+        percent: 5,
+        message: 'Applying stickers…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript.scenes.length,
+        stage: 'video',
+        pipeline: 'video',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'apply-stickers',
+          jobId: selectedId,
+          stickers: normalizeEofStickers(stickers),
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Apply stickers failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForVideoComplete(selectedId, { baselineUpdatedAt })
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Apply stickers did not finish with a video')
+      }
+
+      await loadVideoPreview({ bust: finishedJob.updatedAt || Date.now() })
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess(
+        `Stickers applied (${summarizeEofStickers(finishedJob.stickers || stickers)}) — images and voiceover kept.`,
+      )
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
       setRenderPhase('failed')
       setRenderProgress(null)
@@ -1993,6 +2073,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           enhanceStyle,
           overlayMoments,
           videoEffects: normalizeEofVideoEffects(videoEffects),
+          stickers: normalizeEofStickers(stickers),
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -2044,6 +2125,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           enhanceStyle,
           overlayMoments,
           videoEffects: normalizeEofVideoEffects(videoEffects),
+          stickers: normalizeEofStickers(stickers),
           musicTrackId: musicTrackId || null,
           musicVolume,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
@@ -3032,6 +3114,145 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 />
               </div>
             </div>
+
+            <div className="lg:col-span-2">
+              <p className={PX.label}>Stickers &amp; Elements</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                CapCut-style Subscribe / Follow badges, arrows, shapes, and accents. Up to {stickersMax}{' '}
+                stacked. Burned under captions (after effects). Subscribe defaults to top-right — clears the
+                image-over-image upper card. {stickersStackingRule}
+              </p>
+              <p className="mt-2 text-[11px] text-[#8e8e8e]">
+                Active: {summarizeEofStickers(stickers)}
+              </p>
+              <div className="mt-3 space-y-4">
+                <StickerPickerGrid
+                  title="Buttons"
+                  hint="Subscribe / Follow CTAs — toggle on/off."
+                  items={stickersButtons.length ? stickersButtons : listEofStickersByCategory('buttons')}
+                  selectedIds={stickers.items.map((i) => i.id)}
+                  disabled={busy}
+                  onPick={(id) => {
+                    const next = pickEofSticker(stickers, id)
+                    setStickers(next)
+                    setActiveStickerId(
+                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                    )
+                    markDraftDirty()
+                  }}
+                />
+                <StickerPickerGrid
+                  title="Arrows"
+                  hint="Point left / right / up / down."
+                  items={stickersArrows.length ? stickersArrows : listEofStickersByCategory('arrows')}
+                  selectedIds={stickers.items.map((i) => i.id)}
+                  disabled={busy}
+                  onPick={(id) => {
+                    const next = pickEofSticker(stickers, id)
+                    setStickers(next)
+                    setActiveStickerId(
+                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                    )
+                    markDraftDirty()
+                  }}
+                />
+                <StickerPickerGrid
+                  title="Shapes"
+                  hint="Square, circle, rounded rect, line — solid + outline."
+                  items={stickersShapes.length ? stickersShapes : listEofStickersByCategory('shapes')}
+                  selectedIds={stickers.items.map((i) => i.id)}
+                  disabled={busy}
+                  onPick={(id) => {
+                    const next = pickEofSticker(stickers, id)
+                    setStickers(next)
+                    setActiveStickerId(
+                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                    )
+                    markDraftDirty()
+                  }}
+                />
+                <StickerPickerGrid
+                  title="Stickers"
+                  hint="Fire accent, NEW badge, tap hand — emoji-free originals."
+                  items={stickersExtras.length ? stickersExtras : listEofStickersByCategory('stickers')}
+                  selectedIds={stickers.items.map((i) => i.id)}
+                  disabled={busy}
+                  onPick={(id) => {
+                    const next = pickEofSticker(stickers, id)
+                    setStickers(next)
+                    setActiveStickerId(
+                      next.items.some((i) => i.id === id) ? id : next.items[0]?.id || '',
+                    )
+                    markDraftDirty()
+                  }}
+                />
+              </div>
+              {stickers.items.length ? (
+                <div className="mt-4 rounded-xl border border-[#2a2a2a] bg-[#141414] p-3">
+                  <p className="text-[12px] font-medium text-[#d4d4d4]">Position for selected element</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {stickers.items.map((item) => {
+                      const cat = EOF_STICKERS_CATALOG.find((c) => c.id === item.id)
+                      const active = activeStickerId === item.id
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setActiveStickerId(item.id)}
+                          className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                            active
+                              ? 'border-white/40 bg-[#272727] text-white'
+                              : 'border-[#333] bg-[#1a1a1a] text-[#bbb]'
+                          }`}
+                        >
+                          {cat?.label || item.id}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {activeStickerId ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(stickerPositions.length ? stickerPositions : EOF_STICKER_POSITIONS).map((p) => {
+                        const selectedItem = stickers.items.find((i) => i.id === activeStickerId)
+                        const active = selectedItem?.position === p.id
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            disabled={busy}
+                            title={p.detail}
+                            onClick={() => {
+                              setStickers(setEofStickerPosition(stickers, activeStickerId, p.id))
+                              markDraftDirty()
+                            }}
+                            className={`rounded-lg border px-2.5 py-1.5 text-[11px] ${
+                              active
+                                ? 'border-white/40 bg-[#272727] text-white'
+                                : 'border-[#333] bg-[#1a1a1a] text-[#bbb] hover:border-[#555]'
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={`mt-3 ${PX.btnGhost}`}
+                    onClick={() => {
+                      setStickers({ items: [] })
+                      setActiveStickerId('')
+                      markDraftDirty()
+                    }}
+                  >
+                    Clear all stickers
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div>
@@ -3740,6 +3961,25 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply effects'}
                       </button>
                     </div>
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#303030] pb-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
+                          Stickers · apply
+                        </p>
+                        <p className={`mt-1 text-xs ${PX.muted}`}>
+                          Change Stickers &amp; Elements above, Save, then Apply stickers. Remuxes from clean
+                          stills + VO — keeps images + voiceover. Active: {summarizeEofStickers(stickers)}.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy || isRendering}
+                        onClick={applyStickers}
+                        className={PX.btnPrimary}
+                      >
+                        {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply stickers'}
+                      </button>
+                    </div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
@@ -3748,7 +3988,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         <p className={`mt-1 text-xs ${PX.muted}`}>
                           Change style, edit text, move up/down, resize — then Replace captions. Keeps images +
                           voiceover (no new photos). If a still already has meme/quote text in the picture, use
-                          Rebuild video instead. Effects stay on the job and re-apply on remux.
+                          Rebuild video instead. Effects &amp; stickers stay on the job and re-apply on remux.
                         </p>
                       </div>
                       <button

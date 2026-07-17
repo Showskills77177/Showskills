@@ -297,6 +297,85 @@ export async function renderEofProductionEffectsApply(jobId) {
   }
 }
 
+/**
+ * Apply stickers/elements only: remux Short from cached stills + VO with current sticker overlays.
+ * Same spirit as Replace Captions / Apply effects — no image re-scrape / TTS.
+ * @param {string} jobId
+ */
+export async function renderEofProductionStickersApply(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+
+  const flags = await getEofArtifactFlags(jobId)
+  if (!flags.hasDurableSceneImages) {
+    throw new Error(
+      'Scene stills are missing. Run Build Short once before applying stickers (needs a clean plate).',
+    )
+  }
+
+  console.info(
+    '[eof-production] apply stickers from clean stills (not short.mp4)',
+    jobId,
+    `scenes=${job.script.scenes.length}`,
+  )
+
+  try {
+    return await renderEofProductionVideoJob(jobId, {
+      includeAudioIfPresent: true,
+      reuseSceneImages: true,
+      captionMode: 'free',
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Apply stickers failed'
+    await markEofProductionJobFailed(jobId, message)
+    throw e
+  }
+}
+
+/** @param {string} jobId */
+export async function startEofProductionStickersApplyBackground(jobId) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+
+  const sceneCount = job.script?.scenes?.length || 5
+  const startedAt = new Date().toISOString()
+
+  await updateEofProductionJob(jobId, {
+    status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+    errorMessage: null,
+  })
+  await updateEofProductionRenderProgress(
+    jobId,
+    buildEofRenderProgress({
+      stage: 'video',
+      sceneIndex: 0,
+      sceneCount,
+      startedAt,
+      estimatedTotalSec: Math.max(40, sceneCount * 12),
+      pipeline: 'video',
+      message: 'Applying stickers (keeping images + voiceover)…',
+    }),
+  )
+
+  const run = () =>
+    renderEofProductionStickersApply(jobId).catch((e) => {
+      console.error('[eof-production] apply stickers failed', jobId, e)
+    })
+
+  if (process.env.VERCEL) {
+    try {
+      const { waitUntil } = await import('@vercel/functions')
+      waitUntil(run())
+      return
+    } catch (e) {
+      console.warn('[eof-production] waitUntil unavailable for apply stickers', e)
+    }
+  }
+
+  void run()
+}
+
 /** @param {string} jobId */
 export async function startEofProductionEffectsApplyBackground(jobId) {
   const job = await getEofProductionJob(jobId)
