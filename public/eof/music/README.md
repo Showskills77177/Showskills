@@ -30,6 +30,16 @@ In **Production → Music bed · mixer** you can:
 3. Preview the segment
 4. **Remix music bed** (or Build Short) so that clip loops under the VO
 
+Beds are **auto-mastered** at mix time (loudnorm ≈ −16 LUFS) so Shorts stay balanced — no Master button.
+
+## Compress / re-master files (faster preview loads)
+
+```bash
+npm run master:eof-music
+```
+
+Re-encodes platform MP3s at 128 kbps + loudnorm (skips `default-*` stubs).
+
 ## Register / seed
 
 ```bash

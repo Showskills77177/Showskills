@@ -26,6 +26,13 @@ function musicVolumeToDb(volume) {
 }
 
 /**
+ * Auto-master music beds for Shorts: consistent loudness so every track sits under VO
+ * at a similar perceived level (no manual Master button required).
+ * I=-16 LUFS leaves headroom; volume= then ducks under narration.
+ */
+export const EOF_MUSIC_AUTO_MASTER_FILTER = 'loudnorm=I=-16:TP=-1.5:LRA=11'
+
+/**
  * Concatenate scene narration MP3s then mix with background music bed.
  * Optional musicStartSec / musicEndSec picks a YouTube-style segment of the bed
  * (that clip is looped under the VO if the Short is longer).
@@ -87,6 +94,7 @@ export async function mixEofNarrationWithMusic({
   const fadeOutStart = Math.max(0, narrDur - 2)
   const musicDb = musicVolumeToDb(musicVolume)
 
+  // Auto-master every bed at mix time so Shorts stay balanced across tracks.
   await runFfmpeg(
     [
       '-y',
@@ -97,7 +105,7 @@ export async function mixEofNarrationWithMusic({
       '-i',
       bedPath,
       '-filter_complex',
-      `[1:a]volume=${musicDb}dB,afade=t=in:st=0:d=1.5,afade=t=out:st=${fadeOutStart}:d=2[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[out]`,
+      `[1:a]${EOF_MUSIC_AUTO_MASTER_FILTER},volume=${musicDb}dB,afade=t=in:st=0:d=1.5,afade=t=out:st=${fadeOutStart}:d=2[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[out]`,
       '-map',
       '[out]',
       '-c:a',

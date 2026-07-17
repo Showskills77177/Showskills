@@ -43,6 +43,7 @@
     "test:eof-script-maker": "node --test shared/eofScriptMaker.test.mjs shared/eofSchedulerTime.test.mjs && node scripts/test-eof-script-maker-open-production.mjs",
     "render:eof": "node scripts/render-eof-production.mjs",
     "seed:eof-music": "node scripts/seed-eof-music-catalog.mjs",
+    "master:eof-music": "node scripts/master-eof-music-beds.mjs",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
     "test:quiz": "node --test shared/paidSkillQuestions.test.mjs shared/competitionSkillQuestions.test.mjs shared/vpnDetection.test.mjs shared/competitionPeriods.test.mjs shared/competitionCopy.test.mjs shared/consolationShirtGiveaway.test.mjs",
     "test:email-templates": "node --test shared/emailTemplates.test.mjs shared/siteContact.test.mjs shared/stagingSite.test.mjs",

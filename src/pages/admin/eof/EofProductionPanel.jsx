@@ -4150,10 +4150,10 @@ export default function EofProductionPanel({
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
                 Music bed · mixer
               </p>
-              <p className={`mt-1 text-xs ${PX.muted}`}>
-                Pick a platform bed, drag the segment like YouTube (which part of the song), preview, then
-                Build or Remix under the voiceover.
-              </p>
+                  <p className={`mt-1 text-xs ${PX.muted}`}>
+                    Pick a platform bed, drag the segment like YouTube (which part of the song), preview, then
+                    Build or Remix. Beds are auto-mastered for balanced Shorts volume — no Master button needed.
+                  </p>
               <div className="mt-3 flex flex-wrap items-end gap-3">
                 <label className="block min-w-[220px] flex-1 text-xs text-[#aaa]">
                   Bed track

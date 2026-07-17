@@ -108,8 +108,8 @@ export default function EofMusicLibrary({ onChanged }) {
     <section className={`rounded-xl border ${EOF.panelBorder} ${EOF.panel} p-5`}>
       <h2 className="text-base font-semibold text-white">Music library</h2>
       <p className={`mt-1 text-xs ${EOF.muted}`}>
-        Download tracks from YouTube Studio → Audio library, then add MP3s here. One default bed is mixed under
-        narration on every render.
+        Platform beds are loudness-mastered for Shorts (auto-balanced under VO on every Build / Remix).
+        Prefer cleared / licensed MP3s. One default bed is mixed under narration on every render.
       </p>
 
       {err ? <p className="mt-3 text-sm text-[#ff4e45]">{err}</p> : null}
