@@ -34,6 +34,7 @@ import {
   resolveImageSubject,
   listSecondaryImageSubjects,
 } from '../../../shared/eofSceneImageQueries.mjs'
+import { resolveEofOverlayMoments } from '../../../shared/eofOverlayMoments.mjs'
 import {
   getEofImageProviderSettings,
   normalizeEofImageProvider,
@@ -421,6 +422,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     scenesForVideo.sort((a, b) => a.index - b.index)
     await report('video', 0, { force: true })
 
+    const draftBlob = String(job.script?.plainTextDraft || '').trim()
+    const secondaryPeople = listSecondaryImageSubjects(job.topic, draftBlob)
+    const sceneCountForOverlay = scenesForVideo.length
+    const secondarySceneIndex =
+      secondaryPeople.length && sceneCountForOverlay >= 3
+        ? Math.min(1, Math.max(0, sceneCountForOverlay - 2))
+        : null
+
     const rendered = await renderEofProductionVideo({
       jobId,
       scenes: scenesForVideo,
@@ -433,6 +442,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       enhanceStyle: job.enhanceStyle,
       format: job.script?.format,
       captionMode,
+      overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
+      hasSecondarySubject: secondaryPeople.length > 0,
+      secondarySceneIndex,
       onSceneProgress: async (done) => report('video', done),
     })
     const { relPath } = rendered

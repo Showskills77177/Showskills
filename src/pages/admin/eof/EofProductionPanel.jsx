@@ -44,6 +44,10 @@ import {
   EOF_COLOR_GRADES,
   EOF_ENHANCE_STYLES,
 } from '../../../../shared/eofVideoLook.mjs'
+import {
+  EOF_DEFAULT_OVERLAY_MOMENTS,
+  EOF_OVERLAY_MOMENTS_OPTIONS,
+} from '../../../../shared/eofOverlayMoments.mjs'
 
 /** Clean Production chrome — keep Studio gray panels so cards don’t blend into page black. */
 const PX = {
@@ -419,6 +423,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [colorGrade, setColorGrade] = useState(EOF_DEFAULT_COLOR_GRADE)
   const [enhanceStyles, setEnhanceStyles] = useState([])
   const [enhanceStyle, setEnhanceStyle] = useState(EOF_DEFAULT_ENHANCE_STYLE)
+  const [overlayMomentsOptions, setOverlayMomentsOptions] = useState([])
+  const [overlayMoments, setOverlayMoments] = useState(EOF_DEFAULT_OVERLAY_MOMENTS)
   const [musicTracks, setMusicTracks] = useState([])
   const [defaultMusicBeds, setDefaultMusicBeds] = useState([])
   const [musicTrackId, setMusicTrackId] = useState('')
@@ -529,6 +535,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (j.defaultCaptionStyle) setCaptionStyle((prev) => prev || j.defaultCaptionStyle)
       setTransitionStyles(Array.isArray(j.transitionStyles) ? j.transitionStyles : [])
       if (j.defaultTransitionStyle) setTransitionStyle((prev) => prev || j.defaultTransitionStyle)
+      setOverlayMomentsOptions(Array.isArray(j.overlayMomentsOptions) ? j.overlayMomentsOptions : [])
+      if (j.defaultOverlayMoments) setOverlayMoments((prev) => prev || j.defaultOverlayMoments)
       setColorGrades(Array.isArray(j.colorGrades) ? j.colorGrades : [])
       if (j.defaultColorGrade) setColorGrade((prev) => prev || j.defaultColorGrade)
       setEnhanceStyles(Array.isArray(j.enhanceStyles) ? j.enhanceStyles : [])
@@ -710,6 +718,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.transitionStyle) setTransitionStyle(job.transitionStyle)
     if (job.colorGrade) setColorGrade(job.colorGrade)
     if (job.enhanceStyle) setEnhanceStyle(job.enhanceStyle)
+    if (job.overlayMoments) setOverlayMoments(job.overlayMoments)
     setMusicTrackId(job.musicTrackId || '')
     if (job.musicVolume != null && Number.isFinite(Number(job.musicVolume))) {
       setMusicVolume(Number(job.musicVolume))
@@ -1516,6 +1525,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           transitionStyle,
           colorGrade,
           enhanceStyle,
+          overlayMoments,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -1565,6 +1575,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           transitionStyle,
           colorGrade,
           enhanceStyle,
+          overlayMoments,
           musicTrackId: musicTrackId || null,
           musicVolume,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
@@ -2337,6 +2348,46 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           <span className="mt-0.5 block truncate text-[10px] text-[#888]">{e.vibe}</span>
                         ) : null}
                       </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              <p className={PX.label}>Image over image</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                Optional CapCut-style pop-up inset (upper third) with a swipe whoosh. Auto uses one middle
+                beat when a secondary still exists (e.g. Tuchel over Rooney) — not every scene. Save, then
+                Rebuild Short.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(overlayMomentsOptions.length
+                  ? overlayMomentsOptions
+                  : EOF_OVERLAY_MOMENTS_OPTIONS
+                ).map((o) => {
+                  const active = overlayMoments === o.id
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => setOverlayMoments(o.id)}
+                      className={`min-w-[7.5rem] flex-1 rounded-xl border px-3 py-2.5 text-left transition sm:flex-none ${
+                        active
+                          ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                          : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+                      }`}
+                      title={o.detail || o.label}
+                    >
+                      <span
+                        className={`block text-[13px] font-medium ${
+                          active ? 'text-white' : 'text-[#e5e5e5]'
+                        }`}
+                      >
+                        {o.label}
+                      </span>
+                      {o.vibe ? (
+                        <span className="mt-0.5 block text-[11px] text-[#888]">{o.vibe}</span>
+                      ) : null}
                     </button>
                   )
                 })}

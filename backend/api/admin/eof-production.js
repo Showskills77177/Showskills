@@ -60,6 +60,11 @@ import {
   resolveEofEnhanceStyle,
 } from '../../../shared/eofVideoLook.mjs'
 import {
+  EOF_DEFAULT_OVERLAY_MOMENTS,
+  listEofOverlayMomentsOptions,
+  resolveEofOverlayMoments,
+} from '../../../shared/eofOverlayMoments.mjs'
+import {
   ensureEofMusicCatalogSeeded,
   listEofMusicTracks,
   listEofDefaultMusicBeds,
@@ -186,6 +191,8 @@ export default async function handler(req, res) {
         defaultColorGrade: EOF_DEFAULT_COLOR_GRADE,
         enhanceStyles: listEofEnhanceStyles(),
         defaultEnhanceStyle: EOF_DEFAULT_ENHANCE_STYLE,
+        overlayMomentsOptions: listEofOverlayMomentsOptions(),
+        defaultOverlayMoments: EOF_DEFAULT_OVERLAY_MOMENTS,
         captionEngine: eofCaptionEngineStatus(),
         zapcapTemplates: zapcapCatalog.templates,
         zapcapTemplatesError: zapcapCatalog.error,
@@ -600,6 +607,9 @@ export default async function handler(req, res) {
       const enhanceStyle = resolveEofEnhanceStyle(
         typeof body.enhanceStyle === 'string' ? body.enhanceStyle : EOF_DEFAULT_ENHANCE_STYLE,
       )
+      const overlayMoments = resolveEofOverlayMoments(
+        typeof body.overlayMoments === 'string' ? body.overlayMoments : EOF_DEFAULT_OVERLAY_MOMENTS,
+      )
       try {
         const job = await createEofProductionJob({
           topic,
@@ -612,6 +622,7 @@ export default async function handler(req, res) {
           transitionStyle,
           colorGrade,
           enhanceStyle,
+          overlayMoments,
         })
         return json(res, 201, {
           ok: true,
@@ -654,6 +665,10 @@ export default async function handler(req, res) {
         colorGrade: body.colorGrade !== undefined ? resolveEofColorGrade(body.colorGrade) : undefined,
         enhanceStyle:
           body.enhanceStyle !== undefined ? resolveEofEnhanceStyle(body.enhanceStyle) : undefined,
+        overlayMoments:
+          body.overlayMoments !== undefined
+            ? resolveEofOverlayMoments(body.overlayMoments)
+            : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

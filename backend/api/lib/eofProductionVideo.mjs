@@ -24,11 +24,19 @@ import {
   resolveEofEnhanceStyle,
   resolveEofTransitionStyle,
 } from '../../../shared/eofVideoLook.mjs'
+import {
+  buildOverlayPopFilterFragments,
+  planEofOverlayMoments,
+  resolveEofOverlayMoments,
+} from '../../../shared/eofOverlayMoments.mjs'
 import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
+import { mixOverlaySfxIntoAudio, resolveEofWhooshSfxPath } from './eofAudioMix.mjs'
+
+const __eofLibDir = dirname(fileURLToPath(import.meta.url))
 
 const BUNDLED_CAPTION_FONT = join(
-  dirname(fileURLToPath(import.meta.url)),
+  __eofLibDir,
   '../../../assets/fonts/EofCaptionBold.ttf',
 )
 
@@ -150,6 +158,72 @@ export function assertEofCleanPlateImagePath(imagePath) {
 }
 
 /**
+ * Cover-scale + look (+ optional Ken Burns). Captions applied separately so overlays can sit under text.
+ */
+function buildSceneBaseFilters({ frames, lookFilters = [], kenBurns = false }) {
+  const base = [
+    'scale=1080:1920:force_original_aspect_ratio=increase',
+    'crop=1080:1920:(iw-ow)/2:min(ih*0.12\\,ih-oh)',
+  ]
+  if (lookFilters?.length) base.push(...lookFilters)
+  if (kenBurns) {
+    base.push(`zoompan=z='min(zoom+0.0018,1.28)':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`)
+  } else {
+    base.push(`fps=${VIDEO_FPS}`)
+  }
+  return base
+}
+
+/**
+ * Local caption burn: live = bottom bar; CapCut styles = mid vignette (escape hatch only).
+ */
+function buildSceneCaptionFilters({
+  caption,
+  durationSec,
+  captionFont,
+  captionStyle,
+  captionLayout,
+  burnCaptions,
+  textDir,
+}) {
+  if (!burnCaptions) return []
+  const filters = []
+  const lay = normalizeEofCaptionLayout(captionLayout, captionStyle)
+  if (isBottomBarCaptionStyle(captionStyle)) {
+    const plate = captionBottomPlateMode(captionStyle)
+    if (plate === 'full' || plate === 'punch') {
+      const boxY = Math.max(0.35, lay.yNorm - 0.06)
+      filters.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
+    } else if (plate === 'soft') {
+      const boxY = Math.max(0.35, lay.yNorm - 0.05)
+      filters.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.14:color=black@0.32:t=fill`)
+    }
+    if (plate === 'punch') {
+      const barY = Math.min(0.92, lay.yNorm + 0.08)
+      filters.push(
+        `drawbox=x=iw*0.12:y=ih*${barY.toFixed(3)}:w=iw*0.76:h=5:color=0xFFE566@0.95:t=fill`,
+      )
+    }
+  } else {
+    const boxY = Math.max(0.2, lay.yNorm - 0.12)
+    filters.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.28:color=black@0.28:t=fill`)
+  }
+  if (captionFont) {
+    filters.push(
+      ...buildCaptionDrawtextFilters({
+        caption,
+        durationSec,
+        captionFont,
+        style: captionStyle,
+        textDir,
+        layout: lay,
+      }),
+    )
+  }
+  return filters
+}
+
+/**
  * Local caption burn: live = bottom bar; CapCut styles = mid vignette (escape hatch only).
  * Enhance + color grade sit after crop so 9:16 faces stay framed, then CapCut pack look.
  */
@@ -165,62 +239,58 @@ function buildSceneVideoFilter({
   kenBurns = false,
   textDir,
 }) {
-  // Cover-scale into 9:16 with a strong top bias so faces stay in frame on landscape
-  // Google stills (center crop was shearing heads; 0.12 matches thumbnail face framing).
-  const base = [
-    'scale=1080:1920:force_original_aspect_ratio=increase',
-    'crop=1080:1920:(iw-ow)/2:min(ih*0.12\\,ih-oh)',
-  ]
+  return [
+    ...buildSceneBaseFilters({ frames, lookFilters, kenBurns }),
+    ...buildSceneCaptionFilters({
+      caption,
+      durationSec,
+      captionFont,
+      captionStyle,
+      captionLayout,
+      burnCaptions,
+      textDir,
+    }),
+  ].join(',')
+}
 
-  if (lookFilters?.length) {
-    base.push(...lookFilters)
+/**
+ * Base still + inset pop card (upper third) via filter_complex; captions burn on top.
+ */
+function buildSceneOverlayFilterComplex({
+  frames,
+  caption,
+  durationSec,
+  captionFont,
+  captionStyle,
+  captionLayout,
+  burnCaptions,
+  lookFilters = [],
+  kenBurns = false,
+  textDir,
+  overlayMoment,
+}) {
+  const baseChain = buildSceneBaseFilters({ frames, lookFilters, kenBurns }).join(',')
+  const pop = buildOverlayPopFilterFragments({
+    startSec: overlayMoment.startSec,
+    endSec: overlayMoment.endSec,
+  })
+  const captionChain = buildSceneCaptionFilters({
+    caption,
+    durationSec,
+    captionFont,
+    captionStyle,
+    captionLayout,
+    burnCaptions,
+    textDir,
+  })
+  const overlay =
+    `[0:v]${baseChain}[base];` +
+    `[1:v]${pop.overlayPrep}[ov];` +
+    `[base][ov]overlay=${pop.overlayXy}:enable='${pop.enableExpr}'`
+  if (captionChain.length) {
+    return `${overlay}[comp];[comp]${captionChain.join(',')}[vout]`
   }
-
-  if (kenBurns) {
-    base.push(`zoompan=z='min(zoom+0.0018,1.28)':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`)
-  } else {
-    base.push(`fps=${VIDEO_FPS}`)
-  }
-
-  if (burnCaptions) {
-    const lay = normalizeEofCaptionLayout(captionLayout, captionStyle)
-    if (isBottomBarCaptionStyle(captionStyle)) {
-      // Subtitle styles — plate follows editable Y; mode varies by look.
-      const plate = captionBottomPlateMode(captionStyle)
-      if (plate === 'full' || plate === 'punch') {
-        const boxY = Math.max(0.35, lay.yNorm - 0.06)
-        base.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
-      } else if (plate === 'soft') {
-        const boxY = Math.max(0.35, lay.yNorm - 0.05)
-        base.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.14:color=black@0.32:t=fill`)
-      }
-      if (plate === 'punch') {
-        const barY = Math.min(0.92, lay.yNorm + 0.08)
-        base.push(
-          `drawbox=x=iw*0.12:y=ih*${barY.toFixed(3)}:w=iw*0.76:h=5:color=0xFFE566@0.95:t=fill`,
-        )
-      }
-    } else {
-      const boxY = Math.max(0.2, lay.yNorm - 0.12)
-      base.push(
-        `drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.28:color=black@0.28:t=fill`,
-      )
-    }
-    if (captionFont) {
-      base.push(
-        ...buildCaptionDrawtextFilters({
-          caption,
-          durationSec,
-          captionFont,
-          style: captionStyle,
-          textDir,
-          layout: lay,
-        }),
-      )
-    }
-  }
-
-  return base.join(',')
+  return `${overlay}[vout]`
 }
 
 async function encodeSceneClip({
@@ -233,6 +303,7 @@ async function encodeSceneClip({
   lookFilters,
   kenBurns,
   encodeDurationSec,
+  overlayMoment = null,
 }) {
   const contentDur = Math.max(2, Number(scene.durationSec) || 3)
   const dur = Math.max(contentDur, Number(encodeDurationSec) || contentDur)
@@ -241,6 +312,69 @@ async function encodeSceneClip({
   const caption = String(scene.caption || '').trim().slice(0, 140) || `Scene ${scene.index + 1}`
   const textDir = join(workDir, `caption-text-${scene.index + 1}`)
   mkdirSync(textDir, { recursive: true })
+
+  const overlayPath = overlayMoment?.overlayImagePath
+  const useOverlay =
+    Boolean(overlayMoment) &&
+    Boolean(overlayPath) &&
+    existsSync(overlayPath) &&
+    overlayPath !== scene.imagePath
+
+  if (useOverlay) {
+    const filterComplex = buildSceneOverlayFilterComplex({
+      frames,
+      caption,
+      durationSec: contentDur,
+      captionFont,
+      captionStyle,
+      captionLayout,
+      burnCaptions,
+      lookFilters,
+      kenBurns,
+      textDir,
+      overlayMoment,
+    })
+    try {
+      await runFfmpeg(
+        [
+          '-y',
+          '-loop',
+          '1',
+          '-i',
+          scene.imagePath,
+          '-loop',
+          '1',
+          '-i',
+          overlayPath,
+          '-filter_complex',
+          filterComplex,
+          '-map',
+          '[vout]',
+          '-t',
+          String(dur),
+          '-c:v',
+          'libx264',
+          '-preset',
+          VIDEO_PRESET,
+          '-crf',
+          VIDEO_CRF,
+          '-threads',
+          '0',
+          '-pix_fmt',
+          'yuv420p',
+          '-an',
+          clipPath,
+        ],
+        { maxBuffer: 16 * 1024 * 1024 },
+      )
+      return clipPath
+    } catch (e) {
+      console.warn(
+        '[eof-video] overlay moment failed, falling back to full-frame scene',
+        e instanceof Error ? e.message : e,
+      )
+    }
+  }
 
   const vf = buildSceneVideoFilter({
     frames,
@@ -389,6 +523,9 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
  *   enhanceStyle?: string,
  *   format?: string,
  *   captionMode?: 'auto' | 'free' | 'zapcap-only',
+ *   overlayMoments?: 'off' | 'auto' | 'always',
+ *   hasSecondarySubject?: boolean,
+ *   secondarySceneIndex?: number | null,
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
  * }} opts
  */
@@ -405,6 +542,9 @@ export async function renderEofProductionVideo({
   enhanceStyle,
   format,
   captionMode = 'auto',
+  overlayMoments: overlayMomentsMode,
+  hasSecondarySubject = false,
+  secondarySceneIndex = null,
   onSceneProgress,
 }) {
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
@@ -428,6 +568,22 @@ export async function renderEofProductionVideo({
   })
   const useXfade = look.perCutTransitions.length > 0 && sorted.length > 1
   const kenBurns = Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1'
+  const overlayMode = resolveEofOverlayMoments(overlayMomentsMode)
+  const overlayPlan = planEofOverlayMoments({
+    mode: overlayMode,
+    scenes: sorted,
+    hasSecondarySubject,
+    secondarySceneIndex,
+  })
+  const overlayByScene = new Map()
+  for (const m of overlayPlan) {
+    const overlayScene = sorted.find((s) => s.index === m.overlaySceneIndex)
+    if (!overlayScene?.imagePath || !existsSync(overlayScene.imagePath)) continue
+    overlayByScene.set(m.sceneIndex, {
+      ...m,
+      overlayImagePath: overlayScene.imagePath,
+    })
+  }
 
   console.info(
     '[eof-video] look',
@@ -443,6 +599,9 @@ export async function renderEofProductionVideo({
     look.transitionSec,
     'kenBurns',
     kenBurns,
+    'overlayMoments',
+    overlayMode,
+    overlayByScene.size ? `n=${overlayByScene.size}` : 'none',
   )
 
   const engine = plan.engine
@@ -496,6 +655,7 @@ export async function renderEofProductionVideo({
       lookFilters,
       kenBurns,
       encodeDurationSec: encodeDurs[i] ?? contentDurs[i],
+      overlayMoment: overlayByScene.get(scene.index) || null,
     })
     clipsDone += 1
     if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
@@ -506,12 +666,42 @@ export async function renderEofProductionVideo({
   const orderedClips = clipPaths.map((c) => c.clipPath)
 
   const targetDurationSec = contentDurs.reduce((a, b) => a + b, 0)
+
+  let audioForMux = mixedAudioPath
+  if (audioForMux && existsSync(audioForMux) && overlayByScene.size > 0) {
+    const sfxPath = resolveEofWhooshSfxPath()
+    if (sfxPath) {
+      const sfxOut = join(workDir, 'mixed-with-overlay-sfx.mp3')
+      const events = []
+      for (const m of overlayByScene.values()) {
+        events.push({ atSec: m.sfxAtSec, volume: 0.55 })
+        if (m.sfxOutAtSec != null && m.sfxOutAtSec > m.sfxAtSec + 0.4) {
+          events.push({ atSec: m.sfxOutAtSec, volume: 0.32 })
+        }
+      }
+      try {
+        audioForMux = await mixOverlaySfxIntoAudio({
+          mixedAudioPath: audioForMux,
+          sfxPath,
+          events,
+          outputPath: sfxOut,
+        })
+      } catch (e) {
+        console.warn(
+          '[eof-video] overlay whoosh mix skipped',
+          e instanceof Error ? e.message : e,
+        )
+        audioForMux = mixedAudioPath
+      }
+    }
+  }
+
   let hasAudio
   if (graph) {
     try {
       hasAudio = await stitchWithXfade({
         clipPaths: orderedClips,
-        mixedAudioPath,
+        mixedAudioPath: audioForMux,
         out,
         graph,
         targetDurationSec,
@@ -535,13 +725,22 @@ export async function renderEofProductionVideo({
             lookFilters,
             kenBurns,
             encodeDurationSec: contentDurs[i],
+            overlayMoment: overlayByScene.get(sorted[i].index) || null,
           }),
         )
       }
-      hasAudio = await stitchWithConcat({ clipPaths: plainClips, mixedAudioPath, out })
+      hasAudio = await stitchWithConcat({
+        clipPaths: plainClips,
+        mixedAudioPath: audioForMux,
+        out,
+      })
     }
   } else {
-    hasAudio = await stitchWithConcat({ clipPaths: orderedClips, mixedAudioPath, out })
+    hasAudio = await stitchWithConcat({
+      clipPaths: orderedClips,
+      mixedAudioPath: audioForMux,
+      out,
+    })
   }
 
   if (!existsSync(out)) throw new Error('Video render produced no output file.')
@@ -603,6 +802,14 @@ export async function renderEofProductionVideo({
       transitionSec: look.transitionSec,
       kenBurns,
       xfade: Boolean(graph),
+      overlayMoments: overlayMode,
+      overlayCount: overlayByScene.size,
     },
+    overlayMoments: [...overlayByScene.values()].map((m) => ({
+      sceneIndex: m.sceneIndex,
+      overlaySceneIndex: m.overlaySceneIndex,
+      absoluteStartSec: m.absoluteStartSec,
+      absoluteEndSec: m.absoluteEndSec,
+    })),
   }
 }
