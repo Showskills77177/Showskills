@@ -443,6 +443,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       format: job.script?.format,
       captionMode,
       overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
+      videoEffects: job.videoEffects,
       hasSecondarySubject: secondaryPeople.length > 0,
       secondarySceneIndex,
       onSceneProgress: async (done) => report('video', done),

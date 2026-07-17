@@ -29,6 +29,17 @@ import {
   planEofOverlayMoments,
   resolveEofOverlayMoments,
 } from '../../../shared/eofOverlayMoments.mjs'
+import {
+  normalizeEofVideoEffects,
+  videoEffectsFilterChain,
+  eofVideoEffectIds,
+} from '../../../shared/eofVideoEffects.mjs'
+import {
+  normalizeEofStickers,
+  eofStickersActive,
+  eofStickerIds,
+  chainStickersThenCaptions,
+} from './eofProductionStickers.mjs'
 import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 import { mixOverlaySfxIntoAudio, resolveEofWhooshSfxPath } from './eofAudioMix.mjs'
@@ -236,11 +247,13 @@ function buildSceneVideoFilter({
   captionLayout,
   burnCaptions,
   lookFilters = [],
+  effectFilters = [],
   kenBurns = false,
   textDir,
 }) {
   return [
     ...buildSceneBaseFilters({ frames, lookFilters, kenBurns }),
+    ...(effectFilters?.length ? effectFilters : []),
     ...buildSceneCaptionFilters({
       caption,
       durationSec,
@@ -265,6 +278,7 @@ function buildSceneOverlayFilterComplex({
   captionLayout,
   burnCaptions,
   lookFilters = [],
+  effectFilters = [],
   kenBurns = false,
   textDir,
   overlayMoment,
@@ -274,6 +288,7 @@ function buildSceneOverlayFilterComplex({
     startSec: overlayMoment.startSec,
     endSec: overlayMoment.endSec,
   })
+  const fxChain = effectFilters?.length ? effectFilters.join(',') : ''
   const captionChain = buildSceneCaptionFilters({
     caption,
     durationSec,
@@ -283,10 +298,17 @@ function buildSceneOverlayFilterComplex({
     burnCaptions,
     textDir,
   })
+  // Effects on whole composed frame, then captions on top (sharp text).
   const overlay =
     `[0:v]${baseChain}[base];` +
     `[1:v]${pop.overlayPrep}[ov];` +
     `[base][ov]overlay=${pop.overlayXy}:enable='${pop.enableExpr}'`
+  if (fxChain && captionChain.length) {
+    return `${overlay}[comp];[comp]${fxChain}[fx];[fx]${captionChain.join(',')}[vout]`
+  }
+  if (fxChain) {
+    return `${overlay}[comp];[comp]${fxChain}[vout]`
+  }
   if (captionChain.length) {
     return `${overlay}[comp];[comp]${captionChain.join(',')}[vout]`
   }
@@ -301,6 +323,7 @@ async function encodeSceneClip({
   captionLayout,
   burnCaptions,
   lookFilters,
+  effectFilters = [],
   kenBurns,
   encodeDurationSec,
   overlayMoment = null,
@@ -330,6 +353,7 @@ async function encodeSceneClip({
       captionLayout,
       burnCaptions,
       lookFilters,
+      effectFilters,
       kenBurns,
       textDir,
       overlayMoment,
@@ -385,6 +409,7 @@ async function encodeSceneClip({
     captionLayout,
     burnCaptions,
     lookFilters,
+    effectFilters,
     kenBurns,
     textDir,
   })
@@ -524,6 +549,7 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
  *   format?: string,
  *   captionMode?: 'auto' | 'free' | 'zapcap-only',
  *   overlayMoments?: 'off' | 'auto' | 'always',
+ *   videoEffects?: object | null,
  *   hasSecondarySubject?: boolean,
  *   secondarySceneIndex?: number | null,
  *   onSceneProgress?: (index: number, total: number) => Promise<void> | void,
@@ -543,6 +569,7 @@ export async function renderEofProductionVideo({
   format,
   captionMode = 'auto',
   overlayMoments: overlayMomentsMode,
+  videoEffects: videoEffectsRaw = null,
   hasSecondarySubject = false,
   secondarySceneIndex = null,
   onSceneProgress,
@@ -566,6 +593,8 @@ export async function renderEofProductionVideo({
     enhanceStyle: look.enhanceStyle,
     colorGrade: look.colorGrade,
   })
+  const videoEffects = normalizeEofVideoEffects(videoEffectsRaw)
+  const effectFilters = videoEffectsFilterChain(videoEffects)
   const useXfade = look.perCutTransitions.length > 0 && sorted.length > 1
   const kenBurns = Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1'
   const overlayMode = resolveEofOverlayMoments(overlayMomentsMode)
@@ -602,6 +631,8 @@ export async function renderEofProductionVideo({
     'overlayMoments',
     overlayMode,
     overlayByScene.size ? `n=${overlayByScene.size}` : 'none',
+    'effects',
+    eofVideoEffectIds(videoEffects).join(',') || 'none',
   )
 
   const engine = plan.engine
@@ -653,6 +684,7 @@ export async function renderEofProductionVideo({
       captionLayout,
       burnCaptions,
       lookFilters,
+      effectFilters,
       kenBurns,
       encodeDurationSec: encodeDurs[i] ?? contentDurs[i],
       overlayMoment: overlayByScene.get(scene.index) || null,
@@ -723,6 +755,7 @@ export async function renderEofProductionVideo({
             captionLayout,
             burnCaptions,
             lookFilters,
+            effectFilters,
             kenBurns,
             encodeDurationSec: contentDurs[i],
             overlayMoment: overlayByScene.get(sorted[i].index) || null,
@@ -804,6 +837,8 @@ export async function renderEofProductionVideo({
       xfade: Boolean(graph),
       overlayMoments: overlayMode,
       overlayCount: overlayByScene.size,
+      videoEffects,
+      effectIds: eofVideoEffectIds(videoEffects),
     },
     overlayMoments: [...overlayByScene.values()].map((m) => ({
       sceneIndex: m.sceneIndex,

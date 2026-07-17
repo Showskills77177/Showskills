@@ -20,6 +20,7 @@ import {
   startApplyEofProductionZapcapBackground,
   startEofProductionMusicRemixBackground,
   startEofProductionCaptionReplaceBackground,
+  startEofProductionEffectsApplyBackground,
 } from '../lib/eofProductionRenderRunner.mjs'
 import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
@@ -64,6 +65,16 @@ import {
   listEofOverlayMomentsOptions,
   resolveEofOverlayMoments,
 } from '../../../shared/eofOverlayMoments.mjs'
+import {
+  EOF_DEFAULT_VIDEO_EFFECTS,
+  EOF_EFFECT_STACKING_RULE,
+  listEofVideoEffects,
+  listEofEffectPresets,
+  normalizeEofVideoEffects,
+  EOF_MOTION_EFFECTS,
+  EOF_LIGHT_EFFECTS,
+  EOF_COLOUR_EFFECTS,
+} from '../../../shared/eofVideoEffects.mjs'
 import {
   ensureEofMusicCatalogSeeded,
   listEofMusicTracks,
@@ -193,6 +204,32 @@ export default async function handler(req, res) {
         defaultEnhanceStyle: EOF_DEFAULT_ENHANCE_STYLE,
         overlayMomentsOptions: listEofOverlayMomentsOptions(),
         defaultOverlayMoments: EOF_DEFAULT_OVERLAY_MOMENTS,
+        videoEffectsCatalog: listEofVideoEffects(),
+        videoEffectPresets: listEofEffectPresets(),
+        videoEffectsMotion: EOF_MOTION_EFFECTS.map(({ id, label, detail, vibe, preview }) => ({
+          id,
+          label,
+          detail,
+          vibe,
+          preview,
+        })),
+        videoEffectsLight: EOF_LIGHT_EFFECTS.map(({ id, label, detail, vibe, preview }) => ({
+          id,
+          label,
+          detail,
+          vibe,
+          preview,
+        })),
+        videoEffectsColour: EOF_COLOUR_EFFECTS.map((e) => ({
+          id: e.id,
+          label: e.label,
+          detail: e.detail,
+          vibe: e.vibe,
+          preview: e.preview,
+          subgroup: e.subgroup || null,
+        })),
+        defaultVideoEffects: EOF_DEFAULT_VIDEO_EFFECTS,
+        videoEffectsStackingRule: EOF_EFFECT_STACKING_RULE,
         captionEngine: eofCaptionEngineStatus(),
         zapcapTemplates: zapcapCatalog.templates,
         zapcapTemplatesError: zapcapCatalog.error,
@@ -416,6 +453,38 @@ export default async function handler(req, res) {
         }
       }
 
+      if (action === 'apply-effects') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (!(existing.script?.scenes?.length >= 1)) {
+          return json(res, 400, { error: 'Job has no script scenes.' })
+        }
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          return json(res, 409, {
+            error:
+              'This Short is already rendering. Wait until it finishes, then click Apply effects again.',
+          })
+        }
+
+        try {
+          await updateEofProductionJob(jobId, {
+            videoEffects:
+              body.videoEffects !== undefined
+                ? normalizeEofVideoEffects(body.videoEffects)
+                : undefined,
+          })
+          await startEofProductionEffectsApplyBackground(jobId)
+          const job = await getEofProductionJob(jobId)
+          return json(res, 202, { ok: true, accepted: true, job })
+        } catch (e) {
+          return json(res, 500, {
+            error: e instanceof Error ? e.message : 'Apply effects failed',
+          })
+        }
+      }
+
       if (action === 'replace-captions') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
@@ -610,6 +679,9 @@ export default async function handler(req, res) {
       const overlayMoments = resolveEofOverlayMoments(
         typeof body.overlayMoments === 'string' ? body.overlayMoments : EOF_DEFAULT_OVERLAY_MOMENTS,
       )
+      const videoEffects = normalizeEofVideoEffects(
+        body.videoEffects !== undefined ? body.videoEffects : EOF_DEFAULT_VIDEO_EFFECTS,
+      )
       try {
         const job = await createEofProductionJob({
           topic,
@@ -623,6 +695,7 @@ export default async function handler(req, res) {
           colorGrade,
           enhanceStyle,
           overlayMoments,
+          videoEffects,
         })
         return json(res, 201, {
           ok: true,
@@ -669,6 +742,8 @@ export default async function handler(req, res) {
           body.overlayMoments !== undefined
             ? resolveEofOverlayMoments(body.overlayMoments)
             : undefined,
+        videoEffects:
+          body.videoEffects !== undefined ? normalizeEofVideoEffects(body.videoEffects) : undefined,
         voiceSettings:
           body.voiceSettings !== undefined
             ? normalizeElevenLabsVoiceSettings(body.voiceSettings)

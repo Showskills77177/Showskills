@@ -48,6 +48,17 @@ import {
   EOF_DEFAULT_OVERLAY_MOMENTS,
   EOF_OVERLAY_MOMENTS_OPTIONS,
 } from '../../../../shared/eofOverlayMoments.mjs'
+import {
+  EOF_DEFAULT_VIDEO_EFFECTS,
+  EOF_EFFECT_STACKING_RULE,
+  EOF_MOTION_EFFECTS,
+  EOF_LIGHT_EFFECTS,
+  EOF_COLOUR_EFFECTS,
+  EOF_EFFECT_PRESETS,
+  normalizeEofVideoEffects,
+  pickEofVideoEffect,
+  summarizeEofVideoEffects,
+} from '../../../../shared/eofVideoEffects.mjs'
 
 /** Clean Production chrome — keep Studio gray panels so cards don’t blend into page black. */
 const PX = {
@@ -348,6 +359,148 @@ function EnhanceStylePreview({ styleId, className = '' }) {
   )
 }
 
+/* CapCut-style FX card previews (CSS only — no looping media). */
+const EOF_FX_CSS = `
+@media (prefers-reduced-motion: no-preference){
+ .eoffx-shake-soft{animation:eoffx-shake 0.55s ease-in-out infinite}
+ .eoffx-shake-hard{animation:eoffx-shake-hard 0.4s ease-in-out infinite}
+ .eoffx-wave{animation:eoffx-wave 1.4s ease-in-out infinite}
+ .eoffx-flash{animation:eoffx-flash 1.1s ease-in-out infinite}
+ .eoffx-glow{animation:eoffx-glow 1.6s ease-in-out infinite}
+ .eoffx-rgb::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,0,80,.22),transparent 40%,rgba(0,180,255,.22));mix-blend-mode:screen;animation:eoffx-rgb 1.2s ease-in-out infinite}
+}
+@keyframes eoffx-shake{0%,100%{transform:translate(0,0)}25%{transform:translate(1.5px,-1px)}75%{transform:translate(-1.5px,1px)}}
+@keyframes eoffx-shake-hard{0%,100%{transform:translate(0,0) rotate(0)}25%{transform:translate(2.5px,-2px) rotate(-1deg)}75%{transform:translate(-2.5px,2px) rotate(1deg)}}
+@keyframes eoffx-wave{0%,100%{transform:rotate(-1.2deg) scale(1.04)}50%{transform:rotate(1.2deg) scale(1.04)}}
+@keyframes eoffx-flash{0%,70%,100%{filter:brightness(1)}80%{filter:brightness(1.55)}}
+@keyframes eoffx-glow{0%,100%{filter:brightness(1.05) saturate(1.1)}50%{filter:brightness(1.25) saturate(1.2)}}
+@keyframes eoffx-rgb{0%,100%{opacity:.35;transform:translateX(-2px)}50%{opacity:.7;transform:translateX(2px)}}
+`
+
+let eofFxStylesInjected = false
+function useEofFxStyles() {
+  useEffect(() => {
+    if (eofFxStylesInjected || typeof document === 'undefined') return
+    if (document.getElementById('eof-fx-preview-styles')) {
+      eofFxStylesInjected = true
+      return
+    }
+    const el = document.createElement('style')
+    el.id = 'eof-fx-preview-styles'
+    el.textContent = EOF_FX_CSS
+    document.head.appendChild(el)
+    eofFxStylesInjected = true
+  }, [])
+}
+
+const EFFECT_PREVIEW_LOOK = {
+  none: { filter: 'none', anim: '' },
+  shake_subtle: { filter: 'none', anim: 'eoffx-shake-soft' },
+  shake_strong: { filter: 'none', anim: 'eoffx-shake-hard' },
+  blur_soft: { filter: 'blur(1.4px)', anim: '' },
+  blur_motion: { filter: 'blur(0.9px) contrast(1.05)', anim: 'eoffx-shake-soft' },
+  wave_gentle: { filter: 'none', anim: 'eoffx-wave' },
+  wave_rgb: { filter: 'contrast(1.05) saturate(1.15)', anim: 'eoffx-rgb' },
+  light_leak: {
+    filter: 'saturate(1.15) brightness(1.05)',
+    overlay: 'linear-gradient(135deg,rgba(255,140,40,.45),transparent 55%)',
+    anim: 'eoffx-glow',
+  },
+  flash: { filter: 'none', anim: 'eoffx-flash' },
+  glow_pulse: { filter: 'brightness(1.08)', anim: 'eoffx-glow' },
+  cold: {
+    filter: 'contrast(1.06) saturate(1.1)',
+    overlay: 'linear-gradient(180deg,rgba(40,120,255,.28),rgba(0,60,180,.16))',
+  },
+  warm: {
+    filter: 'contrast(1.05) saturate(1.15)',
+    overlay: 'linear-gradient(180deg,rgba(255,150,40,.28),rgba(255,90,0,.14))',
+  },
+  contrast_punch: { filter: 'contrast(1.2) saturate(1.25) brightness(1.02)' },
+  noir: { filter: 'grayscale(1) contrast(1.2) brightness(0.95)' },
+  teal_orange: {
+    filter: 'contrast(1.08) saturate(1.15)',
+    overlay: 'linear-gradient(180deg,rgba(0,160,170,.22),rgba(255,120,40,.2))',
+  },
+  hdr_pop: {
+    filter: 'contrast(1.18) saturate(1.2) brightness(1.04)',
+    overlay: 'radial-gradient(circle at 50% 35%,rgba(255,255,255,.18),transparent 55%)',
+  },
+  hdr_glow: {
+    filter: 'brightness(1.1) saturate(1.15) contrast(1.06)',
+    overlay: 'radial-gradient(circle at 50% 30%,rgba(255,240,200,.35),transparent 50%)',
+    anim: 'eoffx-glow',
+  },
+  hdr_crisp: { filter: 'contrast(1.22) saturate(1.12) brightness(1.02)' },
+}
+
+function EffectCardPreview({ effectId, className = '' }) {
+  useEofFxStyles()
+  const look = EFFECT_PREVIEW_LOOK[effectId] || EFFECT_PREVIEW_LOOK.none
+  return (
+    <div className={`relative overflow-hidden bg-black ${className}`}>
+      <div className={`h-full w-full ${look.anim || ''}`} style={{ filter: look.filter || 'none' }}>
+        <SampleMiniFrame variant="a" />
+      </div>
+      {look.overlay ? (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: look.overlay, mixBlendMode: 'soft-light' }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled }) {
+  return (
+    <div>
+      <p className="text-[12px] font-medium text-[#d4d4d4]">{title}</p>
+      {hint ? <p className={`mt-0.5 text-[11px] ${PX.muted}`}>{hint}</p> : null}
+      <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+        {items.map((fx) => {
+          const active = activeId === fx.id
+          return (
+            <button
+              key={fx.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onPick(fx.id)}
+              className={`overflow-hidden rounded-lg border text-left transition disabled:opacity-40 ${
+                active
+                  ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
+                  : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+              }`}
+              title={fx.detail || fx.label}
+            >
+              <div className="relative mx-auto aspect-[9/16] w-full max-w-[68px] overflow-hidden bg-black">
+                <EffectCardPreview effectId={fx.id} className="h-full w-full" />
+                {active ? (
+                  <span className="absolute right-1 top-1 z-10 rounded bg-white px-1 py-0.5 text-[9px] font-semibold text-black">
+                    ✓
+                  </span>
+                ) : null}
+              </div>
+              <div className="px-1.5 py-1">
+                <span
+                  className={`block truncate text-[11px] font-medium leading-tight ${
+                    active ? 'text-white' : 'text-[#e5e5e5]'
+                  }`}
+                >
+                  {fx.label}
+                </span>
+                {fx.vibe ? (
+                  <span className="mt-0.5 block truncate text-[10px] text-[#888]">{fx.vibe}</span>
+                ) : null}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 
 function readStoredScriptProvider() {
@@ -425,6 +578,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   const [enhanceStyle, setEnhanceStyle] = useState(EOF_DEFAULT_ENHANCE_STYLE)
   const [overlayMomentsOptions, setOverlayMomentsOptions] = useState([])
   const [overlayMoments, setOverlayMoments] = useState(EOF_DEFAULT_OVERLAY_MOMENTS)
+  const [videoEffects, setVideoEffects] = useState(() => ({ ...EOF_DEFAULT_VIDEO_EFFECTS }))
+  const [videoEffectsMotion, setVideoEffectsMotion] = useState([])
+  const [videoEffectsLight, setVideoEffectsLight] = useState([])
+  const [videoEffectsColour, setVideoEffectsColour] = useState([])
+  const [videoEffectPresets, setVideoEffectPresets] = useState([])
+  const [videoEffectsStackingRule, setVideoEffectsStackingRule] = useState(EOF_EFFECT_STACKING_RULE)
   const [musicTracks, setMusicTracks] = useState([])
   const [defaultMusicBeds, setDefaultMusicBeds] = useState([])
   const [musicTrackId, setMusicTrackId] = useState('')
@@ -537,6 +696,20 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       if (j.defaultTransitionStyle) setTransitionStyle((prev) => prev || j.defaultTransitionStyle)
       setOverlayMomentsOptions(Array.isArray(j.overlayMomentsOptions) ? j.overlayMomentsOptions : [])
       if (j.defaultOverlayMoments) setOverlayMoments((prev) => prev || j.defaultOverlayMoments)
+      setVideoEffectsMotion(Array.isArray(j.videoEffectsMotion) ? j.videoEffectsMotion : [])
+      setVideoEffectsLight(Array.isArray(j.videoEffectsLight) ? j.videoEffectsLight : [])
+      setVideoEffectsColour(Array.isArray(j.videoEffectsColour) ? j.videoEffectsColour : [])
+      setVideoEffectPresets(Array.isArray(j.videoEffectPresets) ? j.videoEffectPresets : [])
+      if (typeof j.videoEffectsStackingRule === 'string' && j.videoEffectsStackingRule) {
+        setVideoEffectsStackingRule(j.videoEffectsStackingRule)
+      }
+      if (j.defaultVideoEffects) {
+        setVideoEffects((prev) =>
+          prev?.motion || prev?.light || prev?.colour
+            ? prev
+            : normalizeEofVideoEffects(j.defaultVideoEffects),
+        )
+      }
       setColorGrades(Array.isArray(j.colorGrades) ? j.colorGrades : [])
       if (j.defaultColorGrade) setColorGrade((prev) => prev || j.defaultColorGrade)
       setEnhanceStyles(Array.isArray(j.enhanceStyles) ? j.enhanceStyles : [])
@@ -648,6 +821,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     [imageProvider],
   )
 
+
   useEffect(() => {
     load()
   }, [load])
@@ -719,6 +893,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     if (job.colorGrade) setColorGrade(job.colorGrade)
     if (job.enhanceStyle) setEnhanceStyle(job.enhanceStyle)
     if (job.overlayMoments) setOverlayMoments(job.overlayMoments)
+    setVideoEffects(normalizeEofVideoEffects(job.videoEffects || EOF_DEFAULT_VIDEO_EFFECTS))
     setMusicTrackId(job.musicTrackId || '')
     if (job.musicVolume != null && Number.isFinite(Number(job.musicVolume))) {
       setMusicVolume(Number(job.musicVolume))
@@ -1099,6 +1274,81 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       setTimeout(() => {
         resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 300)
+    } catch (e) {
+      setRenderPhase('failed')
+      setRenderProgress(null)
+      setErr(e instanceof Error ? e.message : 'Error')
+      await refreshJobsQuiet()
+    } finally {
+      stopRenderPolling()
+      setBusy(false)
+      setRenderPhase('')
+    }
+  }
+
+  /** Post-build: remux with current CapCut-style effects — keeps stills + VO (no image re-scrape). */
+  async function applyEffects() {
+    if (!selectedId || !draftScript?.scenes?.length) return
+    setBusy(true)
+    setErr('')
+    setSuccess('Applying effects (keeping images + voiceover)…')
+    setRenderPhase('rendering-video')
+    if (videoPreviewUrl) {
+      try {
+        URL.revokeObjectURL(videoPreviewUrl)
+      } catch {
+        /* ignore */
+      }
+    }
+    setVideoPreviewUrl('')
+
+    const baselineUpdatedAt = selected?.updatedAt || null
+
+    try {
+      const estSec = Math.max(40, (draftScript.scenes.length || 4) * 12)
+      setRenderProgress({
+        percent: 5,
+        message: 'Applying effects…',
+        etaLabel: `~${formatDuration(estSec)} est.`,
+        elapsedSeconds: 0,
+        estimatedTotalSec: estSec,
+        startedAt: new Date().toISOString(),
+        sceneCount: draftScript.scenes.length,
+        stage: 'video',
+        pipeline: 'video',
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'apply-effects',
+          jobId: selectedId,
+          videoEffects: normalizeEofVideoEffects(videoEffects),
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok && res.status !== 202) {
+        throw new Error(j.error || `Apply effects failed to start (HTTP ${res.status})`)
+      }
+      if (j.job) {
+        upsertJob(j.job)
+        if (j.job.renderProgress) setRenderProgress(j.job.renderProgress)
+      }
+
+      const finishedJob = await waitForVideoComplete(selectedId, { baselineUpdatedAt })
+      if (finishedJob.status !== 'video_rendered') {
+        throw new Error(finishedJob.errorMessage || 'Apply effects did not finish with a video')
+      }
+
+      await loadVideoPreview({ bust: finishedJob.updatedAt || Date.now() })
+      setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
+      setSuccess(
+        `Effects applied (${summarizeEofVideoEffects(finishedJob.videoEffects || videoEffects)}) — images and voiceover kept.`,
+      )
+      upsertJob(finishedJob)
+      hydratedJobIdRef.current = selectedId
+      hydrateDraftFromJob(finishedJob)
     } catch (e) {
       setRenderPhase('failed')
       setRenderProgress(null)
@@ -1526,6 +1776,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           colorGrade,
           enhanceStyle,
           overlayMoments,
+          videoEffects: normalizeEofVideoEffects(videoEffects),
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -1576,6 +1827,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           colorGrade,
           enhanceStyle,
           overlayMoments,
+          videoEffects: normalizeEofVideoEffects(videoEffects),
           musicTrackId: musicTrackId || null,
           musicVolume,
           voiceSettings: voicePreset === 'brian' ? voiceSettings : null,
@@ -1953,7 +2205,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   }
 
   return (
-    <div className="w-full space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       {loading ? <p className={`text-sm ${PX.muted}`}>Loading…</p> : null}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -2027,6 +2279,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ))}
               </select>
             </label>
+
+
             {imageProvider === 'serpapi' && !imageSources.serpapi ? (
               <p className="text-[#ff9b95]">SerpAPI selected but SERPAPI_API_KEY is not configured.</p>
             ) : null}
@@ -2188,6 +2442,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ))}
               </select>
             </label>
+
+
             <label className={PX.label}>
               Voice
               <select value={voicePreset} onChange={(e) => setVoicePreset(e.target.value)} className={inputCls}>
@@ -2213,7 +2469,6 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               SerpAPI / Auto.
             </p>
           ) : null}
-
           <div className="grid gap-5 lg:grid-cols-2">
             <div>
               <p className={PX.label}>Transitions</p>
@@ -2221,7 +2476,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 See the motion between scenes, then pick one. Auto picks CapCut fades / slides / wipes from
                 the format.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
                 {(transitionStyles.length ? transitionStyles : EOF_TRANSITION_STYLES).map((t) => {
                   const active = transitionStyle === t.id
                   return (
@@ -2267,7 +2522,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 Preview the grade, then pick one. Auto grades every scene so mixed stock stills look like one
                 edit.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
                 {(colorGrades.length ? colorGrades : EOF_COLOR_GRADES).map((g) => {
                   const active = colorGrade === g.id
                   return (
@@ -2313,7 +2568,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 CapCut-style clarify after the 9:16 crop — mild denoise + soft sharpen, not plastic AI faces.
                 Stacks with color match. Apply before Rebuild.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
                 {(enhanceStyles.length ? enhanceStyles : EOF_ENHANCE_STYLES).map((e) => {
                   const active = enhanceStyle === e.id
                   return (
@@ -2353,7 +2608,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 })}
               </div>
             </div>
-            <div className="lg:col-span-2">
+              <div className="lg:col-span-2">
               <p className={PX.label}>Image over image</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
                 Optional CapCut-style pop-up inset (upper third) with a swipe whoosh. Auto uses one middle
@@ -2393,6 +2648,92 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 })}
               </div>
             </div>
+
+            <div className="lg:col-span-2">
+              <p className={PX.label}>Effects</p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                CapCut-style free local FFmpeg effects (shake, blur, lights, waves, colour + HDR looks).{' '}
+                {videoEffectsStackingRule} Effects run on the footage plate before captions so text stays
+                sharp. Default is Off. After a Short is built, use Apply effects to remux without new photos.
+              </p>
+              <p className="mt-2 text-[11px] text-[#8e8e8e]">
+                Active: {summarizeEofVideoEffects(videoEffects)}
+              </p>
+              <div className="mt-3 space-y-4">
+                <EffectPickerGrid
+                  title="Presets"
+                  hint="One-tap bundles — still only fill motion + light + colour."
+                  items={(videoEffectPresets.length ? videoEffectPresets : EOF_EFFECT_PRESETS).map(
+                    (p) => ({
+                      id: p.id,
+                      label: p.label,
+                      detail: p.detail,
+                      vibe: p.vibe,
+                    }),
+                  )}
+                  activeId={videoEffects.preset || 'none'}
+                  disabled={busy}
+                  onPick={(id) => {
+                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'preset'))
+                    markDraftDirty()
+                  }}
+                />
+                <EffectPickerGrid
+                  title="Motion"
+                  hint="Shake / blur / waves — pick one or Off."
+                  items={videoEffectsMotion.length ? videoEffectsMotion : EOF_MOTION_EFFECTS}
+                  activeId={videoEffects.motion || 'none'}
+                  disabled={busy}
+                  onPick={(id) => {
+                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'motion'))
+                    markDraftDirty()
+                  }}
+                />
+                <EffectPickerGrid
+                  title="Lights"
+                  hint="Light leak / flash / glow — pick one or Off."
+                  items={videoEffectsLight.length ? videoEffectsLight : EOF_LIGHT_EFFECTS}
+                  activeId={videoEffects.light || 'none'}
+                  disabled={busy}
+                  onPick={(id) => {
+                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'light'))
+                    markDraftDirty()
+                  }}
+                />
+                <EffectPickerGrid
+                  title="Colour"
+                  hint="Cold / warm / punch / noir / teal–orange — pick one or Off (HDR below shares this slot)."
+                  items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
+                    (e) => e.subgroup !== 'hdr',
+                  )}
+                  activeId={
+                    String(videoEffects.colour || '').startsWith('hdr_')
+                      ? 'none'
+                      : videoEffects.colour || 'none'
+                  }
+                  disabled={busy}
+                  onPick={(id) => {
+                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
+                    markDraftDirty()
+                  }}
+                />
+                <EffectPickerGrid
+                  title="HDR looks"
+                  hint="TikTok-style HDR punch (not true HDR10) — counts as the colour slot, don’t stack two grades."
+                  items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
+                    (e) => e.subgroup === 'hdr',
+                  )}
+                  activeId={
+                    String(videoEffects.colour || '').startsWith('hdr_') ? videoEffects.colour : ''
+                  }
+                  disabled={busy}
+                  onPick={(id) => {
+                    setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
+                    markDraftDirty()
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -2419,7 +2760,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 animated template (~$0.10/min).
               </p>
             )}
-            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
+            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {[
                 { id: 'live', label: 'Live subs', vibe: 'Bottom TV / CC', preview: 'live', free: true },
                 { id: 'classic', label: 'Classic subs', vibe: 'Netflix / YouTube', preview: 'classic', free: true },
@@ -2560,7 +2901,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ) : null}
                 {zapcapTemplates.length ? (
                   <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()
@@ -3081,6 +3422,26 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
                 {(selected.status === 'video_rendered' || videoPreviewUrl) && draftScript?.scenes?.length ? (
                   <div className="mt-5 rounded-xl border border-[#303030] bg-[#161616] p-4">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-[#303030] pb-4">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
+                          Effects · apply
+                        </p>
+                        <p className={`mt-1 text-xs ${PX.muted}`}>
+                          Change Effects above, Save, then Apply effects. Remuxes with FFmpeg filters — keeps
+                          images + voiceover (same spirit as Replace captions). Active:{' '}
+                          {summarizeEofVideoEffects(videoEffects)}.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy || isRendering}
+                        onClick={applyEffects}
+                        className={PX.btnPrimary}
+                      >
+                        {busy && renderPhase === 'rendering-video' ? 'Applying…' : 'Apply effects'}
+                      </button>
+                    </div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#d4d4d4]">
@@ -3089,7 +3450,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         <p className={`mt-1 text-xs ${PX.muted}`}>
                           Change style, edit text, move up/down, resize — then Replace captions. Keeps images +
                           voiceover (no new photos). If a still already has meme/quote text in the picture, use
-                          Rebuild video instead.
+                          Rebuild video instead. Effects stay on the job and re-apply on remux.
                         </p>
                       </div>
                       <button

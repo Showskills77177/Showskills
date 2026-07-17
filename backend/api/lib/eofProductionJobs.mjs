@@ -31,6 +31,10 @@ import {
   EOF_DEFAULT_OVERLAY_MOMENTS,
   resolveEofOverlayMoments,
 } from '../../../shared/eofOverlayMoments.mjs'
+import {
+  EOF_DEFAULT_VIDEO_EFFECTS,
+  normalizeEofVideoEffects,
+} from '../../../shared/eofVideoEffects.mjs'
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
@@ -48,7 +52,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
   caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
-  overlay_moments,
+  overlay_moments, video_effects_json,
   narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
@@ -111,6 +115,7 @@ function rowToJob(row) {
     colorGrade: resolveEofColorGrade(row.color_grade || EOF_DEFAULT_COLOR_GRADE),
     enhanceStyle: resolveEofEnhanceStyle(row.enhance_style || EOF_DEFAULT_ENHANCE_STYLE),
     overlayMoments: resolveEofOverlayMoments(row.overlay_moments || EOF_DEFAULT_OVERLAY_MOMENTS),
+    videoEffects: normalizeEofVideoEffects(row.video_effects_json || EOF_DEFAULT_VIDEO_EFFECTS),
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -158,6 +163,7 @@ export async function createEofProductionJob({
   colorGrade = EOF_DEFAULT_COLOR_GRADE,
   enhanceStyle = EOF_DEFAULT_ENHANCE_STYLE,
   overlayMoments = EOF_DEFAULT_OVERLAY_MOMENTS,
+  videoEffects = EOF_DEFAULT_VIDEO_EFFECTS,
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
@@ -181,6 +187,7 @@ export async function createEofProductionJob({
   const color = resolveEofColorGrade(colorGrade)
   const enhance = resolveEofEnhanceStyle(enhanceStyle)
   const overlay = resolveEofOverlayMoments(overlayMoments)
+  const effects = normalizeEofVideoEffects(videoEffects)
 
   let script
   let scriptSource
@@ -221,8 +228,8 @@ export async function createEofProductionJob({
 
   await query(
     `INSERT INTO eof_production_jobs
-     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, zapcap_template_id, transition_style, color_grade, enhance_style, overlay_moments, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+     (id, topic, title, status, script_json, script_source, music_track_id, music_volume, voice_preset, voice_settings_json, caption_style, zapcap_template_id, transition_style, color_grade, enhance_style, overlay_moments, video_effects_json, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
     [
       id,
       t,
@@ -240,6 +247,7 @@ export async function createEofProductionJob({
       color,
       enhance,
       overlay,
+      JSON.stringify(effects),
       createdBy || null,
     ],
   )
@@ -422,6 +430,9 @@ export async function updateEofProductionJob(id, patch) {
     patch.overlayMoments !== undefined
       ? resolveEofOverlayMoments(patch.overlayMoments)
       : resolveEofOverlayMoments(job.overlayMoments)
+  const videoEffects = normalizeEofVideoEffects(
+    patch.videoEffects !== undefined ? patch.videoEffects : job.videoEffects,
+  )
   const captionLayout = normalizeEofCaptionLayout(
     patch.captionLayout !== undefined ? patch.captionLayout : job.captionLayout,
     captionStyle,
@@ -453,6 +464,7 @@ export async function updateEofProductionJob(id, patch) {
          enhance_style = $23,
          caption_layout_json = $24,
          overlay_moments = $25,
+         video_effects_json = $26,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -481,6 +493,7 @@ export async function updateEofProductionJob(id, patch) {
       enhanceStyle,
       JSON.stringify(captionLayout),
       overlayMoments,
+      JSON.stringify(videoEffects),
     ],
   )
 
