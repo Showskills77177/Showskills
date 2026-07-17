@@ -462,6 +462,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     wikimedia: true,
   })
   const [imagesNote, setImagesNote] = useState('')
+  const [imageProvider, setImageProvider] = useState('auto')
+  const [imageProviderOptions, setImageProviderOptions] = useState([
+    { id: 'auto', label: 'Auto (SerpAPI → Oxylabs)', configured: true },
+    { id: 'serpapi', label: 'SerpAPI', configured: false },
+    { id: 'oxylabs', label: 'Oxylabs', configured: false },
+  ])
+  const [imageProviderBusy, setImageProviderBusy] = useState(false)
   const [pinterestStatus, setPinterestStatus] = useState(null)
   const [serpapiStatus, setSerpapiStatus] = useState(null)
   const [oxylabsStatus, setOxylabsStatus] = useState(null)
@@ -547,6 +554,12 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             },
       )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
+      if (typeof j.imageProvider === 'string' && j.imageProvider.trim()) {
+        setImageProvider(j.imageProvider.trim().toLowerCase())
+      }
+      if (Array.isArray(j.imageProviderOptions) && j.imageProviderOptions.length) {
+        setImageProviderOptions(j.imageProviderOptions)
+      }
       setPinterestStatus(j.pinterest && typeof j.pinterest === 'object' ? j.pinterest : null)
       setSerpapiStatus(j.serpapi && typeof j.serpapi === 'object' ? j.serpapi : null)
       setOxylabsStatus(j.oxylabs && typeof j.oxylabs === 'object' ? j.oxylabs : null)
@@ -566,6 +579,42 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       /* background */
     }
   }, [fetchProduction])
+
+  const saveImageProvider = useCallback(
+    async (next) => {
+      const value = String(next || '').trim().toLowerCase()
+      if (!value || value === imageProvider) return
+      const prev = imageProvider
+      setImageProvider(value)
+      setImageProviderBusy(true)
+      setErr('')
+      try {
+        const res = await apiFetch('/api/admin/eof-production', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update-image-provider', imageProvider: value }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error || 'Could not save Google Images provider')
+        if (typeof j.imageProvider === 'string') setImageProvider(j.imageProvider)
+        if (Array.isArray(j.imageProviderOptions)) setImageProviderOptions(j.imageProviderOptions)
+        if (typeof j.imagesNote === 'string') setImagesNote(j.imagesNote)
+        setSuccess(
+          j.imageProvider === 'oxylabs'
+            ? 'Google Images provider: Oxylabs'
+            : j.imageProvider === 'serpapi'
+              ? 'Google Images provider: SerpAPI'
+              : 'Google Images provider: Auto (SerpAPI → Oxylabs)',
+        )
+      } catch (e) {
+        setImageProvider(prev)
+        setErr(e instanceof Error ? e.message : 'Could not save Google Images provider')
+      } finally {
+        setImageProviderBusy(false)
+      }
+    },
+    [imageProvider],
+  )
 
   useEffect(() => {
     load()
@@ -1771,6 +1820,35 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            <label className="block space-y-1">
+              <span className="text-[#aaaaaa]">Google Images provider</span>
+              <select
+                value={imageProvider}
+                disabled={imageProviderBusy}
+                onChange={(e) => saveImageProvider(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[#303030] bg-[#121212] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#555] disabled:opacity-50"
+              >
+                {imageProviderOptions.map((p) => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    disabled={p.id !== 'auto' && !p.configured}
+                    title={p.detail}
+                  >
+                    {p.label}
+                    {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {imageProvider === 'serpapi' && !imageSources.serpapi ? (
+              <p className="text-[#ff9b95]">SerpAPI selected but SERPAPI_API_KEY is not configured.</p>
+            ) : null}
+            {imageProvider === 'oxylabs' && !imageSources.oxylabs ? (
+              <p className="text-[#ff9b95]">
+                Oxylabs selected but OXYLABS_USERNAME / OXYLABS_PASSWORD are not configured.
+              </p>
+            ) : null}
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
             {serpapiStatus?.configured ? (
               <p className={serpapiStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
@@ -1858,7 +1936,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             />
           </label>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <label className={PX.label}>
               Format
               <select value={format} onChange={(e) => setFormat(e.target.value)} className={inputCls}>
@@ -1904,6 +1982,27 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               </select>
             </label>
             <label className={PX.label}>
+              Google Images
+              <select
+                value={imageProvider}
+                disabled={imageProviderBusy}
+                onChange={(e) => saveImageProvider(e.target.value)}
+                className={inputCls}
+              >
+                {imageProviderOptions.map((p) => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    disabled={p.id !== 'auto' && !p.configured}
+                    title={p.detail}
+                  >
+                    {p.label}
+                    {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={PX.label}>
               Voice
               <select value={voicePreset} onChange={(e) => setVoicePreset(e.target.value)} className={inputCls}>
                 {(voicePresets.length
@@ -1917,6 +2016,17 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               </select>
             </label>
           </div>
+          {imageProvider === 'serpapi' && !imageSources.serpapi ? (
+            <p className={`text-xs ${PX.muted} text-[#ff9b95]`}>
+              SerpAPI is selected but not keyed — add SERPAPI_API_KEY and redeploy, or pick Oxylabs / Auto.
+            </p>
+          ) : null}
+          {imageProvider === 'oxylabs' && !imageSources.oxylabs ? (
+            <p className={`text-xs ${PX.muted} text-[#ff9b95]`}>
+              Oxylabs is selected but not keyed — add OXYLABS_USERNAME + OXYLABS_PASSWORD and redeploy, or pick
+              SerpAPI / Auto.
+            </p>
+          ) : null}
 
           <div className="grid gap-5 lg:grid-cols-2">
             <div>

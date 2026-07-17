@@ -25,6 +25,10 @@ import {
 } from './eofApImages.mjs'
 import { isEofOxylabsConfigured, claimOxylabsPoolHit } from './eofOxylabsImages.mjs'
 import { isEofSerpApiConfigured } from './eofSerpApiImages.mjs'
+import {
+  normalizeEofImageProvider,
+  eofImageProviderConfigurationNote,
+} from './eofImageProviderSettings.mjs'
 
 const PALETTES = ['0x1e3a5f', '0x1a4d3e', '0x3d2a1a', '0x2a1f4d', '0x4a1f2a']
 
@@ -45,14 +49,11 @@ export function eofImageSourceStatus() {
   }
 }
 
-export function eofImagesConfigurationNote() {
+export function eofImagesConfigurationNote(preferredProvider = 'auto') {
   const { ap, serpapi, oxylabs, google, pexels, pinterestApi } = eofImageSourceStatus()
-  if (serpapi) {
-    return 'SerpAPI: 1 Google Images search per Short (cheaper primary). Oxylabs/CSE fallback when needed.'
-  }
-  if (oxylabs) {
-    return 'Oxylabs: 1 search per Short (only as many stills as scenes). Wikimedia last-resort.'
-  }
+  const preferred = normalizeEofImageProvider(preferredProvider)
+  const providerNote = eofImageProviderConfigurationNote(preferred)
+  if (providerNote) return providerNote
   if (ap || google || pexels || pinterestApi) {
     return pinterestApi && !ap && !google && !pexels
       ? 'Pinterest token is set, but pin search needs Pinterest app approval. Add SERPAPI_API_KEY or Oxylabs for Google Images hit-rate.'

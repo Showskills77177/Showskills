@@ -17,6 +17,10 @@ import { fetchEofSceneImage, clearEofSceneImageCache } from './eofSceneImages.mj
 import { listWikimediaPersonImages } from './eofWikimediaImages.mjs'
 import { isEofOxylabsConfigured, fetchEofOxylabsJobPool } from './eofOxylabsImages.mjs'
 import { isEofSerpApiConfigured, fetchEofSerpApiJobPool } from './eofSerpApiImages.mjs'
+import {
+  getEofImageProviderSettings,
+  resolveEofImageProviderAttemptOrder,
+} from './eofImageProviderSettings.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
 import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
 import {
@@ -137,7 +141,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
 
     let imagesDone = 0
     // Google Images pool: exactly ONE billable query for the whole Short.
-    // Prefer SerpAPI (cheaper) → Oxylabs → per-scene CSE/AP later. 7 scenes ≠ 7 credits.
+    // Order follows admin imageProvider (auto / serpapi / oxylabs), then AP/CSE per scene.
     let oxyPool = null
     let wikiPool = []
     if (!reuseSceneImages) {
@@ -145,42 +149,53 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         0,
         ...priorManifest.map((m) => Number(m?.imageAttempt) || 0),
       )
-      if (isEofSerpApiConfigured()) {
-        try {
-          const pool = await fetchEofSerpApiJobPool({
-            topic: job.topic,
-            sceneCount: rows.length,
-            attempt: maxAttempt,
-          })
-          if (pool.hits?.length) {
-            oxyPool = {
-              query: pool.query,
-              hits: pool.hits,
-              claimed: new Set(),
-              source: 'serpapi',
+      const imageSettings = await getEofImageProviderSettings().catch(() => ({
+        imageProvider: 'auto',
+      }))
+      const providerOrder = resolveEofImageProviderAttemptOrder(imageSettings.imageProvider, {
+        serpapi: isEofSerpApiConfigured(),
+        oxylabs: isEofOxylabsConfigured(),
+      })
+      for (const provider of providerOrder) {
+        if (oxyPool?.hits?.length) break
+        if (provider === 'serpapi') {
+          try {
+            const pool = await fetchEofSerpApiJobPool({
+              topic: job.topic,
+              sceneCount: rows.length,
+              attempt: maxAttempt,
+            })
+            if (pool.hits?.length) {
+              oxyPool = {
+                query: pool.query,
+                hits: pool.hits,
+                claimed: new Set(),
+                source: 'serpapi',
+              }
             }
+          } catch (e) {
+            console.warn('[eof-video] serpapi job pool failed', e instanceof Error ? e.message : e)
           }
-        } catch (e) {
-          console.warn('[eof-video] serpapi job pool failed', e instanceof Error ? e.message : e)
-          oxyPool = null
+          continue
         }
-      }
-      if (!oxyPool?.hits?.length && isEofOxylabsConfigured()) {
-        try {
-          const pool = await fetchEofOxylabsJobPool({
-            topic: job.topic,
-            sceneCount: rows.length,
-            attempt: maxAttempt,
-          })
-          oxyPool = {
-            query: pool.query,
-            hits: pool.hits,
-            claimed: new Set(),
-            source: 'oxylabs',
+        if (provider === 'oxylabs') {
+          try {
+            const pool = await fetchEofOxylabsJobPool({
+              topic: job.topic,
+              sceneCount: rows.length,
+              attempt: maxAttempt,
+            })
+            if (pool.hits?.length) {
+              oxyPool = {
+                query: pool.query,
+                hits: pool.hits,
+                claimed: new Set(),
+                source: 'oxylabs',
+              }
+            }
+          } catch (e) {
+            console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
           }
-        } catch (e) {
-          console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
-          oxyPool = null
         }
       }
       if (!oxyPool?.hits?.length) {

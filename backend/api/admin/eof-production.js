@@ -23,6 +23,12 @@ import {
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
 import {
+  getEofImageProviderSettings,
+  updateEofImageProviderSettings,
+  listEofImageProviderOptions,
+  normalizeEofImageProvider,
+} from '../lib/eofImageProviderSettings.mjs'
+import {
   EOF_VOICE_PRESETS,
   EOF_RENDER_STACK,
   EOF_DEFAULT_VOICE_PRESET,
@@ -149,6 +155,11 @@ export default async function handler(req, res) {
         tracks = await listEofMusicTracks({ activeOnly: false }).catch(() => [])
       }
 
+      const imageProviderSettings = await getEofImageProviderSettings().catch(() => ({
+        imageProvider: 'auto',
+        updatedAt: null,
+      }))
+
       return json(res, 200, {
         ok: true,
         jobs,
@@ -211,7 +222,10 @@ export default async function handler(req, res) {
           : 'Video build needs ffmpeg (bundled ffmpeg-static on deploy, or FFMPEG_PATH locally).',
         pexelsConfigured: eofImageSourceStatus().pexels,
         imageSources: eofImageSourceStatus(),
-        imagesNote: eofImagesConfigurationNote(),
+        imageProvider: imageProviderSettings.imageProvider || 'auto',
+        imageProviderOptions: listEofImageProviderOptions(),
+        imageProviderUpdatedAt: imageProviderSettings.updatedAt || null,
+        imagesNote: eofImagesConfigurationNote(imageProviderSettings.imageProvider),
         pinterest: pinterestProbe,
         serpapi: serpapiProbe,
         oxylabs: oxylabsProbe,
@@ -223,6 +237,34 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = await readJsonBody(req)
       const action = typeof body.action === 'string' ? body.action : 'create'
+
+      if (action === 'update-image-provider' || action === 'image-provider') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, {
+            error: 'Only the channel owner can change the Google Images provider.',
+          })
+        }
+        const raw =
+          body.imageProvider !== undefined
+            ? body.imageProvider
+            : body.provider !== undefined
+              ? body.provider
+              : body.serpProvider
+        if (raw === undefined || raw === null || String(raw).trim() === '') {
+          return json(res, 400, { error: 'imageProvider is required (auto | serpapi | oxylabs).' })
+        }
+        const imageProvider = normalizeEofImageProvider(raw)
+        const settings = await updateEofImageProviderSettings({ imageProvider })
+        return json(res, 200, {
+          ok: true,
+          settings,
+          imageProvider: settings.imageProvider,
+          imageProviderOptions: listEofImageProviderOptions(),
+          imagesNote: eofImagesConfigurationNote(settings.imageProvider),
+        })
+      }
 
       if (action === 'apply-zapcap-captions') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
