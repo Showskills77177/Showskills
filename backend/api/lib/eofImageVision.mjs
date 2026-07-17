@@ -56,13 +56,15 @@ export async function rankEofPoolHitsWithVision(opts = {}) {
     .join('\n')
 
   const system = `You are an Eyes Of Football stills editor. Score Google Image candidates for a vertical Short.
-Return JSON only: { "scores": [ { "index": number, "score": number, "person": string, "era": "pundit"|"playing"|"coach"|"other"|"unknown", "watermark": boolean, "burned_captions": boolean, "reason": string } ] }
+Return JSON only: { "scores": [ { "index": number, "score": number, "person": string, "era": "pundit"|"playing"|"coach"|"other"|"unknown", "watermark": boolean, "burned_captions": boolean, "subject_visible": boolean, "reason": string } ] }
 Rules:
-- score 0–10. Prefer clear face of the RIGHT person (clean photo, not a graphic).
-- For intent "${intent}": pundit = studio/suit/TV now; playing = kit/action; coach = sideline/presser.
-- HARD fail (score ≤2) if watermark/banner/Getty overlay, wrong person, or unusable crop.
+- score 0–10. Prefer a CLEAR, identifiable face of the LEAD subject (clean press photo, not a graphic).
+- HARD fail (score ≤1, subject_visible=false) if the lead subject is NOT clearly in the frame — e.g. random other footballers posing, stock couples, unrelated group shots, wrong celebrity.
+- HARD fail (score ≤2) if watermark/banner/Getty overlay, or unusable crop.
 - HARD fail (score ≤2, burned_captions=true) for meme/quote cards, collage graphics, or any still with large burned-in captions/text overlays — we burn our own Shorts captions on top and those stack.
-- If a secondary person is needed (${secondary.join(', ') || 'none'}), note them in person when visible.`
+- Group photos: only score ≥6 if the lead subject is the obvious main person (largest/closest face, not a tiny background figure).
+- For intent "${intent}": pundit = studio/suit/TV now; playing = kit/action; coach = sideline/presser.
+- If a secondary person is needed (${secondary.join(', ') || 'none'}), note them in person when visible — but NEVER pass a still that lacks the lead subject.`
 
   const userContent = [
     {
@@ -117,6 +119,8 @@ Score every index 1–${hits.length}.`,
       if (row?.watermark === true) s = Math.min(s, 2)
       // Meme/quote stills with on-image text double under ffmpeg caption burn.
       if (row?.burned_captions === true) s = Math.min(s, 2)
+      // Wrong people / group shots with no lead subject (e.g. random duo when we need Rooney).
+      if (row?.subject_visible === false) s = Math.min(s, 1)
       s = Math.max(0, Math.min(10, s))
       scores.set(hits[idx].url, s)
     }
@@ -149,7 +153,7 @@ export function applyVisionScoresToHits(hits, visionScores) {
         visionScore: Number.isFinite(vs) ? vs : null,
       }
     })
-    .filter((h) => h.visionScore == null || h.visionScore >= 3)
+    .filter((h) => h.visionScore == null || h.visionScore >= 4)
     .sort((a, b) => {
       const diff = (b.visionScore ?? 5) - (a.visionScore ?? 5)
       if (diff !== 0) return diff

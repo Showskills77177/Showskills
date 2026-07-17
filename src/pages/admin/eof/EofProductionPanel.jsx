@@ -371,22 +371,24 @@ function EnhanceStylePreview({ styleId, className = '' }) {
   )
 }
 
-/* CapCut-style FX card previews (CSS only — no looping media). */
+/* CapCut-style FX card previews — contained so shake never moves the page. */
 const EOF_FX_CSS = `
+.eoffx-stage{contain:layout paint;isolation:isolate;overflow:hidden;transform:translateZ(0)}
+.eoffx-stage .eoffx-inner{transform-origin:center center;will-change:transform,filter}
 @media (prefers-reduced-motion: no-preference){
  .eoffx-shake-soft{animation:eoffx-shake 0.55s ease-in-out infinite}
  .eoffx-shake-hard{animation:eoffx-shake-hard 0.4s ease-in-out infinite}
  .eoffx-wave{animation:eoffx-wave 1.4s ease-in-out infinite}
  .eoffx-flash{animation:eoffx-flash 1.1s ease-in-out infinite}
  .eoffx-glow{animation:eoffx-glow 1.6s ease-in-out infinite}
- .eoffx-rgb::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,0,80,.22),transparent 40%,rgba(0,180,255,.22));mix-blend-mode:screen;animation:eoffx-rgb 1.2s ease-in-out infinite}
+ .eoffx-rgb::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,0,80,.22),transparent 40%,rgba(0,180,255,.22));mix-blend-mode:screen;animation:eoffx-rgb 1.2s ease-in-out infinite;pointer-events:none}
 }
-@keyframes eoffx-shake{0%,100%{transform:translate(0,0)}25%{transform:translate(1.5px,-1px)}75%{transform:translate(-1.5px,1px)}}
-@keyframes eoffx-shake-hard{0%,100%{transform:translate(0,0) rotate(0)}25%{transform:translate(2.5px,-2px) rotate(-1deg)}75%{transform:translate(-2.5px,2px) rotate(1deg)}}
-@keyframes eoffx-wave{0%,100%{transform:rotate(-1.2deg) scale(1.04)}50%{transform:rotate(1.2deg) scale(1.04)}}
-@keyframes eoffx-flash{0%,70%,100%{filter:brightness(1)}80%{filter:brightness(1.55)}}
-@keyframes eoffx-glow{0%,100%{filter:brightness(1.05) saturate(1.1)}50%{filter:brightness(1.25) saturate(1.2)}}
-@keyframes eoffx-rgb{0%,100%{opacity:.35;transform:translateX(-2px)}50%{opacity:.7;transform:translateX(2px)}}
+@keyframes eoffx-shake{0%,100%{transform:translate3d(0,0,0)}25%{transform:translate3d(1px,-0.5px,0)}75%{transform:translate3d(-1px,0.5px,0)}}
+@keyframes eoffx-shake-hard{0%,100%{transform:translate3d(0,0,0) rotate(0)}25%{transform:translate3d(1.5px,-1px,0) rotate(-0.6deg)}75%{transform:translate3d(-1.5px,1px,0) rotate(0.6deg)}}
+@keyframes eoffx-wave{0%,100%{transform:rotate(-0.8deg) scale(1.02)}50%{transform:rotate(0.8deg) scale(1.02)}}
+@keyframes eoffx-flash{0%,70%,100%{filter:brightness(1)}80%{filter:brightness(1.45)}}
+@keyframes eoffx-glow{0%,100%{filter:brightness(1.05) saturate(1.1)}50%{filter:brightness(1.2) saturate(1.15)}}
+@keyframes eoffx-rgb{0%,100%{opacity:.35;transform:translateX(-1px)}50%{opacity:.65;transform:translateX(1px)}}
 `
 
 let eofFxStylesInjected = false
@@ -450,8 +452,11 @@ function EffectCardPreview({ effectId, className = '' }) {
   useEofFxStyles()
   const look = EFFECT_PREVIEW_LOOK[effectId] || EFFECT_PREVIEW_LOOK.none
   return (
-    <div className={`relative overflow-hidden bg-black ${className}`}>
-      <div className={`h-full w-full ${look.anim || ''}`} style={{ filter: look.filter || 'none' }}>
+    <div className={`eoffx-stage relative overflow-hidden bg-black ${className}`}>
+      <div
+        className={`eoffx-inner h-full w-full ${look.anim || ''}`}
+        style={{ filter: look.filter || 'none' }}
+      >
         <SampleMiniFrame variant="a" />
       </div>
       {look.overlay ? (
@@ -470,18 +475,18 @@ function EffectPickerGrid({ title, hint, items, activeId, onPick, disabled }) {
       <p className="text-[12px] font-medium text-[#d4d4d4]">{title}</p>
       {hint ? <p className={`mt-0.5 text-[11px] ${PX.muted}`}>{hint}</p> : null}
       <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-        {items.map((fx) => {
-          const active = activeId === fx.id
+        {(Array.isArray(items) ? items : []).map((fx) => {
+          const active = Boolean(activeId) && activeId === fx.id
           return (
             <button
               key={fx.id}
               type="button"
               disabled={disabled}
               onClick={() => onPick(fx.id)}
-              className={`overflow-hidden rounded-lg border text-left transition disabled:opacity-40 ${
+              className={`overflow-hidden rounded-lg border text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                 active
-                  ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
-                  : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
+                  ? 'border-white/50 bg-[#2a2a2a] ring-1 ring-white/25'
+                  : 'border-[#333] bg-[#161616] hover:border-[#666] hover:bg-[#1c1c1c]'
               }`}
               title={fx.detail || fx.label}
             >
@@ -3032,9 +3037,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <div className="lg:col-span-2">
               <p className={PX.label}>Effects</p>
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                CapCut-style free local FFmpeg effects (shake, blur, lights, waves, colour + HDR looks).{' '}
-                {videoEffectsStackingRule} Effects run on the footage plate before captions so text stays
-                sharp. Default is Off. After a Short is built, use Apply effects to remux without new photos.
+                CapCut-style free local FFmpeg effects (shake, blur, lights, waves, colour + HDR).{' '}
+                {videoEffectsStackingRule} Effects burn onto the footage before captions.
+              </p>
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                <span className="text-[#d4d4d4]">How it works:</span> tap cards to choose (always clickable).
+                That only updates your draft. Then click <span className="text-[#d4d4d4]">Apply effects</span>{' '}
+                on a finished Short to remux — same stills + voiceover, new look. Or include them on the next
+                Build / Rebuild.
               </p>
               <p className="mt-2 text-[11px] text-[#8e8e8e]">
                 Active: {summarizeEofVideoEffects(videoEffects)}
@@ -3052,7 +3062,6 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     }),
                   )}
                   activeId={videoEffects.preset || 'none'}
-                  disabled={busy}
                   onPick={(id) => {
                     setVideoEffects(pickEofVideoEffect(videoEffects, id, 'preset'))
                     markDraftDirty()
@@ -3063,7 +3072,6 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   hint="Shake / blur / waves — pick one or Off."
                   items={videoEffectsMotion.length ? videoEffectsMotion : EOF_MOTION_EFFECTS}
                   activeId={videoEffects.motion || 'none'}
-                  disabled={busy}
                   onPick={(id) => {
                     setVideoEffects(pickEofVideoEffect(videoEffects, id, 'motion'))
                     markDraftDirty()
@@ -3074,7 +3082,6 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   hint="Light leak / flash / glow — pick one or Off."
                   items={videoEffectsLight.length ? videoEffectsLight : EOF_LIGHT_EFFECTS}
                   activeId={videoEffects.light || 'none'}
-                  disabled={busy}
                   onPick={(id) => {
                     setVideoEffects(pickEofVideoEffect(videoEffects, id, 'light'))
                     markDraftDirty()
@@ -3088,10 +3095,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   )}
                   activeId={
                     String(videoEffects.colour || '').startsWith('hdr_')
-                      ? 'none'
+                      ? ''
                       : videoEffects.colour || 'none'
                   }
-                  disabled={busy}
                   onPick={(id) => {
                     setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
                     markDraftDirty()
@@ -3099,14 +3105,13 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 />
                 <EffectPickerGrid
                   title="HDR looks"
-                  hint="TikTok-style HDR punch (not true HDR10) — counts as the colour slot, don’t stack two grades."
+                  hint="TikTok-style HDR punch (not true HDR10) — counts as the colour slot."
                   items={(videoEffectsColour.length ? videoEffectsColour : EOF_COLOUR_EFFECTS).filter(
                     (e) => e.subgroup === 'hdr',
                   )}
                   activeId={
                     String(videoEffects.colour || '').startsWith('hdr_') ? videoEffects.colour : ''
                   }
-                  disabled={busy}
                   onPick={(id) => {
                     setVideoEffects(pickEofVideoEffect(videoEffects, id, 'colour'))
                     markDraftDirty()
@@ -3131,7 +3136,6 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   hint="Subscribe / Follow CTAs — toggle on/off."
                   items={stickersButtons.length ? stickersButtons : listEofStickersByCategory('buttons')}
                   selectedIds={stickers.items.map((i) => i.id)}
-                  disabled={busy}
                   onPick={(id) => {
                     const next = pickEofSticker(stickers, id)
                     setStickers(next)
@@ -3146,7 +3150,6 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   hint="Point left / right / up / down."
                   items={stickersArrows.length ? stickersArrows : listEofStickersByCategory('arrows')}
                   selectedIds={stickers.items.map((i) => i.id)}
-                  disabled={busy}
                   onPick={(id) => {
                     const next = pickEofSticker(stickers, id)
                     setStickers(next)
@@ -3158,10 +3161,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 />
                 <StickerPickerGrid
                   title="Shapes"
-                  hint="Square, circle, rounded rect, line — solid + outline."
+                  hint="Small accents only — won’t cover the face."
                   items={stickersShapes.length ? stickersShapes : listEofStickersByCategory('shapes')}
                   selectedIds={stickers.items.map((i) => i.id)}
-                  disabled={busy}
                   onPick={(id) => {
                     const next = pickEofSticker(stickers, id)
                     setStickers(next)
@@ -3173,10 +3175,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 />
                 <StickerPickerGrid
                   title="Stickers"
-                  hint="Fire accent, NEW badge, tap hand — emoji-free originals."
+                  hint="Fire / NEW / tap — keep compact."
                   items={stickersExtras.length ? stickersExtras : listEofStickersByCategory('stickers')}
                   selectedIds={stickers.items.map((i) => i.id)}
-                  disabled={busy}
                   onPick={(id) => {
                     const next = pickEofSticker(stickers, id)
                     setStickers(next)
@@ -3947,9 +3948,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           Effects · apply
                         </p>
                         <p className={`mt-1 text-xs ${PX.muted}`}>
-                          Change Effects above, Save, then Apply effects. Remuxes with FFmpeg filters — keeps
-                          images + voiceover (same spirit as Replace captions). Active:{' '}
-                          {summarizeEofVideoEffects(videoEffects)}.
+                          Pick Effects cards above (draft only). This button burns them into the Short —
+                          keeps the same photos + VO, like Replace captions. Does not scrape new images.
+                          Active: {summarizeEofVideoEffects(videoEffects)}.
                         </p>
                       </div>
                       <button

@@ -420,42 +420,45 @@ export function pickEofVideoEffect(current, effectId, category) {
   const cat = String(category || '')
     .trim()
     .toLowerCase()
-  if (cat === 'preset' || PRESET_IDS.has(id)) {
-    return normalizeEofVideoEffects({ preset: id === 'none' && cat !== 'preset' ? 'none' : id })
+
+  // Explicit slot writes — always honour category so Off / HDR / colour picks never no-op.
+  if (cat === 'preset') {
+    return normalizeEofVideoEffects({ preset: PRESET_IDS.has(id) ? id : 'none' })
   }
-  if (cat === 'motion' || (MOTION_IDS.has(id) && cat !== 'light' && cat !== 'colour')) {
-    if (cat === 'motion' || MOTION_IDS.has(id)) {
-      return {
-        motion: resolveEofMotionEffect(id),
-        light: base.light,
-        colour: base.colour,
-        preset: 'none',
-      }
+  if (cat === 'motion') {
+    return {
+      motion: resolveEofMotionEffect(id),
+      light: base.light,
+      colour: base.colour,
+      preset: 'none',
     }
   }
-  if (cat === 'light' || LIGHT_IDS.has(id)) {
-    if (cat === 'light' || (LIGHT_IDS.has(id) && id !== 'none')) {
-      return {
-        motion: base.motion,
-        light: resolveEofLightEffect(id),
-        colour: base.colour,
-        preset: 'none',
-      }
+  if (cat === 'light') {
+    return {
+      motion: base.motion,
+      light: resolveEofLightEffect(id),
+      colour: base.colour,
+      preset: 'none',
     }
   }
-  if (cat === 'colour' || COLOUR_IDS.has(id)) {
-    if (cat === 'colour' || (COLOUR_IDS.has(id) && id !== 'none')) {
-      return {
-        motion: base.motion,
-        light: base.light,
-        colour: resolveEofColourEffect(id),
-        preset: 'none',
-      }
+  if (cat === 'colour') {
+    return {
+      motion: base.motion,
+      light: base.light,
+      colour: resolveEofColourEffect(id),
+      preset: 'none',
     }
   }
-  // Bare `none` without category → clear motion (first slot).
-  if (id === 'none') {
-    return { motion: 'none', light: base.light, colour: base.colour, preset: 'none' }
+
+  if (PRESET_IDS.has(id)) return normalizeEofVideoEffects({ preset: id })
+  if (MOTION_IDS.has(id)) {
+    return { motion: resolveEofMotionEffect(id), light: base.light, colour: base.colour, preset: 'none' }
+  }
+  if (LIGHT_IDS.has(id)) {
+    return { motion: base.motion, light: resolveEofLightEffect(id), colour: base.colour, preset: 'none' }
+  }
+  if (COLOUR_IDS.has(id)) {
+    return { motion: base.motion, light: base.light, colour: resolveEofColourEffect(id), preset: 'none' }
   }
   return base
 }
