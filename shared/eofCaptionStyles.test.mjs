@@ -16,8 +16,8 @@ import {
   normalizeZapcapTemplateId,
   listEofCaptionStyles,
 } from './eofCaptionStyles.mjs'
+import { buildWordBeats } from './eofCaptionBeats.mjs'
 import {
-  buildWordBeats,
   buildCaptionDrawtextFilters,
   escapeDrawtext,
 } from '../backend/api/lib/eofTikTokCaptions.mjs'

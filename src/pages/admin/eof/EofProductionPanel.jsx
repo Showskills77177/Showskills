@@ -29,6 +29,7 @@ import {
   isLocalCaptionStyle,
   isZapcapCaptionStyle,
 } from '../../../../shared/eofCaptionStyles.mjs'
+import { buildWordBeats } from '../../../../shared/eofCaptionBeats.mjs'
 import {
   defaultEofCaptionLayout,
   normalizeEofCaptionLayout,
@@ -96,6 +97,154 @@ const inputCls =
   'mt-1.5 w-full rounded-xl border border-[#303030] bg-[#121212] px-3.5 py-2.5 text-sm text-white placeholder:text-[#717171] outline-none transition focus:border-[#555]'
 const SELECTED_JOB_KEY = 'eof_production_selected_job'
 
+const FREE_CAPTION_PREVIEW_SAMPLE = 'Spain beat Belgium last night'
+const FREE_CAPTION_PREVIEW_LOOP_SEC = 3.2
+
+/** Looping clock for free CapCut-style caption thumbs (no video decode). */
+function useLoopClock(durationSec) {
+  const [t, setT] = useState(0)
+  useEffect(() => {
+    const dur = Math.max(1.2, Number(durationSec) || 3)
+    let raf = 0
+    const start = performance.now()
+    const tick = (now) => {
+      setT(((now - start) / 1000) % dur)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [durationSec])
+  return t
+}
+
+/**
+ * In-place motion thumb for free Pop / Karaoke / Beast burns.
+ * Uses the same character-weighted word beats as the ffmpeg path.
+ */
+function FreeCaptionMotionThumb({ styleId }) {
+  const t = useLoopClock(FREE_CAPTION_PREVIEW_LOOP_SEC)
+  const beats = useMemo(
+    () => buildWordBeats(FREE_CAPTION_PREVIEW_SAMPLE, FREE_CAPTION_PREVIEW_LOOP_SEC),
+    [],
+  )
+  const activeIdx = Math.max(
+    0,
+    beats.findIndex((b) => t >= b.start && t < b.end),
+  )
+  const active = beats[activeIdx] || beats[0]
+  const local = Math.max(0, t - (active?.start || 0))
+
+  if (styleId === 'pop') {
+    const n = 2
+    const groupStart = Math.floor(activeIdx / n) * n
+    const group = beats.slice(groupStart, groupStart + n)
+    const text = group.map((b) => b.text).join(' ').toUpperCase()
+    const flash = local < 0.14
+    const scale = local < 0.09 ? 0.82 + local * 2.2 : local < 0.16 ? 1.08 : 1
+    return (
+      <span
+        className={`inline-block rounded-[3px] px-1.5 py-0.5 text-[13px] font-black uppercase leading-none tracking-wide transition-transform duration-75 ${
+          flash ? 'bg-[#FFE566] text-black' : 'bg-transparent text-white [text-shadow:0_1px_2px_#000,0_0_1px_#000]'
+        }`}
+        style={{ transform: `scale(${scale})` }}
+      >
+        {text}
+      </span>
+    )
+  }
+
+  if (styleId === 'karaoke') {
+    const windowSize = 4
+    const winStart = Math.max(0, activeIdx - Math.floor((windowSize - 1) / 2))
+    const window = beats.slice(winStart, winStart + windowSize)
+    return (
+      <span className="flex flex-wrap items-end justify-center gap-x-1 px-1 leading-none">
+        {window.map((b) => {
+          const on = b.index === activeIdx
+          return (
+            <span
+              key={b.index}
+              className={`font-black uppercase transition-all duration-100 ${
+                on
+                  ? 'text-[13px] text-[#FFE566] [text-shadow:0_1px_2px_#000]'
+                  : 'text-[11px] text-white/70 [text-shadow:0_1px_1px_#000]'
+              }`}
+            >
+              {b.text}
+            </span>
+          )
+        })}
+      </span>
+    )
+  }
+
+  // beast
+  const popScale = local < 0.1 ? 0.7 + local * 4 : local < 0.18 ? 1.12 : 1
+  return (
+    <span
+      className="inline-block text-[18px] font-black uppercase leading-none text-[#FFE566] drop-shadow-[0_1px_2px_#000]"
+      style={{ transform: `scale(${popScale})` }}
+    >
+      {String(active?.text || 'GOAL').toUpperCase()}
+    </span>
+  )
+}
+
+/** Static free-subtitle chip art (non-animated looks). */
+function FreeCaptionStaticThumb({ preview }) {
+  if (preview === 'live') {
+    return (
+      <div className="w-full bg-black/60 px-1 py-1 text-center">
+        <span className="text-[11px] font-bold leading-none text-white">Tuchel</span>
+      </div>
+    )
+  }
+  if (preview === 'classic') {
+    return (
+      <span className="px-1 text-[11px] font-semibold leading-none text-white [text-shadow:0_1px_1px_#000]">
+        still running
+      </span>
+    )
+  }
+  if (preview === 'softbar') {
+    return (
+      <span className="rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+        Spain beat
+      </span>
+    )
+  }
+  if (preview === 'broadcast') {
+    return (
+      <span className="text-[11px] font-bold text-white [text-shadow:-0.5px_0_#000,0.5px_0_#000]">
+        Full-time
+      </span>
+    )
+  }
+  if (preview === 'desk') {
+    return (
+      <div className="w-[90%] bg-black/35 px-1 py-1 text-center">
+        <span className="text-[12px] font-bold text-white">Rooney</span>
+      </div>
+    )
+  }
+  if (preview === 'elegant') {
+    return (
+      <span className="text-[11px] font-semibold text-[#F5E6C8] [text-shadow:0_1px_2px_#000]">
+        remember
+      </span>
+    )
+  }
+  if (preview === 'punch') {
+    return (
+      <div className="rounded-[2px] bg-black/55 px-1.5 py-1 text-center">
+        <span className="text-[10px] font-black uppercase leading-none text-[#FFE566]">Spain</span>
+        <div className="mx-auto mt-0.5 h-px w-3/4 bg-[#FFE566]" />
+      </div>
+    )
+  }
+  return <span className="text-[10px] uppercase tracking-wide text-white/40">off</span>
+}
+
 /**
  * Animated caption-style preview (CapCut-like). Plays ZapCap's looping mp4/webm demo,
  * shows a gif/image when that's what's provided, and falls back to a labelled tile.
@@ -123,13 +272,13 @@ function CaptionTemplatePreview({
   const isImage = Boolean(url) && type === 'image'
   const poster = template?.posterUrl || (isImage ? url : '')
   const mediaCls = emphasizeCaptions
-    ? 'h-full w-full origin-bottom scale-[2.35] object-cover object-[center_82%]'
+    ? 'h-full w-full origin-bottom scale-[2.55] object-cover object-[center_84%]'
     : 'h-full w-full object-cover'
 
   const [hovered, setHovered] = useState(false)
   const videoRef = useRef(null)
   // Only mount/decode a <video> when this card is actually being previewed.
-  // "always" is for the single selected-look strip; grid cards play on hover/focus
+  // "always" is for the selected look + active grid cell; others play on hover/focus
   // so we never decode dozens of mp4s at once (that was crashing the tab on memory).
   const shouldPlay = isVideo && (playMode === 'always' || hovered)
 
@@ -149,12 +298,12 @@ function CaptionTemplatePreview({
     const idleFallback = poster ? (
       <img src={poster} alt="" loading="lazy" className={mediaCls} />
     ) : (
-      <div className="flex h-full w-full flex-col items-center justify-end gap-1 bg-[#0d0d12] px-1.5 pb-2">
-        <span className="rounded bg-yellow-400 px-2 py-1 text-[12px] font-black uppercase tracking-wide text-black shadow">
+      <div className="flex h-full w-full flex-col items-center justify-end gap-1 bg-[#0d0d12] px-1.5 pb-2.5">
+        <span className="rounded bg-yellow-400 px-2.5 py-1 text-[13px] font-black uppercase tracking-wide text-black shadow">
           {String(template?.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
         </span>
         {playMode !== 'always' ? (
-          <span className={`text-center text-[9px] font-semibold ${muted}`}>Hover</span>
+          <span className={`text-center text-[10px] font-semibold ${muted}`}>Hover to play</span>
         ) : null}
       </div>
     )
@@ -192,8 +341,8 @@ function CaptionTemplatePreview({
     )
   }
   return (
-    <div className={`flex flex-col items-center justify-end gap-1 bg-[#0d0d12] px-1.5 pb-2 ${className}`}>
-      <span className="rounded bg-yellow-400 px-2 py-1 text-[12px] font-black uppercase tracking-wide text-black shadow">
+    <div className={`flex flex-col items-center justify-end gap-1 bg-[#0d0d12] px-1.5 pb-2.5 ${className}`}>
+      <span className="rounded bg-yellow-400 px-2.5 py-1 text-[13px] font-black uppercase tracking-wide text-black shadow">
         {String(template?.name || 'CapCut').split(/\s+/)[0]?.slice(0, 10) || 'CAP'}
       </span>
       <span className={`text-center text-[10px] font-bold ${muted}`}>Preview soon</span>
@@ -201,35 +350,35 @@ function CaptionTemplatePreview({
   )
 }
 
-/** Compact ZapCap picker cell — plays the preview in-place on hover (no sticky portal flyout). */
+/** ZapCap picker cell — larger in-place preview; active cell autoplays (no sticky flyout). */
 function ZapCapTemplateCell({ template, active, onSelect }) {
   return (
     <button
       type="button"
       onClick={() => onSelect?.()}
-      className={`group relative overflow-hidden rounded-md border text-left transition ${
+      className={`group relative overflow-hidden rounded-lg border text-left transition ${
         active
           ? 'border-white/40 bg-[#272727] ring-1 ring-white/20'
           : 'border-[#2a2a2a] bg-[#161616] hover:border-[#555]'
       }`}
       title={template.description || template.name || template.id}
     >
-      <div className="relative mx-auto h-11 w-full overflow-hidden rounded-sm bg-[#0d0d12]">
+      <div className="relative mx-auto h-[4.5rem] w-full overflow-hidden rounded-md bg-[#0d0d12] sm:h-20">
         <CaptionTemplatePreview
           template={template}
           className="h-full w-full transition-transform duration-150 group-hover:scale-[1.02]"
           emphasizeCaptions
-          playMode="hover"
+          playMode={active ? 'always' : 'hover'}
         />
         {active ? (
-          <span className="absolute right-0.5 top-0.5 rounded bg-white px-1 py-px text-[7px] font-semibold text-black">
+          <span className="absolute right-1 top-1 rounded bg-white px-1 py-px text-[8px] font-semibold text-black">
             ✓
           </span>
         ) : null}
       </div>
-      <div className="px-0.5 py-0.5">
+      <div className="px-1 py-1">
         <span
-          className={`block truncate text-[9px] font-medium leading-tight ${
+          className={`block truncate text-[10px] font-medium leading-tight ${
             active ? 'text-white' : 'text-[#e5e5e5]'
           }`}
         >
@@ -3341,7 +3490,7 @@ export default function EofProductionPanel({
                 animated template (~$0.10/min).
               </p>
             )}
-            <div className="mt-2 grid gap-1 grid-cols-4 sm:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 2xl:grid-cols-11">
+            <div className="mt-2 grid gap-1.5 grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-9">
               {[
                 { id: 'live', label: 'Live subs', vibe: 'Bottom TV / CC', preview: 'live', free: true },
                 { id: 'classic', label: 'Classic subs', vibe: 'Netflix / YouTube', preview: 'classic', free: true },
@@ -3350,9 +3499,9 @@ export default function EofProductionPanel({
                 { id: 'desk', label: 'Desk VO', vibe: 'Larger commentary', preview: 'desk', free: true },
                 { id: 'elegant', label: 'Gold trim', vibe: 'Cream lower third', preview: 'elegant', free: true },
                 { id: 'punch', label: 'Match bar', vibe: 'Sports lower-third', preview: 'punch', free: true },
-                { id: 'pop', label: 'Pop punch', vibe: '1–2 word hooks', preview: 'pop', free: true },
-                { id: 'karaoke', label: 'Word highlight', vibe: 'Active word yellow', preview: 'karaoke', free: true },
-                { id: 'beast', label: 'Beast boom', vibe: 'Huge single word', preview: 'beast', free: true },
+                { id: 'pop', label: 'Pop punch', vibe: '1–2 word hooks', preview: 'pop', free: true, motion: true },
+                { id: 'karaoke', label: 'Word highlight', vibe: 'Active word yellow', preview: 'karaoke', free: true, motion: true },
+                { id: 'beast', label: 'Beast boom', vibe: 'Huge single word', preview: 'beast', free: true, motion: true },
                 { id: 'off', label: 'Off', vibe: 'No captions', preview: 'off', free: true },
               ].map((s) => {
                 const active = captionStyle === s.id
@@ -3365,69 +3514,29 @@ export default function EofProductionPanel({
                       setZapcapTemplateId('')
                       markDraftDirty()
                     }}
-                    className={`overflow-hidden rounded-md border text-left transition ${
+                    className={`overflow-hidden rounded-lg border text-left transition ${
                       active
                         ? 'border-white/35 bg-[#272727] ring-1 ring-white/20'
                         : 'border-[#303030] bg-[#121212] hover:border-[#555] hover:bg-[#1c1c1c]'
                     }`}
                     title={`${s.label} — ${s.vibe}`}
                   >
-                    {/* CapCut-like chip: short strip showing caption look only (not tall 9:16 frame) */}
-                    <div className="relative flex h-10 w-full items-center justify-center overflow-hidden bg-gradient-to-b from-[#1a2a1a] to-[#0f1a30]">
-                      {s.preview === 'live' ? (
-                        <div className="w-full bg-black/60 px-0.5 py-0.5 text-center">
-                          <span className="text-[7px] font-bold leading-none text-white">Tuchel</span>
-                        </div>
-                      ) : s.preview === 'classic' ? (
-                        <span className="px-0.5 text-[7px] font-semibold leading-none text-white [text-shadow:0_1px_1px_#000]">
-                          still running
-                        </span>
-                      ) : s.preview === 'softbar' ? (
-                        <span className="rounded-[2px] bg-black/65 px-1 py-px text-[6.5px] font-semibold text-white">
-                          Spain beat
-                        </span>
-                      ) : s.preview === 'broadcast' ? (
-                        <span className="text-[7px] font-bold text-white [text-shadow:-0.5px_0_#000,0.5px_0_#000]">
-                          Full-time
-                        </span>
-                      ) : s.preview === 'desk' ? (
-                        <div className="w-[90%] bg-black/35 px-0.5 py-0.5 text-center">
-                          <span className="text-[7.5px] font-bold text-white">Rooney</span>
-                        </div>
-                      ) : s.preview === 'elegant' ? (
-                        <span className="text-[7px] font-semibold text-[#F5E6C8] [text-shadow:0_1px_2px_#000]">
-                          remember
-                        </span>
-                      ) : s.preview === 'punch' ? (
-                        <div className="rounded-[1px] bg-black/55 px-1 py-0.5 text-center">
-                          <span className="text-[6.5px] font-black uppercase leading-none text-[#FFE566]">Spain</span>
-                          <div className="mx-auto mt-px h-px w-3/4 bg-[#FFE566]" />
-                        </div>
-                      ) : s.preview === 'pop' ? (
-                        <span className="rounded-[2px] bg-[#FFE566] px-1 text-[9px] font-black uppercase leading-none text-black">
-                          SPAIN
-                        </span>
-                      ) : s.preview === 'karaoke' ? (
-                        <span className="leading-none">
-                          <span className="text-[7px] font-extrabold uppercase text-white/70">spain </span>
-                          <span className="text-[7.5px] font-black uppercase text-[#FFE566]">beat</span>
-                        </span>
-                      ) : s.preview === 'beast' ? (
-                        <span className="text-[11px] font-black uppercase leading-none text-[#FFE566] drop-shadow">
-                          GOAL
-                        </span>
+                    {/* Readable caption strip — motion for CapCut free burns */}
+                    <div className="relative flex h-[3.75rem] w-full items-center justify-center overflow-hidden bg-gradient-to-b from-[#1a2a1a] to-[#0f1a30] sm:h-16">
+                      {s.motion ? (
+                        <FreeCaptionMotionThumb styleId={s.id} />
                       ) : (
-                        <span className="text-[6px] uppercase tracking-wide text-white/40">off</span>
+                        <FreeCaptionStaticThumb preview={s.preview} />
                       )}
                       {active ? (
-                        <span className="absolute right-0.5 top-0.5 rounded bg-white px-0.5 text-[5px] font-semibold leading-none text-black">
+                        <span className="absolute right-1 top-1 rounded bg-white px-1 text-[7px] font-semibold leading-none text-black">
                           ✓
                         </span>
                       ) : null}
                     </div>
-                    <div className="px-1 py-0.5">
+                    <div className="px-1.5 py-1">
                       <span
-                        className={`block truncate text-[9px] font-medium leading-tight ${
+                        className={`block truncate text-[10px] font-medium leading-tight ${
                           active ? 'text-white' : 'text-[#e5e5e5]'
                         }`}
                       >
@@ -3457,8 +3566,8 @@ export default function EofProductionPanel({
                   <p className="text-xs text-[#fbbf24]">{zapcapTemplatesError}</p>
                 ) : null}
                 {zapcapTemplates.length ? (
-                  <div className="max-h-[16rem] overflow-y-auto overflow-x-visible rounded-xl border border-[#303030] bg-[#121212] p-1.5">
-                    <div className="grid grid-cols-5 gap-1 sm:grid-cols-7 lg:grid-cols-9 xl:grid-cols-11 2xl:grid-cols-[repeat(14,minmax(0,1fr))]">
+                  <div className="max-h-[22rem] overflow-y-auto overflow-x-visible rounded-xl border border-[#303030] bg-[#121212] p-2">
+                    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()
@@ -3496,8 +3605,8 @@ export default function EofProductionPanel({
                   </p>
                 )}
                 {zapcapTemplateId ? (
-                  <div className="flex items-center gap-2.5 rounded-lg border border-[#303030] bg-[#1a1a1a] px-2.5 py-2">
-                    <div className="h-12 w-[4.5rem] shrink-0 overflow-hidden rounded bg-[#0d0d12]">
+                  <div className="flex items-center gap-3 rounded-lg border border-[#303030] bg-[#1a1a1a] px-3 py-2.5">
+                    <div className="h-20 w-[7.5rem] shrink-0 overflow-hidden rounded-md bg-[#0d0d12]">
                       <CaptionTemplatePreview
                         template={zapcapTemplates.find((t) => t.id === zapcapTemplateId)}
                         className="h-full w-full"
