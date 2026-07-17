@@ -10,7 +10,10 @@ import {
   getEofCaptionStyle,
   isLocalCaptionStyle,
   isZapcapCaptionStyle,
+  isBottomBarCaptionStyle,
+  resolveFreeLocalBurnStyle,
   normalizeZapcapTemplateId,
+  listEofCaptionStyles,
 } from './eofCaptionStyles.mjs'
 import {
   buildWordBeats,
@@ -20,35 +23,48 @@ import {
 import { normalizeZapcapTemplateList } from '../backend/api/lib/eofZapcapCaptions.mjs'
 
 describe('eofCaptionStyles', () => {
-  it('exposes free live + ZapCap + CapCut shortcuts + Off', () => {
-    assert.ok(EOF_CAPTION_STYLES.length >= 5)
+  it('exposes free local + CapCut shortcuts + ZapCap catalog + Off', () => {
+    assert.ok(EOF_CAPTION_STYLES.length >= 6)
     assert.deepEqual(
       EOF_CAPTION_STYLES.map((s) => s.id).sort(),
-      ['beast', 'karaoke', 'live', 'off', 'pop', 'zapcap'],
+      ['beast', 'karaoke', 'live', 'off', 'pop', 'punch', 'zapcap'],
     )
     assert.equal(EOF_DEFAULT_CAPTION_STYLE, 'live')
     assert.equal(resolveEofCaptionStyle('off'), 'off')
     assert.equal(resolveEofCaptionStyle('none'), 'off')
     assert.equal(resolveEofCaptionStyle('subs'), 'live')
+    assert.equal(resolveEofCaptionStyle('match'), 'punch')
+    assert.equal(resolveEofCaptionStyle('ticker'), 'punch')
     assert.equal(resolveEofCaptionStyle('zapcap'), 'zapcap')
     assert.equal(
       resolveEofCaptionStyle('ca050348-e2d0-49a7-9c75-7a5e8335c67d'),
       'zapcap',
     )
     assert.equal(isLocalCaptionStyle('live'), true)
+    assert.equal(isLocalCaptionStyle('punch'), true)
     assert.equal(isZapcapCaptionStyle('zapcap'), true)
     assert.equal(isZapcapCaptionStyle('pop'), true)
     assert.equal(isLocalCaptionStyle('pop'), false)
+    assert.equal(isBottomBarCaptionStyle('live'), true)
+    assert.equal(isBottomBarCaptionStyle('punch'), true)
+    assert.equal(isBottomBarCaptionStyle('pop'), false)
+    assert.equal(resolveFreeLocalBurnStyle('zapcap'), 'pop')
+    assert.equal(resolveFreeLocalBurnStyle('karaoke'), 'karaoke')
+    assert.equal(resolveFreeLocalBurnStyle('punch'), 'punch')
     assert.equal(
       normalizeZapcapTemplateId('ca050348-e2d0-49a7-9c75-7a5e8335c67d'),
       'ca050348-e2d0-49a7-9c75-7a5e8335c67d',
     )
     assert.equal(normalizeZapcapTemplateId('nope'), '')
+    const listed = listEofCaptionStyles()
+    assert.ok(listed.every((s) => typeof s.free === 'boolean'))
+    assert.ok(listed.filter((s) => s.free).length >= 5)
   })
 
   it('resolves unknown styles to default', () => {
     assert.equal(resolveEofCaptionStyle('nope'), 'live')
-    assert.equal(getEofCaptionStyle('beast').label.includes('Beast'), true)
+    assert.equal(getEofCaptionStyle('beast').label.toLowerCase().includes('beast'), true)
+    assert.equal(getEofCaptionStyle('punch').free, true)
   })
 })
 
@@ -96,8 +112,8 @@ describe('caption drawtext builders', () => {
     assert.ok(beats[0].start < beats[beats.length - 1].end)
   })
 
-  it('emits drawtext for each style', () => {
-    for (const id of ['live', 'pop', 'karaoke', 'beast']) {
+  it('emits drawtext for each free style', () => {
+    for (const id of ['live', 'punch', 'pop', 'karaoke', 'beast']) {
       const filters = buildCaptionDrawtextFilters({
         caption: 'Rooney is right about Ronaldo',
         durationSec: 4,
@@ -109,14 +125,23 @@ describe('caption drawtext builders', () => {
     }
   })
 
-  it('places live subs near the bottom', () => {
-    const filters = buildCaptionDrawtextFilters({
+  it('places live / punch near the bottom safe zone', () => {
+    const live = buildCaptionDrawtextFilters({
       caption: 'Spain beat Belgium last night in a thriller',
       durationSec: 5,
       captionFont: '/tmp/font.ttf',
       style: 'live',
     })
-    assert.ok(filters.some((f) => f.includes('y=h*0.78')))
+    assert.ok(live.some((f) => f.includes('y=h*0.76')))
+
+    const punch = buildCaptionDrawtextFilters({
+      caption: 'Spain beat Belgium last night in a thriller',
+      durationSec: 5,
+      captionFont: '/tmp/font.ttf',
+      style: 'punch',
+    })
+    assert.ok(punch.some((f) => f.includes('y=h*0.73')))
+    assert.ok(punch.some((f) => f.includes('0xFFE566')), 'match bar uses stadium yellow')
   })
 
   it('inline live mode escapes commas when no textDir', () => {
@@ -147,13 +172,11 @@ describe('caption drawtext builders', () => {
       assert.ok(filters.length >= 1)
       assert.ok(filters.every((f) => f.includes('textfile=')), 'production burns must use textfile=')
       assert.ok(filters.every((f) => !f.includes("text='")), 'must not use inline text=')
-      const live0 = join(textDir, 'live-0.txt')
-      const body = readFileSync(live0, 'utf8')
-      assert.ok(body.includes('Fans are divided') || body.includes('Tuchel'), 'caption chunk written to file')
-      assert.ok(body.includes('\u2019') || body.includes('Tuchel'), 'apostrophe sanitized in file')
+      const bodies = filters.map((_, i) => readFileSync(join(textDir, `live-${i}.txt`), 'utf8')).join(' ')
+      assert.ok(bodies.includes('Fans are divided'), 'caption chunk written to file')
+      assert.ok(bodies.includes('Tuchel') && bodies.includes('\u2019'), 'apostrophe sanitized across chunks')
     } finally {
       rmSync(textDir, { recursive: true, force: true })
     }
   })
 })
-

@@ -9,8 +9,10 @@ import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
 import {
   resolveEofCaptionStyle,
   captionsEnabledForStyle,
+  isBottomBarCaptionStyle,
   isLocalCaptionStyle,
   isZapcapCaptionStyle,
+  resolveFreeLocalBurnStyle,
 } from '../../../shared/eofCaptionStyles.mjs'
 import {
   autoTuneVideoLook,
@@ -50,7 +52,7 @@ function resolveCaptionFont() {
 
 /**
  * Decide how captions are burned for a render pass.
- * - free: iteration (Build/Rebuild/voiceover) — local live preview, never ZapCap
+ * - free: iteration (Build/Rebuild) — local ffmpeg burns (live/punch/CapCut looks), never ZapCap
  * - zapcap-only: Apply ZapCap — clean plate locally, then paid ZapCap burn
  * - auto: legacy full zapcap when style requests it
  * @param {{ captionStyle?: string, captionMode?: 'auto' | 'free' | 'zapcap-only' }} opts
@@ -62,7 +64,7 @@ export function resolveCaptionRenderPlan({ captionStyle, captionMode = 'auto' })
   const zapcapOnly = mode === 'zapcap-only' && isZapcapCaptionStyle(requestedStyle)
 
   let style = requestedStyle
-  if (forceFreeCaptions) style = 'live'
+  if (forceFreeCaptions) style = resolveFreeLocalBurnStyle(requestedStyle)
   else if (zapcapOnly) style = 'off'
 
   let engine = 'none'
@@ -70,7 +72,7 @@ export function resolveCaptionRenderPlan({ captionStyle, captionMode = 'auto' })
     engine = 'zapcap'
   } else if (!captionsEnabledForStyle(style)) {
     engine = 'none'
-  } else if (isLocalCaptionStyle(style)) {
+  } else if (forceFreeCaptions || isLocalCaptionStyle(style)) {
     engine = 'local'
   } else if (mode === 'auto' && isZapcapCaptionStyle(requestedStyle)) {
     engine = 'zapcap'
@@ -129,9 +131,14 @@ function buildSceneVideoFilter({
   }
 
   if (burnCaptions) {
-    const live = isLocalCaptionStyle(captionStyle)
-    if (live) {
-      base.push('drawbox=x=0:y=ih*0.74:w=iw:h=ih*0.14:color=black@0.45:t=fill')
+    if (isBottomBarCaptionStyle(captionStyle)) {
+      // live / punch — readable lower-third plate above Subscribe CTA
+      const bottom = resolveEofCaptionStyle(captionStyle)
+      const y = bottom === 'punch' ? 0.68 : 0.72
+      base.push(`drawbox=x=0:y=ih*${y}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
+      if (bottom === 'punch') {
+        base.push('drawbox=x=iw*0.12:y=ih*0.815:w=iw*0.76:h=5:color=0xFFE566@0.95:t=fill')
+      }
     } else {
       base.push('drawbox=x=0:y=ih*0.42:w=iw:h=ih*0.28:color=black@0.28:t=fill')
     }
@@ -378,14 +385,17 @@ export async function renderEofProductionVideo({
     console.info('[eof-video] clean plate — paid ZapCap burn follows')
   } else if (style === 'off') {
     console.info('[eof-video] captions off — clean plate')
-  } else if (style === 'live') {
+  } else if (engine === 'local') {
     console.info(
-      '[eof-video] live bottom subtitles (free)',
-      forceFreeCaptions ? `(previewing ZapCap template ${preferredZapcapTemplateId || 'n/a'} without billing)` : '',
+      '[eof-video] free local captions',
+      style,
+      forceFreeCaptions
+        ? `(ZapCap style ${requestedStyle} → local burn; template ${preferredZapcapTemplateId || 'n/a'} kept for Apply)`
+        : '',
     )
   } else if (engine === 'none') {
     console.warn(
-      '[eof-video] No ZapCap key — pick Live subs (free) or set ZAPCAP_API_KEY for CapCut-class burn.',
+      '[eof-video] No ZapCap key — pick a free caption style or set ZAPCAP_API_KEY for CapCut-class burn.',
     )
   }
   console.info('[eof-video] caption style', style, 'engine', engine)

@@ -1350,7 +1350,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           voicePreset,
           scriptProvider,
           captionStyle,
-          zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
+          zapcapTemplateId:
+            captionStyle === 'live' || captionStyle === 'punch' || captionStyle === 'off'
+              ? ''
+              : zapcapTemplateId,
           transitionStyle,
           colorGrade,
           enhanceStyle,
@@ -1399,7 +1402,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           script: draftScript,
           voicePreset,
           captionStyle,
-          zapcapTemplateId: captionStyle === 'live' || captionStyle === 'off' ? '' : zapcapTemplateId,
+          zapcapTemplateId:
+            captionStyle === 'live' || captionStyle === 'punch' || captionStyle === 'off'
+              ? ''
+              : zapcapTemplateId,
           transitionStyle,
           colorGrade,
           enhanceStyle,
@@ -1906,8 +1912,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <p>
               Captions:{' '}
               {captionEngine.zapcap
-                ? 'ZapCap ready · Live subs free'
-                : 'Live subs free (ZapCap optional)'}
+                ? 'ZapCap ready · free local styles'
+                : 'Free local styles (ZapCap optional)'}
             </p>
             {captionEngine.note ? <p className="text-[#fbbf24]">{captionEngine.note}</p> : null}
             {scriptBillingNote ? <p className="text-[#fbbf24]">{scriptBillingNote}</p> : null}
@@ -2173,26 +2179,33 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <p className={PX.label}>Captions</p>
             {captionStyle === 'off' ? (
               <p className={`mt-1 text-xs ${PX.muted}`}>Captions off — clean plate, voiceover only.</p>
-            ) : captionStyle === 'live' ? (
+            ) : captionStyle === 'live' || captionStyle === 'punch' ? (
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                Free live subtitles along the bottom — no ZapCap cost or ZapCap watermark.
+                Free local burn — no ZapCap cost or ZapCap watermark. Build/Rebuild uses this look.
+              </p>
+            ) : ['pop', 'karaoke', 'beast'].includes(captionStyle) ? (
+              <p className={`mt-1 text-xs ${PX.muted}`}>
+                Free CapCut-style burn on Build/Rebuild. Optional{' '}
+                <span className="text-[#fbbf24]">Apply ZapCap</span> upgrades to animated templates
+                {captionEngine.zapcap ? ' (~$0.10/min; free ZapCap credits are watermarked).' : ' when ZAPCAP_API_KEY is set.'}
               </p>
             ) : !captionEngine.zapcap ? (
               <p className="mt-1 text-xs text-[#fbbf24]">
-                CapCut templates need ZAPCAP_API_KEY. Use Live subs (free) for bottom captions without it.
+                ZapCap catalog needs ZAPCAP_API_KEY. Use any Free style above for captions without it.
               </p>
             ) : (
               <p className={`mt-1 text-xs ${PX.muted}`}>
-                Preview how captions look, then pick one (~$0.10/min for ZapCap). Free ZapCap credits stamp a
-                watermark — Pro removes it.
+                Catalog template selected — Build uses a free local Pop preview; Apply ZapCap burns the
+                animated template (~$0.10/min).
               </p>
             )}
-            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
               {[
-                { id: 'live', label: 'Live subs (free)', vibe: 'Bottom TV bar', preview: 'live', free: true },
-                { id: 'pop', label: 'Pop (Hormozi)', vibe: 'CapCut · 1–2 words', preview: 'pop' },
-                { id: 'karaoke', label: 'Karaoke fill', vibe: 'CapCut · word highlight', preview: 'karaoke' },
-                { id: 'beast', label: 'Beast bounce', vibe: 'CapCut · huge word', preview: 'beast' },
+                { id: 'live', label: 'Live subs', vibe: 'Bottom TV / CC', preview: 'live', free: true },
+                { id: 'punch', label: 'Match bar', vibe: 'Sports lower-third', preview: 'punch', free: true },
+                { id: 'pop', label: 'Pop punch', vibe: '1–2 word hooks', preview: 'pop', free: true },
+                { id: 'karaoke', label: 'Word highlight', vibe: 'Active word yellow', preview: 'karaoke', free: true },
+                { id: 'beast', label: 'Beast boom', vibe: 'Huge single word', preview: 'beast', free: true },
                 { id: 'off', label: 'Off', vibe: 'No captions', preview: 'off', free: true },
               ].map((s) => {
                 const active = captionStyle === s.id
@@ -2211,14 +2224,23 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                     }`}
                     title={s.label}
                   >
-                    <div className="relative aspect-[9/16] max-h-44 w-full overflow-hidden bg-gradient-to-b from-[#1a153d] to-[#0f1a30]">
+                    <div className="relative aspect-[9/16] max-h-44 w-full overflow-hidden bg-gradient-to-b from-[#1a2a1a] to-[#0f1a30]">
                       {/* faux subject photo */}
-                      <div className="absolute inset-x-[16%] top-[16%] h-[42%] rounded-full bg-[#2a2460]/70" />
+                      <div className="absolute inset-x-[16%] top-[16%] h-[42%] rounded-full bg-[#2a4030]/70" />
                       {s.preview === 'live' ? (
-                        <div className="absolute inset-x-0 bottom-[12%] bg-black/55 px-1.5 py-1 text-center">
-                          <span className="text-[10px] font-semibold leading-tight text-white drop-shadow">
+                        <div className="absolute inset-x-0 bottom-[12%] bg-black/60 px-1.5 py-1.5 text-center">
+                          <span className="text-[10px] font-bold leading-tight text-white drop-shadow">
                             Tuchel: we go again
                           </span>
+                        </div>
+                      ) : s.preview === 'punch' ? (
+                        <div className="absolute inset-x-0 bottom-[14%] px-1.5 text-center">
+                          <div className="rounded-sm bg-black/55 px-1 py-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wide text-[#FFE566] drop-shadow">
+                              Spain beat Belgium
+                            </span>
+                            <div className="mx-auto mt-1 h-0.5 w-3/4 bg-[#FFE566]" />
+                          </div>
                         </div>
                       ) : s.preview === 'pop' ? (
                         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
@@ -2243,15 +2265,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                           <span className="text-[9px] uppercase tracking-widest text-white/40">clean plate</span>
                         </div>
                       )}
-                      {s.free ? (
-                        <span className="absolute left-1 top-1 rounded bg-emerald-500/80 px-1 py-0.5 text-[8px] font-bold uppercase text-black">
-                          Free
-                        </span>
-                      ) : (
-                        <span className="absolute left-1 top-1 rounded bg-white/15 px-1 py-0.5 text-[8px] font-bold uppercase text-white/80">
-                          ZapCap
-                        </span>
-                      )}
+                      <span className="absolute left-1 top-1 rounded bg-emerald-500/80 px-1 py-0.5 text-[8px] font-bold uppercase text-black">
+                        Free
+                      </span>
                       {active ? (
                         <span className="absolute right-1 top-1 rounded bg-white px-1 py-0.5 text-[8px] font-semibold text-black">
                           Selected
@@ -2567,36 +2583,29 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         setZapcapTemplateId(v.slice('zapcap:'.length))
                       } else {
                         setCaptionStyle(v)
-                        if (v === 'live' || v === 'off') setZapcapTemplateId('')
+                        if (v === 'live' || v === 'punch' || v === 'off') setZapcapTemplateId('')
                       }
                       markDraftDirty()
                     }}
                     className={`${inputCls} mt-0.5 min-w-[180px] py-1.5 text-xs`}
                   >
-                    <option value="live">Live subs (free)</option>
-                    <option value="off">Off</option>
+                    <optgroup label="Free local">
+                      <option value="live">Live subs</option>
+                      <option value="punch">Match bar</option>
+                      <option value="pop">Pop punch</option>
+                      <option value="karaoke">Word highlight</option>
+                      <option value="beast">Beast boom</option>
+                      <option value="off">Off</option>
+                    </optgroup>
                     {zapcapTemplates.length ? (
-                      <optgroup label="ZapCap templates">
+                      <optgroup label="ZapCap templates (paid apply)">
                         {zapcapTemplates.map((t) => (
                           <option key={t.id} value={`zapcap:${t.id}`}>
                             {t.name}
                           </option>
                         ))}
                       </optgroup>
-                    ) : (
-                      (captionStyles.length
-                        ? captionStyles.filter((s) => s.engine === 'zapcap')
-                        : [
-                            { id: 'pop', label: 'Pop (Hormozi)' },
-                            { id: 'karaoke', label: 'Karaoke fill' },
-                            { id: 'beast', label: 'Beast bounce' },
-                          ]
-                      ).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label}
-                        </option>
-                      ))
-                    )}
+                    ) : null}
                   </select>
                 </label>
                 <button
@@ -3135,7 +3144,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                       </button>
                       <span className="text-[11px] text-[#8a8a8a]">
                         Refreshes images + applies transitions &amp; filters with{' '}
-                        <span className="text-[#7ee787]">free live captions</span> — no ElevenLabs or ZapCap
+                        <span className="text-[#7ee787]">free captions</span> — no ElevenLabs or ZapCap
                         charges. Click again until photos look right.
                       </span>
                     </div>

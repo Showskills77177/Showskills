@@ -1,7 +1,7 @@
 /**
  * Caption burn-in for EOF Shorts (ffmpeg drawtext).
- * - live: free bottom subtitles
- * - pop / karaoke / beast: CapCut mid-frame looks (local fallback only)
+ * - live / punch: free bottom / lower-third sports bars
+ * - pop / karaoke / beast: CapCut mid-frame looks (free local burn on Build)
  * Works with ffmpeg-static (no libass required).
  *
  * Prefer `textfile=` (via textDir) for production burns so commas/apostrophes
@@ -259,12 +259,12 @@ function buildBeastFilters({ beats, captionFont, textDir }) {
 
 /**
  * Free live-style subtitles: short phrases along the bottom safe zone
- * (above Subscribe watermark), white on dark bar — like TV / YouTube CC.
+ * (above Subscribe watermark), white + heavy stroke — TV / YouTube CC.
  */
-export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 6, textDir }) {
+export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5, textDir }) {
   if (!captionFont || !beats?.length) return []
   const escapedFont = escapeFilterPath(captionFont)
-  const chunk = Math.max(3, Math.min(8, Number(displayWords) || 6))
+  const chunk = Math.max(3, Math.min(7, Number(displayWords) || 5))
   const filters = []
   for (let i = 0, gi = 0; i < beats.length; i += chunk, gi++) {
     const group = beats.slice(i, i + chunk)
@@ -275,7 +275,34 @@ export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 6,
     const end = group[group.length - 1].end
     // Bottom third, leave room for Subscribe CTA (~bottom 12%)
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=46:fontcolor=white:borderw=5:bordercolor=black@0.92:shadowcolor=black@0.55:shadowx=0:shadowy=3:x=(w-text_w)/2:y=h*0.78:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=54:fontcolor=white:borderw=7:bordercolor=black@0.94:shadowcolor=black@0.65:shadowx=0:shadowy=4:x=(w-text_w)/2:y=h*0.76:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+    )
+  }
+  return filters
+}
+
+/**
+ * Free sports “match bar”: uppercase lower-third in stadium yellow — football Shorts graphic.
+ */
+export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4, textDir }) {
+  if (!captionFont || !beats?.length) return []
+  const escapedFont = escapeFilterPath(captionFont)
+  const chunk = Math.max(2, Math.min(5, Number(displayWords) || 4))
+  const filters = []
+  for (let i = 0, gi = 0; i < beats.length; i += chunk, gi++) {
+    const group = beats.slice(i, i + chunk)
+    const phrase = group
+      .map((b) => b.text)
+      .join(' ')
+      .toUpperCase()
+    if (!phrase) continue
+    const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `punch-${gi}` })
+    const start = group[0].start
+    const end = group[group.length - 1].end
+    const local = `t-${start.toFixed(3)}`
+    const alpha = `if(lt(${local}\\,0.06)\\,${local}/0.06\\,if(gt(t\\,${(end - 0.08).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.08\\,1))`
+    filters.push(
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=56:fontcolor=0xFFE566:borderw=9:bordercolor=black@0.96:shadowcolor=black@0.7:shadowx=0:shadowy=5:alpha='${alpha}':x=(w-text_w)/2:y=h*0.73:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
@@ -294,6 +321,14 @@ export function buildCaptionDrawtextFilters({ caption, durationSec, captionFont,
 
   if (styleId === 'live') {
     return buildLiveSubtitleFilters({
+      beats,
+      captionFont,
+      displayWords: meta.displayWords,
+      textDir,
+    })
+  }
+  if (styleId === 'punch') {
+    return buildPunchSubtitleFilters({
       beats,
       captionFont,
       displayWords: meta.displayWords,

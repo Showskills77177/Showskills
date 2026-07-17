@@ -1,16 +1,21 @@
 /**
  * Caption styles for Eyes Of Football Shorts.
- * - zapcap / pop / karaoke / beast → ZapCap template burn when keyed
- * - live → free bottom subtitles (ffmpeg, no ZapCap)
- * - off → clean plate
  *
- * Prefer picking a concrete ZapCap templateId in Production; pop/karaoke/beast
- * remain named shortcuts when the catalog is unavailable.
+ * Free local burns (ffmpeg drawtext, no ZapCap credits):
+ * - live → classic bottom TV/CC bar
+ * - punch → sports lower-third “match bar”
+ * - pop / karaoke / beast → CapCut-class local looks (Build/Rebuild)
+ *
+ * Paid ZapCap path (Apply ZapCap / auto mode when keyed):
+ * - zapcap → pick any catalog templateId
+ * - pop / karaoke / beast → named ZapCap template shortcuts
+ *
+ * off → clean plate
  */
 
 export const EOF_DEFAULT_CAPTION_STYLE = 'live'
 
-/** @typedef {'live' | 'zapcap' | 'pop' | 'karaoke' | 'beast' | 'off'} EofCaptionStyleId */
+/** @typedef {'live' | 'punch' | 'zapcap' | 'pop' | 'karaoke' | 'beast' | 'off'} EofCaptionStyleId */
 
 /**
  * @type {Array<{
@@ -20,6 +25,7 @@ export const EOF_DEFAULT_CAPTION_STYLE = 'live'
  *   vibe: string,
  *   displayWords: number,
  *   engine: 'zapcap' | 'local' | 'none',
+ *   free: boolean,
  *   zapcapTemplateEnv: string,
  *   zapcapTemplateDefault: string,
  * }>}
@@ -28,50 +34,66 @@ export const EOF_CAPTION_STYLES = [
   {
     id: 'live',
     label: 'Live subs (free)',
-    detail: 'Classic bottom subtitles under the picture — free, no ZapCap.',
-    vibe: 'Free · live TV style',
-    displayWords: 6,
+    detail: 'High-contrast bottom captions — free ffmpeg burn, no ZapCap.',
+    vibe: 'Free · TV / YouTube CC',
+    displayWords: 5,
     engine: 'local',
+    free: true,
+    zapcapTemplateEnv: '',
+    zapcapTemplateDefault: '',
+  },
+  {
+    id: 'punch',
+    label: 'Match bar (free)',
+    detail: 'Sports lower-third: short uppercase lines with a yellow accent — free, football Shorts style.',
+    vibe: 'Free · matchday graphic',
+    displayWords: 4,
+    engine: 'local',
+    free: true,
     zapcapTemplateEnv: '',
     zapcapTemplateDefault: '',
   },
   {
     id: 'zapcap',
     label: 'ZapCap template',
-    detail: 'Pick any CapCut-class template from your ZapCap catalog.',
+    detail: 'Pick any CapCut-class template from your ZapCap catalog (credits / watermark on free ZapCap tier).',
     vibe: 'ZapCap · choose template',
     displayWords: 3,
     engine: 'zapcap',
+    free: false,
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_POP',
     zapcapTemplateDefault: 'ca050348-e2d0-49a7-9c75-7a5e8335c67d',
   },
   {
     id: 'pop',
-    label: 'Pop (Hormozi)',
-    detail: '1–2 words at a time, yellow flash then bold white — CapCut / Hormozi classic.',
-    vibe: 'ZapCap · punchy hooks',
+    label: 'Pop punch (free)',
+    detail: '1–2 words flash yellow then hold white — free local burn. Apply ZapCap for animated Hormozi.',
+    vibe: 'Free · CapCut hooks',
     displayWords: 2,
     engine: 'zapcap',
+    free: true,
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_POP',
     zapcapTemplateDefault: 'ca050348-e2d0-49a7-9c75-7a5e8335c67d',
   },
   {
     id: 'karaoke',
-    label: 'Karaoke fill',
-    detail: 'Phrase on screen; active word lights yellow as it is spoken — CapCut karaoke.',
-    vibe: 'ZapCap · story beats',
+    label: 'Word highlight (free)',
+    detail: 'Phrase on screen; active word lights yellow — free local burn. Apply ZapCap for CapCut karaoke.',
+    vibe: 'Free · story beats',
     displayWords: 4,
     engine: 'zapcap',
+    free: true,
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_KARAOKE',
     zapcapTemplateDefault: '21327a45-df89-46bc-8d56-34b8d29d3a0e',
   },
   {
     id: 'beast',
-    label: 'Beast bounce',
-    detail: 'Single huge word pops with neon energy — MrBeast / high-retention Shorts.',
-    vibe: 'ZapCap · lists & hype',
+    label: 'Beast boom (free)',
+    detail: 'One huge word pops neon — free local burn. Apply ZapCap for MrBeast-class animation.',
+    vibe: 'Free · lists & hype',
     displayWords: 1,
     engine: 'zapcap',
+    free: true,
     zapcapTemplateEnv: 'ZAPCAP_TEMPLATE_BEAST',
     zapcapTemplateDefault: '46d20d67-255c-4c6a-b971-31fddcfea7f0',
   },
@@ -82,12 +104,22 @@ export const EOF_CAPTION_STYLES = [
     vibe: 'Voiceover only',
     displayWords: 0,
     engine: 'none',
+    free: true,
     zapcapTemplateEnv: '',
     zapcapTemplateDefault: '',
   },
 ]
 
 const STYLE_IDS = new Set(EOF_CAPTION_STYLES.map((s) => s.id))
+
+/** Styles that use a bottom safe-zone bar (vs mid-frame CapCut pack). */
+const BOTTOM_BAR_STYLES = new Set(['live', 'punch'])
+
+/**
+ * CapCut shortcuts that have a free local ffmpeg burn for Build/Rebuild.
+ * Catalog `zapcap` falls back to local `pop` in free mode.
+ */
+const LOCAL_FREE_BURN_STYLES = new Set(['live', 'punch', 'pop', 'karaoke', 'beast'])
 
 const ZAPCAP_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -101,6 +133,7 @@ export function resolveEofCaptionStyle(style) {
   const id = String(style || EOF_DEFAULT_CAPTION_STYLE).trim().toLowerCase()
   if (id === 'none' || id === 'disabled' || id === 'off') return 'off'
   if (id === 'subs' || id === 'subtitles' || id === 'subtitle' || id === 'bottom') return 'live'
+  if (id === 'match' || id === 'ticker' || id === 'scorebar' || id === 'sports') return 'punch'
   if (id === 'zap' || id === 'capcut' || id === 'template') return 'zapcap'
   // Selecting a raw template UUID counts as ZapCap mode
   if (ZAPCAP_UUID_RE.test(id)) return 'zapcap'
@@ -111,14 +144,31 @@ export function captionsEnabledForStyle(style) {
   return resolveEofCaptionStyle(style) !== 'off'
 }
 
-/** Free local burn (bottom live subs) — never sends to ZapCap. */
+/** Pure local engines (live / punch) — never ZapCap shortcuts. */
 export function isLocalCaptionStyle(style) {
   return getEofCaptionStyle(style).engine === 'local'
 }
 
-/** Paid CapCut templates via ZapCap. */
+/** Paid CapCut templates via ZapCap (including named shortcuts). */
 export function isZapcapCaptionStyle(style) {
   return getEofCaptionStyle(style).engine === 'zapcap'
+}
+
+/** Bottom-bar layout (live / punch) vs mid-frame CapCut pack. */
+export function isBottomBarCaptionStyle(style) {
+  return BOTTOM_BAR_STYLES.has(resolveEofCaptionStyle(style))
+}
+
+/**
+ * Style id to burn with free local ffmpeg during Build/Rebuild.
+ * Catalog ZapCap picks preview as punchy local `pop`.
+ */
+export function resolveFreeLocalBurnStyle(style) {
+  const id = resolveEofCaptionStyle(style)
+  if (id === 'off') return 'off'
+  if (id === 'zapcap') return 'pop'
+  if (LOCAL_FREE_BURN_STYLES.has(id)) return id
+  return EOF_DEFAULT_CAPTION_STYLE
 }
 
 export function getEofCaptionStyle(style) {
@@ -133,5 +183,6 @@ export function listEofCaptionStyles() {
     detail: s.detail,
     vibe: s.vibe,
     engine: s.engine,
+    free: Boolean(s.free),
   }))
 }
