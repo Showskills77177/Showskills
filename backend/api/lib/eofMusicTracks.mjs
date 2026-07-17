@@ -23,8 +23,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const PLATFORM_LICENSE =
   'Platform music bed — confirm you have rights to use on YouTube before publishing.'
 
-/** Retired URLs — deactivated on seed so they disappear from the mixer. */
+/** Retired URLs / titles — deactivated on seed so they disappear from the mixer. */
 const EOF_RETIRED_MUSIC_PUBLIC_URLS = ['/eof/music/default-dramatic.mp3']
+const EOF_RETIRED_MUSIC_TITLES = ['Dramatic bed', 'okokok', 'OKOKOK', 'Okokok']
 
 export const EOF_DEFAULT_MUSIC_BEDS = [
   {
@@ -261,17 +262,24 @@ function rowToTrack(row) {
 export async function ensureEofMusicCatalogSeeded() {
   await ensureEofProductionSchema()
 
-  // Drop retired placeholder beds (e.g. Dramatic bed) from the mixer.
+  // Drop retired placeholder / unwanted beds from the mixer.
   for (const url of EOF_RETIRED_MUSIC_PUBLIC_URLS) {
     await query(
       `UPDATE eof_music_tracks SET active = 0, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE public_url = $1`,
       [url],
     ).catch(() => {})
+  }
+  for (const title of EOF_RETIRED_MUSIC_TITLES) {
     await query(
-      `UPDATE eof_music_tracks SET active = 0, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE title = $1`,
-      ['Dramatic bed'],
+      `UPDATE eof_music_tracks SET active = 0, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE lower(title) = lower($1)`,
+      [title],
     ).catch(() => {})
   }
+  // Fuzzy: any title that is just "okokok" (ignoring spaces/punctuation)
+  await query(
+    `UPDATE eof_music_tracks SET active = 0, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`}
+     WHERE lower(replace(replace(title, ' ', ''), '.', '')) = 'okokok'`,
+  ).catch(() => {})
 
   const existing = await listEofMusicTracks({ activeOnly: false })
   const byUrl = new Map(existing.map((t) => [t.publicUrl, t]))
