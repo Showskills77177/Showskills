@@ -33,6 +33,7 @@ import {
   EOF_RENDER_STACK,
   EOF_DEFAULT_VOICE_PRESET,
   EOF_DEFAULT_MUSIC_VOLUME,
+  listEofFreeVoicePresets,
 } from '../../../shared/eofProduction.mjs'
 import { eofCaptionEngineStatus, listZapcapTemplates } from '../lib/eofZapcapCaptions.mjs'
 import { probeEofPinterestApi } from '../lib/eofPinterestImages.mjs'
@@ -167,6 +168,7 @@ export default async function handler(req, res) {
         defaultMusicBeds: listEofDefaultMusicBeds(),
         defaultMusicVolume: EOF_DEFAULT_MUSIC_VOLUME,
         voicePresets: Object.values(EOF_VOICE_PRESETS),
+        freeVoicePresets: listEofFreeVoicePresets(),
         defaultVoicePreset: EOF_DEFAULT_VOICE_PRESET,
         elevenLabsConfigured: isEofElevenLabsConfigured(),
         elevenLabsVoiceFields: EOF_ELEVENLABS_VOICE_FIELDS,
@@ -321,14 +323,20 @@ export default async function handler(req, res) {
           return json(res, 202, { ok: true, accepted: true, job: existing })
         }
 
+        // Optional per-build override of Google Images provider (auto | serpapi | oxylabs).
+        const imageProvider =
+          body.imageProvider !== undefined && body.imageProvider !== null && String(body.imageProvider).trim()
+            ? normalizeEofImageProvider(body.imageProvider)
+            : undefined
+
         try {
           if (action === 'render-video') {
-            await startEofProductionVideoRenderBackground(jobId)
+            await startEofProductionVideoRenderBackground(jobId, { imageProvider })
           } else {
-            await startEofProductionFullBuildBackground(jobId)
+            await startEofProductionFullBuildBackground(jobId, { imageProvider })
           }
           const job = await getEofProductionJob(jobId)
-          return json(res, 202, { ok: true, accepted: true, job })
+          return json(res, 202, { ok: true, accepted: true, job, imageProvider: imageProvider || null })
         } catch (e) {
           return json(res, 500, { error: e instanceof Error ? e.message : 'Build failed' })
         }

@@ -26,8 +26,9 @@ function estimateFullBuildSec(script) {
 /**
  * Full Short: narration (Edge TTS) + images + captions + mux.
  * @param {string} jobId
+ * @param {{ imageProvider?: string | null }} [opts]
  */
-export async function renderEofProductionFullBuild(jobId) {
+export async function renderEofProductionFullBuild(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
@@ -37,6 +38,7 @@ export async function renderEofProductionFullBuild(jobId) {
     return await renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,
       captionMode: 'free',
+      imageProvider: opts.imageProvider,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Build failed'
@@ -45,8 +47,11 @@ export async function renderEofProductionFullBuild(jobId) {
   }
 }
 
-/** @param {string} jobId */
-export async function startEofProductionFullBuildBackground(jobId) {
+/**
+ * @param {string} jobId
+ * @param {{ imageProvider?: string | null }} [opts]
+ */
+export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
@@ -71,7 +76,7 @@ export async function startEofProductionFullBuildBackground(jobId) {
   )
 
   const run = () =>
-    renderEofProductionFullBuild(jobId).catch((e) => {
+    renderEofProductionFullBuild(jobId, opts).catch((e) => {
       console.error('[eof-production] full Short build failed', jobId, e)
     })
 
@@ -340,8 +345,11 @@ export async function startEofProductionMusicRemixBackground(jobId) {
   void run()
 }
 
-/** @param {string} jobId */
-export async function startEofProductionVideoRenderBackground(jobId) {
+/**
+ * @param {string} jobId
+ * @param {{ imageProvider?: string | null }} [opts]
+ */
+export async function startEofProductionVideoRenderBackground(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
@@ -371,6 +379,7 @@ export async function startEofProductionVideoRenderBackground(jobId) {
     renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,
       captionMode: 'free',
+      imageProvider: opts.imageProvider,
     }).catch((e) => {
       console.error('[eof-production] background video render failed', jobId, e)
     })

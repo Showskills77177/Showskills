@@ -16,7 +16,7 @@ export const EOF_VOICE_PRESETS = {
   british: {
     id: 'british',
     label: 'British (Edge, free)',
-    detail: 'Microsoft Edge neural TTS — default, no API credits',
+    detail: 'Microsoft Edge neural TTS (en-GB-RyanNeural) — default, no API key or credits',
     engine: 'edge',
     voice: 'en-GB-RyanNeural',
     rate: '-8%',
@@ -24,10 +24,18 @@ export const EOF_VOICE_PRESETS = {
   british_calm: {
     id: 'british_calm',
     label: 'British calm (Edge, free)',
-    detail: 'Slower Edge neural TTS fallback',
+    detail: 'Slower Microsoft Edge neural TTS (en-GB-ThomasNeural) — free, no API key',
     engine: 'edge',
     voice: 'en-GB-ThomasNeural',
     rate: '-12%',
+  },
+  american: {
+    id: 'american',
+    label: 'American (Edge, free)',
+    detail: 'Microsoft Edge neural TTS (en-US-GuyNeural) — free US narrator, no API key',
+    engine: 'edge',
+    voice: 'en-US-GuyNeural',
+    rate: '-8%',
   },
   brian: {
     id: 'brian',
@@ -45,6 +53,16 @@ export const EOF_VOICE_PRESETS = {
 
 /** Default narrator for new production jobs — free Edge TTS (no ElevenLabs credits). */
 export const EOF_DEFAULT_VOICE_PRESET = 'british'
+
+/** Free Microsoft Edge neural voices (no ELEVENLABS_API_KEY). */
+export function listEofFreeVoicePresets() {
+  return Object.values(EOF_VOICE_PRESETS).filter((p) => p.engine === 'edge')
+}
+
+export function isEofFreeVoicePreset(voicePreset) {
+  const id = String(voicePreset || '').trim()
+  return Boolean(id && EOF_VOICE_PRESETS[id]?.engine === 'edge')
+}
 
 export const EOF_MUSIC_MOODS = [
   { id: 'neutral', label: 'Neutral / general' },

@@ -6,7 +6,7 @@ import {
   updateEofSchedulerSettings,
 } from '../lib/eofSchedulerSettings.mjs'
 import { EOF_SCRIPT_FORMATS } from '../../../shared/eofScriptTemplates.mjs'
-import { EOF_VOICE_PRESETS } from '../../../shared/eofProduction.mjs'
+import { EOF_VOICE_PRESETS, listEofFreeVoicePresets } from '../../../shared/eofProduction.mjs'
 
 function authorizeCron(req) {
   const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
@@ -71,6 +71,7 @@ export default async function handler(req, res) {
         settings,
         formats: EOF_SCRIPT_FORMATS,
         voicePresets: Object.values(EOF_VOICE_PRESETS),
+        freeVoicePresets: listEofFreeVoicePresets(),
         note:
           'Daily cron composes a football news Short (worldwide + World Cup) with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube.',
       })

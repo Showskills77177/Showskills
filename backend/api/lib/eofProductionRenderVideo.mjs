@@ -19,6 +19,7 @@ import { isEofOxylabsConfigured, fetchEofOxylabsJobPool } from './eofOxylabsImag
 import { isEofSerpApiConfigured, fetchEofSerpApiJobPool } from './eofSerpApiImages.mjs'
 import {
   getEofImageProviderSettings,
+  normalizeEofImageProvider,
   resolveEofImageProviderAttemptOrder,
 } from './eofImageProviderSettings.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath } from './eofProductionVideo.mjs'
@@ -61,13 +62,22 @@ export function assertEofVideoPersisted(persisted) {
  * Build 9:16 Short MP4 from script scenes: stock images + on-screen captions.
  * Audio is optional (legacy path). Image-only Shorts are the default.
  * @param {string} jobId
- * @param {{ includeAudioIfPresent?: boolean, reuseSceneImages?: boolean, captionMode?: 'auto' | 'free' | 'zapcap-only' }} [opts]
+ * @param {{
+ *   includeAudioIfPresent?: boolean,
+ *   reuseSceneImages?: boolean,
+ *   captionMode?: 'auto' | 'free' | 'zapcap-only',
+ *   imageProvider?: string | null,
+ * }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
   const includeAudioIfPresent = opts.includeAudioIfPresent === true
   const reuseSceneImages = opts.reuseSceneImages === true
   const captionMode =
     opts.captionMode === 'zapcap-only' ? 'zapcap-only' : opts.captionMode === 'auto' ? 'auto' : 'free'
+  const imageProviderOverride =
+    opts.imageProvider !== undefined && opts.imageProvider !== null && String(opts.imageProvider).trim()
+      ? normalizeEofImageProvider(opts.imageProvider)
+      : null
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
@@ -152,10 +162,19 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       const imageSettings = await getEofImageProviderSettings().catch(() => ({
         imageProvider: 'auto',
       }))
-      const providerOrder = resolveEofImageProviderAttemptOrder(imageSettings.imageProvider, {
+      // Per-rebuild override (Production UI) wins over the saved admin default.
+      const preferredProvider = imageProviderOverride || imageSettings.imageProvider || 'auto'
+      const providerOrder = resolveEofImageProviderAttemptOrder(preferredProvider, {
         serpapi: isEofSerpApiConfigured(),
         oxylabs: isEofOxylabsConfigured(),
       })
+      console.info(
+        '[eof-video] image provider',
+        preferredProvider,
+        imageProviderOverride ? '(rebuild override)' : '(saved default)',
+        '→',
+        providerOrder.join(' → ') || '(none keyed)',
+      )
       for (const provider of providerOrder) {
         if (oxyPool?.hits?.length) break
         if (provider === 'serpapi') {

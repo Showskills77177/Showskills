@@ -61,7 +61,7 @@ export async function synthesizeEofSceneNarration({
   if (preset.engine === 'elevenlabs') {
     if (!isEofElevenLabsConfigured()) {
       throw new Error(
-        'Brian (ElevenLabs) needs ELEVENLABS_API_KEY on the server. Add it in Vercel env, or pick a free Edge voice.',
+        'Brian (ElevenLabs) needs ELEVENLABS_API_KEY on the server. Add it in Vercel env, or pick a free Edge voice (British / British calm / American).',
       )
     }
     const resolved = resolveElevenLabsVoiceSettings(preset, voiceSettings)

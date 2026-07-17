@@ -468,6 +468,8 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
     { id: 'serpapi', label: 'SerpAPI', configured: false },
     { id: 'oxylabs', label: 'Oxylabs', configured: false },
   ])
+  /** Per-rebuild override for Google Images (defaults to the saved admin preference). */
+  const [rebuildImageProvider, setRebuildImageProvider] = useState('auto')
   const [imageProviderBusy, setImageProviderBusy] = useState(false)
   const [pinterestStatus, setPinterestStatus] = useState(null)
   const [serpapiStatus, setSerpapiStatus] = useState(null)
@@ -555,7 +557,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       )
       setImagesNote(typeof j.imagesNote === 'string' ? j.imagesNote : '')
       if (typeof j.imageProvider === 'string' && j.imageProvider.trim()) {
-        setImageProvider(j.imageProvider.trim().toLowerCase())
+        const nextProvider = j.imageProvider.trim().toLowerCase()
+        setImageProvider(nextProvider)
+        setRebuildImageProvider(nextProvider)
       }
       if (Array.isArray(j.imageProviderOptions) && j.imageProviderOptions.length) {
         setImageProviderOptions(j.imageProviderOptions)
@@ -596,7 +600,10 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
         })
         const j = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(j.error || 'Could not save Google Images provider')
-        if (typeof j.imageProvider === 'string') setImageProvider(j.imageProvider)
+        if (typeof j.imageProvider === 'string') {
+          setImageProvider(j.imageProvider)
+          setRebuildImageProvider(j.imageProvider)
+        }
         if (Array.isArray(j.imageProviderOptions)) setImageProviderOptions(j.imageProviderOptions)
         if (typeof j.imagesNote === 'string') setImagesNote(j.imagesNote)
         setSuccess(
@@ -995,7 +1002,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'build-short', jobId: selectedId }),
+        body: JSON.stringify({
+          action: 'build-short',
+          jobId: selectedId,
+          imageProvider: rebuildImageProvider || imageProvider || 'auto',
+        }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok && res.status !== 202) {
@@ -1102,9 +1113,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   // Hits the backend 'render-video' action which never calls TTS/ElevenLabs.
   async function rebuildVideo() {
     if (!selectedId || !draftScript) return
+    const imagesVia = rebuildImageProvider || imageProvider || 'auto'
     setBusy(true)
     setErr('')
-    setSuccess('Rebuilding video — reusing voiceover, refreshing images (free captions)…')
+    setSuccess(
+      `Rebuilding video — reusing voiceover, refreshing images via ${
+        imagesVia === 'serpapi' ? 'SerpAPI' : imagesVia === 'oxylabs' ? 'Oxylabs' : 'Auto'
+      } (free captions)…`,
+    )
     setRenderPhase('rendering-video')
     setVideoPreviewUrl('')
 
@@ -1131,7 +1147,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
       const res = await apiFetch('/api/admin/eof-production', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'render-video', jobId: selectedId }),
+        body: JSON.stringify({
+          action: 'render-video',
+          jobId: selectedId,
+          imageProvider: imagesVia,
+        }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok && res.status !== 202) {
@@ -1149,7 +1169,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
 
       await loadVideoPreview()
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
-      setSuccess('Video rebuilt — same voiceover, fresh images, free captions. No ElevenLabs or ZapCap charges.')
+      setSuccess(
+        `Video rebuilt — same voiceover, fresh images via ${
+          imagesVia === 'serpapi' ? 'SerpAPI' : imagesVia === 'oxylabs' ? 'Oxylabs' : 'Auto'
+        }, free captions. No ElevenLabs or ZapCap charges.`,
+      )
       upsertJob(finishedJob)
       hydratedJobIdRef.current = selectedId
       hydrateDraftFromJob(finishedJob)
@@ -2616,6 +2640,30 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 >
                   Save
                 </button>
+                {selected.status === 'video_rendered' ? (
+                  <label className="mt-4 text-[10px] text-[#aaa]">
+                    Images
+                    <select
+                      value={rebuildImageProvider}
+                      onChange={(e) => setRebuildImageProvider(e.target.value)}
+                      disabled={busy || isRendering}
+                      className={`${inputCls} mt-0.5 min-w-[140px] py-1.5 text-xs`}
+                      title="Google Images provider for Rebuild / full rebuild"
+                    >
+                      {imageProviderOptions.map((p) => (
+                        <option
+                          key={p.id}
+                          value={p.id}
+                          disabled={p.id !== 'auto' && !p.configured}
+                          title={p.detail}
+                        >
+                          {p.label}
+                          {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <button
                   type="button"
                   disabled={busy || isRendering || sceneCount < 1}
@@ -2623,7 +2671,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   className={`mt-4 ${PX.btnSoft}`}
                   title={
                     selected.status === 'video_rendered'
-                      ? 'Refreshes images + transitions with free captions — no ElevenLabs or ZapCap charges'
+                      ? `Refreshes images via ${rebuildImageProvider} + transitions with free captions — no ElevenLabs or ZapCap charges`
                       : 'Generates voiceover + images + video (free captions until you Apply ZapCap)'
                   }
                 >
@@ -3133,6 +3181,40 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
               {sceneCount >= 1 ? (
                 selected.status === 'video_rendered' ? (
                   <div className="mt-4 space-y-3 border-t border-[#303030] pt-4">
+                    <label className="block max-w-xs text-[10px] text-[#aaa]">
+                      Images for this rebuild
+                      <select
+                        value={rebuildImageProvider}
+                        onChange={(e) => setRebuildImageProvider(e.target.value)}
+                        disabled={busy || (isRendering && !isRenderStuck)}
+                        className={`${inputCls} mt-0.5 py-1.5 text-xs`}
+                        title="Override Google Images provider for this rebuild only"
+                      >
+                        {imageProviderOptions.map((p) => (
+                          <option
+                            key={p.id}
+                            value={p.id}
+                            disabled={p.id !== 'auto' && !p.configured}
+                            title={p.detail}
+                          >
+                            {p.label}
+                            {p.id !== 'auto' && !p.configured ? ' (not set)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {rebuildImageProvider === 'serpapi' && !imageSources.serpapi ? (
+                      <p className="text-[11px] text-[#ff9b95]">
+                        SerpAPI selected but SERPAPI_API_KEY is missing on the server — add it and redeploy,
+                        or pick Auto / Oxylabs.
+                      </p>
+                    ) : null}
+                    {rebuildImageProvider === 'oxylabs' && !imageSources.oxylabs ? (
+                      <p className="text-[11px] text-[#ff9b95]">
+                        Oxylabs selected but credentials are missing — add OXYLABS_USERNAME +
+                        OXYLABS_PASSWORD and redeploy, or pick Auto / SerpAPI.
+                      </p>
+                    ) : null}
                     <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                       <button
                         type="button"
@@ -3183,9 +3265,9 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                             — <span className="text-[#fbbf24]">uses ElevenLabs credits</span>
                           </>
                         ) : (
-                          ' (free Edge voice)'
+                          ' (free Edge voice — British / calm / American)'
                         )}
-                        .
+                        . Uses the Images picker above for Google Images.
                       </span>
                     </div>
                   </div>

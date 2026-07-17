@@ -1,11 +1,39 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  EOF_DEFAULT_VOICE_PRESET,
+  EOF_VOICE_PRESETS,
   buildEofRenderProgress,
   buildFallbackRenderProgress,
   estimateEofRenderDurationSec,
   estimateEofVideoRenderDurationSec,
+  isEofFreeVoicePreset,
+  listEofFreeVoicePresets,
 } from './eofProduction.mjs'
+
+describe('eofProduction voice presets', () => {
+  it('defaults to a free Edge voice', () => {
+    assert.equal(EOF_DEFAULT_VOICE_PRESET, 'british')
+    assert.equal(EOF_VOICE_PRESETS.british.engine, 'edge')
+    assert.ok(isEofFreeVoicePreset(EOF_DEFAULT_VOICE_PRESET))
+  })
+
+  it('exposes one to three free Edge voices plus optional ElevenLabs Brian', () => {
+    const free = listEofFreeVoicePresets()
+    assert.ok(free.length >= 1 && free.length <= 3)
+    assert.deepEqual(
+      free.map((v) => v.id).sort(),
+      ['american', 'british', 'british_calm'].sort(),
+    )
+    for (const preset of free) {
+      assert.equal(preset.engine, 'edge')
+      assert.ok(String(preset.voice || '').includes('Neural'))
+      assert.match(String(preset.label), /free/i)
+    }
+    assert.equal(EOF_VOICE_PRESETS.brian.engine, 'elevenlabs')
+    assert.equal(isEofFreeVoicePreset('brian'), false)
+  })
+})
 
 describe('eofProduction render estimates', () => {
   it('audio estimate stays under 3 minutes for a 5-scene script', () => {
