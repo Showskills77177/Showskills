@@ -9,6 +9,7 @@ import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
 import {
   resolveEofCaptionStyle,
   captionsEnabledForStyle,
+  captionBottomPlateMode,
   isBottomBarCaptionStyle,
   isLocalCaptionStyle,
   isZapcapCaptionStyle,
@@ -184,11 +185,16 @@ function buildSceneVideoFilter({
   if (burnCaptions) {
     const lay = normalizeEofCaptionLayout(captionLayout, captionStyle)
     if (isBottomBarCaptionStyle(captionStyle)) {
-      // live / punch — plate follows the editable Y position
-      const bottom = resolveEofCaptionStyle(captionStyle)
-      const boxY = Math.max(0.35, lay.yNorm - 0.06)
-      base.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
-      if (bottom === 'punch') {
+      // Subtitle styles — plate follows editable Y; mode varies by look.
+      const plate = captionBottomPlateMode(captionStyle)
+      if (plate === 'full' || plate === 'punch') {
+        const boxY = Math.max(0.35, lay.yNorm - 0.06)
+        base.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.16:color=black@0.5:t=fill`)
+      } else if (plate === 'soft') {
+        const boxY = Math.max(0.35, lay.yNorm - 0.05)
+        base.push(`drawbox=x=0:y=ih*${boxY.toFixed(3)}:w=iw:h=ih*0.14:color=black@0.32:t=fill`)
+      }
+      if (plate === 'punch') {
         const barY = Math.min(0.92, lay.yNorm + 0.08)
         base.push(
           `drawbox=x=iw*0.12:y=ih*${barY.toFixed(3)}:w=iw*0.76:h=5:color=0xFFE566@0.95:t=fill`,

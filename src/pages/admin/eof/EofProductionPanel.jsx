@@ -22,7 +22,12 @@ import {
   normalizeElevenLabsVoiceSettings,
 } from '../../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../../shared/eofVoiceRegeneration.mjs'
-import { EOF_DEFAULT_CAPTION_STYLE, isZapcapCaptionStyle } from '../../../../shared/eofCaptionStyles.mjs'
+import {
+  EOF_DEFAULT_CAPTION_STYLE,
+  isBottomBarCaptionStyle,
+  isLocalCaptionStyle,
+  isZapcapCaptionStyle,
+} from '../../../../shared/eofCaptionStyles.mjs'
 import {
   defaultEofCaptionLayout,
   normalizeEofCaptionLayout,
@@ -1507,10 +1512,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           voicePreset,
           scriptProvider,
           captionStyle,
-          zapcapTemplateId:
-            captionStyle === 'live' || captionStyle === 'punch' || captionStyle === 'off'
-              ? ''
-              : zapcapTemplateId,
+          zapcapTemplateId: isZapcapCaptionStyle(captionStyle) ? zapcapTemplateId : '',
           transitionStyle,
           colorGrade,
           enhanceStyle,
@@ -1559,10 +1561,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
           script: draftScript,
           voicePreset,
           captionStyle,
-          zapcapTemplateId:
-            captionStyle === 'live' || captionStyle === 'punch' || captionStyle === 'off'
-              ? ''
-              : zapcapTemplateId,
+          zapcapTemplateId: isZapcapCaptionStyle(captionStyle) ? zapcapTemplateId : '',
           transitionStyle,
           colorGrade,
           enhanceStyle,
@@ -2349,7 +2348,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
             <p className={PX.label}>Captions</p>
             {captionStyle === 'off' ? (
               <p className={`mt-1 text-xs ${PX.muted}`}>Captions off — clean plate, voiceover only.</p>
-            ) : captionStyle === 'live' || captionStyle === 'punch' ? (
+            ) : isLocalCaptionStyle(captionStyle) || isBottomBarCaptionStyle(captionStyle) ? (
               <p className={`mt-1 text-xs ${PX.muted}`}>
                 Free local burn — no ZapCap cost or ZapCap watermark. Build/Rebuild uses this look.
               </p>
@@ -2369,9 +2368,14 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 animated template (~$0.10/min).
               </p>
             )}
-            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
               {[
                 { id: 'live', label: 'Live subs', vibe: 'Bottom TV / CC', preview: 'live', free: true },
+                { id: 'classic', label: 'Classic subs', vibe: 'Netflix / YouTube', preview: 'classic', free: true },
+                { id: 'softbar', label: 'Soft bar', vibe: 'Pill background', preview: 'softbar', free: true },
+                { id: 'broadcast', label: 'Broadcast', vibe: 'Thin stroke', preview: 'broadcast', free: true },
+                { id: 'desk', label: 'Desk VO', vibe: 'Larger commentary', preview: 'desk', free: true },
+                { id: 'elegant', label: 'Gold trim', vibe: 'Cream lower third', preview: 'elegant', free: true },
                 { id: 'punch', label: 'Match bar', vibe: 'Sports lower-third', preview: 'punch', free: true },
                 { id: 'pop', label: 'Pop punch', vibe: '1–2 word hooks', preview: 'pop', free: true },
                 { id: 'karaoke', label: 'Word highlight', vibe: 'Active word yellow', preview: 'karaoke', free: true },
@@ -2402,6 +2406,36 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         <div className="absolute inset-x-0 bottom-[12%] bg-black/60 px-1.5 py-1.5 text-center">
                           <span className="text-[10px] font-bold leading-tight text-white drop-shadow">
                             Tuchel: we go again
+                          </span>
+                        </div>
+                      ) : s.preview === 'classic' ? (
+                        <div className="absolute inset-x-[8%] bottom-[11%] px-1 text-center">
+                          <span className="text-[10px] font-semibold leading-tight text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_1px_#000]">
+                            He is still running the show
+                          </span>
+                        </div>
+                      ) : s.preview === 'softbar' ? (
+                        <div className="absolute inset-x-[10%] bottom-[12%] flex justify-center px-1">
+                          <span className="rounded-md bg-black/65 px-2 py-1 text-[9px] font-semibold leading-tight text-white">
+                            Spain beat Belgium last night
+                          </span>
+                        </div>
+                      ) : s.preview === 'broadcast' ? (
+                        <div className="absolute inset-x-[8%] bottom-[11%] px-1 text-center">
+                          <span className="text-[10px] font-bold leading-tight text-white [text-shadow:-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,1px_1px_0_#000]">
+                            Full-time whistle goes
+                          </span>
+                        </div>
+                      ) : s.preview === 'desk' ? (
+                        <div className="absolute inset-x-[6%] bottom-[13%] bg-black/35 px-1.5 py-1.5 text-center">
+                          <span className="text-[11px] font-bold leading-tight text-white drop-shadow">
+                            Rooney is right about him
+                          </span>
+                        </div>
+                      ) : s.preview === 'elegant' ? (
+                        <div className="absolute inset-x-[8%] bottom-[12%] px-1 text-center">
+                          <span className="text-[10px] font-semibold leading-tight text-[#F5E6C8] [text-shadow:0_2px_3px_rgba(0,0,0,0.9)]">
+                            A night to remember
                           </span>
                         </div>
                       ) : s.preview === 'punch' ? (
@@ -2754,7 +2788,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                         setZapcapTemplateId(v.slice('zapcap:'.length))
                       } else {
                         setCaptionStyle(v)
-                        if (v === 'live' || v === 'punch' || v === 'off') setZapcapTemplateId('')
+                        if (!isZapcapCaptionStyle(v)) setZapcapTemplateId('')
                       }
                       markDraftDirty()
                     }}
@@ -2762,6 +2796,11 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                   >
                     <optgroup label="Free local">
                       <option value="live">Live subs</option>
+                      <option value="classic">Classic subs</option>
+                      <option value="softbar">Soft bar</option>
+                      <option value="broadcast">Broadcast</option>
+                      <option value="desk">Desk VO</option>
+                      <option value="elegant">Gold trim</option>
                       <option value="punch">Match bar</option>
                       <option value="pop">Pop punch</option>
                       <option value="karaoke">Word highlight</option>

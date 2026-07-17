@@ -1,6 +1,6 @@
 /**
  * Caption burn-in for EOF Shorts (ffmpeg drawtext).
- * - live / punch: free bottom / lower-third sports bars
+ * - live / classic / softbar / broadcast / desk / elegant / punch: free bottom subs
  * - pop / karaoke / beast: CapCut mid-frame looks (free local burn on Build)
  * Works with ffmpeg-static (no libass required).
  *
@@ -290,73 +290,232 @@ function buildBeastFilters({ beats, captionFont, textDir, layout }) {
 }
 
 /**
- * Free live-style subtitles: short phrases along the bottom safe zone
- * (above Subscribe watermark), white + heavy stroke — TV / YouTube CC.
+ * Shared phrase-window burn for bottom-bar subtitle styles.
+ * @param {{
+ *   beats: Array<{ text: string, start: number, end: number }>,
+ *   captionFont: string,
+ *   displayWords?: number,
+ *   textDir?: string,
+ *   layout?: object,
+ *   filePrefix: string,
+ *   baseFontSize?: number,
+ *   maxWordsMin?: number,
+ *   maxWordsMax?: number,
+ *   transformPhrase?: (phrase: string) => string,
+ *   fade?: boolean,
+ *   drawExtras?: string,
+ *   fontcolor?: string,
+ *   borderw?: number,
+ *   bordercolor?: string,
+ *   shadowcolor?: string,
+ *   shadowx?: number,
+ *   shadowy?: number,
+ * }} opts
  */
-export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5, textDir, layout }) {
+function buildPhraseSubtitleFilters({
+  beats,
+  captionFont,
+  displayWords = 5,
+  textDir,
+  layout,
+  filePrefix,
+  baseFontSize = 54,
+  maxWordsMin = 3,
+  maxWordsMax = 7,
+  transformPhrase = (s) => s,
+  fade = false,
+  drawExtras = '',
+  fontcolor = 'white',
+  borderw = 5,
+  bordercolor = 'black@0.9',
+  shadowcolor = 'black@0.65',
+  shadowx = 0,
+  shadowy = 3,
+}) {
   if (!captionFont || !beats?.length) return []
   const escapedFont = escapeFilterPath(captionFont)
-  const maxWords = Math.max(3, Math.min(7, Number(displayWords) || 5))
+  const maxWords = Math.max(maxWordsMin, Math.min(maxWordsMax, Number(displayWords) || 5))
   const y = captionLayoutYExpr(layout)
   const x = captionLayoutXExpr()
-  const baseFs = captionLayoutFontSize(54, layout)
+  const baseFs = captionLayoutFontSize(baseFontSize, layout)
   const maxW = captionSafeMaxWidthPx()
   const words = beats.map((b) => b.text)
   const phrases = chunkWordsToSafeWidth(words, baseFs, { maxWidth: maxW, maxWords })
 
-  // Map phrases back onto beat timing by consuming words in order.
   const filters = []
   let wordIdx = 0
   for (let gi = 0; gi < phrases.length; gi++) {
-    const phrase = phrases[gi]
-    const phraseWords = phrase.split(/\s+/).filter(Boolean)
+    const rawPhrase = phrases[gi]
+    const phrase = transformPhrase(rawPhrase)
+    const phraseWords = rawPhrase.split(/\s+/).filter(Boolean)
     const slice = beats.slice(wordIdx, wordIdx + phraseWords.length)
     wordIdx += phraseWords.length
     if (!slice.length) continue
-    const fs = captionFitFontSize(54, phrase, layout, { maxWidth: maxW })
-    const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `live-${gi}` })
+    const fs = captionFitFontSize(baseFontSize, phrase, layout, { maxWidth: maxW })
+    const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `${filePrefix}-${gi}` })
     const start = slice[0].start
     const end = slice[slice.length - 1].end
+    const fadePart = fade
+      ? (() => {
+          const local = `t-${start.toFixed(3)}`
+          const alpha = `if(lt(${local}\\,0.06)\\,${local}/0.06\\,if(gt(t\\,${(end - 0.08).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.08\\,1))`
+          return `alpha='${alpha}':`
+        })()
+      : ''
     filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=white:borderw=7:bordercolor=black@0.94:shadowcolor=black@0.65:shadowx=0:shadowy=4:x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
+      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=${fontcolor}:borderw=${borderw}:bordercolor=${bordercolor}:shadowcolor=${shadowcolor}:shadowx=${shadowx}:shadowy=${shadowy}:${fadePart}${drawExtras}x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
     )
   }
   return filters
 }
 
 /**
+ * Free live-style subtitles: short phrases along the bottom safe zone
+ * (above Subscribe watermark), white + heavy stroke — TV / YouTube CC.
+ */
+export function buildLiveSubtitleFilters({ beats, captionFont, displayWords = 5, textDir, layout }) {
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'live',
+    baseFontSize: 54,
+    fontcolor: 'white',
+    borderw: 7,
+    bordercolor: 'black@0.94',
+    shadowcolor: 'black@0.65',
+    shadowy: 4,
+  })
+}
+
+/**
+ * Netflix / YouTube-style classic white subs — soft outline + shadow, no heavy plate.
+ */
+export function buildClassicSubtitleFilters({ beats, captionFont, displayWords = 6, textDir, layout }) {
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'classic',
+    baseFontSize: 50,
+    maxWordsMax: 8,
+    fontcolor: 'white',
+    borderw: 4,
+    bordercolor: 'black@0.88',
+    shadowcolor: 'black@0.78',
+    shadowy: 3,
+  })
+}
+
+/**
+ * Soft semi-transparent pill behind white sentence-case text.
+ */
+export function buildSoftbarSubtitleFilters({ beats, captionFont, displayWords = 6, textDir, layout }) {
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'softbar',
+    baseFontSize: 48,
+    maxWordsMax: 8,
+    fontcolor: '0xFAFAFA',
+    borderw: 2,
+    bordercolor: 'black@0.55',
+    shadowcolor: 'black@0.35',
+    shadowy: 2,
+    drawExtras: 'box=1:boxcolor=black@0.62:boxborderw=18:',
+  })
+}
+
+/**
+ * Clean broadcast lower-third — bold white, thin black stroke.
+ */
+export function buildBroadcastSubtitleFilters({ beats, captionFont, displayWords = 5, textDir, layout }) {
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'broadcast',
+    baseFontSize: 52,
+    fontcolor: 'white',
+    borderw: 3,
+    bordercolor: 'black@0.96',
+    shadowcolor: 'black@0.55',
+    shadowy: 2,
+  })
+}
+
+/**
+ * Desk VO — slightly larger clear commentary subs.
+ */
+export function buildDeskSubtitleFilters({ beats, captionFont, displayWords = 6, textDir, layout }) {
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'desk',
+    baseFontSize: 62,
+    maxWordsMax: 8,
+    fontcolor: 'white',
+    borderw: 6,
+    bordercolor: 'black@0.92',
+    shadowcolor: 'black@0.7',
+    shadowy: 4,
+  })
+}
+
+/**
+ * Elegant cream/gold lower-third — subtle accent, still readable on green.
+ */
+export function buildElegantSubtitleFilters({ beats, captionFont, displayWords = 5, textDir, layout }) {
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'elegant',
+    baseFontSize: 50,
+    fontcolor: '0xF5E6C8',
+    borderw: 5,
+    bordercolor: 'black@0.9',
+    shadowcolor: 'black@0.72',
+    shadowy: 4,
+  })
+}
+
+/**
  * Free sports “match bar”: uppercase lower-third in stadium yellow — football Shorts graphic.
  */
 export function buildPunchSubtitleFilters({ beats, captionFont, displayWords = 4, textDir, layout }) {
-  if (!captionFont || !beats?.length) return []
-  const escapedFont = escapeFilterPath(captionFont)
-  const maxWords = Math.max(2, Math.min(5, Number(displayWords) || 4))
-  const y = captionLayoutYExpr(layout)
-  const x = captionLayoutXExpr()
-  const baseFs = captionLayoutFontSize(56, layout)
-  const maxW = captionSafeMaxWidthPx()
-  const words = beats.map((b) => b.text)
-  const phrases = chunkWordsToSafeWidth(words, baseFs, { maxWidth: maxW, maxWords })
-
-  const filters = []
-  let wordIdx = 0
-  for (let gi = 0; gi < phrases.length; gi++) {
-    const phrase = phrases[gi].toUpperCase()
-    const phraseWords = phrases[gi].split(/\s+/).filter(Boolean)
-    const slice = beats.slice(wordIdx, wordIdx + phraseWords.length)
-    wordIdx += phraseWords.length
-    if (!slice.length) continue
-    const fs = captionFitFontSize(56, phrase, layout, { maxWidth: maxW })
-    const textOpt = drawtextTextOption({ text: phrase, textDir, fileBase: `punch-${gi}` })
-    const start = slice[0].start
-    const end = slice[slice.length - 1].end
-    const local = `t-${start.toFixed(3)}`
-    const alpha = `if(lt(${local}\\,0.06)\\,${local}/0.06\\,if(gt(t\\,${(end - 0.08).toFixed(3)})\\,(${end.toFixed(3)}-t)/0.08\\,1))`
-    filters.push(
-      `drawtext=${fontExpr(escapedFont)}:${textOpt}:fontsize=${fs}:fontcolor=0xFFE566:borderw=9:bordercolor=black@0.96:shadowcolor=black@0.7:shadowx=0:shadowy=5:alpha='${alpha}':x=${x}:y=${y}:enable='between(t\\,${start.toFixed(3)}\\,${end.toFixed(3)})'`,
-    )
-  }
-  return filters
+  return buildPhraseSubtitleFilters({
+    beats,
+    captionFont,
+    displayWords,
+    textDir,
+    layout,
+    filePrefix: 'punch',
+    baseFontSize: 56,
+    maxWordsMin: 2,
+    maxWordsMax: 5,
+    transformPhrase: (s) => s.toUpperCase(),
+    fade: true,
+    fontcolor: '0xFFE566',
+    borderw: 9,
+    bordercolor: 'black@0.96',
+    shadowcolor: 'black@0.7',
+    shadowy: 5,
+  })
 }
 
 /**
@@ -377,25 +536,21 @@ export function buildCaptionDrawtextFilters({
   const beats = buildWordBeats(caption, durationSec)
   if (!beats.length) return []
   const lay = normalizeEofCaptionLayout(layout, styleId)
+  const common = {
+    beats,
+    captionFont,
+    displayWords: meta.displayWords,
+    textDir,
+    layout: lay,
+  }
 
-  if (styleId === 'live') {
-    return buildLiveSubtitleFilters({
-      beats,
-      captionFont,
-      displayWords: meta.displayWords,
-      textDir,
-      layout: lay,
-    })
-  }
-  if (styleId === 'punch') {
-    return buildPunchSubtitleFilters({
-      beats,
-      captionFont,
-      displayWords: meta.displayWords,
-      textDir,
-      layout: lay,
-    })
-  }
+  if (styleId === 'live') return buildLiveSubtitleFilters(common)
+  if (styleId === 'classic') return buildClassicSubtitleFilters(common)
+  if (styleId === 'softbar') return buildSoftbarSubtitleFilters(common)
+  if (styleId === 'broadcast') return buildBroadcastSubtitleFilters(common)
+  if (styleId === 'desk') return buildDeskSubtitleFilters(common)
+  if (styleId === 'elegant') return buildElegantSubtitleFilters(common)
+  if (styleId === 'punch') return buildPunchSubtitleFilters(common)
   if (styleId === 'karaoke') {
     return buildKaraokeFilters({
       beats,

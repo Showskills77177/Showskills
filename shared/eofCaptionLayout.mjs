@@ -30,7 +30,12 @@ export function defaultEofCaptionLayout(style) {
   const id = resolveEofCaptionStyle(style)
   if (id === 'off') return { yNorm: 0.72, fontScale: 1 }
   if (isBottomBarCaptionStyle(id)) {
-    return { yNorm: id === 'punch' ? 0.73 : 0.76, fontScale: 1 }
+    if (id === 'punch') return { yNorm: 0.73, fontScale: 1 }
+    if (id === 'desk') return { yNorm: 0.74, fontScale: 1.05 }
+    if (id === 'live') return { yNorm: 0.76, fontScale: 1 }
+    if (id === 'softbar') return { yNorm: 0.77, fontScale: 1 }
+    // classic / broadcast / elegant — Netflix-style lower third
+    return { yNorm: 0.78, fontScale: 1 }
   }
   // CapCut mid-frame pack
   return { yNorm: 0.52, fontScale: 1 }

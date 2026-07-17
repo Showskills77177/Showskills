@@ -47,6 +47,16 @@ describe('resolveCaptionRenderPlan', () => {
     assert.equal(off.callZapcap, false)
   })
 
+  it('free mode burns new subtitle styles locally', () => {
+    for (const id of ['classic', 'softbar', 'broadcast', 'desk', 'elegant']) {
+      const plan = resolveCaptionRenderPlan({ captionStyle: id, captionMode: 'free' })
+      assert.equal(plan.style, id)
+      assert.equal(plan.engine, 'local')
+      assert.equal(plan.burnCaptions, true)
+      assert.equal(plan.callZapcap, false)
+    }
+  })
+
   it('zapcap-only mode burns clean plate then ZapCap (apply action)', () => {
     const plan = resolveCaptionRenderPlan({ captionStyle: 'karaoke', captionMode: 'zapcap-only' })
     assert.equal(plan.requestedStyle, 'karaoke')

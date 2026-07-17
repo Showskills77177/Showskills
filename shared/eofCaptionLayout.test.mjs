@@ -17,6 +17,11 @@ describe('eofCaptionLayout', () => {
     const live = defaultEofCaptionLayout('live')
     const pop = defaultEofCaptionLayout('pop')
     assert.ok(live.yNorm > pop.yNorm)
+    const classic = defaultEofCaptionLayout('classic')
+    const desk = defaultEofCaptionLayout('desk')
+    assert.ok(classic.yNorm >= live.yNorm)
+    assert.ok(desk.yNorm < live.yNorm)
+    assert.ok(desk.fontScale >= 1)
   })
 
   it('clamps y and scale', () => {

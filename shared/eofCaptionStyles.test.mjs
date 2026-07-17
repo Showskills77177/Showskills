@@ -11,6 +11,7 @@ import {
   isLocalCaptionStyle,
   isZapcapCaptionStyle,
   isBottomBarCaptionStyle,
+  captionBottomPlateMode,
   resolveFreeLocalBurnStyle,
   normalizeZapcapTemplateId,
   listEofCaptionStyles,
@@ -24,15 +25,32 @@ import { normalizeZapcapTemplateList } from '../backend/api/lib/eofZapcapCaption
 
 describe('eofCaptionStyles', () => {
   it('exposes free local + CapCut shortcuts + ZapCap catalog + Off', () => {
-    assert.ok(EOF_CAPTION_STYLES.length >= 6)
+    assert.ok(EOF_CAPTION_STYLES.length >= 11)
     assert.deepEqual(
       EOF_CAPTION_STYLES.map((s) => s.id).sort(),
-      ['beast', 'karaoke', 'live', 'off', 'pop', 'punch', 'zapcap'],
+      [
+        'beast',
+        'broadcast',
+        'classic',
+        'desk',
+        'elegant',
+        'karaoke',
+        'live',
+        'off',
+        'pop',
+        'punch',
+        'softbar',
+        'zapcap',
+      ],
     )
     assert.equal(EOF_DEFAULT_CAPTION_STYLE, 'live')
     assert.equal(resolveEofCaptionStyle('off'), 'off')
     assert.equal(resolveEofCaptionStyle('none'), 'off')
     assert.equal(resolveEofCaptionStyle('subs'), 'live')
+    assert.equal(resolveEofCaptionStyle('netflix'), 'classic')
+    assert.equal(resolveEofCaptionStyle('pill'), 'softbar')
+    assert.equal(resolveEofCaptionStyle('commentary'), 'desk')
+    assert.equal(resolveEofCaptionStyle('gold'), 'elegant')
     assert.equal(resolveEofCaptionStyle('match'), 'punch')
     assert.equal(resolveEofCaptionStyle('ticker'), 'punch')
     assert.equal(resolveEofCaptionStyle('zapcap'), 'zapcap')
@@ -41,16 +59,27 @@ describe('eofCaptionStyles', () => {
       'zapcap',
     )
     assert.equal(isLocalCaptionStyle('live'), true)
+    assert.equal(isLocalCaptionStyle('classic'), true)
+    assert.equal(isLocalCaptionStyle('softbar'), true)
     assert.equal(isLocalCaptionStyle('punch'), true)
     assert.equal(isZapcapCaptionStyle('zapcap'), true)
     assert.equal(isZapcapCaptionStyle('pop'), true)
     assert.equal(isLocalCaptionStyle('pop'), false)
     assert.equal(isBottomBarCaptionStyle('live'), true)
+    assert.equal(isBottomBarCaptionStyle('classic'), true)
+    assert.equal(isBottomBarCaptionStyle('desk'), true)
     assert.equal(isBottomBarCaptionStyle('punch'), true)
     assert.equal(isBottomBarCaptionStyle('pop'), false)
+    assert.equal(captionBottomPlateMode('live'), 'full')
+    assert.equal(captionBottomPlateMode('punch'), 'punch')
+    assert.equal(captionBottomPlateMode('desk'), 'soft')
+    assert.equal(captionBottomPlateMode('classic'), 'none')
+    assert.equal(captionBottomPlateMode('softbar'), 'none')
     assert.equal(resolveFreeLocalBurnStyle('zapcap'), 'pop')
     assert.equal(resolveFreeLocalBurnStyle('karaoke'), 'karaoke')
     assert.equal(resolveFreeLocalBurnStyle('punch'), 'punch')
+    assert.equal(resolveFreeLocalBurnStyle('classic'), 'classic')
+    assert.equal(resolveFreeLocalBurnStyle('elegant'), 'elegant')
     assert.equal(
       normalizeZapcapTemplateId('ca050348-e2d0-49a7-9c75-7a5e8335c67d'),
       'ca050348-e2d0-49a7-9c75-7a5e8335c67d',
@@ -58,7 +87,7 @@ describe('eofCaptionStyles', () => {
     assert.equal(normalizeZapcapTemplateId('nope'), '')
     const listed = listEofCaptionStyles()
     assert.ok(listed.every((s) => typeof s.free === 'boolean'))
-    assert.ok(listed.filter((s) => s.free).length >= 5)
+    assert.ok(listed.filter((s) => s.free).length >= 10)
   })
 
   it('resolves unknown styles to default', () => {
@@ -113,7 +142,18 @@ describe('caption drawtext builders', () => {
   })
 
   it('emits drawtext for each free style', () => {
-    for (const id of ['live', 'punch', 'pop', 'karaoke', 'beast']) {
+    for (const id of [
+      'live',
+      'classic',
+      'softbar',
+      'broadcast',
+      'desk',
+      'elegant',
+      'punch',
+      'pop',
+      'karaoke',
+      'beast',
+    ]) {
       const filters = buildCaptionDrawtextFilters({
         caption: 'Rooney is right about Ronaldo',
         durationSec: 4,
@@ -122,6 +162,16 @@ describe('caption drawtext builders', () => {
       })
       assert.ok(filters.length >= 1, `${id} should emit filters`)
       assert.ok(filters.every((f) => f.startsWith('drawtext=')), `${id} filters must be drawtext`)
+    }
+    // Phrase / single-word styles center with safe-x expr; karaoke lays out word windows.
+    for (const id of ['live', 'classic', 'softbar', 'broadcast', 'desk', 'elegant', 'punch', 'pop', 'beast']) {
+      const filters = buildCaptionDrawtextFilters({
+        caption: 'Rooney is right about Ronaldo',
+        durationSec: 4,
+        captionFont: '/tmp/font.ttf',
+        style: id,
+      })
+      assert.ok(filters.every((f) => f.includes('x=max(w*0.10')), `${id} must use horizontal safe x`)
     }
   })
 
@@ -144,6 +194,52 @@ describe('caption drawtext builders', () => {
     assert.ok(punch.some((f) => f.includes('y=h*0.73')))
     assert.ok(punch.some((f) => f.includes('0xFFE566')), 'match bar uses stadium yellow')
     assert.ok(punch.every((f) => f.includes('x=max(w*0.10')), 'punch must use horizontal safe x')
+  })
+
+  it('builds readable subtitle looks with distinct traits', () => {
+    const classic = buildCaptionDrawtextFilters({
+      caption: 'He is still running the show tonight',
+      durationSec: 4,
+      captionFont: '/tmp/font.ttf',
+      style: 'classic',
+    })
+    assert.ok(classic.some((f) => f.includes('y=h*0.78')))
+    assert.ok(classic.some((f) => f.includes('borderw=4')))
+
+    const softbar = buildCaptionDrawtextFilters({
+      caption: 'He is still running the show tonight',
+      durationSec: 4,
+      captionFont: '/tmp/font.ttf',
+      style: 'softbar',
+    })
+    assert.ok(softbar.every((f) => f.includes('box=1')))
+    assert.ok(softbar.some((f) => f.includes('boxcolor=black@0.62')))
+
+    const broadcast = buildCaptionDrawtextFilters({
+      caption: 'He is still running the show tonight',
+      durationSec: 4,
+      captionFont: '/tmp/font.ttf',
+      style: 'broadcast',
+    })
+    assert.ok(broadcast.some((f) => f.includes('borderw=3')))
+
+    const desk = buildCaptionDrawtextFilters({
+      caption: 'He is still running the show tonight',
+      durationSec: 4,
+      captionFont: '/tmp/font.ttf',
+      style: 'desk',
+    })
+    assert.ok(desk.some((f) => f.includes('y=h*0.74')))
+    // Larger base + default fontScale 1.05 → fitted size above classic 50
+    assert.ok(desk.some((f) => /fontsize=6\d/.test(f)))
+
+    const elegant = buildCaptionDrawtextFilters({
+      caption: 'He is still running the show tonight',
+      durationSec: 4,
+      captionFont: '/tmp/font.ttf',
+      style: 'elegant',
+    })
+    assert.ok(elegant.some((f) => f.includes('0xF5E6C8')))
   })
 
   it('keeps long live phrases inside the safe band via wrap/fit', () => {
