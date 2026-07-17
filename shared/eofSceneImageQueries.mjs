@@ -74,6 +74,32 @@ const KNOWN_COACH_RE =
 
 const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
 
+/**
+ * Role / era intent for image search — pundit desk stills vs playing-career action.
+ * Detected from topic + voiceover draft + scene captions (not from SERP titles).
+ */
+const PUNDIT_STRONG_RE =
+  /\b(pundit|punditry|studio|presenter|commentator|commentary|co[- ]?commentary|analyst|analysis|sky\s*sports|tnt\s*sports|bt\s*sport|talksport|monday\s*night\s*football|soccer\s*saturday|match\s*of\s*the\s*day|motd)\b/i
+const PUNDIT_MEDIUM_RE =
+  /\b(tv\s*desk|television|tv\s*panel|panel\s*show|on\s*the\s*couch|couch\s*panel|broadcast|presenter'?s?\s*chair|mic\s*in\s*hand)\b/i
+const PUNDIT_WEAK_RE =
+  /\b(slammed|reckons|argues|opines|his\s+take|her\s+take|their\s+take|hot\s*take|reaction|reacts|claims\s+that|insists|warns|blasts|tears\s+into)\b/i
+
+const PLAYING_STRONG_RE =
+  /\b(scored|scoring|goal|goals|hat[- ]?trick|debut|world\s*cup\s*goal|champions\s*league\s*final|celebrat(e|ed|ing|ion)|as\s+a\s+player|playing\s+career|in\s+his\s+prime|in\s+her\s+prime|match[- ]?winner|bicycle\s*kick|volley|free[- ]?kick)\b/i
+const PLAYING_MEDIUM_RE =
+  /\b(kit|jersey|on\s+the\s+pitch|striker|midfielder|winger|centre[- ]?back|in\s+action|matchday|old\s+trafford\s+goal|united\s+kit|chelsea\s+kit)\b/i
+
+/** Title/URL cues when ranking SERP hits for a known intent. */
+const PUNDIT_HIT_BOOST_RE =
+  /\b(pundit|studio|presenter|commentator|commentary|analyst|analysis|sky|tnt|talksport|suit|tv\s*desk|television|panel|broadcast|motd)\b/i
+const PLAYING_HIT_BOOST_RE =
+  /\b(goal|goals|celebrat|scoring|scored|kit|jersey|in\s+action|match|debut|hat[- ]?trick|volley|free[- ]?kick|champions\s*league|world\s*cup)\b/i
+const PLAYING_HIT_DEMOTE_RE =
+  /\b(pundit|studio|presenter|tv\s*desk|television\s*panel|sky\s*sports\s*studio)\b/i
+const PUNDIT_HIT_DEMOTE_RE =
+  /\b(goal|goals|celebrat|scoring|scored|kit|jersey|in\s+action|hat[- ]?trick|bicycle|volley|free[- ]?kick|playing\s+for|manchester\s+united\s+2\d{3}|united\s+kit|chelsea\s+kit|everton\s+kit)\b/i
+
 /** High-signal football surnames / mononyms for hard entity matching. */
 const KNOWN_PLAYER_RE =
   /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|lewa(ndowski)?|ney(mar)?|benzema|modric|de\s*bruyne|rodri|yamal|pedri|gavi|osimhen|lookman|palmer|rice|son|heung|lavelle|putellas|rooney|beckham|giggs|shearer|drogba|henry|torres|aguero|suarez|iniesta|xavi|zidane|ronaldinho|owen|gerrard|lampard|terry|ferdinand|scholes|neville|cole|ashley\s*cole)\b/i
@@ -214,6 +240,95 @@ export function topicLooksLikeCoach(topic) {
   return COACH_ROLE_RE.test(t) || KNOWN_COACH_RE.test(t)
 }
 
+/**
+ * Count overlapping regex hits in text (non-overlapping word-ish matches).
+ * @param {string} text
+ * @param {RegExp} re
+ */
+function countRegexHits(text, re) {
+  if (!text) return 0
+  const flags = re.flags.includes('g') ? re.flags : `${re.flags}g`
+  const global = new RegExp(re.source, flags)
+  const m = text.match(global)
+  return m ? m.length : 0
+}
+
+/**
+ * Detect whether the Short needs pundit/TV stills, playing-career action, coach
+ * touchline/presser shots, or a neutral person search.
+ *
+ * Prefer topic + plainTextDraft + captions so a “Rooney slammed X” voiceover does
+ * not scrape Man Utd kit celebration photos.
+ *
+ * @param {{ topic?: string, plainTextDraft?: string, captions?: string|string[], imageQuery?: string, intent?: string }} [input]
+ * @returns {'pundit'|'playing'|'coach'|'neutral'}
+ */
+export function detectImageRoleIntent(input = {}) {
+  if (input?.intent && ['pundit', 'playing', 'coach', 'neutral'].includes(input.intent)) {
+    return input.intent
+  }
+  const captions = Array.isArray(input.captions)
+    ? input.captions.join(' ')
+    : String(input.captions || '')
+  const blob = [input.topic, input.plainTextDraft, captions, input.imageQuery]
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+    .join(' \n ')
+  if (!blob) return 'neutral'
+
+  // Active coaches / manager headlines win over weak “said” noise.
+  if (topicLooksLikeCoach(blob) && !PLAYING_STRONG_RE.test(blob)) {
+    return 'coach'
+  }
+
+  const punditScore =
+    countRegexHits(blob, PUNDIT_STRONG_RE) * 3 +
+    countRegexHits(blob, PUNDIT_MEDIUM_RE) * 2 +
+    countRegexHits(blob, PUNDIT_WEAK_RE)
+  const playingScore =
+    countRegexHits(blob, PLAYING_STRONG_RE) * 3 + countRegexHits(blob, PLAYING_MEDIUM_RE) * 2
+
+  if (punditScore >= 3 && punditScore > playingScore) return 'pundit'
+  if (playingScore >= 3 && playingScore > punditScore) return 'playing'
+  // Single strong cue is enough when the other side is silent.
+  if (punditScore >= 3 && playingScore === 0) return 'pundit'
+  if (playingScore >= 3 && punditScore === 0) return 'playing'
+  if (punditScore > playingScore && punditScore >= 2) return 'pundit'
+  if (playingScore > punditScore && playingScore >= 2) return 'playing'
+  if (topicLooksLikeCoach(blob)) return 'coach'
+  return 'neutral'
+}
+
+/**
+ * Extra relevance from SERP title/URL for a known role intent.
+ * @param {'pundit'|'playing'|'coach'|'neutral'} intent
+ * @param {string} haystack
+ */
+export function scoreImageRoleIntentMatch(intent, haystack) {
+  const hay = String(haystack || '').toLowerCase()
+  if (!hay || !intent || intent === 'neutral') return 0
+  if (intent === 'pundit') {
+    let s = 0
+    if (PUNDIT_HIT_BOOST_RE.test(hay)) s += 10
+    if (PUNDIT_HIT_DEMOTE_RE.test(hay)) s -= 14
+    if (/\b(199\d|200\d|201[0-6])\b/.test(hay)) s -= 10
+    return s
+  }
+  if (intent === 'playing') {
+    let s = 0
+    if (PLAYING_HIT_BOOST_RE.test(hay)) s += 8
+    if (PLAYING_HIT_DEMOTE_RE.test(hay)) s -= 8
+    return s
+  }
+  if (intent === 'coach') {
+    let s = 0
+    if (/\b(manager|coach|sideline|touchline|press conference|tactics|england)\b/i.test(hay)) s += 6
+    if (/\b(kit|jersey|as a player|playing career|celebrat)\b/i.test(hay)) s -= 8
+    return s
+  }
+  return 0
+}
+
 /** Sentence/dialogue words that must never glue onto a person name ("Thomas Tuchel We"). */
 const NAME_BREAK_RE =
   /^(we|i|you|they|he|she|it|this|that|these|those|what|when|where|why|how|who|whom|whose|were|was|are|is|am|been|being|have|has|had|do|does|did|will|would|can|could|should|may|might|must|not|no|yes|ok|okay|sloppy|enough|fast|slow|good|bad|very|really|just|also|then|than|too|so|if|or|but|and|the|a|an)$/i
@@ -343,6 +458,14 @@ const PLAYER_ANGLES = [
   (core) => `${core} training`,
 ]
 
+const PUNDIT_ANGLES = [
+  (core) => `${core} pundit`,
+  (core) => `${core} TV studio`,
+  (core) => `${core} Sky Sports`,
+  (core) => `${core} presenter`,
+  (core) => `${core} analysis studio`,
+]
+
 const COACH_ANGLES = [
   (core) => `${core} manager`,
   (core) => `${core} coach press conference`,
@@ -352,39 +475,71 @@ const COACH_ANGLES = [
 ]
 
 /**
- * Build ordered search queries — person/club first, competition never alone.
- * @param {{ topic?: string, imageQuery?: string, sceneIndex?: number }} input
+ * @param {'pundit'|'playing'|'coach'|'neutral'} intent
  */
-export function buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex = 0 }) {
+function anglesForIntent(intent) {
+  if (intent === 'pundit') return PUNDIT_ANGLES
+  if (intent === 'coach') return COACH_ANGLES
+  return PLAYER_ANGLES
+}
+
+/**
+ * Build ordered search queries — person/club first, competition never alone.
+ * @param {{ topic?: string, imageQuery?: string, sceneIndex?: number, plainTextDraft?: string, captions?: string|string[], intent?: string }} input
+ */
+export function buildSceneImageSearchQueries({
+  topic,
+  imageQuery,
+  sceneIndex = 0,
+  plainTextDraft,
+  captions,
+  intent: intentOpt,
+} = {}) {
   const name = String(topic || '').trim()
   const custom = String(imageQuery || '').trim()
   const entities = primaryImageEntities(name, custom)
   const core = entities.slice(0, 2).join(' ') || extractTopicImageTokens(name).slice(0, 2).join(' ') || name || 'football'
   const year = new Date().getFullYear()
-  const coach = topicLooksLikeCoach(`${name} ${custom}`)
-  const angles = coach ? COACH_ANGLES : PLAYER_ANGLES
+  const intent = detectImageRoleIntent({
+    topic: name,
+    imageQuery: custom,
+    plainTextDraft,
+    captions,
+    intent: intentOpt,
+  })
+  const coach = intent === 'coach'
+  const pundit = intent === 'pundit'
+  const angles = anglesForIntent(intent)
   const angle = angles[sceneIndex % angles.length](core)
-  const roleTag = coach ? 'manager' : 'football'
+  const roleTag = coach ? 'manager' : pundit ? 'pundit' : 'football'
   const lead = entities[0] || core
 
   /** Expand mononyms that stock APIs understand better as full names. */
   const fullName = expandPlayerFullName(lead)
+  const person = fullName || lead
 
   const queries = [
     // Prefer the scene’s own imageQuery when it already names the person/club
     custom && entities.some((e) => new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(custom))
       ? custom
       : '',
-    fullName ? `${fullName} football` : '',
-    `${lead} football`,
-    `${core} football`,
+    pundit ? `"${person}" pundit` : '',
+    pundit ? `"${person}" TV studio ${year}` : '',
+    pundit ? `"${person}" Sky Sports` : '',
+    fullName && !pundit ? `${fullName} football` : '',
+    !pundit ? `${lead} football` : '',
+    !pundit ? `${core} football` : '',
     `${lead} ${year}`,
     `${lead} latest ${year}`,
     fullName ? `${fullName} ${year}` : '',
     angle,
-    coach ? `${core} football manager ${year}` : `${lead} celebrating football`,
+    coach
+      ? `${core} football manager ${year}`
+      : pundit
+        ? `${person} studio suit`
+        : `${lead} celebrating football`,
     name && !COMP_NOISE_RE.test(name) ? `${name} ${roleTag}` : '',
-    /world\s*cup/i.test(`${name} ${custom}`) ? `${fullName || lead} World Cup football` : '',
+    !pundit && /world\s*cup/i.test(`${name} ${custom}`) ? `${fullName || lead} World Cup football` : '',
     custom,
   ]
 
@@ -397,10 +552,19 @@ export function buildSceneImageSearchQueries({ topic, imageQuery, sceneIndex = 0
  * @param {string} topic
  * @param {string} haystack
  * @param {string} [imageQuery]
+ * @param {{ intent?: string, plainTextDraft?: string, captions?: string|string[] }} [opts]
  */
-export function scoreImageRelevance(topic, haystack, imageQuery = '') {
+export function scoreImageRelevance(topic, haystack, imageQuery = '', opts = {}) {
   const hay = String(haystack || '').toLowerCase()
   if (!hay) return 0
+
+  const intent = detectImageRoleIntent({
+    topic,
+    imageQuery,
+    plainTextDraft: opts.plainTextDraft,
+    captions: opts.captions,
+    intent: opts.intent,
+  })
 
   const required = primaryImageEntities(topic, imageQuery)
   const mustHit = required.filter((t) => t.length >= 4 || KNOWN_PLAYER_RE.test(t) || KNOWN_COACH_RE.test(t))
@@ -422,16 +586,24 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '') {
   if (/\b(football|soccer|premier|liga|serie|bundesliga|champions|world cup|fifa|england|manager|coach|argentina|barcelona|psg|inter miami)\b/i.test(hay)) {
     score += 3
   }
-  if (topicLooksLikeCoach(topic) && /\b(manager|coach|sideline|press conference|england)\b/i.test(hay)) {
+  if ((intent === 'coach' || topicLooksLikeCoach(topic)) && /\b(manager|coach|sideline|press conference|england)\b/i.test(hay)) {
     score += 4
   }
+  // Pundit / playing era bias (coach already handled above — avoid double-counting).
+  if (intent === 'pundit' || intent === 'playing') {
+    score += scoreImageRoleIntentMatch(intent, hay)
+  } else if (intent === 'coach' && /\b(kit|jersey|as a player|playing career)\b/i.test(hay)) {
+    score -= 8
+  }
+
   const year = new Date().getFullYear()
   if (hay.includes(String(year))) score += 8
   else if (hay.includes(String(year - 1))) score += 5
-  // Prefer current stills for active coaches/stories, but keep career match photos for
-  // named players (Rooney / Beckham / Henry — best Google hits are often 2000s–2010s).
+  // Soften year bias for playing-career legends (best Google hits are often 2000s–2010s).
+  // Pundit / coach scripts need current/studio stills — keep the hard legacy penalty.
   const namedStarHit = mustHit.some((t) => hay.includes(t.toLowerCase()))
-  const softLegacyYears = namedStarHit && !topicLooksLikeCoach(topic)
+  const softLegacyYears =
+    namedStarHit && intent !== 'coach' && intent !== 'pundit' && (intent === 'playing' || intent === 'neutral')
   if (/\b(throwback|archive|young|childhood|retro)\b/i.test(hay)) score -= softLegacyYears ? 4 : 14
   else if (/\b(199\d|200\d|201[0-6])\b/i.test(hay)) score -= softLegacyYears ? 2 : 14
   else if (/\b(201[7-9])\b/i.test(hay) && !softLegacyYears) score -= 8
@@ -446,43 +618,78 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '') {
  * Caption → photo angle so scene stills match the beat (tactics, England, celebration…).
  * @param {string} caption
  * @param {string} subject
- * @param {boolean} coach
+ * @param {boolean|{'pundit'|'playing'|'coach'|'neutral'}} [coachOrIntent]
  */
-export function imageAngleFromCaption(caption, subject, coach = false) {
+export function imageAngleFromCaption(caption, subject, coachOrIntent = false) {
   const core = String(subject || '').trim() || 'football'
   const c = String(caption || '').toLowerCase()
+  const intent =
+    typeof coachOrIntent === 'string'
+      ? coachOrIntent
+      : coachOrIntent
+        ? 'coach'
+        : detectImageRoleIntent({ caption, topic: subject })
+  const coach = intent === 'coach'
+  const pundit = intent === 'pundit'
+
+  if (pundit || /\b(pundit|studio|sky|tnt|presenter|analysis|desk)\b/.test(c)) {
+    if (/\bsky\b/.test(c)) return `${core} Sky Sports`
+    if (/\btnt\b/.test(c)) return `${core} TNT Sports`
+    if (/\bstudio|desk|panel\b/.test(c)) return `${core} TV studio`
+    return `${core} pundit`
+  }
   if (/\btactic|formation|system|shape|press(ing)?\b/.test(c)) {
     return coach ? `${core} tactics board` : `${core} football tactics`
   }
   if (/\bengland\b/.test(c) && coach) return `${core} England manager`
-  if (/\bpress|interview|says|said|quotes?\b/.test(c)) return `${core} press conference`
+  if (/\bpress|interview|says|said|quotes?\b/.test(c)) {
+    return pundit ? `${core} TV studio` : `${core} press conference`
+  }
   if (/\btrain|session|drill\b/.test(c)) return `${core} training`
   if (/\bcelebrat|goal|scores?|winner\b/.test(c)) return `${core} celebrating football`
   if (/\bsideline|touchline|bench\b/.test(c)) return `${core} sideline`
   if (/\bmatch|game|derby|final\b/.test(c)) return `${core} match football`
-  return coach ? `${core} manager` : `${core} football`
+  if (coach) return `${core} manager`
+  if (pundit) return `${core} pundit`
+  return `${core} football`
 }
 
 /**
  * Per-scene image search line for auto-generated scripts.
  * @param {string} topic
  * @param {number} sceneIndex
+ * @param {{ plainTextDraft?: string, captions?: string|string[], intent?: string }} [opts]
  */
-export function defaultSceneImageQuery(topic, sceneIndex) {
+export function defaultSceneImageQuery(topic, sceneIndex, opts = {}) {
   const name = String(topic || '').trim() || 'football'
   // Anchor every scene to the topic's player/club (expanded full name), never caption noise
   const core = resolveImageSubject(name) || name
-  const angles = topicLooksLikeCoach(name) ? COACH_ANGLES : PLAYER_ANGLES
+  const intent = detectImageRoleIntent({ topic: name, ...opts })
+  const angles = anglesForIntent(intent)
   return angles[sceneIndex % angles.length](core)
 }
 
 /**
  * Ensure AI / adapted imageQuery still names the lead subject and matches the caption beat.
- * @param {{ topic?: string, imageQuery?: string, caption?: string, sceneIndex?: number }} input
+ * @param {{ topic?: string, imageQuery?: string, caption?: string, sceneIndex?: number, plainTextDraft?: string, intent?: string }} input
  */
-export function anchorSceneImageQuery({ topic, imageQuery, caption, sceneIndex = 0 } = {}) {
+export function anchorSceneImageQuery({
+  topic,
+  imageQuery,
+  caption,
+  sceneIndex = 0,
+  plainTextDraft,
+  intent: intentOpt,
+} = {}) {
   const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
-  const coach = topicLooksLikeCoach(`${topic || ''} ${caption || ''}`)
+  const intent = detectImageRoleIntent({
+    topic,
+    caption,
+    imageQuery,
+    plainTextDraft,
+    intent: intentOpt,
+  })
+  const coach = intent === 'coach'
   const raw = String(imageQuery || '').trim()
   const surname = subject.split(/\s+/).filter(Boolean).pop() || subject
   const namesSubject =
@@ -490,13 +697,22 @@ export function anchorSceneImageQuery({ topic, imageQuery, caption, sceneIndex =
     (new RegExp(subject.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(raw) ||
       (surname.length >= 4 && new RegExp(`\\b${surname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(raw)))
 
+  // Pundit scripts: rewrite playing-career imageQueries (kit / celebration / old club action).
+  if (intent === 'pundit' && namesSubject && PUNDIT_HIT_DEMOTE_RE.test(raw) && !PUNDIT_HIT_BOOST_RE.test(raw)) {
+    return imageAngleFromCaption(caption || topic || '', subject, intent)
+  }
+
   if (namesSubject && !/^(stadium|crowd|fans?|generic)\b/i.test(raw)) {
     // Keep AI angle when it already names the person; lightly enrich with caption cues.
-    if (caption && /\btactic|england|celebrat|press|train/i.test(caption) && !/\btactic|england|celebrat|press|train/i.test(raw)) {
-      return imageAngleFromCaption(caption, subject, coach)
+    if (
+      caption &&
+      /\btactic|england|celebrat|press|train|pundit|studio|sky|tnt/i.test(caption) &&
+      !/\btactic|england|celebrat|press|train|pundit|studio|sky|tnt/i.test(raw)
+    ) {
+      return imageAngleFromCaption(caption, subject, intent)
     }
     return raw
   }
-  if (caption) return imageAngleFromCaption(caption, subject, coach)
-  return defaultSceneImageQuery(topic || subject, sceneIndex)
+  if (caption) return imageAngleFromCaption(caption, subject, intent)
+  return defaultSceneImageQuery(topic || subject, sceneIndex, { plainTextDraft, intent })
 }

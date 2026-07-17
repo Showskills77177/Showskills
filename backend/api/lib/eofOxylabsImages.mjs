@@ -15,6 +15,8 @@
 import {
   resolveImageSubject,
   scoreImageRelevance,
+  detectImageRoleIntent,
+  scoreImageRoleIntentMatch,
 } from '../../../shared/eofSceneImageQueries.mjs'
 
 const OXYLABS_REALTIME_URL = 'https://realtime.oxylabs.io/v1/queries'
@@ -77,14 +79,41 @@ export function scoreImageCandidate(url, width = 0, height = 0) {
 }
 
 /**
- * Job-level Google Images query for one Short. Prefer the person full name; avoid
- * wrong “manager” angles for players and avoid year-only queries that miss legends.
+ * Job-level Google Images query for one Short. Prefer the person full name; bias
+ * the era/role from script context (pundit desk vs playing career vs coach).
+ * Still exactly ONE billable SERP query per Short — smarter wording, not more searches.
+ *
  * @param {string} topic
  * @param {number} [attempt]
+ * @param {{ plainTextDraft?: string, captions?: string|string[], intent?: string }} [context]
  */
-export function buildOxylabsJobQuery(topic, attempt = 0) {
+export function buildOxylabsJobQuery(topic, attempt = 0, context = {}) {
   const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const year = new Date().getFullYear()
+  const intent = detectImageRoleIntent({
+    topic,
+    plainTextDraft: context.plainTextDraft,
+    captions: context.captions,
+    intent: context.intent,
+  })
   const n = Math.max(0, Number(attempt) || 0) % 3
+
+  if (intent === 'pundit') {
+    if (n === 1) return `"${subject}" TV studio ${year}`
+    if (n === 2) return `"${subject}" Sky Sports presenter`
+    return `"${subject}" pundit`
+  }
+  if (intent === 'coach') {
+    if (n === 1) return `"${subject}" manager press conference`
+    if (n === 2) return `"${subject}" sideline ${year}`
+    return `"${subject}" football manager`
+  }
+  if (intent === 'playing') {
+    if (n === 1) return `"${subject}" football action`
+    if (n === 2) return `"${subject}" celebrating football`
+    return `"${subject}" football`
+  }
+  // Neutral rebuild rotations
   if (n === 1) return `"${subject}" football portrait`
   if (n === 2) return `"${subject}" football action`
   return `"${subject}" football`
@@ -390,12 +419,18 @@ export async function searchOxylabsGoogleImage(query, index = 0, opts = {}) {
 /**
  * ONE billable Google Images query for an entire Short (all scenes share the SERP pool).
  * For 6–7 scenes this costs 1 credit, not 6–7.
- * @param {{ topic?: string, sceneCount?: number, attempt?: number, signal?: AbortSignal }} opts
+ * @param {{ topic?: string, sceneCount?: number, attempt?: number, signal?: AbortSignal, plainTextDraft?: string, captions?: string|string[], intent?: string }} opts
  */
 export async function fetchEofOxylabsJobPool(opts = {}) {
   const sceneCount = Math.max(1, Math.min(12, Number(opts.sceneCount) || 6))
   const attempt = Math.max(0, Number(opts.attempt) || 0)
-  const query = buildOxylabsJobQuery(opts.topic || '', attempt)
+  const context = {
+    plainTextDraft: opts.plainTextDraft,
+    captions: opts.captions,
+    intent: opts.intent,
+  }
+  const intent = detectImageRoleIntent({ topic: opts.topic, ...context })
+  const query = buildOxylabsJobQuery(opts.topic || '', attempt, context)
 
   // Pull a wider SERP slice (still 1 credit), then keep the best portrait/high-res rows
   // so scenes are not stuck with the first 7 thin landscape thumbs.
@@ -409,12 +444,14 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
   console.info(
     '[eof-oxylabs] job pool',
     query.slice(0, 60),
+    `intent=${intent}`,
     `scenes=${sceneCount}`,
     `kept=${kept.length}/${fetchLimit}`,
     `(${EOF_OXYLABS_MAX_QUERIES_PER_JOB} query/Short — not per scene)`,
   )
   return {
     query,
+    intent,
     hits: kept.map((h) => ({
       url: h.url,
       title: h.title || null,
@@ -428,32 +465,41 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
  * Rank a SERP hit for a specific scene using title relevance + portrait preference.
  * Do NOT inject the job search query into the haystack — that hid weak titles.
  * @param {{ url?: string, title?: string|null, width?: number, height?: number }} hit
- * @param {{ topic?: string, imageQuery?: string, caption?: string }} scene
+ * @param {{ topic?: string, imageQuery?: string, caption?: string, plainTextDraft?: string, intent?: string }} scene
  */
 export function scoreOxylabsHitForScene(hit, scene = {}) {
   const title = String(hit?.title || '').trim()
   const topic = String(scene.topic || '').trim()
   const imageQuery = String(scene.imageQuery || '').trim()
   const caption = String(scene.caption || '').trim()
-  const relevance = scoreImageRelevance(
-    topic || imageQuery || caption,
-    title,
-    imageQuery || caption,
-  )
+  const intent = detectImageRoleIntent({
+    topic,
+    imageQuery,
+    caption,
+    plainTextDraft: scene.plainTextDraft,
+    intent: scene.intent,
+  })
+  const relevance = scoreImageRelevance(topic || imageQuery || caption, title, imageQuery || caption, {
+    intent,
+    plainTextDraft: scene.plainTextDraft,
+    captions: caption,
+  })
   const portrait = scoreImageCandidate(hit?.url, hit?.width, hit?.height)
   // Caption tokens in the title (tactics / England / celebrate) get a small extra nudge.
   let captionBoost = 0
-  const hay = title.toLowerCase()
+  const hay = `${title} ${hit?.url || ''}`.toLowerCase()
   for (const tok of caption.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 5)) {
     if (hay.includes(tok)) captionBoost += 3
   }
-  return relevance * 12 + Math.max(-20, Math.min(40, portrait)) + captionBoost
+  // URL-only era cues (titles already scored inside scoreImageRelevance).
+  const urlRole = scoreImageRoleIntentMatch(intent, String(hit?.url || ''))
+  return relevance * 12 + Math.max(-20, Math.min(40, portrait)) + captionBoost + urlRole
 }
 
 /**
  * Claim a unique URL from a shared job pool (safe under scene concurrency).
  * Prefers the best title match for this scene’s topic/imageQuery/caption, not blind rotation.
- * @param {{ hits: Array<{ url: string, title?: string|null, width?: number, height?: number }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number, topic?: string, imageQuery?: string, caption?: string, keyPrefix?: string }} opts
+ * @param {{ hits: Array<{ url: string, title?: string|null, width?: number, height?: number }>, claimed: Set<string>, avoidKeys?: Iterable<string>, index?: number, topic?: string, imageQuery?: string, caption?: string, plainTextDraft?: string, intent?: string, keyPrefix?: string }} opts
  */
 export function claimOxylabsPoolHit(opts = {}) {
   const hits = Array.isArray(opts.hits) ? opts.hits : []
@@ -473,6 +519,8 @@ export function claimOxylabsPoolHit(opts = {}) {
     topic: opts.topic,
     imageQuery: opts.imageQuery,
     caption: opts.caption,
+    plainTextDraft: opts.plainTextDraft,
+    intent: opts.intent,
   }
   const ranked = hits
     .map((hit, i) => ({

@@ -176,6 +176,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         providerOrder.join(' → ') || '(none keyed)',
         `| topic=${String(job.topic || '').slice(0, 80)}`,
       )
+      const imageContext = {
+        plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
+        captions: rows.map((r) => r.caption).filter(Boolean),
+      }
       for (const provider of providerOrder) {
         if (oxyPool?.hits?.length) break
         if (provider === 'serpapi') {
@@ -184,6 +188,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
               topic: job.topic,
               sceneCount: rows.length,
               attempt: maxAttempt,
+              ...imageContext,
             })
             if (pool.hits?.length) {
               oxyPool = {
@@ -191,6 +196,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 hits: pool.hits,
                 claimed: new Set(),
                 source: 'serpapi',
+                plainTextDraft: imageContext.plainTextDraft,
+                intent: pool.intent || null,
               }
             }
           } catch (e) {
@@ -204,6 +211,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
               topic: job.topic,
               sceneCount: rows.length,
               attempt: maxAttempt,
+              ...imageContext,
             })
             if (pool.hits?.length) {
               oxyPool = {
@@ -211,6 +219,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 hits: pool.hits,
                 claimed: new Set(),
                 source: 'oxylabs',
+                plainTextDraft: imageContext.plainTextDraft,
+                intent: pool.intent || null,
               }
             }
           } catch (e) {
@@ -283,6 +293,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           avoidKeys: priorHistory,
           wikiPool,
           oxyPool,
+          plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
+          intent: oxyPool?.intent || null,
         })
         imageAttempt = attempt
         imageKey = imageMeta.imageKey || null

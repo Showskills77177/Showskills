@@ -189,7 +189,7 @@ const IMAGE_ROTATE_MAX_TRIES = 8
  * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
  * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
  * record what was used and avoid it next time.
- * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string, source?: string } | null }} opts
+ * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string, source?: string, plainTextDraft?: string, intent?: string } | null, plainTextDraft?: string, intent?: string }} opts
  */
 export async function fetchEofSceneImage({
   imageQuery,
@@ -202,6 +202,8 @@ export async function fetchEofSceneImage({
   avoidKeys = [],
   wikiPool = null,
   oxyPool = null,
+  plainTextDraft = '',
+  intent = null,
 }) {
   mkdirSync(dirname(outPath), { recursive: true })
   if (!refresh && existsSync(outPath)) {
@@ -217,13 +219,24 @@ export async function fetchEofSceneImage({
 
   const pexelsKey = (process.env.PEXELS_API_KEY || process.env.EOF_PEXELS_API_KEY || '').trim()
   const pinterestToken = getEofPinterestAccessToken()
+  const draft = String(plainTextDraft || oxyPool?.plainTextDraft || '').trim()
+  const roleIntent = intent || oxyPool?.intent || undefined
   const anchoredQuery = anchorSceneImageQuery({
     topic,
     imageQuery,
     caption,
     sceneIndex: index,
+    plainTextDraft: draft,
+    intent: roleIntent,
   })
-  const queries = buildSceneImageSearchQueries({ topic, imageQuery: anchoredQuery, sceneIndex: index })
+  const queries = buildSceneImageSearchQueries({
+    topic,
+    imageQuery: anchoredQuery,
+    sceneIndex: index,
+    plainTextDraft: draft,
+    captions: caption,
+    intent: roleIntent,
+  })
   const custom = String(anchoredQuery || '').trim()
 
   const avoid = new Set((avoidKeys || []).filter(Boolean))
@@ -291,6 +304,8 @@ export async function fetchEofSceneImage({
         topic,
         imageQuery: anchoredQuery,
         caption,
+        plainTextDraft: draft,
+        intent: roleIntent,
         keyPrefix: poolSource,
       })
       if (!claimed) break
@@ -299,6 +314,7 @@ export async function fetchEofSceneImage({
         topic || anchoredQuery || '',
         claimed.title || '',
         anchoredQuery || caption || '',
+        { plainTextDraft: draft, captions: caption, intent: roleIntent },
       )
       if (score < 2 && claimed.title) {
         // Release so another scene can try a better-titled hit.

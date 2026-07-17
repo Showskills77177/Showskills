@@ -9,6 +9,7 @@ import {
   resolveImageSubject,
   anchorSceneImageQuery,
   imageAngleFromCaption,
+  detectImageRoleIntent,
 } from './eofSceneImageQueries.mjs'
 
 describe('eofSceneImageQueries', () => {
@@ -138,7 +139,70 @@ describe('eofSceneImageQueries', () => {
     const career = scoreImageRelevance(
       'Wayne Rooney',
       'Wayne Rooney Manchester United Champions League final 2008',
+      '',
+      { intent: 'playing' },
     )
     assert.ok(career >= 6, `career Rooney photo must stay usable, got ${career}`)
+  })
+
+  it('detects pundit vs playing role intent from topic + draft', () => {
+    assert.equal(
+      detectImageRoleIntent({
+        topic: 'Wayne Rooney on Ronaldo',
+        plainTextDraft:
+          'Wayne Rooney slammed Cristiano Ronaldo on Sky Sports. The pundit said United need better service.',
+        captions: ['Rooney on the studio desk', 'His TNT take went viral'],
+      }),
+      'pundit',
+    )
+    assert.equal(
+      detectImageRoleIntent({
+        topic: 'Wayne Rooney Champions League final',
+        plainTextDraft:
+          'Wayne Rooney scored that Champions League final goal in 2008. The celebration still lives on.',
+      }),
+      'playing',
+    )
+    assert.equal(
+      detectImageRoleIntent({
+        topic: 'Did Tuchel tactics cost England?',
+        plainTextDraft: 'Thomas Tuchel’s tactics left England exposed again.',
+      }),
+      'coach',
+    )
+    // Lead name still wins when a secondary star appears later.
+    assert.equal(resolveImageSubject('Rooney on Ronaldo service'), 'Wayne Rooney')
+  })
+
+  it('ranks studio pundit stills above playing-career kit photos for pundit scripts', () => {
+    const year = new Date().getFullYear()
+    const opts = {
+      intent: 'pundit',
+      plainTextDraft: 'Wayne Rooney slammed Ronaldo as a Sky Sports pundit on the studio desk.',
+    }
+    const studio = scoreImageRelevance(
+      'Wayne Rooney on Ronaldo',
+      `Wayne Rooney Sky Sports pundit studio ${year}`,
+      'Wayne Rooney pundit',
+      opts,
+    )
+    const playing = scoreImageRelevance(
+      'Wayne Rooney on Ronaldo',
+      'Wayne Rooney Manchester United kit celebration goal 2008',
+      'Wayne Rooney pundit',
+      opts,
+    )
+    assert.ok(studio > playing, `studio (${studio}) should beat playing (${playing})`)
+    assert.ok(studio >= 6, `studio still must be usable, got ${studio}`)
+  })
+
+  it('builds pundit-biased scene queries for Rooney TV takes', () => {
+    const qs = buildSceneImageSearchQueries({
+      topic: 'Wayne Rooney slammed Ronaldo',
+      plainTextDraft: 'Rooney the pundit tore into Ronaldo on Sky Sports studio analysis.',
+      sceneIndex: 0,
+    })
+    assert.ok(qs.some((q) => /pundit|studio|Sky Sports/i.test(q)), `expected pundit queries, got ${qs}`)
+    assert.ok(!qs.some((q) => /celebrating football/i.test(q)))
   })
 })

@@ -18,6 +18,7 @@ import {
   scoreImageCandidate,
   claimOxylabsPoolHit,
 } from './eofOxylabsImages.mjs'
+import { detectImageRoleIntent } from '../../../shared/eofSceneImageQueries.mjs'
 
 const SERPAPI_SEARCH_URL = 'https://serpapi.com/search.json'
 const SERPAPI_ACCOUNT_URL = 'https://serpapi.com/account.json'
@@ -197,12 +198,18 @@ export async function searchSerpApiGoogleImages(query, opts = {}) {
 
 /**
  * ONE billable Google Images query for an entire Short (all scenes share the SERP pool).
- * @param {{ topic?: string, sceneCount?: number, attempt?: number, signal?: AbortSignal }} opts
+ * @param {{ topic?: string, sceneCount?: number, attempt?: number, signal?: AbortSignal, plainTextDraft?: string, captions?: string|string[], intent?: string }} opts
  */
 export async function fetchEofSerpApiJobPool(opts = {}) {
   const sceneCount = Math.max(1, Math.min(12, Number(opts.sceneCount) || 6))
   const attempt = Math.max(0, Number(opts.attempt) || 0)
-  const query = buildOxylabsJobQuery(opts.topic || '', attempt)
+  const context = {
+    plainTextDraft: opts.plainTextDraft,
+    captions: opts.captions,
+    intent: opts.intent,
+  }
+  const intent = detectImageRoleIntent({ topic: opts.topic, ...context })
+  const query = buildOxylabsJobQuery(opts.topic || '', attempt, context)
 
   const need = Math.max(1, sceneCount + 1)
   const fetchLimit = Math.min(40, Math.max(16, need * 3))
@@ -214,12 +221,14 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
   console.info(
     '[eof-serpapi] job pool',
     query.slice(0, 60),
+    `intent=${intent}`,
     `scenes=${sceneCount}`,
     `kept=${kept.length}/${fetchLimit}`,
     `(${EOF_SERPAPI_MAX_QUERIES_PER_JOB} query/Short — not per scene)`,
   )
   return {
     query,
+    intent,
     source: 'serpapi',
     hits: kept.map((h) => ({
       url: h.url,

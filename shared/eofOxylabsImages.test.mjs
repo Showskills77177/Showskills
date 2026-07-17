@@ -35,6 +35,71 @@ describe('eofOxylabsImages', () => {
     assert.doesNotMatch(buildOxylabsJobQuery('Rooney', 2), /manager/i)
   })
 
+  it('biases job queries toward pundit stills when the script is a TV take', () => {
+    const draft =
+      'Wayne Rooney slammed Cristiano Ronaldo on Sky Sports. The pundit said the service is the problem.'
+    const q0 = buildOxylabsJobQuery('Rooney on Ronaldo', 0, { plainTextDraft: draft })
+    const q1 = buildOxylabsJobQuery('Rooney on Ronaldo', 1, { plainTextDraft: draft })
+    assert.match(q0, /Wayne Rooney/i)
+    assert.match(q0, /pundit/i)
+    assert.doesNotMatch(q0, /football action|celebrating|Manchester United 2008/i)
+    assert.match(q1, /studio|TV/i)
+  })
+
+  it('biases job queries toward playing action for career scripts', () => {
+    const draft =
+      'Wayne Rooney scored that Champions League final goal in 2008. The celebration still lives on.'
+    const q0 = buildOxylabsJobQuery('Wayne Rooney Champions League final', 0, { plainTextDraft: draft })
+    const q2 = buildOxylabsJobQuery('Wayne Rooney Champions League final', 2, { plainTextDraft: draft })
+    assert.match(q0, /"Wayne Rooney" football/)
+    assert.match(q2, /celebrating|action/i)
+    assert.doesNotMatch(q0, /pundit/i)
+  })
+
+  it('ranks pundit studio titles above playing kit titles for Rooney TV scripts', () => {
+    const year = new Date().getFullYear()
+    const hits = [
+      {
+        url: 'https://cdn.example.com/rooney-2008-kit.jpg',
+        title: 'Wayne Rooney Manchester United kit celebration goal 2008',
+        width: 900,
+        height: 1200,
+      },
+      {
+        url: 'https://cdn.example.com/rooney-studio.jpg',
+        title: `Wayne Rooney Sky Sports pundit studio suit ${year}`,
+        width: 900,
+        height: 1200,
+      },
+    ]
+    const claimed = new Set()
+    const pick = claimOxylabsPoolHit({
+      hits,
+      claimed,
+      topic: 'Wayne Rooney on Ronaldo',
+      imageQuery: 'Wayne Rooney pundit',
+      caption: 'Rooney slammed him from the studio desk',
+      plainTextDraft:
+        'Wayne Rooney slammed Ronaldo on Sky Sports. The pundit tore into the service.',
+      index: 0,
+    })
+    assert.equal(pick.imgUrl, 'https://cdn.example.com/rooney-studio.jpg')
+    assert.ok(
+      scoreOxylabsHitForScene(hits[1], {
+        topic: 'Wayne Rooney on Ronaldo',
+        imageQuery: 'Wayne Rooney pundit',
+        caption: 'studio desk',
+        intent: 'pundit',
+      }) >
+        scoreOxylabsHitForScene(hits[0], {
+          topic: 'Wayne Rooney on Ronaldo',
+          imageQuery: 'Wayne Rooney pundit',
+          caption: 'studio desk',
+          intent: 'pundit',
+        }),
+    )
+  })
+
   it('prefers portrait stills over ultra-wide landscapes for Shorts', () => {
     const portrait = scoreImageCandidate('https://cdn.example.com/a.jpg', 900, 1400)
     const wide = scoreImageCandidate('https://cdn.example.com/b.jpg', 1600, 900)
