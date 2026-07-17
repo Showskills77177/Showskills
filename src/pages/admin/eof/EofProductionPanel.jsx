@@ -1953,7 +1953,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="w-full space-y-8">
       {loading ? <p className={`text-sm ${PX.muted}`}>Loading…</p> : null}
 
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -2221,7 +2221,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 See the motion between scenes, then pick one. Auto picks CapCut fades / slides / wipes from
                 the format.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                 {(transitionStyles.length ? transitionStyles : EOF_TRANSITION_STYLES).map((t) => {
                   const active = transitionStyle === t.id
                   return (
@@ -2267,7 +2267,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 Preview the grade, then pick one. Auto grades every scene so mixed stock stills look like one
                 edit.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                 {(colorGrades.length ? colorGrades : EOF_COLOR_GRADES).map((g) => {
                   const active = colorGrade === g.id
                   return (
@@ -2313,7 +2313,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 CapCut-style clarify after the 9:16 crop — mild denoise + soft sharpen, not plastic AI faces.
                 Stacks with color match. Apply before Rebuild.
               </p>
-              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                 {(enhanceStyles.length ? enhanceStyles : EOF_ENHANCE_STYLES).map((e) => {
                   const active = enhanceStyle === e.id
                   return (
@@ -2419,7 +2419,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 animated template (~$0.10/min).
               </p>
             )}
-            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
               {[
                 { id: 'live', label: 'Live subs', vibe: 'Bottom TV / CC', preview: 'live', free: true },
                 { id: 'classic', label: 'Classic subs', vibe: 'Netflix / YouTube', preview: 'classic', free: true },
@@ -2560,7 +2560,7 @@ export default function EofProductionPanel({ isOwner, active = true, onSendToStu
                 ) : null}
                 {zapcapTemplates.length ? (
                   <div className="max-h-[28rem] overflow-y-auto rounded-xl border border-[#303030] bg-[#121212] p-2">
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
                       {zapcapTemplates
                         .filter((t) => {
                           const q = zapcapTemplateFilter.trim().toLowerCase()

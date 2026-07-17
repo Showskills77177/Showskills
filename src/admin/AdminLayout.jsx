@@ -50,7 +50,7 @@ export function AdminLayout() {
   return (
     <div className={adminThemeRootClass(theme)}>
       <header className={theme.header}>
-        <div className="mx-auto max-w-7xl px-4">
+        <div className="mx-auto max-w-screen-2xl px-4">
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] py-2.5">
             <div className="flex items-center gap-3">
               <AdminLogo size="sm" />
@@ -87,7 +87,7 @@ export function AdminLayout() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <main className="mx-auto max-w-screen-2xl px-4 py-8">
         <Outlet />
       </main>
     </div>
