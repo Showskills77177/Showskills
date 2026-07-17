@@ -406,7 +406,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
     }
   }
 
-  async function previewTopics() {
+  async function runPreviewTopics() {
     setBusy(true)
     setErr('')
     try {
@@ -526,7 +526,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
               <button
                 type="button"
                 disabled={busy}
-                onClick={previewTopics}
+                onClick={runPreviewTopics}
                 className="rounded-full border border-[#303030] px-4 py-2 text-sm text-white disabled:opacity-50"
               >
                 Preview topics
