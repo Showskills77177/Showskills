@@ -23,6 +23,7 @@ import {
   startEofProductionEffectsApplyBackground,
   startEofProductionStickersApplyBackground,
 } from '../lib/eofProductionRenderRunner.mjs'
+import { EofQualityGateBlockedError } from '../lib/eofShortQualityGateApply.mjs'
 import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
 import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
 import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
@@ -462,6 +463,14 @@ export default async function handler(req, res) {
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job, imageProvider: imageProvider || null })
         } catch (e) {
+          if (e instanceof EofQualityGateBlockedError) {
+            const job = await getEofProductionJob(jobId)
+            return json(res, 422, {
+              error: e.message,
+              qualityGate: e.gate,
+              job,
+            })
+          }
           return json(res, 500, { error: e instanceof Error ? e.message : 'Build failed' })
         }
       }

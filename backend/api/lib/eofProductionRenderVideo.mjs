@@ -38,7 +38,12 @@ import {
   isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import { resolveEofOverlayMoments } from '../../../shared/eofOverlayMoments.mjs'
-import { applyEofShortQualityGateToJob } from './eofShortQualityGateApply.mjs'
+import {
+  applyEofShortQualityGateToJob,
+  applyEofShortQualityPreflightToJob,
+  applyEofShortQualityStillsPreflightToJob,
+  EofQualityGateBlockedError,
+} from './eofShortQualityGateApply.mjs'
 import {
   getEofImageProviderSettings,
   normalizeEofImageProvider,
@@ -96,6 +101,8 @@ export function assertEofVideoPersisted(persisted) {
  *   reuseSceneImages?: boolean,
  *   captionMode?: 'auto' | 'free' | 'zapcap-only',
  *   imageProvider?: string | null,
+ *   qualityGateMode?: 'auto' | 'manual',
+ *   skipPlanPreflight?: boolean,
  * }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
@@ -107,12 +114,21 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     opts.imageProvider !== undefined && opts.imageProvider !== null && String(opts.imageProvider).trim()
       ? normalizeEofImageProvider(opts.imageProvider)
       : null
+  const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
   const scriptScenes = job.script?.scenes || []
   if (!scriptScenes.length) {
     throw new Error('Job has no script scenes — write a script first.')
+  }
+
+  // Plan-time gate before any image API / ffmpeg work (skipped when caller already ran it).
+  if (!opts.skipPlanPreflight) {
+    await applyEofShortQualityPreflightToJob(jobId, {
+      mode: qualityGateMode,
+      blockOnFail: true,
+    })
   }
 
   const workDir = eofProductionWorkDir(jobId)
@@ -557,6 +573,27 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         ? Math.min(1, Math.max(0, sceneCountForOverlay - 2))
         : null
 
+    // Stills gate — stop before ffmpeg when placeholders / clickbait pop sources fail hard.
+    const stillsManifest = scenesForVideo.map((s) => ({
+      index: s.index,
+      durationSec: s.durationSec,
+      caption: s.caption,
+      imageSource: s.imageSource || null,
+      imageKey: s.imageKey || null,
+      imageTitle: s.imageTitle || null,
+      imageQuery: s.imageQueryUsed || s.imageQuery || null,
+      imageQueryUsed: s.imageQueryUsed || null,
+    }))
+    await applyEofShortQualityStillsPreflightToJob(jobId, {
+      mode: qualityGateMode,
+      blockOnFail: true,
+      jobSnapshot: { narrationManifest: stillsManifest },
+      renderMeta: {
+        hasSecondarySubject: secondaryPeople.length > 0,
+        secondarySceneIndex,
+      },
+    })
+
     const rendered = await renderEofProductionVideo({
       jobId,
       scenes: scenesForVideo,
@@ -656,6 +693,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       return saved
     }
   } catch (e) {
+    if (e instanceof EofQualityGateBlockedError) throw e
     await markEofProductionJobFailed(jobId, e instanceof Error ? e.message : 'Video render failed')
     throw e
   }

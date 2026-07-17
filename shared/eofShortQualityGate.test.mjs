@@ -4,6 +4,8 @@ import {
   captionNarrationOverlap,
   captionLooksMismatched,
   collectEofShortQualityHeuristicChecks,
+  collectEofShortQualityPlanChecks,
+  collectEofShortQualityStillsChecks,
   finalizeEofQualityGate,
   parseEofQualityGate,
   summarizeEofQualityGate,
@@ -11,6 +13,8 @@ import {
   isEofShortQualityGateEnabled,
   isEofShortQualityVisionEnabled,
   runEofShortQualityGate,
+  runEofShortQualityPreflight,
+  runEofShortQualityStillsPreflight,
 } from '../backend/api/lib/eofShortQualityGate.mjs'
 
 describe('eofShortQualityGate helpers', () => {
@@ -255,5 +259,175 @@ describe('eofShortQualityGate helpers', () => {
     const gate = await runEofShortQualityGate({ topic: 'x' }, { mode: 'manual', skipVision: true })
     assert.equal(gate.mode, 'off')
     assert.equal(gate.pass, true)
+  })
+
+  it('plan preflight fails on missing music and caption mismatch before any stills', () => {
+    const checks = collectEofShortQualityPlanChecks({
+      topic: 'Jude Bellingham',
+      captionStyle: 'live',
+      captionLayout: { yNorm: 0.76, fontScale: 1 },
+      musicTrackId: null,
+      musicVolume: 0.22,
+      overlayMoments: 'off',
+      script: {
+        scenes: [
+          {
+            narration: 'Jude Bellingham hit back at Thomas Tuchel after heat comments.',
+            caption: 'Completely different topic about tennis rackets today',
+            durationSec: 5,
+          },
+          {
+            narration: 'Bellingham said Tuchel does not know that heat.',
+            caption: 'Bellingham said Tuchel does not know that heat.',
+            durationSec: 5,
+          },
+        ],
+      },
+    })
+    const ids = checks.map((c) => c.id)
+    assert.ok(ids.includes('music_missing_track'))
+    assert.ok(ids.some((id) => id.startsWith('captions_mismatch')))
+    // Plan-time must not require image manifest / render paths.
+    assert.equal(ids.includes('stills_placeholder'), false)
+    assert.equal(ids.includes('voiceover_missing_mix'), false)
+
+    const gate = runEofShortQualityPreflight(
+      {
+        topic: 'Jude Bellingham',
+        captionStyle: 'live',
+        captionLayout: { yNorm: 0.76, fontScale: 1 },
+        musicTrackId: null,
+        overlayMoments: 'off',
+        script: {
+          scenes: [
+            {
+              narration: 'Jude Bellingham hit back at Thomas Tuchel after heat comments.',
+              caption: 'Completely different topic about tennis rackets today',
+              durationSec: 5,
+            },
+          ],
+        },
+      },
+      { mode: 'manual' },
+    )
+    assert.equal(gate.phase, 'preflight')
+    assert.equal(gate.pass, false)
+    assert.equal(gate.blocked, true, 'manual preflight should block expensive build steps')
+    assert.match(formatEofQualityGateBlockMessage(gate), /blocked build/)
+  })
+
+  it('plan preflight passes a healthy script plan without stills', () => {
+    const vo1 =
+      'Jude Bellingham hit back at Thomas Tuchel after Tuchel questioned his performance in the heat.'
+    const vo2 =
+      'Bellingham said Tuchel does not know what it is like to play in that heat. Fair response?'
+    const gate = runEofShortQualityPreflight(
+      {
+        topic: 'Jude Bellingham',
+        captionStyle: 'live',
+        captionLayout: { yNorm: 0.76, fontScale: 1 },
+        musicTrackId: 'bed-1',
+        musicVolume: 0.22,
+        musicStartSec: 0,
+        musicEndSec: null,
+        overlayMoments: 'auto',
+        script: {
+          scenes: [
+            { narration: vo1, caption: 'Bellingham hit back at Tuchel after heat comments', durationSec: 5 },
+            { narration: vo2, caption: 'Bellingham said Tuchel does not know that heat', durationSec: 5 },
+            {
+              narration: 'Agree with Bellingham or Tuchel? Drop your take.',
+              caption: 'Agree with Bellingham or Tuchel? Drop your take.',
+              durationSec: 4,
+            },
+          ],
+        },
+      },
+      { mode: 'auto', renderMeta: { hasSecondarySubject: true, secondarySceneIndex: 1 } },
+    )
+    assert.equal(gate.phase, 'preflight')
+    assert.equal(gate.pass, true)
+    assert.equal(gate.blocked, false)
+  })
+
+  it('stills preflight fails on clickbait pop source before ffmpeg', () => {
+    const checks = collectEofShortQualityStillsChecks(
+      {
+        topic: 'Thomas Tuchel',
+        captionStyle: 'off',
+        musicTrackId: 'bed-1',
+        musicVolume: 0.22,
+        overlayMoments: 'auto',
+        script: {
+          scenes: [
+            { narration: 'Tuchel presser.', caption: 'Tuchel presser.', durationSec: 4 },
+            { narration: 'Bananas headline.', caption: 'Bananas headline.', durationSec: 4 },
+            { narration: 'Take your side.', caption: 'Take your side.', durationSec: 4 },
+          ],
+        },
+        narrationManifest: [
+          { index: 0, durationSec: 4, imageSource: 'google', imageKey: 'a', imageTitle: 'Tuchel presser' },
+          {
+            index: 1,
+            durationSec: 4,
+            imageSource: 'google',
+            imageKey: 'b',
+            imageTitle: 'THOMAS TUCHEL IS GOING BANANAS!',
+          },
+          { index: 2, durationSec: 4, imageSource: 'google', imageKey: 'c', imageTitle: 'Studio' },
+        ],
+      },
+      {
+        overlayMoments: [{ sceneIndex: 0, overlaySceneIndex: 1, absoluteStartSec: 0.5, absoluteEndSec: 2.5 }],
+      },
+    )
+    assert.ok(checks.some((c) => c.id === 'overlay_bad_still' && c.severity === 'fail'))
+
+    const gate = runEofShortQualityStillsPreflight(
+      {
+        topic: 'Tuchel',
+        captionStyle: 'off',
+        musicTrackId: 'bed-1',
+        musicVolume: 0.22,
+        overlayMoments: 'off',
+        narrationManifest: [
+          { index: 0, durationSec: 4, imageSource: 'placeholder', imageKey: 'p1' },
+          { index: 1, durationSec: 4, imageSource: 'placeholder', imageKey: 'p2' },
+          { index: 2, durationSec: 4, imageSource: 'placeholder', imageKey: 'p3' },
+        ],
+        script: {
+          scenes: [
+            { narration: 'a', caption: 'a', durationSec: 4 },
+            { narration: 'b', caption: 'b', durationSec: 4 },
+            { narration: 'c', caption: 'c', durationSec: 4 },
+          ],
+        },
+      },
+      { mode: 'auto' },
+    )
+    assert.equal(gate.phase, 'stills')
+    assert.equal(gate.pass, false)
+    assert.equal(gate.blocked, true)
+    assert.ok(gate.checks.some((c) => c.id === 'stills_placeholder'))
+  })
+
+  it('plan checks are included in the full heuristic suite', () => {
+    const plan = collectEofShortQualityPlanChecks({
+      topic: 'x',
+      captionStyle: 'off',
+      musicTrackId: null,
+      overlayMoments: 'off',
+      script: { scenes: [{ narration: 'hello world here', caption: 'hello', durationSec: 4 }] },
+    })
+    const all = collectEofShortQualityHeuristicChecks({
+      topic: 'x',
+      captionStyle: 'off',
+      musicTrackId: null,
+      overlayMoments: 'off',
+      script: { scenes: [{ narration: 'hello world here', caption: 'hello', durationSec: 4 }] },
+      renderOutputPath: 'v.mp4',
+    })
+    assert.ok(plan.some((c) => c.id === 'music_missing_track'))
+    assert.ok(all.some((c) => c.id === 'music_missing_track'))
   })
 })

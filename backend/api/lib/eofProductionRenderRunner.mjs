@@ -17,6 +17,10 @@ import {
   estimateEofVoiceoverRemuxDurationSec,
 } from '../../../shared/eofProduction.mjs'
 import { getEofArtifactFlags } from './eofProductionArtifacts.mjs'
+import {
+  applyEofShortQualityPreflightToJob,
+  EofQualityGateBlockedError,
+} from './eofShortQualityGateApply.mjs'
 
 function estimateFullBuildSec(script) {
   const scenes = script?.scenes?.length || 5
@@ -26,21 +30,31 @@ function estimateFullBuildSec(script) {
 /**
  * Full Short: narration (Edge TTS) + images + captions + mux.
  * @param {string} jobId
- * @param {{ imageProvider?: string | null }} [opts]
+ * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual' }} [opts]
  */
 export async function renderEofProductionFullBuild(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
+  const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
+
   try {
+    // Plan-time gate — stop before TTS / image credits / ffmpeg on hard fails.
+    await applyEofShortQualityPreflightToJob(jobId, {
+      mode: qualityGateMode,
+      blockOnFail: true,
+    })
     await renderEofProductionAudio(jobId)
     return await renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,
       captionMode: 'free',
       imageProvider: opts.imageProvider,
+      qualityGateMode,
+      skipPlanPreflight: true,
     })
   } catch (e) {
+    if (e instanceof EofQualityGateBlockedError) throw e
     const message = e instanceof Error ? e.message : 'Build failed'
     await markEofProductionJobFailed(jobId, message)
     throw e
@@ -49,11 +63,18 @@ export async function renderEofProductionFullBuild(jobId, opts = {}) {
 
 /**
  * @param {string} jobId
- * @param {{ imageProvider?: string | null }} [opts]
+ * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual' }} [opts]
  */
 export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
+
+  const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
+  // Fail fast in the request path so admin sees the report without a "Building…" flash.
+  await applyEofShortQualityPreflightToJob(jobId, {
+    mode: qualityGateMode,
+    blockOnFail: true,
+  })
 
   const sceneCount = job.script?.scenes?.length || 5
   const startedAt = new Date().toISOString()
@@ -76,7 +97,8 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
   )
 
   const run = () =>
-    renderEofProductionFullBuild(jobId, opts).catch((e) => {
+    renderEofProductionFullBuild(jobId, { ...opts, qualityGateMode }).catch((e) => {
+      if (e instanceof EofQualityGateBlockedError) return
       console.error('[eof-production] full Short build failed', jobId, e)
     })
 
@@ -586,11 +608,17 @@ export async function startEofProductionMusicRemixBackground(jobId) {
 
 /**
  * @param {string} jobId
- * @param {{ imageProvider?: string | null }} [opts]
+ * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual' }} [opts]
  */
 export async function startEofProductionVideoRenderBackground(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
+
+  const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
+  await applyEofShortQualityPreflightToJob(jobId, {
+    mode: qualityGateMode,
+    blockOnFail: true,
+  })
 
   const sceneCount = job.script?.scenes?.length || 5
   const startedAt = new Date().toISOString()
@@ -619,7 +647,10 @@ export async function startEofProductionVideoRenderBackground(jobId, opts = {}) 
       includeAudioIfPresent: true,
       captionMode: 'free',
       imageProvider: opts.imageProvider,
+      qualityGateMode,
+      skipPlanPreflight: true,
     }).catch((e) => {
+      if (e instanceof EofQualityGateBlockedError) return
       console.error('[eof-production] background video render failed', jobId, e)
     })
 

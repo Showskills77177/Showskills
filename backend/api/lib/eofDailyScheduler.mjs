@@ -104,7 +104,8 @@ export async function runEofDailyShortPipeline(opts = {}) {
       })
     }
 
-    await renderEofProductionFullBuild(jobId)
+    // Auto mode: plan/stills preflight inside full build stops before image/ffmpeg spend.
+    await renderEofProductionFullBuild(jobId, { qualityGateMode: 'auto' })
     const rendered = await getEofProductionJob(jobId)
     if (!rendered || rendered.status !== EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED) {
       throw new Error(rendered?.errorMessage || 'Daily Short build did not finish with a video')

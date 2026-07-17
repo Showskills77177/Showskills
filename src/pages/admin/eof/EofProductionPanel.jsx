@@ -4884,7 +4884,10 @@ export default function EofProductionPanel({
                         })`
                       : 'Quality gate passed'
                     : selected.qualityGate.blocked
-                      ? 'Quality gate blocked publish'
+                      ? selected.qualityGate.phase === 'preflight' ||
+                        selected.qualityGate.phase === 'stills'
+                        ? 'Quality gate blocked build (before images/render)'
+                        : 'Quality gate blocked publish'
                       : 'Quality gate found issues'}
                 </p>
                 {selected.qualityGate.reasons?.length ? (
