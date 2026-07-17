@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { resolveEofVideoDiskMaterialize } from '../backend/api/lib/eofProductionArtifacts.mjs'
+import {
+  resolveEofVideoDiskMaterialize,
+  resolveEofSceneImageDiskMaterialize,
+} from '../backend/api/lib/eofProductionArtifacts.mjs'
 import { assertEofCleanPlateImagePath } from '../backend/api/lib/eofProductionVideo.mjs'
 
 describe('ensureEofVideoOnDisk materialize policy', () => {
@@ -22,6 +25,30 @@ describe('ensureEofVideoOnDisk materialize policy', () => {
   it('returns null when neither disk nor durable blob exists', () => {
     assert.equal(
       resolveEofVideoDiskMaterialize({ diskExists: false, hasDurableBase64: false }),
+      null,
+    )
+  })
+})
+
+describe('ensureEofSceneImageOnDisk materialize policy', () => {
+  it('always refreshes from durable scene stills even when disk scene-N.jpg exists', () => {
+    // Warm Vercel /tmp holding pre-Rebuild (possibly meme) stills must not win on Replace.
+    assert.equal(
+      resolveEofSceneImageDiskMaterialize({ diskExists: true, hasDurableBase64: true }),
+      'write-durable',
+    )
+  })
+
+  it('refuses orphan on-disk still when durable stills were cleared (mid rebuild)', () => {
+    assert.equal(
+      resolveEofSceneImageDiskMaterialize({ diskExists: true, hasDurableBase64: false }),
+      null,
+    )
+  })
+
+  it('returns null when neither disk nor durable still exists', () => {
+    assert.equal(
+      resolveEofSceneImageDiskMaterialize({ diskExists: false, hasDurableBase64: false }),
       null,
     )
   })

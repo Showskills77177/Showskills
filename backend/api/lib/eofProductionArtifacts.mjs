@@ -227,6 +227,22 @@ export async function ensureEofVideoOnDisk(jobId) {
 }
 
 /**
+ * Decide how to materialize scene-N.jpg for Replace Captions / remux.
+ *
+ * INVARIANT: Never trust an existing on-disk still when durable scene_images_base64_json
+ * is missing or when a newer blob exists in the DB. Warm Vercel /tmp can retain stills
+ * from a prior Build while another instance Rebuilt and rewrote durable stills —
+ * disk-first would remux the old (possibly meme-contaminated) plate.
+ *
+ * @param {{ diskExists: boolean, hasDurableBase64: boolean }} opts
+ * @returns {'write-durable' | null}
+ */
+export function resolveEofSceneImageDiskMaterialize({ diskExists: _diskExists, hasDurableBase64 }) {
+  if (hasDurableBase64) return 'write-durable'
+  return null
+}
+
+/**
  * @param {string} jobId
  * @param {number} sceneNumber 1-based
  * @returns {Promise<string|null>}
@@ -234,7 +250,6 @@ export async function ensureEofVideoOnDisk(jobId) {
 export async function ensureEofSceneImageOnDisk(jobId, sceneNumber) {
   const n = Math.max(1, Number(sceneNumber) || 1)
   const abs = eofSceneImageAbsPath(eofProductionWorkDir(jobId), n)
-  if (existsSync(abs)) return abs
 
   await ensureEofProductionSchema()
   const { rows } = await query(`SELECT scene_images_base64_json FROM eof_production_jobs WHERE id = $1`, [jobId])
@@ -248,9 +263,15 @@ export async function ensureEofSceneImageOnDisk(jobId, sceneNumber) {
     return null
   }
   const b64 = map?.[String(n)] || map?.[n]
-  if (!b64 || typeof b64 !== 'string') return null
+  const hasDurable = Boolean(b64 && typeof b64 === 'string')
+  const action = resolveEofSceneImageDiskMaterialize({
+    diskExists: existsSync(abs),
+    hasDurableBase64: hasDurable,
+  })
+  if (action !== 'write-durable') return null
 
   mkdirSync(dirname(abs), { recursive: true })
+  // Always refresh from durable so a stale /tmp still cannot win after Rebuild.
   writeFileSync(abs, Buffer.from(b64, 'base64'))
   return existsSync(abs) ? abs : null
 }
