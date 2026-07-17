@@ -40,13 +40,13 @@ export default async function handler(req, res) {
 
   try {
     if (isCron && (req.method === 'GET' || req.method === 'POST')) {
-      // Vercel cron is UTC-only: schedule hits 23:00 + 00:00 UTC; only UK midnight proceeds.
+      // Standalone cron path still gates on UK midnight (Hobby schedule lives on eof-daily-cron).
       if (!isLondonLocalMidnightHour(new Date())) {
         return json(res, 200, {
           ok: true,
           skipped: true,
           reason:
-            'Not UK midnight (Europe/London). Cron fires at 23:00 and 00:00 UTC; only the matching local-midnight window runs.',
+            'Not UK midnight (Europe/London). Staging cron fires /api/eof-daily-cron at 23:00 UTC (BST midnight); only the local-midnight window runs Script Maker.',
         })
       }
       if (process.env.VERCEL) {
@@ -85,7 +85,7 @@ export default async function handler(req, res) {
         note:
           'Script Maker writes judged draft voiceovers at UK midnight (Europe/London; no video, no YouTube). Drafts are ready when you wake up — Adapt / Rebuild / post yourself.',
         scheduleNote:
-          'Runs once at UK midnight. Vercel cron fires at 23:00 UTC (BST) and 00:00 UTC (GMT); the handler only proceeds during the Europe/London 00:00 hour.',
+          'Runs at UK midnight via /api/eof-daily-cron (Hobby: ≤2 once-daily jobs). Second slot is 23:00 UTC for BST; swap to 00:00 UTC for GMT winters. Handler only proceeds during Europe/London 00:00 hour.',
       })
     }
 

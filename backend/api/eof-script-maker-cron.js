@@ -1,8 +1,7 @@
 import handler from './admin/eof-script-maker.js'
 
 /**
- * Vercel Cron entry for Script Maker.
- * Two once-daily UTC schedules (23:00 + 00:00) — Hobby forbids a single
- * expression that fires more than once per day. Handler gates to Europe/London midnight.
+ * Optional Script Maker cron alias (admin / manual). Staging Hobby schedule
+ * is merged into /api/eof-daily-cron (≤2 once-daily jobs) — see vercel.json.
  */
 export default handler

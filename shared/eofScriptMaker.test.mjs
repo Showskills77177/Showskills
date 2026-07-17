@@ -80,15 +80,24 @@ describe('eof Script Maker UK midnight schedule', () => {
     assert.equal(sameLondonCalendarDay(runAt, new Date('2026-07-17T08:00:00.000Z')), false)
   })
 
-  it('vercel cron uses two once-daily UTC entries (Hobby-safe)', () => {
+  it('vercel Hobby uses ≤2 once-daily crons; Script Maker merges into eof-daily-cron', () => {
     const root = dirname(fileURLToPath(import.meta.url))
     const vercel = JSON.parse(readFileSync(join(root, '..', 'vercel.json'), 'utf8'))
-    const crons = (vercel.crons || []).filter((c) => c.path === '/api/eof-script-maker-cron')
-    assert.equal(crons.length, 2, 'need separate 23:00 and 00:00 UTC cron entries')
-    const schedules = new Set(crons.map((c) => c.schedule))
-    assert.deepEqual(schedules, new Set(['0 23 * * *', '0 0 * * *']))
-    // A single "0 0,23 * * *" expression runs twice/day and fails Hobby deploys
-    assert.ok(!crons.some((c) => String(c.schedule).includes(',')))
+    const crons = vercel.crons || []
+    assert.ok(crons.length <= 2, `Hobby allows ≤2 crons, found ${crons.length}`)
+    assert.ok(
+      crons.every((c) => !String(c.schedule).includes(',')),
+      'Hobby rejects expressions that fire more than once per day',
+    )
+    const daily = crons.filter((c) => c.path === '/api/eof-daily-cron')
+    assert.equal(daily.length, 2, 'daily Short + UK-midnight Script Maker share eof-daily-cron')
+    const schedules = new Set(daily.map((c) => c.schedule))
+    assert.deepEqual(schedules, new Set(['0 9 * * *', '0 23 * * *']))
+    assert.equal(
+      crons.filter((c) => c.path === '/api/eof-script-maker-cron').length,
+      0,
+      'Script Maker must not consume a third Hobby cron slot',
+    )
   })
 })
 

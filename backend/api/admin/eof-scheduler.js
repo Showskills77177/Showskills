@@ -7,6 +7,7 @@ import {
 } from '../lib/eofSchedulerSettings.mjs'
 import { EOF_SCRIPT_FORMATS } from '../../../shared/eofScriptTemplates.mjs'
 import { EOF_VOICE_PRESETS, listEofFreeVoicePresets } from '../../../shared/eofProduction.mjs'
+import { isLondonLocalMidnightHour } from '../../../shared/eofScriptMakerSchedule.mjs'
 
 function authorizeCron(req) {
   const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
@@ -23,6 +24,28 @@ function authorizeCron(req) {
 async function runPipeline(opts) {
   const { runEofDailyShortPipeline } = await import('../lib/eofDailyScheduler.mjs')
   return runEofDailyShortPipeline(opts)
+}
+
+async function runScriptMaker(opts) {
+  const { runEofScriptMakerPipeline } = await import('../lib/eofScriptMakerScheduler.mjs')
+  return runEofScriptMakerPipeline(opts)
+}
+
+/** Hobby allows ≤2 once-daily crons: 09:00 UTC (daily Short) + 23:00 UTC (BST UK midnight). */
+async function runCronJobs() {
+  const daily = runPipeline({ force: false, createdBy: 'vercel-cron' }).catch((e) => {
+    console.error('[eof-scheduler] cron failed', e)
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  })
+  if (!isLondonLocalMidnightHour(new Date())) {
+    return { daily: await daily, scriptMaker: { ok: true, skipped: true, reason: 'Not UK midnight' } }
+  }
+  const scriptMaker = runScriptMaker({ force: false, createdBy: 'eof-script-maker' }).catch((e) => {
+    console.error('[eof-script-maker] cron failed', e)
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  })
+  const [dailyResult, scriptMakerResult] = await Promise.all([daily, scriptMaker])
+  return { daily: dailyResult, scriptMaker: scriptMakerResult }
 }
 
 /** GET settings · POST update / run-now / news-topics · Cron GET/POST run */
@@ -45,17 +68,18 @@ export default async function handler(req, res) {
       if (process.env.VERCEL) {
         try {
           const { waitUntil } = await import('@vercel/functions')
-          waitUntil(
-            runPipeline({ force: false, createdBy: 'vercel-cron' }).catch((e) =>
-              console.error('[eof-scheduler] cron failed', e),
-            ),
-          )
-          return json(res, 202, { ok: true, accepted: true, message: 'Daily Short pipeline started.' })
+          waitUntil(runCronJobs())
+          return json(res, 202, {
+            ok: true,
+            accepted: true,
+            message: 'Daily Short cron accepted (Script Maker runs when UK midnight).',
+            scriptMakerEligible: isLondonLocalMidnightHour(new Date()),
+          })
         } catch {
           /* fall through */
         }
       }
-      const result = await runPipeline({ force: false, createdBy: 'vercel-cron' })
+      const result = await runCronJobs()
       return json(res, 200, { ok: true, ...result })
     }
 
@@ -73,7 +97,7 @@ export default async function handler(req, res) {
         voicePresets: Object.values(EOF_VOICE_PRESETS),
         freeVoicePresets: listEofFreeVoicePresets(),
         note:
-          'Daily cron composes a football news Short (worldwide + World Cup) with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube.',
+          'Daily cron (09:00 UTC) composes a football news Short with Grok 4.5, builds it, packages #shortsfeed hashtags, picks a thumbnail scene, and schedules it on YouTube. The same Hobby cron path also fires at 23:00 UTC and runs Script Maker when Europe/London is midnight (BST).',
       })
     }
 

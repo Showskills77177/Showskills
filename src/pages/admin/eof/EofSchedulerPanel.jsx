@@ -447,7 +447,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         </p>
         <p className="mt-2 rounded-lg border border-[#3ea6ff]/25 bg-[#15202b] px-3 py-2 text-xs text-[#9ecbff]">
           {scheduleNote ||
-            'Schedule: UK midnight (Europe/London). Cron hits 23:00 UTC in BST and 00:00 UTC in GMT; only the local-midnight window runs.'}
+            'Schedule: UK midnight (Europe/London). Hobby cron shares /api/eof-daily-cron at 23:00 UTC (BST); only the local-midnight window runs Script Maker.'}
         </p>
         <p className={`mt-2 text-xs ${EOF.muted}`}>
           Pipeline: research → draft → polish → hot-take refine → judge. Refuses canned templates and soft article paste.

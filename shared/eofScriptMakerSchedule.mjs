@@ -1,8 +1,11 @@
 /**
  * Script Maker overnight schedule — UK midnight (Europe/London).
- * Vercel crons are UTC-only; Hobby requires one fire per expression per day,
- * so vercel.json lists two once-daily entries (23:00 and 00:00 UTC). The
- * handler gates with this timezone check so only true UK midnight runs.
+ *
+ * Vercel Hobby allows ≤2 once-daily cron jobs. Staging uses both slots on
+ * /api/eof-daily-cron: 09:00 UTC (daily Short) and 23:00 UTC (BST = UK midnight).
+ * The daily handler gates Script Maker with isLondonLocalMidnightHour so off-window
+ * fires (09:00 UTC) skip Script Maker. Winter GMT midnight is 00:00 UTC — swap the
+ * second vercel.json schedule to "0 0 * * *" if you need GMT coverage instead of BST.
  */
 
 export const EOF_SCRIPT_MAKER_TZ = 'Europe/London'
