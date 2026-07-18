@@ -108,9 +108,22 @@ export const EOF_OVERLAY_LAYOUT = {
 export function eofOverlayCardRect(layout = EOF_OVERLAY_LAYOUT, frame = {}) {
   const frameW = Math.max(320, Number(frame.frameW) || 1080)
   const frameH = Math.max(480, Number(frame.frameH) || 1920)
-  const widthFrac = Number(layout.widthFrac) || EOF_OVERLAY_LAYOUT.widthFrac
-  const heightFrac = Number(layout.heightFrac) || EOF_OVERLAY_LAYOUT.heightFrac
-  const yFrac = Number(layout.yFrac) || EOF_OVERLAY_LAYOUT.yFrac
+  const rawW = Number(layout.widthFrac)
+  const rawH = Number(layout.heightFrac)
+  const rawY = Number(layout.yFrac)
+  // Zero / NaN / non-finite → defaults; negatives clamp into a usable positive band.
+  const widthFrac = Math.min(
+    1,
+    Math.max(0.05, Number.isFinite(rawW) && rawW > 0 ? rawW : EOF_OVERLAY_LAYOUT.widthFrac),
+  )
+  const heightFrac = Math.min(
+    1.5,
+    Math.max(0.05, Number.isFinite(rawH) && rawH > 0 ? rawH : EOF_OVERLAY_LAYOUT.heightFrac),
+  )
+  const yFrac = Math.min(
+    0.95,
+    Math.max(0, Number.isFinite(rawY) ? rawY : EOF_OVERLAY_LAYOUT.yFrac),
+  )
   const cardW = frameW * widthFrac
   const cardH = cardW * heightFrac
   const x = (1 - widthFrac) / 2

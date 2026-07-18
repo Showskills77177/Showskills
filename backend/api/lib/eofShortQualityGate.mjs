@@ -517,7 +517,7 @@ export function collectEofShortQualityPlanChecks(job, renderMeta = {}) {
       const scene = scenes[i]
       const cap = String(scene?.caption || '').trim()
       const nar = String(scene?.narration || '').trim()
-      const man = manifest.find((m) => m.index === i) || manifest[i]
+      const man = manifest.find((m) => m != null && m.index === i) || manifest[i]
       const manCap = String(man?.caption || '').trim()
       const effectiveCap = cap || manCap
       if (!effectiveCap) {
@@ -710,11 +710,11 @@ export function collectEofShortQualityPlanChecks(job, renderMeta = {}) {
     const planned = planEofOverlayMoments({
       mode: overlayMode,
       scenes: (manifest.length ? manifest : scenes).map((m, i) => ({
-        index: m.index ?? i,
-        durationSec: m.durationSec,
-        imagePath: m.imageKey || m.imageSource || `scene-${i}`,
-        imageSource: m.imageSource,
-        imageKey: m.imageKey,
+        index: m?.index ?? i,
+        durationSec: m?.durationSec,
+        imagePath: m?.imageKey || m?.imageSource || `scene-${i}`,
+        imageSource: m?.imageSource,
+        imageKey: m?.imageKey,
       })),
       hasSecondarySubject: Boolean(renderMeta?.hasSecondarySubject),
       secondarySceneIndex: renderMeta?.secondarySceneIndex ?? null,
@@ -804,11 +804,11 @@ export function collectEofShortQualityStillsChecks(job, renderMeta = {}) {
       : planEofOverlayMoments({
           mode: overlayMode,
           scenes: manifest.map((m, i) => ({
-            index: m.index ?? i,
-            durationSec: m.durationSec,
-            imagePath: m.imageKey || m.imageSource || `scene-${i}`,
-            imageSource: m.imageSource,
-            imageKey: m.imageKey,
+            index: m?.index ?? i,
+            durationSec: m?.durationSec,
+            imagePath: m?.imageKey || m?.imageSource || `scene-${i}`,
+            imageSource: m?.imageSource,
+            imageKey: m?.imageKey,
           })),
           hasSecondarySubject: Boolean(renderMeta?.hasSecondarySubject),
           secondarySceneIndex: renderMeta?.secondarySceneIndex ?? null,

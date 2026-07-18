@@ -109,26 +109,37 @@ export function watermarkOverlayXY(position, mx = 0, my = 0) {
 }
 
 /**
+ * Parse a finite number from env; invalid / empty → fallback, then clamp.
+ * @param {unknown} raw
+ * @param {number} fallback
+ * @param {number} min
+ * @param {number} max
+ */
+function envFiniteClamped(raw, fallback, min, max) {
+  const n = Number(raw)
+  const base = Number.isFinite(n) ? n : fallback
+  return Math.max(min, Math.min(max, base))
+}
+
+/**
  * Resolve badge size / inset / opacity / anchor from env (with defaults).
  * @param {NodeJS.ProcessEnv} [env]
  */
 export function resolveEofWatermarkLayout(env = process.env) {
-  const cornerW = Math.max(
+  const cornerW = envFiniteClamped(
+    env.EOF_WATERMARK_SIZE,
+    EOF_WATERMARK_DEFAULTS.size,
     120,
-    Math.min(420, Number(env.EOF_WATERMARK_SIZE) || EOF_WATERMARK_DEFAULTS.size),
+    420,
   )
-  const markX = Math.max(
-    0,
-    Math.min(400, Number(env.EOF_WATERMARK_X ?? EOF_WATERMARK_DEFAULTS.x)),
-  )
-  const markY = Math.max(
-    0,
-    Math.min(400, Number(env.EOF_WATERMARK_Y ?? EOF_WATERMARK_DEFAULTS.y)),
-  )
+  const markX = envFiniteClamped(env.EOF_WATERMARK_X, EOF_WATERMARK_DEFAULTS.x, 0, 400)
+  const markY = envFiniteClamped(env.EOF_WATERMARK_Y, EOF_WATERMARK_DEFAULTS.y, 0, 400)
   // Default 1 (solid). Clamp so a “~10% more opaque” bump from a softer env value stays in range.
-  const opacity = Math.max(
+  const opacity = envFiniteClamped(
+    env.EOF_WATERMARK_OPACITY,
+    EOF_WATERMARK_DEFAULTS.opacity,
     0.05,
-    Math.min(1, Number(env.EOF_WATERMARK_OPACITY ?? EOF_WATERMARK_DEFAULTS.opacity)),
+    1,
   )
   const position = String(env.EOF_WATERMARK_POSITION || EOF_WATERMARK_DEFAULTS.position)
     .trim()
