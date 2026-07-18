@@ -50,6 +50,13 @@ No website can be guaranteed “unhackable.” This project uses **defense in de
 | `ADMIN_PASSWORD_HASH` | Bcrypt hash of admin password |
 | `SITE_URL` / `ALLOWED_ORIGINS` | Restrict CORS to your real domain(s) |
 | `E2E_MODE` | **Unset** in production |
+| `OXYLABS_USERNAME` / `OXYLABS_PASSWORD` | EOF Google Images (staging); aliases `OXYLABS_USER` / `OXYLABS_PASS` |
+| `OXYLABS_GEO_LOCATION` | Optional Oxylabs geo (default United States) |
+| `EOF_QUALITY_GATE_SLACK_WEBHOOK` | Optional Slack Incoming Webhook when quality gate blocks auto-publish |
+
+### EOF Oxylabs (staging)
+
+Set `OXYLABS_USERNAME` + `OXYLABS_PASSWORD` on the Vercel staging project and redeploy. Admin → Production Setup shows **ready** vs **SEARCH DOWN** (401/auth) vs **not set**. Missing or rejected credentials soft-fall back to SerpAPI/AP/Wikimedia — never invent or commit secrets.
 
 ## PayPal Dashboard
 

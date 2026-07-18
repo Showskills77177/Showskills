@@ -3022,14 +3022,17 @@ export default function EofProductionPanel({
                 Oxylabs:{' '}
                 {oxylabsStatus.ok
                   ? `ready${oxylabsStatus.detail ? ` — ${String(oxylabsStatus.detail).slice(0, 60)}` : ''}`
-                  : `check failed (${oxylabsStatus.status || 'error'}${
-                      oxylabsStatus.detail ? `: ${String(oxylabsStatus.detail).slice(0, 80)}` : ''
-                    })`}
+                  : `SEARCH DOWN (${oxylabsStatus.status || 'error'}) — soft-fallback to SerpAPI/AP/Wikimedia${
+                      oxylabsStatus.detail ? `. ${String(oxylabsStatus.detail).slice(0, 100)}` : ''
+                    }`}
               </p>
             ) : (
               <p className="text-[#8a8a8a]">
                 Oxylabs: not set — add <code className="text-[#aaa]">OXYLABS_USERNAME</code> +{' '}
-                <code className="text-[#aaa]">OXYLABS_PASSWORD</code> and redeploy.
+                <code className="text-[#aaa]">OXYLABS_PASSWORD</code> (aliases{' '}
+                <code className="text-[#aaa]">OXYLABS_USER</code>/<code className="text-[#aaa]">OXYLABS_PASS</code>
+                ) on Vercel staging and redeploy. Optional:{' '}
+                <code className="text-[#aaa]">OXYLABS_GEO_LOCATION</code>. Builds soft-fall back without keys.
               </p>
             )}
             {pinterestStatus?.configured ? (
@@ -5015,6 +5018,61 @@ export default function EofProductionPanel({
                 /quality gate/i.test(String(selected.errorMessage)) &&
                 selected.status === 'video_rendered' ? (
                   <p className="mt-2 text-[11px] text-[#c9b48a]">{selected.errorMessage}</p>
+                ) : null}
+                {Array.isArray(selected.qualityGateHistory) &&
+                selected.qualityGateHistory.length ? (
+                  <div className="mt-3 border-t border-white/10 pt-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide opacity-70">
+                      Gate history
+                    </p>
+                    <ul className="mt-1 max-h-28 space-y-1 overflow-y-auto text-[11px] opacity-90">
+                      {[...selected.qualityGateHistory]
+                        .slice(-8)
+                        .reverse()
+                        .map((h, i) => {
+                          const when = h.checkedAt
+                            ? new Date(h.checkedAt).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '—'
+                          const verdict = h.pass
+                            ? h.warnings?.length
+                              ? 'warn'
+                              : 'pass'
+                            : h.blocked
+                              ? 'fail'
+                              : 'fail'
+                          const reason =
+                            h.reasons?.[0] ||
+                            (h.warnings?.[0] ? `warn: ${h.warnings[0]}` : '')
+                          return (
+                            <li key={`${h.checkedAt || 't'}-${h.phase || 'p'}-${i}`}>
+                              <span className="opacity-70">{when}</span>
+                              {' · '}
+                              <span>{h.phase || 'post'}</span>
+                              {' · '}
+                              <span
+                                className={
+                                  verdict === 'pass'
+                                    ? 'text-[#9dcea8]'
+                                    : verdict === 'warn'
+                                      ? 'text-[#e6d3a0]'
+                                      : 'text-[#ff9b95]'
+                                }
+                              >
+                                {verdict}
+                              </span>
+                              {reason ? (
+                                <span className="opacity-80"> — {String(reason).slice(0, 72)}</span>
+                              ) : null}
+                            </li>
+                          )
+                        })}
+                    </ul>
+                  </div>
                 ) : null}
               </div>
             ) : null}

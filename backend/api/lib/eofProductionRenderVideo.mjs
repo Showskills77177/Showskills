@@ -71,6 +71,15 @@ const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 
+/**
+ * Remux / remix / reuse-stills paths must not re-run stills preflight
+ * (stale clickbait/pop metadata must not block audio/captions/effects remux).
+ * @param {{ skipStillsPreflight?: boolean, reuseSceneImages?: boolean }} [opts]
+ */
+export function shouldSkipEofStillsPreflight(opts = {}) {
+  return opts.skipStillsPreflight === true || opts.reuseSceneImages === true
+}
+
 /** Append a used image key; newest last, capped for durable narrationManifest size. */
 export function appendEofImageKeyHistory(priorHistory, imageKey, limit = EOF_IMAGE_KEY_HISTORY_LIMIT) {
   const prior = Array.isArray(priorHistory) ? priorHistory.filter(Boolean) : []
@@ -111,7 +120,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   const reuseSceneImages = opts.reuseSceneImages === true
   // Remux / remix / effects reuse cached stills — skip stills gate (stale clickbait pop
   // metadata must not block audio-only or captions-only remux).
-  const skipStillsPreflight = opts.skipStillsPreflight === true || reuseSceneImages
+  const skipStillsPreflight = shouldSkipEofStillsPreflight(opts)
   const captionMode =
     opts.captionMode === 'zapcap-only' ? 'zapcap-only' : opts.captionMode === 'auto' ? 'auto' : 'free'
   const imageProviderOverride =
@@ -285,6 +294,13 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 attempt: maxAttempt,
                 ...imageContext,
               })
+              if (scraped.healthNote || scraped.health?.softFallback) {
+                console.warn(
+                  '[eof-video] oxylabs pool soft-fallback',
+                  scraped.health?.status || 'unknown',
+                  scraped.healthNote || scraped.health?.detail || '',
+                )
+              }
               if (scraped.hits?.length) {
                 pool = {
                   query: scraped.query,
@@ -294,6 +310,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                   plainTextDraft: imageContext.plainTextDraft,
                   intent: scraped.intent || leadIntent || null,
                   subject: scraped.subject || leadSubject || null,
+                  health: scraped.health || null,
                 }
               }
             } catch (e) {

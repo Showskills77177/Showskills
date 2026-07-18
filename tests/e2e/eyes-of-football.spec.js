@@ -177,3 +177,86 @@ test.describe('Eyes Of Football — upload form UI', () => {
     await expect(row.locator('input[type="checkbox"]')).not.toBeChecked()
   })
 })
+
+/** Thin Production smoke — mocked API only (no ffmpeg / image fetch). */
+test.describe('Eyes Of Football — Production (mocked)', () => {
+  test('opens Production, shows draft job + quality gate banner', async ({ page, context }) => {
+    await adminLogin(page, context)
+    await mockEofHub(page)
+
+    const draftJob = {
+      id: 'e2e-prod-draft-1',
+      topic: 'E2E England draft',
+      title: 'E2E England draft',
+      status: 'draft',
+      script: {
+        format: 'hot_take',
+        plainTextDraft: 'England need a reset. The manager faces pressure tonight.',
+        scenes: [
+          { narration: 'England need a reset.', caption: 'England need a reset', durationSec: 4 },
+        ],
+      },
+      qualityGate: {
+        pass: false,
+        blocked: true,
+        mode: 'manual',
+        phase: 'preflight',
+        checkedAt: '2026-07-18T12:00:00.000Z',
+        reasons: ['Script scenes incomplete for build'],
+        warnings: [],
+        checks: [],
+        visionUsed: false,
+      },
+      qualityGateHistory: [
+        {
+          pass: false,
+          blocked: true,
+          phase: 'preflight',
+          mode: 'manual',
+          checkedAt: '2026-07-18T12:00:00.000Z',
+          reasons: ['Script scenes incomplete for build'],
+          warnings: [],
+        },
+      ],
+      musicTrackId: null,
+      errorMessage: null,
+      renderProgress: null,
+      createdAt: '2026-07-18T11:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+    }
+
+    await page.route('**/api/admin/eof-production**', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true, job: draftJob }),
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          jobs: [draftJob],
+          scriptFormats: [{ id: 'hot_take', label: 'Hot take' }],
+          imageSources: { oxylabs: false, serpapi: false },
+          imagesNote: 'No SerpAPI/Oxylabs keys — falling back to Wikidata + Wikimedia Commons.',
+          oxylabs: { configured: false, ok: false, detail: 'OXYLABS_USERNAME / OXYLABS_PASSWORD not set' },
+          imageProviderOptions: [{ id: 'auto', label: 'Auto', configured: true }],
+        }),
+      })
+    })
+
+    await page.goto('/admin/eyes-of-football')
+    await page.getByRole('button', { name: 'Production' }).click()
+    await expect(page.getByRole('heading', { name: /Production/i }).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByText(/E2E England draft/i).first()).toBeVisible()
+    await page.getByText(/E2E England draft/i).first().click()
+    await expect(page.getByText(/Quality gate/i).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(/Gate history/i)).toBeVisible()
+  })
+})

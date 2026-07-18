@@ -10,11 +10,14 @@ import {
   buildOxylabsJobQuery,
   scoreImageCandidate,
   scoreOxylabsHitForScene,
+  searchOxylabsGoogleImagesWithStatus,
+  formatOxylabsSearchHealthNote,
   EOF_OXYLABS_MAX_QUERIES_PER_JOB,
 } from '../backend/api/lib/eofOxylabsImages.mjs'
 import {
   appendEofImageKeyHistory,
   assertEofVideoPersisted,
+  shouldSkipEofStillsPreflight,
   EOF_IMAGE_KEY_HISTORY_LIMIT,
 } from '../backend/api/lib/eofProductionRenderVideo.mjs'
 
@@ -252,6 +255,73 @@ describe('eofOxylabsImages', () => {
         'https://cdn.example.com/photo-1.jpg',
       ],
     )
+  })
+})
+
+describe('eofOxylabs search health messaging', () => {
+  it('reports not_configured clearly when credentials are missing', async () => {
+    const prevUser = process.env.OXYLABS_USERNAME
+    const prevPass = process.env.OXYLABS_PASSWORD
+    const prevUserAlias = process.env.OXYLABS_USER
+    const prevPassAlias = process.env.OXYLABS_PASS
+    delete process.env.OXYLABS_USERNAME
+    delete process.env.OXYLABS_PASSWORD
+    delete process.env.OXYLABS_USER
+    delete process.env.OXYLABS_PASS
+    try {
+      assert.equal(isEofOxylabsConfigured(), false)
+      const { hits, health } = await searchOxylabsGoogleImagesWithStatus('England kit')
+      assert.deepEqual(hits, [])
+      assert.equal(health.status, 'not_configured')
+      assert.equal(health.softFallback, true)
+      assert.match(formatOxylabsSearchHealthNote(health), /credentials missing|soft-falling/i)
+    } finally {
+      if (prevUser == null) delete process.env.OXYLABS_USERNAME
+      else process.env.OXYLABS_USERNAME = prevUser
+      if (prevPass == null) delete process.env.OXYLABS_PASSWORD
+      else process.env.OXYLABS_PASSWORD = prevPass
+      if (prevUserAlias == null) delete process.env.OXYLABS_USER
+      else process.env.OXYLABS_USER = prevUserAlias
+      if (prevPassAlias == null) delete process.env.OXYLABS_PASS
+      else process.env.OXYLABS_PASS = prevPassAlias
+    }
+  })
+
+  it('maps 401 responses to auth_failed SEARCH DOWN (soft-fallback)', async () => {
+    const prevUser = process.env.OXYLABS_USERNAME
+    const prevPass = process.env.OXYLABS_PASSWORD
+    process.env.OXYLABS_USERNAME = 'eof-test-user'
+    process.env.OXYLABS_PASSWORD = 'eof-test-pass'
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async () =>
+      new Response('unauthorized', { status: 401, headers: { 'Content-Type': 'text/plain' } })
+    try {
+      const { hits, health } = await searchOxylabsGoogleImagesWithStatus('England kit')
+      assert.deepEqual(hits, [])
+      assert.equal(health.status, 'auth_failed')
+      assert.equal(health.httpStatus, 401)
+      assert.equal(health.softFallback, true)
+      assert.match(formatOxylabsSearchHealthNote(health), /SEARCH DOWN|auth/i)
+    } finally {
+      globalThis.fetch = originalFetch
+      if (prevUser == null) delete process.env.OXYLABS_USERNAME
+      else process.env.OXYLABS_USERNAME = prevUser
+      if (prevPass == null) delete process.env.OXYLABS_PASSWORD
+      else process.env.OXYLABS_PASSWORD = prevPass
+    }
+  })
+})
+
+describe('eof remux stills-preflight skip (P0)', () => {
+  it('skips stills preflight for remux / reuseSceneImages / skipStillsPreflight', () => {
+    assert.equal(shouldSkipEofStillsPreflight({}), false)
+    assert.equal(shouldSkipEofStillsPreflight({ skipStillsPreflight: true }), true)
+    assert.equal(shouldSkipEofStillsPreflight({ reuseSceneImages: true }), true)
+    assert.equal(
+      shouldSkipEofStillsPreflight({ reuseSceneImages: true, skipStillsPreflight: true }),
+      true,
+    )
+    assert.equal(shouldSkipEofStillsPreflight({ reuseSceneImages: false }), false)
   })
 })
 

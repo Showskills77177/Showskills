@@ -43,7 +43,7 @@ import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { normalizeEofMusicTrim } from '../../../shared/eofMusicTrim.mjs'
-import { parseEofQualityGate } from './eofShortQualityGate.mjs'
+import { parseEofQualityGate, parseEofQualityGateHistory } from './eofShortQualityGate.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import {
   writeEofProductionScript,
@@ -59,7 +59,7 @@ const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, mu
   music_start_sec, music_end_sec,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
   caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
-  overlay_moments, video_effects_json, stickers_json, quality_gate_json,
+  overlay_moments, video_effects_json, stickers_json, quality_gate_json, quality_gate_history_json,
   narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
@@ -133,6 +133,7 @@ function rowToJob(row) {
     videoEffects: normalizeEofVideoEffects(row.video_effects_json || EOF_DEFAULT_VIDEO_EFFECTS),
     stickers: normalizeEofStickers(row.stickers_json || EOF_DEFAULT_STICKERS),
     qualityGate: parseEofQualityGate(row.quality_gate_json),
+    qualityGateHistory: parseEofQualityGateHistory(row.quality_gate_history_json),
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -469,6 +470,10 @@ export async function updateEofProductionJob(id, patch) {
   )
   const qualityGate =
     patch.qualityGate !== undefined ? patch.qualityGate : job.qualityGate
+  const qualityGateHistory =
+    patch.qualityGateHistory !== undefined
+      ? patch.qualityGateHistory
+      : job.qualityGateHistory
 
   await query(
     `UPDATE eof_production_jobs
@@ -501,6 +506,7 @@ export async function updateEofProductionJob(id, patch) {
          video_effects_json = $28,
          stickers_json = $29,
          quality_gate_json = $30,
+         quality_gate_history_json = $31,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -534,6 +540,9 @@ export async function updateEofProductionJob(id, patch) {
       JSON.stringify(videoEffects),
       JSON.stringify(stickers),
       qualityGate ? JSON.stringify(qualityGate) : null,
+      Array.isArray(qualityGateHistory) && qualityGateHistory.length
+        ? JSON.stringify(qualityGateHistory)
+        : null,
     ],
   )
 

@@ -14,6 +14,8 @@ import {
   runEofShortQualityStillsPreflight,
   formatEofQualityGateBlockMessage,
   isEofShortQualityGateEnabled,
+  appendEofQualityGateHistory,
+  notifyEofQualityGateBlocked,
   EofQualityGateBlockedError,
 } from './eofShortQualityGate.mjs'
 
@@ -36,17 +38,47 @@ function withSecondarySubjectMeta(job, renderMeta = {}) {
 }
 
 /**
+ * Persist gate + append history trail. Optionally alert when auto mode is blocked.
+ * @param {string} jobId
+ * @param {import('./eofShortQualityGate.mjs').EofQualityGateResult} gate
+ * @param {object} [extraPatch]
+ * @param {{ alertOnBlocked?: boolean, topic?: string }} [opts]
+ */
+async function persistGateWithHistory(jobId, gate, extraPatch = {}, opts = {}) {
+  const job = await getEofProductionJob(jobId)
+  const qualityGateHistory = appendEofQualityGateHistory(job?.qualityGateHistory, gate)
+  const updated = await updateEofProductionJob(jobId, {
+    ...extraPatch,
+    qualityGate: gate,
+    qualityGateHistory,
+  })
+  if (opts.alertOnBlocked !== false && gate?.blocked && gate?.mode === 'auto') {
+    await notifyEofQualityGateBlocked({
+      jobId,
+      topic: opts.topic || job?.topic,
+      gate,
+    }).catch(() => {})
+  }
+  return updated
+}
+
+/**
  * Persist a blocking gate failure and throw so callers stop expensive work.
  * @param {string} jobId
  * @param {import('./eofShortQualityGate.mjs').EofQualityGateResult} gate
  */
 async function persistBlockedGateAndThrow(jobId, gate) {
   await updateEofProductionRenderProgress(jobId, null)
-  await updateEofProductionJob(jobId, {
-    qualityGate: gate,
-    status: EOF_PRODUCTION_JOB_STATUS.FAILED,
-    errorMessage: formatEofQualityGateBlockMessage(gate),
-  })
+  const job = await getEofProductionJob(jobId)
+  await persistGateWithHistory(
+    jobId,
+    gate,
+    {
+      status: EOF_PRODUCTION_JOB_STATUS.FAILED,
+      errorMessage: formatEofQualityGateBlockMessage(gate),
+    },
+    { topic: job?.topic },
+  )
   throw new EofQualityGateBlockedError(gate)
 }
 
@@ -75,7 +107,7 @@ export async function applyEofShortQualityPreflightToJob(jobId, opts = {}) {
     await persistBlockedGateAndThrow(jobId, gate)
   }
 
-  await updateEofProductionJob(jobId, { qualityGate: gate })
+  await persistGateWithHistory(jobId, gate, {}, { topic: job.topic, alertOnBlocked: false })
   return { job: await getEofProductionJob(jobId), gate }
 }
 
@@ -105,7 +137,7 @@ export async function applyEofShortQualityStillsPreflightToJob(jobId, opts = {})
     await persistBlockedGateAndThrow(jobId, gate)
   }
 
-  await updateEofProductionJob(jobId, { qualityGate: gate })
+  await persistGateWithHistory(jobId, gate, {}, { topic: job.topic, alertOnBlocked: false })
   return { job: await getEofProductionJob(jobId), gate }
 }
 
@@ -126,7 +158,7 @@ export async function applyEofShortQualityGateToJob(jobId, opts = {}) {
 
   if (!isEofShortQualityGateEnabled()) {
     const gate = await runEofShortQualityGate(job, { mode: opts.mode || 'manual', skipVision: true })
-    await updateEofProductionJob(jobId, { qualityGate: gate })
+    await persistGateWithHistory(jobId, gate, {}, { topic: job.topic, alertOnBlocked: false })
     return { job: await getEofProductionJob(jobId), gate }
   }
 
@@ -137,12 +169,15 @@ export async function applyEofShortQualityGateToJob(jobId, opts = {}) {
     skipVision: opts.skipVision,
   })
 
-  const patch = { qualityGate: gate }
+  const extraPatch = {}
   if (opts.setErrorMessageOnFail && gate.blocked) {
-    patch.errorMessage = formatEofQualityGateBlockMessage(gate)
+    extraPatch.errorMessage = formatEofQualityGateBlockMessage(gate)
   }
 
-  const updated = await updateEofProductionJob(jobId, patch)
+  const updated = await persistGateWithHistory(jobId, gate, extraPatch, {
+    topic: job.topic,
+    alertOnBlocked: Boolean(gate.blocked && gate.mode === 'auto'),
+  })
   return { job: updated, gate }
 }
 

@@ -10,6 +10,9 @@ import {
   collectEofShortQualityStillsChecks,
   finalizeEofQualityGate,
   parseEofQualityGate,
+  parseEofQualityGateHistory,
+  appendEofQualityGateHistory,
+  toEofQualityGateHistoryEntry,
   summarizeEofQualityGate,
   formatEofQualityGateBlockMessage,
   isEofShortQualityGateEnabled,
@@ -17,6 +20,8 @@ import {
   runEofShortQualityGate,
   runEofShortQualityPreflight,
   runEofShortQualityStillsPreflight,
+  notifyEofQualityGateBlocked,
+  EOF_QUALITY_GATE_HISTORY_LIMIT,
 } from '../backend/api/lib/eofShortQualityGate.mjs'
 
 describe('eofShortQualityGate helpers', () => {
@@ -485,5 +490,53 @@ describe('eofShortQualityGate helpers', () => {
     })
     assert.ok(plan.some((c) => c.id === 'music_missing_track'))
     assert.ok(all.some((c) => c.id === 'music_missing_track'))
+  })
+
+  it('appends capped quality-gate history trail without breaking parseEofQualityGate', () => {
+    const gate = finalizeEofQualityGate(
+      [{ id: 'x', severity: 'fail', message: 'bad still', detail: null }],
+      { mode: 'auto', phase: 'stills' },
+    )
+    assert.equal(gate.blocked, true)
+    const entry = toEofQualityGateHistoryEntry(gate)
+    assert.equal(entry.phase, 'stills')
+    assert.equal(entry.pass, false)
+    let history = []
+    for (let i = 0; i < EOF_QUALITY_GATE_HISTORY_LIMIT + 4; i += 1) {
+      history = appendEofQualityGateHistory(history, {
+        ...gate,
+        checkedAt: `2026-07-18T0${i % 10}:00:00.000Z`,
+        reasons: [`fail-${i}`],
+      })
+    }
+    assert.equal(history.length, EOF_QUALITY_GATE_HISTORY_LIMIT)
+    assert.ok(history.at(-1).reasons[0].startsWith('fail-'))
+    const parsed = parseEofQualityGateHistory(JSON.stringify(history))
+    assert.equal(parsed.length, EOF_QUALITY_GATE_HISTORY_LIMIT)
+    // Current qualityGate blob stays free of history keys.
+    const roundTrip = parseEofQualityGate(JSON.stringify(gate))
+    assert.equal(roundTrip.phase, 'stills')
+    assert.equal('history' in roundTrip, false)
+  })
+
+  it('notifyEofQualityGateBlocked no-ops when webhook unset', async () => {
+    const prevA = process.env.EOF_QUALITY_GATE_SLACK_WEBHOOK
+    const prevB = process.env.EOF_SLACK_WEBHOOK
+    delete process.env.EOF_QUALITY_GATE_SLACK_WEBHOOK
+    delete process.env.EOF_SLACK_WEBHOOK
+    try {
+      const out = await notifyEofQualityGateBlocked({
+        jobId: 'j1',
+        topic: 'England',
+        gate: { blocked: true, phase: 'post', mode: 'auto', reasons: ['x'] },
+      })
+      assert.equal(out.sent, false)
+      assert.equal(out.reason, 'webhook_unset')
+    } finally {
+      if (prevA == null) delete process.env.EOF_QUALITY_GATE_SLACK_WEBHOOK
+      else process.env.EOF_QUALITY_GATE_SLACK_WEBHOOK = prevA
+      if (prevB == null) delete process.env.EOF_SLACK_WEBHOOK
+      else process.env.EOF_SLACK_WEBHOOK = prevB
+    }
   })
 })

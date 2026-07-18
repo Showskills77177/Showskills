@@ -10,9 +10,14 @@
  *   EOF_SHORT_QUALITY_GATE=auto|on|off   (default auto — heuristics always on unless off)
  *   EOF_SHORT_QUALITY_VISION=off|auto|on (default off — optional xAI still re-check; costs credits)
  *   EOF_SHORT_QUALITY_MAX_PLACEHOLDER=0.34  max fraction of placeholder stills before fail
+ *   EOF_QUALITY_GATE_SLACK_WEBHOOK / EOF_SLACK_WEBHOOK  optional Incoming Webhook for blocked auto-publish
  *
  * Vision only runs on the post-render pass when EOF_SHORT_QUALITY_VISION is auto/on.
+ * History trail lives in sibling column `quality_gate_history_json` (not inside quality_gate_json).
  */
+
+/** Max compact history entries kept per job (newest last). */
+export const EOF_QUALITY_GATE_HISTORY_LIMIT = 12
 import {
   EOF_CAPTION_LAYOUT_Y_MIN,
   EOF_CAPTION_LAYOUT_Y_MAX,
@@ -131,6 +136,141 @@ export function parseEofQualityGate(raw) {
     checks,
     visionUsed: Boolean(obj.visionUsed),
     visionEnabled: obj.visionEnabled == null ? undefined : Boolean(obj.visionEnabled),
+  }
+}
+
+/**
+ * Compact history entry for admin trail (no full checks payload).
+ * @typedef {{
+ *   pass: boolean,
+ *   blocked: boolean,
+ *   phase: 'preflight'|'stills'|'post',
+ *   mode: 'auto'|'manual'|'off',
+ *   checkedAt: string,
+ *   reasons: string[],
+ *   warnings: string[],
+ * }} EofQualityGateHistoryEntry
+ */
+
+/**
+ * @param {unknown} raw
+ * @returns {EofQualityGateHistoryEntry[]}
+ */
+export function parseEofQualityGateHistory(raw) {
+  if (!raw) return []
+  let arr = raw
+  if (typeof raw === 'string') {
+    try {
+      arr = JSON.parse(raw)
+    } catch {
+      return []
+    }
+  }
+  if (!Array.isArray(arr)) return []
+  return arr
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const phase =
+        item.phase === 'preflight' || item.phase === 'stills' || item.phase === 'post'
+          ? item.phase
+          : 'post'
+      const reasons = Array.isArray(item.reasons) ? item.reasons.map(String).slice(0, 6) : []
+      const warnings = Array.isArray(item.warnings) ? item.warnings.map(String).slice(0, 4) : []
+      return {
+        pass: item.pass !== false && reasons.length === 0,
+        blocked: Boolean(item.blocked),
+        phase,
+        mode: item.mode === 'auto' || item.mode === 'off' ? item.mode : 'manual',
+        checkedAt: String(item.checkedAt || ''),
+        reasons,
+        warnings,
+      }
+    })
+    .filter(Boolean)
+    .slice(-EOF_QUALITY_GATE_HISTORY_LIMIT)
+}
+
+/**
+ * @param {EofQualityGateResult | null | undefined} gate
+ * @returns {EofQualityGateHistoryEntry | null}
+ */
+export function toEofQualityGateHistoryEntry(gate) {
+  if (!gate || typeof gate !== 'object') return null
+  const phase =
+    gate.phase === 'preflight' || gate.phase === 'stills' || gate.phase === 'post'
+      ? gate.phase
+      : 'post'
+  return {
+    pass: Boolean(gate.pass),
+    blocked: Boolean(gate.blocked),
+    phase,
+    mode: gate.mode === 'auto' || gate.mode === 'off' ? gate.mode : 'manual',
+    checkedAt: String(gate.checkedAt || new Date().toISOString()),
+    reasons: Array.isArray(gate.reasons) ? gate.reasons.map(String).slice(0, 6) : [],
+    warnings: Array.isArray(gate.warnings) ? gate.warnings.map(String).slice(0, 4) : [],
+  }
+}
+
+/**
+ * Append a gate run to the history trail (newest last, capped).
+ * @param {unknown} prior
+ * @param {EofQualityGateResult | null | undefined} gate
+ * @param {number} [limit]
+ * @returns {EofQualityGateHistoryEntry[]}
+ */
+export function appendEofQualityGateHistory(prior, gate, limit = EOF_QUALITY_GATE_HISTORY_LIMIT) {
+  const entry = toEofQualityGateHistoryEntry(gate)
+  const base = parseEofQualityGateHistory(prior)
+  if (!entry) return base.slice(-Math.max(1, limit))
+  return [...base, entry].slice(-Math.max(1, Number(limit) || EOF_QUALITY_GATE_HISTORY_LIMIT))
+}
+
+/**
+ * Optional Slack Incoming Webhook when auto-publish / auto-build is blocked by the gate.
+ * Env: EOF_QUALITY_GATE_SLACK_WEBHOOK or EOF_SLACK_WEBHOOK. No-op when unset.
+ * @param {{
+ *   jobId?: string,
+ *   topic?: string,
+ *   gate: EofQualityGateResult,
+ * }} payload
+ */
+export async function notifyEofQualityGateBlocked(payload) {
+  const webhook =
+    envKey('EOF_QUALITY_GATE_SLACK_WEBHOOK', 'EOF_SLACK_WEBHOOK') || ''
+  if (!webhook || !/^https:\/\//i.test(webhook)) return { sent: false, reason: 'webhook_unset' }
+  const gate = payload?.gate
+  if (!gate?.blocked) return { sent: false, reason: 'not_blocked' }
+  const phase = gate.phase || 'post'
+  const verb =
+    phase === 'preflight' || phase === 'stills' ? 'blocked build' : 'blocked auto-publish'
+  const reasons = (gate.reasons || []).slice(0, 4).join('; ') || 'Quality checks failed'
+  const text = [
+    `EOF quality gate ${verb}`,
+    payload.jobId ? `job=${payload.jobId}` : null,
+    payload.topic ? `topic=${String(payload.topic).slice(0, 80)}` : null,
+    `phase=${phase}`,
+    `mode=${gate.mode || 'manual'}`,
+    reasons,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  try {
+    const res = await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 1500) }),
+    })
+    if (!res.ok) {
+      console.warn('[eof-quality-gate] slack webhook HTTP', res.status)
+      return { sent: false, reason: `http_${res.status}` }
+    }
+    return { sent: true }
+  } catch (e) {
+    console.warn(
+      '[eof-quality-gate] slack webhook failed',
+      e instanceof Error ? e.message : e,
+    )
+    return { sent: false, reason: 'fetch_error' }
   }
 }
 

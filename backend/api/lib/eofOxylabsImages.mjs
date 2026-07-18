@@ -215,17 +215,72 @@ export function extractOxylabsImageRows(payload) {
 }
 
 /**
- * Search Google Images via Oxylabs realtime API.
+ * @typedef {'ok'|'empty'|'auth_failed'|'not_configured'|'http_error'|'timeout'|'error'} EofOxylabsSearchStatus
+ * @typedef {{
+ *   status: EofOxylabsSearchStatus,
+ *   detail: string,
+ *   httpStatus?: number,
+ *   softFallback: boolean,
+ * }} EofOxylabsSearchHealth
+ */
+
+/**
+ * Ops-facing note: missing keys vs auth down vs empty SERP (all soft-fall back).
+ * @param {EofOxylabsSearchHealth | null | undefined} health
+ */
+export function formatOxylabsSearchHealthNote(health) {
+  if (!health) return null
+  if (health.status === 'not_configured') {
+    return 'Oxylabs: credentials missing (OXYLABS_USERNAME / OXYLABS_PASSWORD) — soft-falling back to next image source.'
+  }
+  if (health.status === 'auth_failed') {
+    return `Oxylabs: search DOWN (auth ${health.httpStatus || 401}) — soft-falling back. Re-copy username/password from Oxylabs dashboard into Vercel and redeploy.`
+  }
+  if (health.status === 'http_error') {
+    return `Oxylabs: search DOWN (HTTP ${health.httpStatus || '?'}) — soft-falling back. ${health.detail || ''}`.trim()
+  }
+  if (health.status === 'timeout') {
+    return 'Oxylabs: search timed out — soft-falling back to next image source.'
+  }
+  if (health.status === 'error') {
+    return `Oxylabs: search error — soft-falling back. ${health.detail || ''}`.trim()
+  }
+  if (health.status === 'empty') {
+    return 'Oxylabs: auth OK but SERP returned 0 image URLs — soft-falling back (not an auth outage).'
+  }
+  return null
+}
+
+/**
+ * Search Google Images via Oxylabs realtime API (structured health for ops).
+ * Soft-fails to empty hits; never throws on auth/HTTP errors.
  * @param {string} query
  * @param {{ limit?: number, signal?: AbortSignal, timeoutMs?: number }} [opts]
- * @returns {Promise<Array<{ url: string, width?: number, height?: number, title?: string|null, source: 'oxylabs' }>>}
+ * @returns {Promise<{
+ *   hits: Array<{ url: string, width?: number, height?: number, title?: string|null, source: 'oxylabs' }>,
+ *   health: EofOxylabsSearchHealth,
+ * }>}
  */
-export async function searchOxylabsGoogleImages(query, opts = {}) {
+export async function searchOxylabsGoogleImagesWithStatus(query, opts = {}) {
   const creds = getOxylabsCredentials()
-  if (!creds) return []
+  if (!creds) {
+    return {
+      hits: [],
+      health: {
+        status: 'not_configured',
+        detail: 'OXYLABS_USERNAME / OXYLABS_PASSWORD not set',
+        softFallback: true,
+      },
+    }
+  }
 
   const q = String(query || '').trim()
-  if (!q) return []
+  if (!q) {
+    return {
+      hits: [],
+      health: { status: 'empty', detail: 'empty query', softFallback: true },
+    }
+  }
 
   const limit = Math.max(1, Math.min(40, Number(opts.limit) || DEFAULT_LIMIT))
   const timeoutMs = Math.max(5_000, Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS)
@@ -264,14 +319,30 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
       // Never include auth material; body slice only.
       if (res.status === 401 || res.status === 403) {
         console.warn(
-          '[eof-oxylabs] auth failed',
+          '[eof-oxylabs] SEARCH DOWN (auth failed)',
           res.status,
-          '— OXYLABS_PASSWORD on Vercel does not match the Oxylabs dashboard user (username may still be correct).',
+          '— soft-fallback to next source. OXYLABS_PASSWORD on Vercel does not match the Oxylabs dashboard user.',
         )
-      } else {
-        console.warn('[eof-oxylabs] search failed', res.status, body.slice(0, 180))
+        return {
+          hits: [],
+          health: {
+            status: 'auth_failed',
+            detail: 'Unauthorized — username/password rejected',
+            httpStatus: res.status,
+            softFallback: true,
+          },
+        }
       }
-      return []
+      console.warn('[eof-oxylabs] SEARCH DOWN (http)', res.status, body.slice(0, 180), '— soft-fallback')
+      return {
+        hits: [],
+        health: {
+          status: 'http_error',
+          detail: `API error HTTP ${res.status}`,
+          httpStatus: res.status,
+          softFallback: true,
+        },
+      }
     }
 
     const data = await res.json()
@@ -279,29 +350,65 @@ export async function searchOxylabsGoogleImages(query, opts = {}) {
     console.info('[eof-oxylabs] google images', q.slice(0, 60), '→', rows.length, 'urls')
     if (!rows.length) {
       console.warn(
-        '[eof-oxylabs] parsed 0 image URLs — check response shape / high_res_image fields for',
+        '[eof-oxylabs] parsed 0 image URLs (auth OK — empty SERP, not an outage) for',
         q.slice(0, 60),
       )
+      return {
+        hits: [],
+        health: {
+          status: 'empty',
+          detail: 'auth ok but 0 image URLs parsed',
+          httpStatus: res.status,
+          softFallback: true,
+        },
+      }
     }
 
-    return rows.slice(0, limit).map((r) => ({
-      url: r.url,
-      width: r.width,
-      height: r.height,
-      title: r.title || null,
-      source: 'oxylabs',
-    }))
-  } catch (e) {
-    if (e?.name === 'AbortError') {
-      console.warn('[eof-oxylabs] search timed out or aborted')
-    } else {
-      console.warn('[eof-oxylabs] search error', e instanceof Error ? e.message : e)
+    return {
+      hits: rows.slice(0, limit).map((r) => ({
+        url: r.url,
+        width: r.width,
+        height: r.height,
+        title: r.title || null,
+        source: 'oxylabs',
+      })),
+      health: {
+        status: 'ok',
+        detail: `${rows.length} urls`,
+        httpStatus: res.status,
+        softFallback: false,
+      },
     }
-    return []
+  } catch (e) {
+    const aborted = e?.name === 'AbortError'
+    if (aborted) {
+      console.warn('[eof-oxylabs] SEARCH DOWN (timeout/abort) — soft-fallback')
+    } else {
+      console.warn('[eof-oxylabs] SEARCH DOWN (error)', e instanceof Error ? e.message : e, '— soft-fallback')
+    }
+    return {
+      hits: [],
+      health: {
+        status: aborted ? 'timeout' : 'error',
+        detail: aborted ? 'search timed out or aborted' : e instanceof Error ? e.message : 'search failed',
+        softFallback: true,
+      },
+    }
   } finally {
     clearTimeout(timer)
     if (external) external.removeEventListener('abort', onAbort)
   }
+}
+
+/**
+ * Search Google Images via Oxylabs realtime API.
+ * @param {string} query
+ * @param {{ limit?: number, signal?: AbortSignal, timeoutMs?: number }} [opts]
+ * @returns {Promise<Array<{ url: string, width?: number, height?: number, title?: string|null, source: 'oxylabs' }>>}
+ */
+export async function searchOxylabsGoogleImages(query, opts = {}) {
+  const { hits } = await searchOxylabsGoogleImagesWithStatus(query, opts)
+  return hits
 }
 
 /**
@@ -446,25 +553,29 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
   // Tight pool sized to scene count — do not keep 20 Rooney stills for a 3–4 beat Short.
   const need = Math.max(3, sceneCount + 1)
   const fetchLimit = Math.min(24, Math.max(10, need * 2))
-  const hits = filterBlockedStockImages(
-    await searchOxylabsGoogleImages(query, {
-      limit: fetchLimit,
-      signal: opts.signal,
-    }),
-  )
+  const { hits: rawHits, health } = await searchOxylabsGoogleImagesWithStatus(query, {
+    limit: fetchLimit,
+    signal: opts.signal,
+  })
+  const hits = filterBlockedStockImages(rawHits)
   const kept = hits.slice(0, Math.min(hits.length, need + 2))
+  const healthNote = formatOxylabsSearchHealthNote(health)
+  if (healthNote) console.warn('[eof-oxylabs] job pool', healthNote)
   console.info(
     '[eof-oxylabs] job pool',
     query.slice(0, 60),
     `intent=${intent}`,
     `scenes=${sceneCount}`,
     `kept=${kept.length}/${fetchLimit}`,
+    `health=${health.status}`,
     `(≤${EOF_OXYLABS_MAX_QUERIES_PER_JOB} queries/Short — not per scene)`,
   )
   return {
     query,
     intent,
     subject: resolveImageSubject(opts.topic || '') || null,
+    health,
+    healthNote,
     hits: kept.map((h) => ({
       url: h.url,
       title: h.title || null,
@@ -487,15 +598,27 @@ export async function fetchEofOxylabsSecondaryPool(opts = {}) {
     intent === 'coach'
       ? `"${person}" manager sideline`
       : `"${person}" football portrait`
-  const hits = filterBlockedStockImages(
-    await searchOxylabsGoogleImages(query, { limit: 8, signal: opts.signal }),
-  ).slice(0, 5)
-  console.info('[eof-oxylabs] secondary pool', person, `kept=${hits.length}`, '(+1 credit)')
+  const { hits: rawHits, health } = await searchOxylabsGoogleImagesWithStatus(query, {
+    limit: 8,
+    signal: opts.signal,
+  })
+  const hits = filterBlockedStockImages(rawHits).slice(0, 5)
+  const healthNote = formatOxylabsSearchHealthNote(health)
+  if (healthNote) console.warn('[eof-oxylabs] secondary pool', healthNote)
+  console.info(
+    '[eof-oxylabs] secondary pool',
+    person,
+    `kept=${hits.length}`,
+    `health=${health.status}`,
+    '(+1 credit)',
+  )
   if (!hits.length) return null
   return {
     subject: person,
     query,
     intent,
+    health,
+    healthNote,
     hits: hits.map((h) => ({
       url: h.url,
       title: h.title || null,
@@ -735,7 +858,10 @@ export async function probeEofOxylabsApi() {
         configured: true,
         ok: false,
         status: res.status,
-        detail: 'Unauthorized — username/password rejected. Re-copy from Oxylabs dashboard into Vercel.',
+        degraded: true,
+        softFallback: true,
+        detail:
+          'SEARCH DOWN — Unauthorized (username/password rejected). Soft-fallback to SerpAPI/AP/Wikimedia until keys are fixed on Vercel.',
       }
     }
     if (!res.ok) {
@@ -743,13 +869,17 @@ export async function probeEofOxylabsApi() {
         configured: true,
         ok: false,
         status: res.status,
-        detail: `API error HTTP ${res.status}`,
+        degraded: true,
+        softFallback: true,
+        detail: `SEARCH DOWN — API error HTTP ${res.status}. Soft-fallback active.`,
       }
     }
     return {
       configured: true,
       ok: true,
       status: res.status,
+      degraded: false,
+      softFallback: false,
       detail: 'auth ok (Google Images ready)',
     }
   } catch (e) {
@@ -757,7 +887,11 @@ export async function probeEofOxylabsApi() {
     return {
       configured: true,
       ok: false,
-      detail: aborted ? 'probe timed out' : e instanceof Error ? e.message : 'probe failed',
+      degraded: true,
+      softFallback: true,
+      detail: aborted
+        ? 'SEARCH DOWN — probe timed out. Soft-fallback active.'
+        : `SEARCH DOWN — ${e instanceof Error ? e.message : 'probe failed'}. Soft-fallback active.`,
     }
   } finally {
     clearTimeout(timer)

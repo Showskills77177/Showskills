@@ -28,6 +28,10 @@ import {
   applyEofShortQualityGateToJob,
   formatEofQualityGateBlockMessage,
 } from './eofShortQualityGateApply.mjs'
+import {
+  appendEofQualityGateHistory,
+  notifyEofQualityGateBlocked,
+} from './eofShortQualityGate.mjs'
 
 function alreadyRanToday(lastRunAt) {
   if (!lastRunAt) return false
@@ -127,12 +131,21 @@ export async function runEofDailyShortPipeline(opts = {}) {
         blocked: !gate.pass,
         checkedAt: new Date().toISOString(),
       }
+      const history = appendEofQualityGateHistory(rendered.qualityGateHistory, stamped)
       await updateEofProductionJob(jobId, {
         qualityGate: stamped,
+        qualityGateHistory: history,
         ...(stamped.blocked
           ? { errorMessage: formatEofQualityGateBlockMessage(stamped) }
           : {}),
       })
+      if (stamped.blocked) {
+        await notifyEofQualityGateBlocked({
+          jobId,
+          topic: rendered.topic,
+          gate: stamped,
+        }).catch(() => {})
+      }
       gate = stamped
     }
     if (!gate.pass || gate.blocked) {
