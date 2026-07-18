@@ -125,6 +125,24 @@ export function resolveNewsAgencyLogoBlurRegions(opts = {}) {
 }
 
 /**
+ * boxblur chroma radius must fit the chroma plane (≈ half luma for yuv420).
+ * Pop inset cards use short corner crops (~37px tall) where lr=10 fails with:
+ *   "Invalid chroma_param radius value 10, must be >= 0 and <= 9"
+ * which aborts the overlay filtergraph and silently drops the pop moment.
+ *
+ * @param {number} w
+ * @param {number} h
+ * @param {number} requested
+ */
+export function clampNewsAgencyLogoBlurRadius(w, h, requested) {
+  const req = Math.max(1, Math.round(Number(requested) || 1))
+  const minSide = Math.max(1, Math.min(Number(w) || 1, Number(h) || 1))
+  // Leave headroom for chroma subsample: max ≈ floor(minSide/4) - 1
+  const maxSafe = Math.max(1, Math.floor(minSide / 4) - 1)
+  return Math.max(1, Math.min(req, maxSafe))
+}
+
+/**
  * Filtergraph fragment: split → crop+boxblur per corner → overlay back.
  * Expects unlabeled video in; produces unlabeled video out (safe to `,fps=…` after).
  * Label prefix must be unique when base + pop both blur in one filter_complex.
@@ -146,7 +164,7 @@ export function buildNewsAgencyLogoBlurFilterFragment(opts = {}) {
   if (!regions.length) return ''
 
   const prefix = String(opts.labelPrefix || 'nlb').replace(/[^a-zA-Z0-9_]/g, '') || 'nlb'
-  const lr = Math.max(
+  const requestedLr = Math.max(
     2,
     Math.round(Number(opts.blurLr) || readPositiveNumber('EOF_NEWS_LOGO_BLUR_LR', 10)),
   )
@@ -154,6 +172,9 @@ export function buildNewsAgencyLogoBlurFilterFragment(opts = {}) {
     1,
     Math.round(Number(opts.blurLp) || readPositiveNumber('EOF_NEWS_LOGO_BLUR_LP', 2)),
   )
+  // Clamp against the smallest corner patch (pop insets are much smaller than 9:16).
+  const minPatch = Math.min(...regions.map((r) => Math.min(r.w, r.h)))
+  const lr = clampNewsAgencyLogoBlurRadius(minPatch, minPatch, requestedLr)
 
   const n = regions.length
   // split=N+1 → main + one pad per corner
@@ -161,8 +182,9 @@ export function buildNewsAgencyLogoBlurFilterFragment(opts = {}) {
   const parts = [`split=${n + 1}${splitPads.map((p) => `[${p}]`).join('')}`]
 
   for (const r of regions) {
+    const rLr = clampNewsAgencyLogoBlurRadius(r.w, r.h, lr)
     parts.push(
-      `[${prefix}_${r.id}]crop=${r.w}:${r.h}:${r.x}:${r.y},boxblur=${lr}:${lp}[${prefix}_${r.id}b]`,
+      `[${prefix}_${r.id}]crop=${r.w}:${r.h}:${r.x}:${r.y},boxblur=${rLr}:${lp}[${prefix}_${r.id}b]`,
     )
   }
 

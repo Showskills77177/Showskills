@@ -126,6 +126,10 @@ describe('eofOverlayMoments', () => {
     })
     assert.match(blurred.overlayPrep, /boxblur=\d+:\d+/)
     assert.match(blurred.overlayPrep, /\[plb_br\]/)
+    // Must stay chroma-safe on the short pop card (see eofNewsAgencyLogoBlur clamp).
+    const radii = [...blurred.overlayPrep.matchAll(/boxblur=(\d+):/g)].map((m) => Number(m[1]))
+    assert.ok(radii.length >= 1)
+    assert.ok(radii.every((r) => r <= 9), `pop logo blur radii ${radii.join(',')} must be ≤9`)
   })
 
   it('rejects captioned / clickbait stills as pop inset sources', () => {
