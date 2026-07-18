@@ -80,6 +80,33 @@ export function shouldSkipEofStillsPreflight(opts = {}) {
   return opts.skipStillsPreflight === true || opts.reuseSceneImages === true
 }
 
+/**
+ * Remux / remix paths skip plan preflight (already ran on the original Build).
+ * @param {{ skipPlanPreflight?: boolean }} [opts]
+ */
+export function shouldSkipEofPlanPreflight(opts = {}) {
+  return opts.skipPlanPreflight === true
+}
+
+/**
+ * Canonical remux video opts — reuse stills, skip both preflight phases.
+ * @param {{ captionMode?: 'auto'|'free'|'zapcap-only', includeAudioIfPresent?: boolean }} [extra]
+ */
+export function eofRemuxVideoJobOpts(extra = {}) {
+  return {
+    includeAudioIfPresent: extra.includeAudioIfPresent !== false,
+    reuseSceneImages: true,
+    captionMode:
+      extra.captionMode === 'zapcap-only'
+        ? 'zapcap-only'
+        : extra.captionMode === 'auto'
+          ? 'auto'
+          : 'free',
+    skipPlanPreflight: true,
+    skipStillsPreflight: true,
+  }
+}
+
 /** Append a used image key; newest last, capped for durable narrationManifest size. */
 export function appendEofImageKeyHistory(priorHistory, imageKey, limit = EOF_IMAGE_KEY_HISTORY_LIMIT) {
   const prior = Array.isArray(priorHistory) ? priorHistory.filter(Boolean) : []
@@ -121,6 +148,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   // Remux / remix / effects reuse cached stills — skip stills gate (stale clickbait pop
   // metadata must not block audio-only or captions-only remux).
   const skipStillsPreflight = shouldSkipEofStillsPreflight(opts)
+  const skipPlanPreflight = shouldSkipEofPlanPreflight(opts)
   const captionMode =
     opts.captionMode === 'zapcap-only' ? 'zapcap-only' : opts.captionMode === 'auto' ? 'auto' : 'free'
   const imageProviderOverride =
@@ -137,7 +165,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   }
 
   // Plan-time gate before any image API / ffmpeg work (skipped when caller already ran it).
-  if (!opts.skipPlanPreflight) {
+  if (!skipPlanPreflight) {
     await applyEofShortQualityPreflightToJob(jobId, {
       mode: qualityGateMode,
       blockOnFail: true,

@@ -68,6 +68,12 @@ export async function readEofMixedAudioInline(jobId) {
  * When `allowNoMusic` is true and the job has no `musicTrackId`, mix VO-only
  * (do not auto-pick a default bed). Used by post-build music remix / Remove song.
  */
+
+/** True when remix/Remove-song must keep VO-only (never re-pick a default bed). */
+export function shouldEofAllowNoMusic(opts = {}, job = {}) {
+  return opts.allowNoMusic === true && !job?.musicTrackId
+}
+
 export async function renderEofProductionAudio(jobId, opts = {}) {
   const preserveSceneImages = opts.preserveSceneImages === true
   const voiceRegenerationMode = opts.voiceRegenerationMode === true
@@ -193,7 +199,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
 
     await reportProgress('mix', sceneCount, { force: true })
 
-    const wantNoMusic = allowNoMusic && !job.musicTrackId
+    const wantNoMusic = shouldEofAllowNoMusic({ allowNoMusic }, job)
     const track = wantNoMusic ? null : await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
     const musicPath = resolveEofMusicTrackFilePath(track)
     const mixedPath = join(workDir, 'mixed.mp3')

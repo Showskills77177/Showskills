@@ -2,7 +2,10 @@
  * Image Shorts with voiceover: TTS + music mix → stills + captions → muxed 9:16 MP4.
  */
 import { renderEofProductionAudio } from './eofProductionRender.mjs'
-import { renderEofProductionVideoJob } from './eofProductionRenderVideo.mjs'
+import {
+  renderEofProductionVideoJob,
+  eofRemuxVideoJobOpts,
+} from './eofProductionRenderVideo.mjs'
 import {
   getEofProductionJob,
   updateEofProductionJob,
@@ -168,13 +171,7 @@ export async function renderEofProductionVoiceoverOnly(jobId) {
       return refreshed
     }
 
-    return await renderEofProductionVideoJob(jobId, {
-      includeAudioIfPresent: true,
-      reuseSceneImages: true,
-      captionMode: 'free',
-      skipPlanPreflight: true,
-      skipStillsPreflight: true,
-    })
+    return await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Voiceover regeneration failed'
     await markEofProductionJobFailed(jobId, message)
@@ -236,13 +233,7 @@ export async function applyEofProductionZapcapCaptions(jobId) {
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
-  return renderEofProductionVideoJob(jobId, {
-    includeAudioIfPresent: true,
-    reuseSceneImages: true,
-    captionMode: 'zapcap-only',
-    skipPlanPreflight: true,
-    skipStillsPreflight: true,
-  })
+  return renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts({ captionMode: 'zapcap-only' }))
 }
 
 /** @param {string} jobId */
@@ -313,13 +304,7 @@ export async function renderEofProductionEffectsApply(jobId) {
   )
 
   try {
-    return await renderEofProductionVideoJob(jobId, {
-      includeAudioIfPresent: true,
-      reuseSceneImages: true,
-      captionMode: 'free',
-      skipPlanPreflight: true,
-      skipStillsPreflight: true,
-    })
+    return await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Apply effects failed'
     await markEofProductionJobFailed(jobId, message)
@@ -351,13 +336,7 @@ export async function renderEofProductionStickersApply(jobId) {
   )
 
   try {
-    return await renderEofProductionVideoJob(jobId, {
-      includeAudioIfPresent: true,
-      reuseSceneImages: true,
-      captionMode: 'free',
-      skipPlanPreflight: true,
-      skipStillsPreflight: true,
-    })
+    return await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Apply stickers failed'
     await markEofProductionJobFailed(jobId, message)
@@ -477,13 +456,7 @@ export async function renderEofProductionCaptionReplace(jobId) {
   )
 
   try {
-    return await renderEofProductionVideoJob(jobId, {
-      includeAudioIfPresent: true,
-      reuseSceneImages: true,
-      captionMode: 'free',
-      skipPlanPreflight: true,
-      skipStillsPreflight: true,
-    })
+    return await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Caption replace failed'
     await markEofProductionJobFailed(jobId, message)
@@ -564,14 +537,7 @@ export async function renderEofProductionMusicRemix(jobId) {
       return refreshed
     }
 
-    return await renderEofProductionVideoJob(jobId, {
-      includeAudioIfPresent: true,
-      reuseSceneImages: true,
-      captionMode: 'free',
-      // Post-build audio-only remux — plan/stills checks already passed on the original Build.
-      skipPlanPreflight: true,
-      skipStillsPreflight: true,
-    })
+    return await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Music remix failed'
     await markEofProductionJobFailed(jobId, message)
