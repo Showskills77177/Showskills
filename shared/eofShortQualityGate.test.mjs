@@ -3,6 +3,8 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import {
   captionNarrationOverlap,
   captionLooksMismatched,
+  captionMismatchSeverity,
+  sharedCaptionEntities,
   collectEofShortQualityHeuristicChecks,
   collectEofShortQualityPlanChecks,
   collectEofShortQualityStillsChecks,
@@ -64,6 +66,56 @@ describe('eofShortQualityGate helpers', () => {
         'Jude Bellingham hit back at Thomas Tuchel after the presser',
       ),
       false,
+    )
+  })
+
+  it('does not hard-fail valid paraphrases (England boss ↔ Tuchel VO)', () => {
+    const caption = 'The England boss is under fire'
+    const voWithEngland =
+      'Thomas Tuchel faces mounting pressure as England manager tonight after another tough result.'
+    const voCoachOnly = 'Thomas Tuchel faces mounting pressure after another tough result.'
+
+    assert.ok(sharedCaptionEntities(caption, voWithEngland).includes('england'))
+    assert.equal(captionMismatchSeverity(caption, voWithEngland), 'warn')
+    assert.equal(captionLooksMismatched(caption, voWithEngland), false)
+
+    // Role paraphrase bridge (boss ↔ named coach) even when VO omits “England”.
+    assert.equal(captionMismatchSeverity(caption, voCoachOnly), 'warn')
+    assert.equal(captionLooksMismatched(caption, voCoachOnly), false)
+
+    const plan = collectEofShortQualityPlanChecks({
+      topic: 'Thomas Tuchel',
+      captionStyle: 'live',
+      captionLayout: { yNorm: 0.76, fontScale: 1 },
+      musicTrackId: 'bed-1',
+      musicVolume: 0.22,
+      overlayMoments: 'off',
+      script: {
+        scenes: [{ narration: voWithEngland, caption, durationSec: 5 }],
+      },
+    })
+    const mismatch = plan.find((c) => c.id === 'captions_mismatch_0')
+    assert.ok(mismatch)
+    assert.equal(mismatch.severity, 'warn')
+    const gate = finalizeEofQualityGate(plan, { mode: 'auto', phase: 'preflight' })
+    assert.equal(gate.pass, true)
+    assert.equal(gate.blocked, false)
+  })
+
+  it('hard-fails caption↔VO when named entities conflict', () => {
+    assert.equal(
+      captionMismatchSeverity(
+        'Messi hits back after the presser night',
+        'Cristiano Ronaldo slammed the critics after the match',
+      ),
+      'fail',
+    )
+    assert.equal(
+      captionLooksMismatched(
+        'Messi hits back after the presser night',
+        'Cristiano Ronaldo slammed the critics after the match',
+      ),
+      true,
     )
   })
 
@@ -289,6 +341,7 @@ describe('eofShortQualityGate helpers', () => {
     const ids = checks.map((c) => c.id)
     assert.ok(ids.includes('music_missing_track'))
     assert.ok(ids.some((id) => id.startsWith('captions_mismatch')))
+    assert.equal(checks.find((c) => c.id === 'captions_mismatch_0')?.severity, 'fail')
     // Plan-time must not require image manifest / render paths.
     assert.equal(ids.includes('stills_placeholder'), false)
     assert.equal(ids.includes('voiceover_missing_mix'), false)
@@ -316,6 +369,7 @@ describe('eofShortQualityGate helpers', () => {
     assert.equal(gate.pass, false)
     assert.equal(gate.blocked, true, 'manual preflight should block expensive build steps')
     assert.match(formatEofQualityGateBlockMessage(gate), /blocked build/)
+    assert.equal(typeof gate.visionEnabled, 'boolean')
   })
 
   it('plan preflight passes a healthy script plan without stills', () => {

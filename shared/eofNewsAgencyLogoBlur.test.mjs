@@ -18,7 +18,7 @@ describe('eofNewsAgencyLogoBlur detection', () => {
     assert.equal(extractUrlFromEofImageKey('wiki:Wayne_Rooney'), '')
   })
 
-  it('matches Fox / Sky / Getty / Reuters / AP hosts and titles', () => {
+  it('matches Fox / Sky / Getty / Reuters / AP hosts and AP source', () => {
     assert.equal(
       detectEofNewsAgencyStill({
         imageUrl: 'https://a57.foxnews.com/static.foxnews.com/foxnews.com/content/uploads/x.jpg',
@@ -33,18 +33,48 @@ describe('eofNewsAgencyLogoBlur detection', () => {
     )
     assert.equal(
       detectEofNewsAgencyStill({
-        imageTitle: 'Wayne Rooney — Getty Images',
-        imageUrl: 'https://cdn.example.com/opaque.jpg',
-      }).match,
-      true,
-    )
-    assert.equal(
-      detectEofNewsAgencyStill({
         sourcePage: 'https://www.reuters.com/sports/soccer/rooney',
       }).match,
       true,
     )
     assert.equal(detectEofNewsAgencyStill({ imageSource: 'ap' }).match, true)
+    assert.equal(detectEofNewsAgencyStill({ imageSource: 'ap' }).confidence, 'strong')
+  })
+
+  it('title-only agency cues are soft (no blur on clean CDNs)', () => {
+    const gettyTitle = detectEofNewsAgencyStill({
+      imageTitle: 'Wayne Rooney — Getty Images',
+      imageUrl: 'https://cdn.example.com/opaque.jpg',
+    })
+    assert.equal(gettyTitle.match, false)
+    assert.equal(gettyTitle.softMatch, true)
+    assert.equal(gettyTitle.confidence, 'weak')
+    assert.equal(
+      stillNeedsNewsAgencyLogoBlur({
+        imageTitle: 'Wayne Rooney — Getty Images',
+        imageUrl: 'https://cdn.example.com/opaque.jpg',
+      }),
+      false,
+    )
+
+    const skyMeta = {
+      imageTitle: 'Sky Sports studio panel debate',
+      imageUrl: 'https://images.pexels.com/photos/123/x.jpg',
+      imageSource: 'pexels',
+    }
+    const skyStudio = detectEofNewsAgencyStill(skyMeta)
+    assert.equal(skyStudio.match, false)
+    assert.equal(skyStudio.softMatch, true)
+    assert.equal(stillNeedsNewsAgencyLogoBlur(skyMeta), false)
+
+    // Title + agency host still blurs.
+    assert.equal(
+      detectEofNewsAgencyStill({
+        imageTitle: 'Sky Sports studio',
+        imageUrl: 'https://e0.365dm.com/2024/studio.jpg',
+      }).match,
+      true,
+    )
   })
 
   it('does not match clean stock / wiki / AI gen plates', () => {

@@ -18,6 +18,30 @@ const CURRENT_YEAR = new Date().getFullYear()
 const JUNK_TITLE_RE =
   /\b(prisoners?|war|pdf|newspaper|abendpost|daily\s*times|map|coat\s*of\s*arms|logo|flag|signature|autograph|chart|graph|svg|icon|diagram)\b/i
 
+/** Nation-as-query (football script beat about a country, not a named person). */
+const FOOTBALL_NATION_QUERY_RE =
+  /^(england|france|germany|spain|italy|brazil|portugal|netherlands|argentina|belgium|croatia|uruguay|mexico|scotland|wales|ireland|northern\s*ireland|japan|morocco|senegal|nigeria|ghana|cameroon|colombia|chile|peru|ecuador|poland|denmark|sweden|norway|switzerland|austria|turkey|serbia|ukraine|usa|united\s*states|australia|south\s*korea|south\s*africa)(\s+(national\s+)?(team|football|soccer|kit|squad))?$/i
+
+/** Place / infrastructure junk when the query is a football nation. */
+const NATION_PLACE_INFRA_RE =
+  /\b(nato|headquarters|\bhq\b|railway|railroad|train\s*station|airport|brewery|beer|museum|cathedral|bridge|highway|motorway|parliament|embassy|skyscraper|office\s*building|city\s*hall|town\s*hall|harbour|harbor|canal|metro\s*station)\b/i
+
+/**
+ * True when the search subject is a nation (or nation team), not a person/club.
+ * @param {string} topic
+ * @param {string} [imageQuery]
+ */
+export function isEofFootballNationQuery(topic, imageQuery = '') {
+  for (const raw of [imageQuery, topic]) {
+    const q = String(raw || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+    if (!q || q.length > 40) continue
+    if (FOOTBALL_NATION_QUERY_RE.test(q)) return true
+  }
+  return false
+}
+
 /**
  * @param {string} path
  * @param {Record<string, string>} params
@@ -215,6 +239,7 @@ function normalizeCommonsPage(page) {
  */
 export function rankWikimediaCandidates(candidates, topic, imageQuery = '') {
   const year = CURRENT_YEAR
+  const nationQuery = isEofFootballNationQuery(topic, imageQuery)
   return [...candidates]
     .map((c, idx) => {
       let relevance = scoreImageRelevance(topic || imageQuery, c.title || '', imageQuery)
@@ -226,6 +251,12 @@ export function rankWikimediaCandidates(candidates, topic, imageQuery = '') {
       else if (c.year && c.year <= year - 5) relevance -= 10
       if (/\b(mainz|dortmund\s*201|young|childhood|throwback|archive)\b/i.test(c.title || '')) {
         relevance -= 8
+      }
+      // Nation football beats: demote NATO HQ / beer / railway / civic infrastructure.
+      if (nationQuery && NATION_PLACE_INFRA_RE.test(c.title || '')) {
+        relevance -= 28
+      } else if (nationQuery && /\b(football|soccer|kit|stadium|match|national\s*team|fifa|uefa)\b/i.test(c.title || '')) {
+        relevance += 6
       }
       return { ...c, relevance, idx }
     })

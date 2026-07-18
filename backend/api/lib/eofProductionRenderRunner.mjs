@@ -173,6 +173,7 @@ export async function renderEofProductionVoiceoverOnly(jobId) {
       reuseSceneImages: true,
       captionMode: 'free',
       skipPlanPreflight: true,
+      skipStillsPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Voiceover regeneration failed'
@@ -239,6 +240,8 @@ export async function applyEofProductionZapcapCaptions(jobId) {
     includeAudioIfPresent: true,
     reuseSceneImages: true,
     captionMode: 'zapcap-only',
+    skipPlanPreflight: true,
+    skipStillsPreflight: true,
   })
 }
 
@@ -314,6 +317,8 @@ export async function renderEofProductionEffectsApply(jobId) {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
       captionMode: 'free',
+      skipPlanPreflight: true,
+      skipStillsPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Apply effects failed'
@@ -350,6 +355,8 @@ export async function renderEofProductionStickersApply(jobId) {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
       captionMode: 'free',
+      skipPlanPreflight: true,
+      skipStillsPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Apply stickers failed'
@@ -474,6 +481,8 @@ export async function renderEofProductionCaptionReplace(jobId) {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
       captionMode: 'free',
+      skipPlanPreflight: true,
+      skipStillsPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Caption replace failed'
@@ -559,8 +568,9 @@ export async function renderEofProductionMusicRemix(jobId) {
       includeAudioIfPresent: true,
       reuseSceneImages: true,
       captionMode: 'free',
-      // Post-build audio-only remux — plan checks already passed on the original Build.
+      // Post-build audio-only remux — plan/stills checks already passed on the original Build.
       skipPlanPreflight: true,
+      skipStillsPreflight: true,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Music remix failed'

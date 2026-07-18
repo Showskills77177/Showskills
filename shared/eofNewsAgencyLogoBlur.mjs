@@ -41,7 +41,13 @@ export function extractUrlFromEofImageKey(imageKey) {
  *   sourcePage?: string | null,
  *   imageSource?: string | null,
  * }} [meta]
- * @returns {{ match: boolean, agency: string | null, reasons: string[] }}
+ * @returns {{
+ *   match: boolean,
+ *   softMatch: boolean,
+ *   agency: string | null,
+ *   reasons: string[],
+ *   confidence: 'strong' | 'weak' | null,
+ * }}
  */
 export function detectEofNewsAgencyStill(meta = {}) {
   const imageUrl = String(meta.imageUrl || '').trim()
@@ -52,39 +58,59 @@ export function detectEofNewsAgencyStill(meta = {}) {
     .trim()
     .toLowerCase()
   const keyUrl = extractUrlFromEofImageKey(imageKey)
+  // Host / page URL evidence only — titles alone must not force blur on clean CDNs.
   const urlHay = [imageUrl, keyUrl, sourcePage].filter(Boolean).join(' ')
-  const textHay = [imageTitle, sourcePage, imageKey].filter(Boolean).join(' ')
+  const titleHay = String(imageTitle || '').trim()
   const reasons = []
+  const softReasons = []
   let agency = null
 
+  let strong = false
   if (NEWS_AGENCY_IMAGE_SOURCES.has(imageSource)) {
     reasons.push(`source:${imageSource}`)
     agency = agency || imageSource
+    strong = true
   }
   if (urlHay && NEWS_AGENCY_HOST.test(urlHay)) {
     const hostHit = urlHay.match(NEWS_AGENCY_HOST)
     reasons.push(`host:${hostHit?.[1] || 'news'}`)
     agency = agency || String(hostHit?.[1] || 'news').toLowerCase()
+    strong = true
   }
-  if (textHay && NEWS_AGENCY_TEXT.test(textHay)) {
-    const textHit = textHay.match(NEWS_AGENCY_TEXT)
-    reasons.push(`text:${textHit?.[1] || 'agency'}`)
+  // Title-only agency cues are weak (e.g. “Sky Sports studio” on a clean CDN).
+  if (titleHay && NEWS_AGENCY_TEXT.test(titleHay)) {
+    const textHit = titleHay.match(NEWS_AGENCY_TEXT)
+    softReasons.push(`text:${textHit?.[1] || 'agency'}`)
     agency = agency || String(textHit?.[1] || 'agency').toLowerCase().replace(/\s+/g, '-')
   }
 
+  if (strong) {
+    return {
+      match: true,
+      softMatch: softReasons.length > 0,
+      agency,
+      reasons: [...reasons, ...softReasons],
+      confidence: 'strong',
+    }
+  }
+
   return {
-    match: reasons.length > 0,
-    agency,
-    reasons,
+    match: false,
+    softMatch: softReasons.length > 0,
+    agency: softReasons.length ? agency : null,
+    reasons: softReasons,
+    confidence: softReasons.length ? 'weak' : null,
   }
 }
 
 /**
+ * Blur only on strong evidence (agency host CDN or `imageSource: 'ap'`).
+ * Title-only matches are soft hints — do not blur clean stock/wiki plates.
  * @param {Parameters<typeof detectEofNewsAgencyStill>[0]} meta
  */
 export function stillNeedsNewsAgencyLogoBlur(meta) {
   if (!isEofNewsAgencyLogoBlurEnabled()) return false
-  return detectEofNewsAgencyStill(meta).match
+  return detectEofNewsAgencyStill(meta).match === true
 }
 
 export function isEofNewsAgencyLogoBlurEnabled() {

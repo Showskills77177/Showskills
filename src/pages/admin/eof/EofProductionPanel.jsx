@@ -4959,37 +4959,57 @@ export default function EofProductionPanel({
               <div
                 className={`rounded-xl border px-4 py-3 text-sm ${
                   selected.qualityGate.pass
-                    ? 'border-[#2f5d3a]/50 bg-[#142018] text-[#9dcea8]'
-                    : 'border-[#c48a2a]/45 bg-[#2a2110] text-[#f0d39a]'
+                    ? selected.qualityGate.warnings?.length
+                      ? 'border-[#c48a2a]/40 bg-[#1c1a12] text-[#e6d3a0]'
+                      : 'border-[#2f5d3a]/50 bg-[#142018] text-[#9dcea8]'
+                    : selected.qualityGate.blocked
+                      ? 'border-[#ff4e45]/40 bg-[#2a1515] text-[#ff9b95]'
+                      : 'border-[#c48a2a]/45 bg-[#2a2110] text-[#f0d39a]'
                 }`}
               >
-                <p className="font-medium">
-                  {selected.qualityGate.pass
-                    ? selected.qualityGate.warnings?.length
-                      ? `Quality gate passed (${selected.qualityGate.warnings.length} warning${
-                          selected.qualityGate.warnings.length === 1 ? '' : 's'
-                        })`
-                      : 'Quality gate passed'
-                    : selected.qualityGate.blocked
-                      ? selected.qualityGate.phase === 'preflight' ||
-                        selected.qualityGate.phase === 'stills'
-                        ? 'Quality gate blocked build (before images/render)'
-                        : 'Quality gate blocked publish'
-                      : 'Quality gate found issues'}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">
+                    {selected.qualityGate.pass
+                      ? selected.qualityGate.warnings?.length
+                        ? `Quality gate: pass with warnings (${selected.qualityGate.warnings.length})`
+                        : 'Quality gate: passed'
+                      : selected.qualityGate.blocked
+                        ? selected.qualityGate.phase === 'preflight' ||
+                          selected.qualityGate.phase === 'stills'
+                          ? `Quality gate: blocked build (${selected.qualityGate.phase})`
+                          : 'Quality gate: blocked publish'
+                        : 'Quality gate: issues found'}
+                  </p>
+                  <p className="text-[11px] opacity-80">
+                    {selected.qualityGate.visionUsed
+                      ? 'Vision QA: used'
+                      : selected.qualityGate.visionEnabled
+                        ? 'Vision QA: on (not used this pass)'
+                        : 'Vision QA: off'}
+                    {selected.qualityGate.phase
+                      ? ` · ${selected.qualityGate.phase}`
+                      : ''}
+                  </p>
+                </div>
                 {selected.qualityGate.reasons?.length ? (
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-[#f0d39a]">
-                    {selected.qualityGate.reasons.slice(0, 8).map((r) => (
-                      <li key={r}>{r}</li>
-                    ))}
-                  </ul>
+                  <div className="mt-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide opacity-70">Fails</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[12px]">
+                      {selected.qualityGate.reasons.slice(0, 8).map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
-                {selected.qualityGate.pass && selected.qualityGate.warnings?.length ? (
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-[#b8c9bc]">
-                    {selected.qualityGate.warnings.slice(0, 6).map((w) => (
-                      <li key={w}>{w}</li>
-                    ))}
-                  </ul>
+                {selected.qualityGate.warnings?.length ? (
+                  <div className="mt-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide opacity-70">Warnings</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] opacity-90">
+                      {selected.qualityGate.warnings.slice(0, 6).map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
                 {selected.errorMessage &&
                 /quality gate/i.test(String(selected.errorMessage)) &&

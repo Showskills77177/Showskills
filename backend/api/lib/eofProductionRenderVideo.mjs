@@ -103,11 +103,15 @@ export function assertEofVideoPersisted(persisted) {
  *   imageProvider?: string | null,
  *   qualityGateMode?: 'auto' | 'manual',
  *   skipPlanPreflight?: boolean,
+ *   skipStillsPreflight?: boolean,
  * }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
   const includeAudioIfPresent = opts.includeAudioIfPresent === true
   const reuseSceneImages = opts.reuseSceneImages === true
+  // Remux / remix / effects reuse cached stills — skip stills gate (stale clickbait pop
+  // metadata must not block audio-only or captions-only remux).
+  const skipStillsPreflight = opts.skipStillsPreflight === true || reuseSceneImages
   const captionMode =
     opts.captionMode === 'zapcap-only' ? 'zapcap-only' : opts.captionMode === 'auto' ? 'auto' : 'free'
   const imageProviderOverride =
@@ -579,27 +583,30 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         : null
 
     // Stills gate — stop before ffmpeg when placeholders / clickbait pop sources fail hard.
-    const stillsManifest = scenesForVideo.map((s) => ({
-      index: s.index,
-      durationSec: s.durationSec,
-      caption: s.caption,
-      imageSource: s.imageSource || null,
-      imageKey: s.imageKey || null,
-      imageTitle: s.imageTitle || null,
-      imageUrl: s.imageUrl || null,
-      sourcePage: s.sourcePage || null,
-      imageQuery: s.imageQueryUsed || s.imageQuery || null,
-      imageQueryUsed: s.imageQueryUsed || null,
-    }))
-    await applyEofShortQualityStillsPreflightToJob(jobId, {
-      mode: qualityGateMode,
-      blockOnFail: true,
-      jobSnapshot: { narrationManifest: stillsManifest },
-      renderMeta: {
-        hasSecondarySubject: secondaryPeople.length > 0,
-        secondarySceneIndex,
-      },
-    })
+    // Skipped on remux paths that reuse scene images (Remove song / remix / captions / effects).
+    if (!skipStillsPreflight) {
+      const stillsManifest = scenesForVideo.map((s) => ({
+        index: s.index,
+        durationSec: s.durationSec,
+        caption: s.caption,
+        imageSource: s.imageSource || null,
+        imageKey: s.imageKey || null,
+        imageTitle: s.imageTitle || null,
+        imageUrl: s.imageUrl || null,
+        sourcePage: s.sourcePage || null,
+        imageQuery: s.imageQueryUsed || s.imageQuery || null,
+        imageQueryUsed: s.imageQueryUsed || null,
+      }))
+      await applyEofShortQualityStillsPreflightToJob(jobId, {
+        mode: qualityGateMode,
+        blockOnFail: true,
+        jobSnapshot: { narrationManifest: stillsManifest },
+        renderMeta: {
+          hasSecondarySubject: secondaryPeople.length > 0,
+          secondarySceneIndex,
+        },
+      })
+    }
 
     const rendered = await renderEofProductionVideo({
       jobId,

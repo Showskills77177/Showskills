@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { rankWikimediaCandidates } from '../backend/api/lib/eofWikimediaImages.mjs'
+import {
+  rankWikimediaCandidates,
+  isEofFootballNationQuery,
+} from '../backend/api/lib/eofWikimediaImages.mjs'
 
 describe('eofWikimediaImages ranking', () => {
   it('prefers the current England Tuchel portrait over Mainz 2014', () => {
@@ -73,5 +76,48 @@ describe('eofWikimediaImages ranking', () => {
     ])
     assert.equal(pool.length, 2)
     assert.ok(pool.every((c) => c.year >= year - 1))
+  })
+
+  it('detects nation football queries', () => {
+    assert.equal(isEofFootballNationQuery('England'), true)
+    assert.equal(isEofFootballNationQuery('England national team'), true)
+    assert.equal(isEofFootballNationQuery('Thomas Tuchel'), false)
+    assert.equal(isEofFootballNationQuery('Thomas Tuchel', 'England manager'), false)
+  })
+
+  it('penalizes place/infrastructure stills for nation football queries', () => {
+    const ranked = rankWikimediaCandidates(
+      [
+        {
+          title: 'NATO Headquarters in Brussels Belgium.jpg',
+          imgUrl: 'https://example.com/nato.jpg',
+          year: 2024,
+          dateMs: Date.UTC(2024, 0, 1),
+        },
+        {
+          title: 'English beer festival London.jpg',
+          imgUrl: 'https://example.com/beer.jpg',
+          year: 2023,
+          dateMs: Date.UTC(2023, 5, 1),
+        },
+        {
+          title: 'England national football team kit 2024.jpg',
+          imgUrl: 'https://example.com/kit.jpg',
+          year: 2024,
+          dateMs: Date.UTC(2024, 2, 1),
+        },
+        {
+          title: 'England v France Wembley match 2024.jpg',
+          imgUrl: 'https://example.com/match.jpg',
+          year: 2024,
+          dateMs: Date.UTC(2024, 2, 10),
+        },
+      ],
+      'England',
+      'England national team',
+    )
+    assert.ok(ranked.length >= 1)
+    assert.ok(ranked.every((c) => !/nato|beer|railway/i.test(c.title)))
+    assert.match(ranked[0].title, /football|kit|match|england/i)
   })
 })

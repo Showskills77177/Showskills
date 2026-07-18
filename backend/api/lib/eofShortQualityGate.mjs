@@ -64,6 +64,7 @@ function envKey(...names) {
  *   warnings: string[],
  *   checks: EofQualityCheck[],
  *   visionUsed: boolean,
+ *   visionEnabled?: boolean,
  * }} EofQualityGateResult
  */
 
@@ -129,6 +130,7 @@ export function parseEofQualityGate(raw) {
     warnings,
     checks,
     visionUsed: Boolean(obj.visionUsed),
+    visionEnabled: obj.visionEnabled == null ? undefined : Boolean(obj.visionEnabled),
   }
 }
 
@@ -160,6 +162,93 @@ function tokenize(text) {
     .filter((w) => w.length >= 2)
 }
 
+/** Stopwords that are never treated as named entities for caption↔VO matching. */
+const CAPTION_ENTITY_STOP = new Set([
+  'the',
+  'a',
+  'an',
+  'and',
+  'or',
+  'but',
+  'for',
+  'with',
+  'from',
+  'this',
+  'that',
+  'these',
+  'those',
+  'his',
+  'her',
+  'their',
+  'after',
+  'before',
+  'about',
+  'into',
+  'over',
+  'under',
+  'completely',
+  'different',
+  'topic',
+  'today',
+  'tonight',
+  'breaking',
+  'latest',
+  'news',
+  'update',
+  'says',
+  'said',
+])
+
+/** High-signal football names / nations used to bridge paraphrases (boss ↔ Tuchel). */
+const CAPTION_ENTITY_NAME_RE =
+  /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|ney(mar)?|rooney|beckham|tuchel|guardiola|klopp|mourinho|ancelotti|arteta|slot|southgate|deschamps|scaloni|england|france|germany|spain|italy|brazil|portugal|netherlands|argentina|belgium|croatia|scotland|wales|ireland)\b/gi
+
+const COACH_ROLE_RE = /\b(boss|manager|coach|gaffer|head\s*coach)\b/i
+
+/**
+ * Named-entity / proper-noun tokens for soft caption↔VO matching.
+ * Prefers capitalized words, plus known football surnames/nations in any case.
+ * @param {string} text
+ * @returns {Set<string>}
+ */
+export function extractCaptionEntities(text) {
+  const raw = String(text || '')
+  const out = new Set()
+  for (const m of raw.matchAll(/\b([A-Z][a-zA-Z'-]{2,})\b/g)) {
+    const w = m[1].toLowerCase()
+    if (!CAPTION_ENTITY_STOP.has(w)) out.add(w)
+  }
+  for (const m of raw.matchAll(CAPTION_ENTITY_NAME_RE)) {
+    out.add(String(m[0]).toLowerCase())
+  }
+  return out
+}
+
+/**
+ * @param {string} caption
+ * @param {string} narration
+ * @returns {string[]}
+ */
+export function sharedCaptionEntities(caption, narration) {
+  const a = extractCaptionEntities(caption)
+  const b = extractCaptionEntities(narration)
+  const shared = []
+  for (const w of a) {
+    if (b.has(w)) shared.push(w)
+  }
+  return shared
+}
+
+/** Caption uses a role paraphrase (England boss) while VO names a coach/manager. */
+function hasCoachRoleParaphraseBridge(caption, narration) {
+  const c = String(caption || '')
+  const n = String(narration || '')
+  if (!COACH_ROLE_RE.test(c)) return false
+  // Fresh regex — avoid sticky lastIndex from the global CAPTION_ENTITY_NAME_RE.
+  const nameHit = n.match(CAPTION_ENTITY_NAME_RE)
+  return Boolean(nameHit?.length) || /\b(manager|coach|gaffer|head\s*coach)\b/i.test(n)
+}
+
 /** Word overlap 0–1 (Jaccard on caption tokens vs narration). */
 export function captionNarrationOverlap(caption, narration) {
   const cap = new Set(tokenize(caption))
@@ -174,19 +263,47 @@ export function captionNarrationOverlap(caption, narration) {
 }
 
 /**
- * Rough “looks like a typo / wrong script” when caption diverges from VO.
+ * Soft caption↔VO divergence: paraphrases warn; only severe mismatches fail.
+ * Fail when near-zero overlap with no shared entities / role bridge, or when
+ * caption and VO name disjoint proper nouns (entity conflict).
+ *
+ * @param {string} caption
+ * @param {string} narration
+ * @returns {'ok'|'warn'|'fail'}
+ */
+export function captionMismatchSeverity(caption, narration) {
+  const c = String(caption || '').trim()
+  const n = String(narration || '').trim()
+  if (!c || !n) return 'ok'
+  // Short captions that are intentional hooks can differ — only flag longer captions.
+  if (tokenize(c).length < 4) return 'ok'
+  const overlap = captionNarrationOverlap(c, n)
+  if (overlap >= 0.35) return 'ok'
+
+  const shared = sharedCaptionEntities(c, n)
+  if (shared.length > 0) return 'warn'
+  if (hasCoachRoleParaphraseBridge(c, n)) return 'warn'
+
+  const capEnt = extractCaptionEntities(c)
+  const narEnt = extractCaptionEntities(n)
+  const entityConflict = capEnt.size > 0 && narEnt.size > 0
+  // Disjoint named entities + low overlap → hard fail (wrong person / topic).
+  // Threshold allows light stopword overlap (“after/the”) without clearing a conflict.
+  if (entityConflict && overlap < 0.34) return 'fail'
+  // Near-zero lexical overlap with no bridge → hard fail.
+  if (overlap < 0.12) return 'fail'
+  return 'warn'
+}
+
+/**
+ * True only for severe caption↔VO mismatches (hard-fail gate).
+ * Soft paraphrases (“England boss” vs Tuchel VO) return false — use
+ * {@link captionMismatchSeverity} for warn vs fail.
  * @param {string} caption
  * @param {string} narration
  */
 export function captionLooksMismatched(caption, narration) {
-  const c = String(caption || '').trim()
-  const n = String(narration || '').trim()
-  if (!c || !n) return false
-  // Short captions that are intentional hooks can differ — only flag longer captions.
-  if (tokenize(c).length < 4) return false
-  const overlap = captionNarrationOverlap(c, n)
-  // Caption should mostly reuse VO words when both are present.
-  return overlap < 0.35
+  return captionMismatchSeverity(caption, narration) === 'fail'
 }
 
 /**
@@ -272,13 +389,22 @@ export function collectEofShortQualityPlanChecks(job, renderMeta = {}) {
         })
         continue
       }
-      if (nar && captionLooksMismatched(effectiveCap, nar)) {
-        checks.push({
-          id: `captions_mismatch_${i}`,
-          severity: 'fail',
-          message: `Scene ${i + 1} caption does not match voiceover text (possible wrong script / spelling)`,
-          detail: `overlap=${captionNarrationOverlap(effectiveCap, nar).toFixed(2)}`,
-        })
+      if (nar) {
+        const mismatch = captionMismatchSeverity(effectiveCap, nar)
+        if (mismatch === 'fail' || mismatch === 'warn') {
+          const shared = sharedCaptionEntities(effectiveCap, nar)
+          checks.push({
+            id: `captions_mismatch_${i}`,
+            severity: mismatch,
+            message:
+              mismatch === 'fail'
+                ? `Scene ${i + 1} caption does not match voiceover text (possible wrong script / spelling)`
+                : `Scene ${i + 1} caption is a loose paraphrase of the voiceover (review wording)`,
+            detail: `overlap=${captionNarrationOverlap(effectiveCap, nar).toFixed(2)}${
+              shared.length ? ` shared=${shared.slice(0, 4).join(',')}` : ''
+            }`,
+          })
+        }
       }
     }
 
@@ -779,6 +905,7 @@ export function finalizeEofQualityGate(checks, opts = {}) {
     warnings,
     checks,
     visionUsed: checks.some((c) => String(c.id).startsWith('vision_') && c.severity !== 'skip'),
+    visionEnabled: isEofShortQualityVisionEnabled(),
   }
 }
 
@@ -800,6 +927,7 @@ function disabledGateResult() {
       },
     ],
     visionUsed: false,
+    visionEnabled: false,
   }
 }
 
