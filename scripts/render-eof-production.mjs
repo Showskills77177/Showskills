@@ -62,6 +62,7 @@ async function main() {
       topic: values.topic.trim(),
       createdBy: 'cli',
       voicePreset: values.voice,
+      mode: 'full',
     })
     jobId = job.id
     console.log(`Created job ${jobId} — ${job.title}`)

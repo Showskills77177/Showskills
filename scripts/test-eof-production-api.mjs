@@ -22,10 +22,12 @@ async function main() {
 
   await ensureEofProductionSchema()
 
+  // Draft-first is the admin default (empty scenes). Smoke needs a full adapted script.
   const job = await createEofProductionJob({
     topic: 'Lionel Messi',
     createdBy: 'test',
     format: 'listicle',
+    mode: 'full',
   })
   if (!job?.script?.scenes?.length) throw new Error('no scenes')
   if (!job.script.scenes.every((s) => s.caption && s.imageQuery)) throw new Error('scenes missing caption/image')
@@ -34,6 +36,7 @@ async function main() {
     topic: 'Mbappe',
     createdBy: 'test',
     format: 'debate',
+    mode: 'full',
   })
   if (debate.script.format !== 'debate') throw new Error('format not applied')
 
@@ -56,6 +59,7 @@ async function main() {
   const job2 = await createEofProductionJob({
     topic: 'Delete via API',
     createdBy: 'test',
+    mode: 'full',
   })
   const delReq = {
     method: 'POST',
@@ -68,10 +72,33 @@ async function main() {
   const delPayload = JSON.parse(delRes.body)
   if (delRes.statusCode !== 200 || !delPayload.ok) throw new Error('production DELETE failed')
 
-  // Image-only video build can start without prior audio
+  // Draft-first: build-short must refuse empty scenes (adapt first).
+  const draftOnly = await createEofProductionJob({
+    topic: 'Draft only short',
+    createdBy: 'test',
+    mode: 'draft',
+  })
+  if (draftOnly?.script?.scenes?.length) throw new Error('draft mode should not adapt scenes')
+  const draftBuildReq = {
+    method: 'POST',
+    headers: { cookie: `admin_session=${token}` },
+    url: '/api/admin/eof-production',
+    body: { action: 'build-short', jobId: draftOnly.id },
+  }
+  const draftBuildRes = { statusCode: 200, headers: {}, setHeader() {}, end(body) { this.body = body } }
+  await handler(draftBuildReq, draftBuildRes)
+  if (draftBuildRes.statusCode !== 400) {
+    throw new Error(
+      `build-short on draft should 400, got ${draftBuildRes.statusCode}: ${draftBuildRes.body}`,
+    )
+  }
+  await deleteEofProductionJob(draftOnly.id)
+
+  // Full script: image Short build can start without prior audio (async 202).
   const job3 = await createEofProductionJob({
     topic: 'Image only short',
     createdBy: 'test',
+    mode: 'full',
   })
   const videoReq = {
     method: 'POST',
@@ -84,12 +111,22 @@ async function main() {
   if (videoRes.statusCode !== 202) {
     throw new Error(`build-short should accept async (202), got ${videoRes.statusCode}: ${videoRes.body}`)
   }
+  // Wait for background work to leave rendering* before deleting the job dir (avoids TTS ENOENT races).
+  {
+    const deadline = Date.now() + 180_000
+    while (Date.now() < deadline) {
+      const j = await getEofProductionJob(job3.id)
+      if (!j || !['rendering', 'rendering_video'].includes(j.status)) break
+      await new Promise((r) => setTimeout(r, 750))
+    }
+  }
 
   // Durable video restore (simulates cold Vercel instance)
   if (await isFfmpegAvailable()) {
     const durableJob = await createEofProductionJob({
       topic: 'Durable video restore',
       createdBy: 'test',
+      mode: 'full',
     })
     const videoPath = eofProductionVideoAbsPath(durableJob.id)
     mkdirSync(dirname(videoPath), { recursive: true })

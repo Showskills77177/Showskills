@@ -28,6 +28,7 @@ const job = await createEofProductionJob({
   topic: 'Pipeline test',
   createdBy: 'test',
   format: 'listicle',
+  mode: 'full',
 })
 const workDir = eofProductionWorkDir(job.id)
 mkdirSync(workDir, { recursive: true })
