@@ -1,5 +1,13 @@
 # Cloudflare Pages — staging / preview SPA only (API + crons stay on Vercel).
-# Dashboard: set Production branch = staging. Do NOT attach showskills.co.uk.
+# Dashboard (exact):
+#   Production branch = staging
+#   Build command = bash scripts/pages-build.sh
+#   Output directory = dist
+#   Build system = v3
+#   SKIP_DEPENDENCY_INSTALL = 1
+#   NODE_VERSION = 22.16.0
+#   VERCEL_API_ORIGIN = https://<vercel-staging>.vercel.app
+# Do NOT attach showskills.co.uk. See docs/DEPLOY-CLOUDFLARE.md.
 name = "showskills-staging"
 compatibility_date = "2025-07-01"
 pages_build_output_dir = "dist"
