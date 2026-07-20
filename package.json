@@ -3,8 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
+    "build:pages": "bash scripts/pages-build.sh",
     "dev:api": "node scripts/kill-port.mjs 3000 && node server.js",
     "dev:all": "node scripts/kill-port.mjs 3000 && concurrently -k \"npm run dev\" \"node scripts/kill-port.mjs 3000 && node server.js\"",
     "dev:integration": "node scripts/dev-cashflows-integration.mjs",

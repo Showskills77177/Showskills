@@ -8,8 +8,8 @@ function stagingSeoBlockPlugin() {
     name: 'staging-seo-block',
     transformIndexHtml(html) {
       const block = shouldBlockSearchIndexingAtBuild({
-        siteUrl: process.env.SITE_URL || process.env.VERCEL_URL || '',
-        gitRef: process.env.VERCEL_GIT_COMMIT_REF || '',
+        siteUrl: process.env.SITE_URL || process.env.VERCEL_URL || process.env.CF_PAGES_URL || '',
+        gitRef: process.env.VERCEL_GIT_COMMIT_REF || process.env.CF_PAGES_BRANCH || '',
         flag: process.env.VITE_BLOCK_SEARCH_INDEXING || '',
       })
       if (!block) return html

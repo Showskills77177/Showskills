@@ -12,12 +12,14 @@ describe('staging site unlisting', () => {
   it('detects staging host fragment', () => {
     assert.equal(isShowSkillsStagingHost('vercelshowskillstesteasynow.online'), true)
     assert.equal(isShowSkillsStagingHost('https://vercelshowskillstesteasynow.online/account'), true)
+    assert.equal(isShowSkillsStagingHost('showskills-staging.pages.dev'), true)
     assert.equal(isShowSkillsStagingHost('showskills.co.uk'), false)
     assert.equal(isShowSkillsStagingHost('localhost'), false)
   })
 
   it('blocks search indexing for staging host only', () => {
     assert.equal(shouldBlockSearchIndexingForHost('vercelshowskillstesteasynow.online'), true)
+    assert.equal(shouldBlockSearchIndexingForHost('showskills-staging.pages.dev'), true)
     assert.equal(shouldBlockSearchIndexingForHost('showskills.co.uk'), false)
   })
 

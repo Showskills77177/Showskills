@@ -1,0 +1,11 @@
+# Cloudflare Pages — staging / preview SPA only (API + crons stay on Vercel).
+# Dashboard: set Production branch = staging. Do NOT attach showskills.co.uk.
+name = "showskills-staging"
+compatibility_date = "2025-07-01"
+pages_build_output_dir = "dist"
+
+# Set VERCEL_API_ORIGIN in the Pages dashboard (Preview + Production for this project)
+# to your Vercel staging origin, e.g. https://your-app-staging.vercel.app (no trailing slash).
+# Optional fallback when dashboard vars are missing (leave empty in repo):
+# [vars]
+# VERCEL_API_ORIGIN = ""

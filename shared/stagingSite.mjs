@@ -11,7 +11,11 @@ export const STAGING_SITEMAP_XML =
 
 /** @param {string} [hostnameOrUrl] */
 export function isShowSkillsStagingHost(hostnameOrUrl = '') {
-  return String(hostnameOrUrl).toLowerCase().includes(SHOWSKILLS_STAGING_HOST_FRAGMENT)
+  const host = String(hostnameOrUrl).toLowerCase()
+  if (host.includes(SHOWSKILLS_STAGING_HOST_FRAGMENT)) return true
+  // Cloudflare Pages preview project (*.pages.dev) — never production.
+  if (host.includes('.pages.dev')) return true
+  return false
 }
 
 /** True when crawlers must not index this hostname (staging test site). */
@@ -27,6 +31,8 @@ export function shouldBlockSearchIndexingAtBuild({ siteUrl = '', gitRef = '', fl
   const normalizedFlag = String(flag || '').trim().toLowerCase()
   if (normalizedFlag === '1' || normalizedFlag === 'true' || normalizedFlag === 'yes') return true
   if (String(gitRef || '').toLowerCase() === 'staging') return true
+  // Cloudflare Pages always injects CF_PAGES=1 for this preview-only project.
+  if (String(process.env.CF_PAGES || '').trim() === '1') return true
   return isShowSkillsStagingHost(siteUrl)
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SHIRT_PRIZE_REVEAL_VIEW_SECONDS } from '../../shared/shirtPrizeReveal.mjs'
+import { apiFetch } from '../lib/api'
 import { ShirtGiveawayJerseyImagery } from './ShirtGiveawayJerseyImagery'
 
 function formatCountdown(seconds) {
@@ -31,7 +32,7 @@ export function ShirtPrizeRevealViewer({ previewToken, entryNumber: entryNumberP
     setError('')
     setPhase('loading')
     try {
-      const res = await fetch('/api/shirt-prize-reveal', {
+      const res = await apiFetch('/api/shirt-prize-reveal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: previewToken }),

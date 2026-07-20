@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PRIZE_REVEAL_VIEW_SECONDS } from '../../shared/prizeReveal.mjs'
+import { apiFetch } from '../lib/api'
 import { LegacyBundlePrizeStudio } from './LegacyBundlePrizeStudio'
 
 function formatCountdown(seconds) {
@@ -37,7 +38,7 @@ export function PrizeRevealViewer({ resumeToken, orderRef: orderRefProp = '' }) 
     setGuardFlash(false)
     setPhase('loading')
     try {
-      const res = await fetch('/api/prize-reveal', {
+      const res = await apiFetch('/api/prize-reveal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: resumeToken }),
