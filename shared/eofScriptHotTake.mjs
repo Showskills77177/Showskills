@@ -11,7 +11,7 @@ export const EOF_SHORTS_HOT_TAKE_VOICE = `HOT TAKE BAR (non-negotiable for Scrip
 - Every script needs: (1) WHO + CONFLICT in line 1, (2) ONE concrete stake (selection, tactics, pride, result, quote), (3) a sharp agree/disagree CTA.
 - Do NOT paste or lightly rewrite an article. Transform the brief into a spoken argument.
 - TIMELY: prefer what just happened / what was just said. Avoid timeless career fluff unless the format is timeline.
-- If the desk brief is thin, still pick the sharpest defensible angle — never fill with "fans are arguing" empty glue.`
+- If the desk brief is thin, still pick the sharpest defensible angle — never fill with "fans are arguing" empty glue, and never invent transfers/retirements/comebacks/injuries/sackings.`
 
 const ARTICLE_GLUE =
   /\b(that is the football story fans are arguing about|fans are arguing about right now|ignore the noise|strip (away )?the (tribal )?noise|the result changes the table talk|who comes out of this looking stronger|this is the football story|just another chapter|most fans still miss)\b/i

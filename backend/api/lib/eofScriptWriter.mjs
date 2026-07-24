@@ -56,6 +56,10 @@ import {
   EOF_SHORTS_HOT_TAKE_VOICE,
   scoreDraftHotTake,
 } from '../../../shared/eofScriptHotTake.mjs'
+import {
+  EOF_SHORTS_FACTUALITY_VOICE,
+  scoreDraftFactuality,
+} from '../../../shared/eofScriptFactuality.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -402,8 +406,8 @@ function classifyScriptFailureProvider(detail) {
 const DRAFT_FLUFF_RE =
   /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
-/** Prefer punchy Shorts VO — reject fluff, stubs, and vague bookish copy. */
-function isWeakDraft(text, format = '', topic = '') {
+/** Prefer punchy Shorts VO — reject fluff, stubs, vague bookish copy, and invented news. */
+function isWeakDraft(text, format = '', topic = '', deskBrief = '') {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
   if (words < 45) return true
@@ -413,6 +417,8 @@ function isWeakDraft(text, format = '', topic = '') {
   if (/\b(NFL|NBA|MLB|NHL)\b/.test(t)) return true
   const direct = scoreDraftDirectness(t, { format, topic })
   if (!direct.pass && direct.score < 5.5) return true
+  const fact = scoreDraftFactuality(t, { format, topic, deskBrief })
+  if (!fact.pass) return true
   return false
 }
 
@@ -797,19 +803,32 @@ export async function writeEofPlainTextDraft({
       )
     } catch (e) {
       console.warn('[eof-script] judge failed', writerId, e instanceof Error ? e.message : e)
-      // Never auto-accept on judge API errors — local directness still gates quality.
+      // Never auto-accept on judge API errors — local gates still block waffle / invented news.
       const local = scoreDraftDirectness(ai.plainTextDraft, { format: fmt, topic: t })
+      const hot = scoreDraftHotTake(ai.plainTextDraft, { format: fmt, topic: t })
+      const fact = scoreDraftFactuality(ai.plainTextDraft, {
+        format: fmt,
+        topic: t,
+        deskBrief: deskBriefForJudge,
+      })
       judge = {
         skipped: false,
-        pass: local.pass,
-        overall: local.score,
-        merit: local.score,
-        interest: local.score,
+        pass: local.pass && hot.pass && fact.pass,
+        overall: Math.min(local.score, hot.score, fact.score),
+        merit: Math.min(local.score, fact.score),
+        interest: hot.score,
         value: local.score,
         directness: local.score,
-        reasons: ['Judge API error — local directness gate', ...local.reasons],
-        rewriteHints: local.rewriteHints,
-        judgeProvider: 'local-directness',
+        hotTake: hot.score,
+        factuality: fact.score,
+        reasons: [
+          'Judge API error — local directness + hot-take + factuality gates',
+          ...local.reasons,
+          ...hot.reasons,
+          ...fact.reasons,
+        ].slice(0, 7),
+        rewriteHints: [...local.rewriteHints, ...hot.rewriteHints, ...fact.rewriteHints].slice(0, 6),
+        judgeProvider: 'local-directness+hot-take+factuality',
         threshold: 6.5,
       }
     }
@@ -900,7 +919,7 @@ export async function writeEofPlainTextDraft({
         softBest = softBest || { ...ai, deskSources }
         continue
       }
-      if (isWeakDraft(ai.plainTextDraft, fmt, t)) {
+      if (isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge)) {
         softBest = softBest || { ...ai, deskSources }
         failures.push(`[${id}] soft-weak draft kept as candidate`)
         console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
@@ -916,7 +935,7 @@ export async function writeEofPlainTextDraft({
         )
         try {
           const rewrittenAi = await rewriteWithFeedback(id, ai.plainTextDraft, judge, 0.12)
-          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft, fmt, t)) {
+          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft, fmt, t, deskBriefForJudge)) {
             ;({ candidate, judge } = await scoreAndMaybeKeep(rewrittenAi, id))
             if (judge && !judge.skipped && judge.pass && (!autoMode || isExcellentJudge(judge, excellentMin))) {
               return candidate
@@ -950,6 +969,7 @@ export async function writeEofPlainTextDraft({
                     'First line: names + concrete claim or response',
                     'Use said / hit back / responded — no career essay',
                     'More concrete desk-brief facts',
+                    'Do NOT invent transfers/retirements/comebacks/injuries/sackings',
                     'Sharper agree/disagree CTA',
                   ],
                   merit: 5,
@@ -960,7 +980,7 @@ export async function writeEofPlainTextDraft({
                 },
                 0.08,
               )
-              if (!escalated || isWeakDraft(escalated.plainTextDraft, fmt, t)) continue
+              if (!escalated || isWeakDraft(escalated.plainTextDraft, fmt, t, deskBriefForJudge)) continue
               const scored = await scoreAndMaybeKeep(escalated, nextId)
               baseText = scored.candidate.plainTextDraft
               baseJudge = scored.judge
@@ -1010,7 +1030,7 @@ export async function writeEofPlainTextDraft({
           `${id} auto-fallback draft`,
         )
         const ai = finalizeAiDraft(raw, t, resolvedTopic)
-        if (!ai || isWeakDraft(ai.plainTextDraft, fmt, t)) continue
+        if (!ai || isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge)) continue
         const { candidate, judge } = await scoreAndMaybeKeep(ai, id)
         if (isExcellentJudge(judge, excellentMin) || judge?.pass) return candidate
       } catch (e) {
@@ -1022,10 +1042,15 @@ export async function writeEofPlainTextDraft({
   if (softBest) {
     const hot = scoreDraftHotTake(softBest.plainTextDraft, { format: fmt, topic: t })
     const direct = scoreDraftDirectness(softBest.plainTextDraft, { format: fmt, topic: t })
-    if (productionBar && (!hot.pass || !direct.pass || softBest.source === 'template')) {
-      // Overnight Script Maker must not ship glue templates / soft waffle.
+    const fact = scoreDraftFactuality(softBest.plainTextDraft, {
+      format: fmt,
+      topic: t,
+      deskBrief: deskBriefForJudge,
+    })
+    if (productionBar && (!hot.pass || !direct.pass || !fact.pass || softBest.source === 'template')) {
+      // Overnight Script Maker must not ship glue templates / soft waffle / invented news.
       throw new Error(
-        `Script Maker rejected soft draft for “${t.slice(0, 60)}”: ${(hot.reasons[0] || direct.reasons[0] || 'failed hot-take bar')}. ${failures.slice(0, 2).join(' · ')}`,
+        `Script Maker rejected soft draft for “${t.slice(0, 60)}”: ${(fact.reasons[0] || hot.reasons[0] || direct.reasons[0] || 'failed hot-take bar')}. ${failures.slice(0, 2).join(' · ')}`,
       )
     }
     return {
@@ -1159,12 +1184,15 @@ ${EOF_SHORTS_DIRECT_VOICE}
 
 ${EOF_SHORTS_HOT_TAKE_VOICE}
 
+${EOF_SHORTS_FACTUALITY_VOICE}
+
 SHORTS LENGTH:
 - 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
 - Short sentences. Average under 16 words. Max one clause per beat.
 - Sound like Sky Sports News / BBC Sport desk at 10pm — hot, sharp, direct.
 - FIRST SENTENCE must name the player/coach AND the claim or conflict.
-- FACT LOCK: Use ONLY names, scores, clubs, and claims in the DESK BRIEF / current draft. Do NOT invent scores, fees, or fake quotes.
+- FACT LOCK: Use ONLY names, scores, clubs, and claims in the DESK BRIEF / current draft. Do NOT invent scores, fees, fake quotes, transfers, retirements, comebacks, injuries, or sackings.
+- Do NOT invent news events. If unsure, do not claim it happened — prefer opinion/commentary framing.
 - Transform the desk brief into a spoken ARGUMENT. Never copy-paste an article.
 - If PRODUCER DIRECTION is provided, follow it closely while keeping Shorts length and fact lock.
 - Structure for format "${format}": ${draftFormatGuide(format)}
@@ -1199,13 +1227,14 @@ PREVIOUS DRAFT (avoid copying):\n"""\n${prev.slice(0, 700)}\n"""\n`
         : ''
 
   const user = `Topic / headline: ${topic}
-${desk ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${desk}\n` : '\nDESK BRIEF: (none returned — do not invent scores or quotes; keep it cautious.)\n'}${regenBlock}
+${desk ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${desk}\n` : '\nDESK BRIEF: (none returned — do not invent scores, quotes, transfers, retirements, comebacks, injuries, or sackings; keep it cautious commentary only.)\n'}${regenBlock}
 Write the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
 }
 
-function buildPolishPrompt({ topic, format, draft }) {
+function buildPolishPrompt({ topic, format, draft, deskBrief = '' }) {
+  const desk = String(deskBrief || '').trim().slice(0, 1400)
   const system = `You are a ruthless YouTube Shorts editor for Eyes Of Football.
 
 Rewrite the draft into a DIRECT hot-take spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
@@ -1214,6 +1243,8 @@ ${EOF_SHORTS_DIRECT_VOICE}
 
 ${EOF_SHORTS_HOT_TAKE_VOICE}
 
+${EOF_SHORTS_FACTUALITY_VOICE}
+
 Rules:
 - 90–130 words. Cut every soft phrase, career waffle, and article glue.
 - First line: names + the conflict (who hit back / what cost the win / what was just said).
@@ -1221,11 +1252,12 @@ Rules:
 - Short spoken sentences. No book language.
 - Always football, never soccer. Never NFL.
 - Keep one fight CTA question at the end.
+- Do NOT invent transfers, retirements, comebacks, injuries, or sackings absent from the DESK BRIEF.
 - Format intent: ${format}. ${draftFormatGuide(format)}
 - Output the FULL improved voiceover only.`
 
   const user = `Topic: ${topic}
-
+${desk ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond):\n${desk}\n` : ''}
 Draft to tighten into a hot take:
 """
 ${draft}
@@ -1236,25 +1268,29 @@ Return only the improved FULL voiceover.`
   return { system, user }
 }
 
-function buildHotTakeRefinePrompt({ topic, format, draft }) {
+function buildHotTakeRefinePrompt({ topic, format, draft, deskBrief = '' }) {
+  const desk = String(deskBrief || '').trim().slice(0, 1400)
   const system = `Final Eyes Of Football pass — HOT TAKE refine only.
 
 You receive a draft that already passed a polish. Make it bite harder WITHOUT inventing facts.
 
 ${EOF_SHORTS_HOT_TAKE_VOICE}
 
+${EOF_SHORTS_FACTUALITY_VOICE}
+
 Rules:
-- Keep every verified name/score/club/claim from the draft.
+- Keep every verified name/score/club/claim from the draft AND desk brief.
 - Line 1 must punch: who + conflict.
 - Ensure a concrete stake (tactics / selection / pride / result / quote).
-- Ensure a “now” signal (just / after / according to / hit back…).
+- Ensure a “now” signal (just / after / according to / hit back…) ONLY when the brief supports a live event — otherwise use opinion energy, not fake breaking news.
 - Kill any remaining template glue.
+- Never invent retirements, comebacks, transfers, injuries, or sackings.
 - 90–130 words. One CTA question.
 - Format: ${format}.
 - Output the FULL voiceover only.`
 
   const user = `Topic: ${topic}
-
+${desk ? `\nDESK BRIEF (SOURCE OF TRUTH):\n${desk}\n` : ''}
 Draft:
 """
 ${draft}
@@ -1340,6 +1376,7 @@ async function writeDraftPipeline({
         format,
         draft: text,
         temperature: polishTemperature,
+        deskBrief: researchCtx,
       })
       const polishedWords = wordCount(polished)
       const draftWords = wordCount(text)
@@ -1366,6 +1403,7 @@ async function writeDraftPipeline({
         format,
         draft: text,
         temperature: Math.min(0.4, polishTemperature + 0.08),
+        deskBrief: researchCtx,
       })
       const refinedWords = wordCount(refined)
       const baseWords = wordCount(text)
@@ -1445,8 +1483,15 @@ async function writeDraftWithProvider({
   throw new Error(`unknown provider ${provider}`)
 }
 
-async function hotTakeRefineWithProvider({ provider, topic, format, draft, temperature = 0.32 }) {
-  const { system, user } = buildHotTakeRefinePrompt({ topic, format, draft })
+async function hotTakeRefineWithProvider({
+  provider,
+  topic,
+  format,
+  draft,
+  temperature = 0.32,
+  deskBrief = '',
+}) {
+  const { system, user } = buildHotTakeRefinePrompt({ topic, format, draft, deskBrief })
   if (provider === 'xai') {
     return cleanDraftText(await xaiTextCompletion({ system, user, temperature }))
   }
@@ -1475,8 +1520,15 @@ async function hotTakeRefineWithProvider({ provider, topic, format, draft, tempe
   throw new Error(`unknown provider ${provider}`)
 }
 
-async function polishDraftWithProvider({ provider, topic, format, draft, temperature = 0.3 }) {
-  const { system, user } = buildPolishPrompt({ topic, format, draft })
+async function polishDraftWithProvider({
+  provider,
+  topic,
+  format,
+  draft,
+  temperature = 0.3,
+  deskBrief = '',
+}) {
+  const { system, user } = buildPolishPrompt({ topic, format, draft, deskBrief })
   if (provider === 'xai') {
     return cleanDraftText(await xaiTextCompletion({ system, user, temperature }))
   }

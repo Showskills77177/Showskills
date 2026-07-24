@@ -19,6 +19,11 @@ import {
   scoreDraftHotTake,
   mergeHotTakeIntoVerdict,
 } from '../../../shared/eofScriptHotTake.mjs'
+import {
+  EOF_SHORTS_FACTUALITY_VOICE,
+  scoreDraftFactuality,
+  mergeFactualityIntoVerdict,
+} from '../../../shared/eofScriptFactuality.mjs'
 
 function envKey(...names) {
   for (const name of names) {
@@ -48,10 +53,10 @@ export function eofScriptJudgeStatus() {
       mode === 'off'
         ? 'Script judge off (EOF_SCRIPT_JUDGE=off) — local directness gate still runs.'
         : isOpenAiConfigured() || isXaiConfigured()
-          ? 'Second-tier judge ready — merit / interest / value / directness (rejects vague waffle).'
+          ? 'Second-tier judge ready — merit / interest / value / directness / factuality (rejects vague waffle + invented news).'
           : isGroqConfigured()
-            ? 'Only Groq keyed — judge can run on Groq; OpenAI/xAI is better as a second model. Local directness always runs.'
-            : 'Local directness gate is on. Add OPENAI_API_KEY or XAI_API_KEY for a stronger second-model judge.',
+            ? 'Only Groq keyed — judge can run on Groq; OpenAI/xAI is better as a second model. Local directness + factuality always run.'
+            : 'Local directness + factuality gates are on. Add OPENAI_API_KEY or XAI_API_KEY for a stronger second-model judge.',
   }
 }
 
@@ -102,6 +107,7 @@ function normalizeVerdict(raw, judgeProvider) {
   const value = clampScore(raw?.value ?? raw?.valuableInfo ?? raw?.valueScore)
   const directness = clampScore(raw?.directness ?? raw?.directnessScore ?? raw?.punch)
   const hotTake = clampScore(raw?.hotTake ?? raw?.bite ?? raw?.punchiness)
+  const factuality = clampScore(raw?.factuality ?? raw?.grounding ?? raw?.factLock)
   const overall =
     clampScore(raw?.overall ?? raw?.score) ||
     Number(
@@ -110,8 +116,9 @@ function normalizeVerdict(raw, judgeProvider) {
           interest +
           value +
           (directness || (merit + interest + value) / 3) +
-          (hotTake || (merit + interest + value) / 3)) /
-        (directness || hotTake ? 5 : 3)
+          (hotTake || (merit + interest + value) / 3) +
+          (factuality || (merit + interest + value) / 3)) /
+        (directness || hotTake || factuality ? 6 : 3)
       ).toFixed(1),
     )
 
@@ -139,14 +146,16 @@ function normalizeVerdict(raw, judgeProvider) {
     interest >= min - 1 &&
     value >= min - 1 &&
     (directness === 0 || directness >= min - 1) &&
-    (hotTake === 0 || hotTake >= min - 1.5)
+    (hotTake === 0 || hotTake >= min - 1.5) &&
+    (factuality === 0 || factuality >= min - 1)
   const pass =
     explicitFail
       ? false
       : explicitPass
         ? overall >= min - 0.5 &&
           (directness === 0 || directness >= min - 1.5) &&
-          (hotTake === 0 || hotTake >= min - 2)
+          (hotTake === 0 || hotTake >= min - 2) &&
+          (factuality === 0 || factuality >= min - 1.5)
         : overall >= min && dimsOk
 
   return {
@@ -157,6 +166,7 @@ function normalizeVerdict(raw, judgeProvider) {
     value,
     directness,
     hotTake,
+    factuality,
     reasons,
     rewriteHints,
     judgeProvider,
@@ -180,12 +190,15 @@ ${EOF_SHORTS_DIRECT_VOICE}
 
 ${EOF_SHORTS_HOT_TAKE_VOICE}
 
+${EOF_SHORTS_FACTUALITY_VOICE}
+
 Score 0–10 on:
-- merit: factual substance, names/events clear, no invented scores/quotes beyond the desk brief
+- merit: factual substance grounded in the desk brief — names/events clear, NO invented scores/quotes/transfers/retirements/comebacks/injuries/sackings beyond the brief
 - interest: would a football fan STOP scrolling? hot take + opinion + stakes (not a news paste)
 - value: truly valuable angle (tactics/selection/pride/quote row) vs empty fluff / career waffle
 - directness: punchy desk copy with concrete claims/responses — NOT soft storytelling
 - hotTake: bite + "now" energy — would people argue in comments?
+- factuality: every asserted career-status / breaking claim appears in DESK BRIEF or topic (else hard fail)
 
 HARD FAIL (pass=false) if:
 - vague / bookish / "journey/narrative/chapter" tone
@@ -194,6 +207,7 @@ HARD FAIL (pass=false) if:
 - zero concrete football claim / stake
 - canned template glue ("fans are arguing about right now", "ignore the noise")
 - article copy-paste with no sharp take
+- invented news: transfers, retirements, comebacks, injuries, sackings, appointments, or "breaking" claims NOT in the desk brief / topic (e.g. inventing a player coming back from retirement)
 
 Return JSON only:
 {
@@ -204,6 +218,7 @@ Return JSON only:
   "value": number,
   "directness": number,
   "hotTake": number,
+  "factuality": number,
   "reasons": string[],
   "rewriteHints": string[]
 }`
@@ -211,7 +226,7 @@ Return JSON only:
   const user = `Topic: ${topic}
 Format: ${format}
 
-DESK BRIEF (ground truth — inventing beyond this hurts merit):
+DESK BRIEF (ground truth — inventing beyond this hurts merit AND factuality):
 ${String(deskBrief || '(none)').slice(0, 3500)}
 
 SCRIPT TO JUDGE:
@@ -219,7 +234,7 @@ SCRIPT TO JUDGE:
 ${String(draft || '').trim().slice(0, 1800)}
 """
 
-Judge merit, interest, value, directness, AND hotTake. Fail soft waffle and news paste even if names appear.`
+Judge merit, interest, value, directness, hotTake, AND factuality. Fail soft waffle, news paste, AND any invented career/news events even if names appear.`
 
   return { system, user }
 }
@@ -308,32 +323,44 @@ export async function judgeEofScriptDraft(input = {}) {
 
   const local = scoreDraftDirectness(draft, { format: input.format, topic: input.topic })
   const hot = scoreDraftHotTake(draft, { format: input.format, topic: input.topic })
+  const fact = scoreDraftFactuality(draft, {
+    format: input.format,
+    topic: input.topic,
+    deskBrief: input.deskBrief,
+  })
   const judgeProvider = resolveScriptJudgeProvider(input.writerProvider)
   if (!judgeProvider) {
-    // Local directness + hot-take gates still block waffle without a second API.
-    const merged = mergeHotTakeIntoVerdict(
-      mergeDirectnessIntoVerdict(
-        {
-          pass: local.pass && hot.pass,
-          overall: Math.min(local.score, hot.score),
-          merit: local.score,
-          interest: hot.score,
-          value: local.score,
-          reasons: [
-            ...(local.pass && hot.pass
-              ? ['Second model unavailable — local directness + hot-take gates only']
-              : []),
-            ...local.reasons,
-            ...hot.reasons,
-          ].slice(0, 6),
-          rewriteHints: [...local.rewriteHints, ...hot.rewriteHints].slice(0, 5),
-          judgeProvider: 'local-directness+hot-take',
-          threshold: passThreshold(),
-          skipped: false,
-        },
-        local,
+    // Local directness + hot-take + factuality gates still block waffle / invented news without a second API.
+    const merged = mergeFactualityIntoVerdict(
+      mergeHotTakeIntoVerdict(
+        mergeDirectnessIntoVerdict(
+          {
+            pass: local.pass && hot.pass && fact.pass,
+            overall: Math.min(local.score, hot.score, fact.score),
+            merit: Math.min(local.score, fact.score),
+            interest: hot.score,
+            value: local.score,
+            reasons: [
+              ...(local.pass && hot.pass && fact.pass
+                ? ['Second model unavailable — local directness + hot-take + factuality gates only']
+                : []),
+              ...local.reasons,
+              ...hot.reasons,
+              ...fact.reasons,
+            ].slice(0, 7),
+            rewriteHints: [...local.rewriteHints, ...hot.rewriteHints, ...fact.rewriteHints].slice(
+              0,
+              6,
+            ),
+            judgeProvider: 'local-directness+hot-take+factuality',
+            threshold: passThreshold(),
+            skipped: false,
+          },
+          local,
+        ),
+        hot,
       ),
-      hot,
+      fact,
     )
     return merged
   }
@@ -355,9 +382,12 @@ export async function judgeEofScriptDraft(input = {}) {
   }
 
   const modelVerdict = normalizeVerdict(raw, judgeProvider)
-  const verdict = mergeHotTakeIntoVerdict(
-    mergeDirectnessIntoVerdict({ ...modelVerdict, skipped: false }, local),
-    hot,
+  const verdict = mergeFactualityIntoVerdict(
+    mergeHotTakeIntoVerdict(
+      mergeDirectnessIntoVerdict({ ...modelVerdict, skipped: false }, local),
+      hot,
+    ),
+    fact,
   )
   console.info(
     '[eof-script-judge]',
@@ -391,6 +421,9 @@ export function appendJudgeFeedbackToContext(context, verdict) {
   )
   bits.push(
     'Rewrite as a HOT TAKE: named conflict, concrete stake (tactics/selection/pride/result/quote), timely now-signal, sharp agree/disagree CTA. No article paste.',
+  )
+  bits.push(
+    'FACT LOCK: Do NOT invent transfers, retirements, comebacks, injuries, sackings, or breaking claims absent from the desk brief. Prefer opinion/commentary on sourced facts.',
   )
   return [context, 'EDITOR JUDGE FEEDBACK (must address):\n' + bits.join('\n')].filter(Boolean).join('\n\n')
 }

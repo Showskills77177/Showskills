@@ -121,6 +121,7 @@ SOURCING RULES:
 - Write like you have read Sky Sports, BBC Sport, ESPN FC, The Athletic, Marca, L'Équipe.
 - Name which desk style the story fits (match fallout, transfer, injury, managerial, World Cup race).
 - Use only widely reported / defensible facts. If a score/quote is uncertain, mark it uncertain — never invent exact scores or fake quotes.
+- Do NOT invent transfers, retirements, comebacks, injuries, sackings, or appointments. If the topic is a legacy/debate angle, keep facts to reputation and known career peaks — put invented live events in "avoid".
 - Always say football — never soccer. Never American football / NFL.
 
 Return JSON only.`
@@ -143,7 +144,7 @@ Return JSON:
   "stakes": "one sentence why fans care now",
   "hookAngle": "the opening hook idea in one line",
   "ctaQuestion": "one sharp comment question",
-  "avoid": ["things not to invent or pad with"]
+  "avoid": ["things not to invent or pad with — e.g. fake transfers, retirements, comebacks, injuries, sackings"]
 }`
 }
 
