@@ -1,4 +1,5 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { EdgeTTS } from 'node-edge-tts'
 import { EOF_VOICE_PRESETS, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
