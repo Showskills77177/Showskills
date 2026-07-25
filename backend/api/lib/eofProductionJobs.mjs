@@ -186,8 +186,8 @@ export async function createEofProductionJob({
   /** 'draft' = plain text only · 'full' = draft + adapt (scheduler) */
   mode = 'draft',
   context = null,
-  /** 'standard' | 'production' — Script Maker uses production (hot-take bar, no templates) */
-  qualityBar = 'standard',
+  /** 'standard' | 'production' — Production UI + Script Maker use production (hard gates, no bollox softBest) */
+  qualityBar = 'production',
 }) {
   await ensureEofProductionSchema()
   let t = String(topic || '').trim()
@@ -297,6 +297,7 @@ export async function regenerateEofProductionDraft(
     regenerate: true,
     previousDraft,
     directorNote: note,
+    qualityBar: job.script?.qualityBar || 'production',
   })
   const resolvedTopic = draft.resolvedTopic || job.topic
   const script = buildEofDraftShell({

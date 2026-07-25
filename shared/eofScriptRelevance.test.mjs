@@ -4,6 +4,7 @@ import {
   scoreDraftRelevance,
   mergeRelevanceIntoVerdict,
   extractPersonLikeNames,
+  detectTopicDrift,
   EOF_SHORTS_RELEVANCE_VOICE,
 } from './eofScriptRelevance.mjs'
 
@@ -39,6 +40,33 @@ describe('eofScriptRelevance', () => {
       JSON.stringify(v.offTopic),
     )
     assert.ok(v.reasons.some((r) => /Off-topic|Insults/i.test(r)), JSON.stringify(v.reasons))
+  })
+
+  it('fails exact Cuccurella→Keegan topic-drift script even when Keegan is in desk headlines', () => {
+    const draft = `Mark Cuccorea's hair is not the focus of any football story here. Kevin Keegan talks about his career highlights, including winning World Player of the Year twice. He also mentions his iconic "I would love it" remark. What's the most iconic moment of Keegan's career - his playing days or his managerial stint with England?`
+    const pollutedBrief = `${CUCCURELLA_BRIEF}
+
+Live desk headlines:
+1. [BBC Sport] Kevin Keegan on career highlights and I would love it
+2. [Sky Sports] Keegan World Player of the Year twice`
+
+    const drift = detectTopicDrift(draft, CUCCURELLA_TOPIC)
+    assert.equal(drift.drift, true, JSON.stringify(drift))
+    assert.ok(drift.foreign.some((n) => /Keegan/i.test(n)), JSON.stringify(drift.foreign))
+
+    const v = scoreDraftRelevance(draft, {
+      topic: CUCCURELLA_TOPIC,
+      orderedTopic: CUCCURELLA_TOPIC,
+      deskBrief: pollutedBrief,
+      format: 'news',
+    })
+    assert.equal(v.pass, false, JSON.stringify(v))
+    assert.equal(v.topicDrift, true)
+    assert.ok(
+      v.offTopic.some((o) => o.kind === 'topic_drift') || v.reasons.some((r) => /Topic drift/i.test(r)),
+      JSON.stringify(v),
+    )
+    assert.ok(!/Keegan/i.test(draft) || v.pass === false)
   })
 
   it('passes grounded Cuccurella hair/son commentary without boxing or insults', () => {

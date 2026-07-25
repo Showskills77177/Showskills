@@ -10,6 +10,7 @@ import {
   buildDraftPrompt,
   buildPolishPrompt,
   buildHotTakeRefinePrompt,
+  scoreLocalScriptGates,
 } from '../backend/api/lib/eofScriptWriter.mjs'
 
 describe('eof auto script quality', () => {
@@ -150,3 +151,39 @@ describe('eof writer input bundle', () => {
     assert.match(refine.user, /90–130 words/)
   })
 })
+
+describe('eof local script gates block topic drift + cross-sport', () => {
+  const topic =
+    'Marc Cuccurella hits back at long-hair criticism — says it is about his autistic son'
+  const brief = `Headline: Cuccurella responds to long-hair criticism
+Facts:
+- Marc Cuccurella hit back at criticism of his long hair
+- He said he keeps it for a reason linked to his autistic son`
+
+  it('rejects exact Keegan pivot even if Keegan headlines pollute the desk brief', () => {
+    const draft = `Mark Cuccorea's hair is not the focus of any football story here. Kevin Keegan talks about his career highlights, including winning World Player of the Year twice. He also mentions his iconic "I would love it" remark. What's the most iconic moment of Keegan's career - his playing days or his managerial stint with England?`
+    const gates = scoreLocalScriptGates(draft, {
+      topic,
+      orderedTopic: topic,
+      format: 'news',
+      deskBrief: `${brief}\n1. [BBC] Kevin Keegan career highlights`,
+    })
+    assert.equal(gates.pass, false, JSON.stringify(gates.reasons))
+    assert.ok(
+      gates.reasons.some((r) => /Topic drift|Keegan|Off-topic/i.test(r)),
+      JSON.stringify(gates.reasons),
+    )
+  })
+
+  it('rejects exact Fury/Joshua + nut-job Cuccurella script', () => {
+    const draft = `Marc Cuccurella hit back at criticism of his long hair, saying it's about his autistic son. You nut job, he's keeping it for a reason. Cuccurella claims it's not a distraction, but a way to show support. Does his hair give him an edge or create issues on the pitch? Tyson Fury recently questioned Anthony Joshua's pride, showing how sensitive these topics can be. Is Cuccurella's unique look a strength or a weakness? Agree or disagree, his hair is staying, and it's for a cause close to his heart.`
+    const gates = scoreLocalScriptGates(draft, {
+      topic,
+      orderedTopic: topic,
+      format: 'quote',
+      deskBrief: brief,
+    })
+    assert.equal(gates.pass, false, JSON.stringify(gates.reasons))
+  })
+})
+

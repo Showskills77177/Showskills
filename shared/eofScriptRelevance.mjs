@@ -5,10 +5,12 @@
  */
 
 export const EOF_SHORTS_RELEVANCE_VOICE = `TOPIC LOCK / RELEVANCE (non-negotiable):
-- Stay INSIDE the football story from the topic + desk brief. One story. One conflict.
-- Do NOT drag in unrelated athletes, sports, or celebrities (boxing, UFC, F1, tennis, NBA, NFL, Hollywood, etc.) unless they already appear in the DESK BRIEF / topic.
-- No free-association analogies ("this reminds me of Fury vs Joshua…") when the brief never mentions them.
-- Named people in the script must be grounded in the topic/brief (or the clear same-story cast). If they are not in the source, drop them.
+- Stay INSIDE the football story from the ORDERED TOPIC. One story. One conflict.
+- Do NOT pivot to a different player/career retrospective (e.g. Cuccurella hair → Kevin Keegan) even if other headlines appear in research.
+- Do NOT drag in unrelated athletes, sports, or celebrities (boxing, UFC, F1, tennis, NBA, NFL, Hollywood, etc.) unless they already appear in the ORDERED TOPIC.
+- No free-association analogies ("this reminds me of Fury vs Joshua…") when the topic never mentions them.
+- Named people in the script must serve the ordered topic (or the clear same-story cast). If they are not in the topic, drop them.
+- Never write "X is not the focus" then narrate someone else.
 - Sensitive personal details (disability, family, health): only use what the brief already states; keep it respectful and factual — never sensationalise.
 
 VOICE QUALITY (non-negotiable):
@@ -236,12 +238,139 @@ export function extractPersonLikeNames(text) {
 function nameGroundedInSource(name, sourceText) {
   const hay = normalizeHay(sourceText)
   if (!hay) return false
-  const full = normalizeHay(name)
+  const full = cleanNameToken(name)
   if (full && hay.includes(full)) return true
   const parts = full.split(/\s+/).filter((p) => p.length >= 4)
   // Surname (last token ≥4) or any distinctive token in the brief is enough.
   if (parts.length && parts.some((p) => hay.includes(p))) return true
+  // Fuzzy: Cuccorea ≈ Cuccurella / Cucurella (common AI misspells)
+  const hayToks = hay.split(/\s+/).filter((p) => p.length >= 4)
+  if (parts.some((p) => hayToks.some((h) => tokensLooselyEqual(p, h)))) return true
   return false
+}
+
+/** Strip possessive / punctuation from a name token for fuzzy match. */
+function cleanNameToken(s) {
+  return normalizeHay(s).replace(/['’]s\b/g, '').replace(/['’]/g, '')
+}
+
+/**
+ * Loose surname match (Cuccorea ≈ Cuccurella / Cucurella).
+ * @param {string} a
+ * @param {string} b
+ */
+export function tokensLooselyEqual(a, b) {
+  const x = cleanNameToken(a)
+  const y = cleanNameToken(b)
+  if (!x || !y) return false
+  if (x === y) return true
+  if (x.includes(y) || y.includes(x)) return true
+  if (x.length >= 5 && y.length >= 5 && x.slice(0, 4) === y.slice(0, 4) && Math.abs(x.length - y.length) <= 3) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Distinctive person-anchor tokens from the ordered topic (surnames / full names).
+ * Desk brief must NOT expand this — otherwise unrelated RSS unlocks a full pivot.
+ * @param {string} topic
+ * @returns {string[]}
+ */
+export function extractTopicAnchorTokens(topic) {
+  const names = extractPersonLikeNames(topic)
+  const out = []
+  for (const name of names) {
+    const parts = cleanNameToken(name)
+      .split(/\s+/)
+      .filter((p) => p.length >= 4)
+    out.push(...parts)
+  }
+  // Fallback: distinctive capitalized tokens in topic when extractPersonLikeNames misses
+  if (!out.length) {
+    const re = /\b([A-Z][\p{L}'’-]{3,})\b/gu
+    let m
+    const raw = String(topic || '')
+    while ((m = re.exec(raw))) {
+      const tok = cleanNameToken(m[1])
+      if (!tok || NAME_STOP_FIRST.has(tok)) continue
+      if (FOOTBALL_ORG.test(m[1])) continue
+      out.push(tok)
+    }
+  }
+  return [...new Set(out)]
+}
+
+function countTokenMentions(text, tokens) {
+  const hay = normalizeHay(text)
+  if (!hay || !tokens?.length) return 0
+  let n = 0
+  for (const tok of tokens) {
+    const t = cleanNameToken(tok)
+    if (!t || t.length < 4) continue
+    if (hay.includes(t)) {
+      n += 1
+      continue
+    }
+    // Fuzzy: any hay word loosely equals token
+    for (const w of hay.split(/\s+/)) {
+      if (tokensLooselyEqual(w, t)) {
+        n += 1
+        break
+      }
+    }
+  }
+  return n
+}
+
+const TOPIC_DISMISS_RE =
+  /\b(not the focus|isn'?t the (real )?focus|not (really )?about|isn'?t about|different story|unrelated to|instead,? (we|let'?s)|moving on (to|from)|forget (about )?(him|her|them|that))\b/i
+
+/**
+ * True when the draft abandons the ordered-topic person/story for a different main subject
+ * (e.g. Cuccurella hair → Kevin Keegan career retrospective).
+ * Uses TOPIC anchors only — desk headlines must not unlock a pivot.
+ * @param {string} draft
+ * @param {string} topic
+ */
+export function detectTopicDrift(draft, topic) {
+  const text = String(draft || '').trim()
+  const ordered = String(topic || '').trim()
+  const anchors = extractTopicAnchorTokens(ordered)
+  if (!text || anchors.length === 0) {
+    return { drift: false, foreign: [], anchors, dismiss: false, anchorMentions: 0, foreignMentions: 0 }
+  }
+
+  const draftNames = extractPersonLikeNames(text)
+  const foreign = []
+  for (const name of draftNames) {
+    const parts = cleanNameToken(name)
+      .split(/\s+/)
+      .filter((p) => p.length >= 4)
+    const matchesAnchor = parts.some((p) => anchors.some((a) => tokensLooselyEqual(p, a)))
+    if (matchesAnchor) continue
+    // Same-story cast still in the ordered topic string (club etc. already filtered by extract)
+    if (nameGroundedInSource(name, ordered)) continue
+    foreign.push(name)
+  }
+
+  const dismiss = TOPIC_DISMISS_RE.test(text)
+  const anchorMentions = countTokenMentions(text, anchors)
+  const foreignTokens = foreign.flatMap((n) =>
+    cleanNameToken(n)
+      .split(/\s+/)
+      .filter((p) => p.length >= 4),
+  )
+  const foreignMentions = countTokenMentions(text, foreignTokens)
+
+  // Pivot: dismiss topic, or a foreign person dominates the VO vs topic anchors.
+  const drift =
+    foreign.length > 0 &&
+    (dismiss ||
+      (foreignMentions >= 2 && anchorMentions <= 1) ||
+      (foreignMentions > anchorMentions && foreignMentions >= 2))
+
+  return { drift, foreign, anchors, dismiss, anchorMentions, foreignMentions }
 }
 
 /**
@@ -252,7 +381,7 @@ function nameGroundedInSource(name, sourceText) {
  */
 export function scoreDraftRelevance(draft, opts = {}) {
   const text = String(draft || '').trim()
-  const topic = String(opts.topic || '')
+  const topic = String(opts.orderedTopic || opts.topic || '')
   const deskBrief = String(opts.deskBrief || opts.context || '')
   const sourceText = `${topic}\n${deskBrief}`
   const reasons = []
@@ -267,7 +396,26 @@ export function scoreDraftRelevance(draft, opts = {}) {
       offTopic: [],
       reasons: [],
       rewriteHints: [],
+      topicDrift: false,
     }
+  }
+
+  // A0) Topic drift — ordered topic only (desk RSS must not unlock a Keegan pivot)
+  const drift = detectTopicDrift(text, topic)
+  if (drift.drift) {
+    score = Math.min(score, 1.5)
+    const foreignLabel = drift.foreign[0] || 'another person'
+    offTopic.push({
+      id: `topic_drift:${normalizeHay(foreignLabel).replace(/\s+/g, '_')}`,
+      label: foreignLabel,
+      kind: 'topic_drift',
+    })
+    reasons.push(
+      drift.dismiss
+        ? `Topic drift — dismisses ordered story and pivots to ${foreignLabel}`
+        : `Topic drift — main narrative shifts to ${foreignLabel} instead of the ordered topic`,
+    )
+    rewriteHints.push('Stay on the ordered topic’s people and conflict — do not pivot to a different career/story')
   }
 
   // A) Cross-sport figures
@@ -317,18 +465,21 @@ export function scoreDraftRelevance(draft, opts = {}) {
   if (offTopic.length) {
     score = Math.min(score, 2.5)
     for (const o of offTopic.slice(0, 4)) {
+      if (o.kind === 'topic_drift') continue // reason already added
       if (o.kind === 'cross_sport_person' || o.kind === 'cross_sport') {
         reasons.push(`Off-topic ${o.label} not in topic/desk brief`)
       } else {
         reasons.push(`Named “${o.label}” not grounded in topic/desk brief`)
       }
     }
-    rewriteHints.push(
-      'Stay inside the football story — drop unrelated athletes/sports/celebrities not in the brief',
-    )
-    rewriteHints.push(
-      'Only name people who appear in the topic or desk brief (same-story cast)',
-    )
+    if (offTopic.some((o) => o.kind !== 'topic_drift')) {
+      rewriteHints.push(
+        'Stay inside the football story — drop unrelated athletes/sports/celebrities not in the brief',
+      )
+      rewriteHints.push(
+        'Only name people who appear in the topic or desk brief (same-story cast)',
+      )
+    }
   }
 
   // B) Viewer insults — hard fail
@@ -340,13 +491,15 @@ export function scoreDraftRelevance(draft, opts = {}) {
 
   // B) Agree/disagree spam + empty rhetorical ping-pong
   const ctaHits = (text.match(new RegExp(AGREE_DISAGREE_CTA.source, 'gi')) || []).length
+  const emptyPingPong = EMPTY_PINGPONG.test(text)
+  const agreeDisagree = AGREE_DISAGREE_CTA.test(text)
   if (ctaHits >= 2) {
     score -= 2.5
     reasons.push('Agree/disagree CTA spam')
     rewriteHints.push('One fight question at the end — not repeated agree/disagree loops')
   }
-  if (EMPTY_PINGPONG.test(text) && AGREE_DISAGREE_CTA.test(text)) {
-    score -= 2
+  if (emptyPingPong && agreeDisagree) {
+    score = Math.min(score, 3)
     reasons.push('Empty strength/weakness rhetorical ping-pong')
     rewriteHints.push('Replace waffle questions with one concrete stake + one CTA')
   }
@@ -365,9 +518,16 @@ export function scoreDraftRelevance(draft, opts = {}) {
 
   score = Math.max(0, Math.min(10, Math.round(score * 10) / 10))
   const hardFail =
-    offTopic.some((o) => o.kind === 'cross_sport_person' || o.kind === 'cross_sport') ||
+    offTopic.some(
+      (o) =>
+        o.kind === 'cross_sport_person' ||
+        o.kind === 'cross_sport' ||
+        o.kind === 'topic_drift',
+    ) ||
     VIEWER_INSULT.test(text) ||
-    offTopic.filter((o) => o.kind === 'ungrounded_name').length >= 1
+    offTopic.filter((o) => o.kind === 'ungrounded_name').length >= 1 ||
+    ctaHits >= 2 ||
+    (emptyPingPong && agreeDisagree)
 
   const pass = !hardFail && score >= 6
 
@@ -375,6 +535,7 @@ export function scoreDraftRelevance(draft, opts = {}) {
     pass,
     score: hardFail ? Math.min(score, 3) : score,
     offTopic,
+    topicDrift: Boolean(drift.drift),
     reasons: reasons.slice(0, 6),
     rewriteHints: [...new Set(rewriteHints)].slice(0, 5),
   }

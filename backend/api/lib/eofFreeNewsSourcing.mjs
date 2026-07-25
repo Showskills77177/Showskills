@@ -212,18 +212,25 @@ export function formatArticlesForPrompt(articles) {
  * Free research pack: NewsData (if keyed) + Guardian (if keyed) + RSS headlines.
  */
 export async function fetchFreeFootballDeskPack({ topic = '', limit = 8 } = {}) {
-  const { fetchFootballDeskHeadlines } = await import('./eofFootballDeskResearch.mjs')
-  const [newsdata, guardian, rss] = await Promise.all([
-    fetchNewsdataFootballArticles({ topic, limit }).catch((e) => {
+  const { fetchFootballDeskHeadlines, filterDeskItemsToTopic } = await import(
+    './eofFootballDeskResearch.mjs'
+  )
+  const [newsdataRaw, guardianRaw, rssRaw] = await Promise.all([
+    fetchNewsdataFootballArticles({ topic, limit: Math.max(limit, 12) }).catch((e) => {
       console.warn('[eof-free-news] NewsData failed', e instanceof Error ? e.message : e)
       return []
     }),
-    fetchGuardianFootballArticles({ topic, limit }).catch((e) => {
+    fetchGuardianFootballArticles({ topic, limit: Math.max(limit, 12) }).catch((e) => {
       console.warn('[eof-free-news] Guardian failed', e instanceof Error ? e.message : e)
       return []
     }),
-    fetchFootballDeskHeadlines({ topic, limit }).catch(() => []),
+    fetchFootballDeskHeadlines({ topic, limit: Math.max(limit, 12) }).catch(() => []),
   ])
+
+  // Drop cross-sport / off-topic rows before they enter the writer brief or judge source.
+  const newsdata = filterDeskItemsToTopic(newsdataRaw, topic, { limit })
+  const guardian = filterDeskItemsToTopic(guardianRaw, topic, { limit })
+  const rss = filterDeskItemsToTopic(rssRaw, topic, { limit })
 
   const seen = new Set()
   const merged = []

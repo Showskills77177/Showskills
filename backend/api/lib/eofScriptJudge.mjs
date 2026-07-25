@@ -344,16 +344,18 @@ export async function judgeEofScriptDraft(input = {}) {
     }
   }
 
-  const local = scoreDraftDirectness(draft, { format: input.format, topic: input.topic })
-  const hot = scoreDraftHotTake(draft, { format: input.format, topic: input.topic })
+  const orderedTopic = input.orderedTopic || input.topic
+  const local = scoreDraftDirectness(draft, { format: input.format, topic: orderedTopic })
+  const hot = scoreDraftHotTake(draft, { format: input.format, topic: orderedTopic })
   const fact = scoreDraftFactuality(draft, {
     format: input.format,
-    topic: input.topic,
+    topic: orderedTopic,
     deskBrief: input.deskBrief,
   })
   const rel = scoreDraftRelevance(draft, {
     format: input.format,
-    topic: input.topic,
+    topic: orderedTopic,
+    orderedTopic,
     deskBrief: input.deskBrief,
   })
   const judgeProvider = resolveScriptJudgeProvider(input.writerProvider)

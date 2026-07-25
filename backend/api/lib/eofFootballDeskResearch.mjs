@@ -45,6 +45,64 @@ function topicTokens(topic) {
     .filter((w) => w.length >= 3 && !/^(the|and|for|with|from|this|that|news|latest|update|world|cup|football)$/.test(w))
 }
 
+/** Cross-sport people / combat sports — never feed into a football-topic brief unless the topic already names them. */
+const CROSS_SPORT_HEADLINE_RE =
+  /\b(tyson\s+fury|anthony\s+joshua|\busyk\b|canelo(\s+alvarez)?|(floyd\s+)?mayweather|mike\s+tyson|(conor\s+)?mcgregor|jon\s+jones|khabib(\s+nurmagomedov)?|lewis\s+hamilton|max\s+verstappen|charles\s+leclerc|lando\s+norris|novak\s+djokovic|serena\s+williams|(roger\s+)?federer|(rafael\s+|rafa\s+)?nadal|tiger\s+woods|lebron(\s+james)?|(stephen|steph)\s+curry|tom\s+brady|(patrick\s+)?mahomes|boxing|boxer|heavyweight|ufc|\bmma\b|formula\s*1|\bf1\b|\bnba\b|\bnfl\b|\bmlb\b|\bnhl\b|wwe)\b/i
+
+/**
+ * True when a headline/article injects cross-sport names that are NOT in the football topic.
+ * @param {string} text
+ * @param {string} topic
+ */
+export function isOffTopicCrossSportDeskItem(text, topic = '') {
+  const hay = String(text || '')
+  if (!CROSS_SPORT_HEADLINE_RE.test(hay)) return false
+  const topicHay = String(topic || '')
+  // Topic itself is cross-sport / crossover — allow matching figures.
+  if (CROSS_SPORT_HEADLINE_RE.test(topicHay)) return false
+  return true
+}
+
+/**
+ * Keep only desk items that match the topic tokens; drop cross-sport free-association.
+ * Never pads with unrelated football headlines when the topic has distinctive tokens.
+ * @param {Array<{ title?: string, description?: string, body?: string }>} items
+ * @param {string} topic
+ * @param {{ limit?: number, requireTopicHit?: boolean }} [opts]
+ */
+export function filterDeskItemsToTopic(items, topic = '', opts = {}) {
+  const limit = Math.max(1, Number(opts.limit) || 8)
+  const tokens = topicTokens(topic)
+  const requireHit = opts.requireTopicHit !== false && tokens.length > 0
+  const list = Array.isArray(items) ? items : []
+  const scored = list
+    .map((item) => {
+      const hay = `${item?.title || ''} ${item?.description || ''} ${item?.body || ''}`
+      if (isOffTopicCrossSportDeskItem(hay, topic)) {
+        return { item, hits: -1, drop: true }
+      }
+      const low = hay.toLowerCase()
+      const hits = tokens.filter((t) => low.includes(t)).length
+      return { item, hits, drop: false }
+    })
+    .filter((row) => !row.drop)
+
+  const preferred = scored.filter((row) => row.hits > 0)
+  const pool = requireHit ? preferred : preferred.length ? preferred : scored
+  const seen = new Set()
+  const out = []
+  for (const row of pool.sort((a, b) => b.hits - a.hits)) {
+    const key = String(row.item?.title || '')
+      .toLowerCase()
+      .slice(0, 80)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(row.item)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 /**
  * Fetch recent football headlines from public RSS (no API key).
  * @returns {Promise<Array<{ desk: string, title: string, description: string, link: string }>>}
@@ -72,31 +130,13 @@ export async function fetchFootballDeskHeadlines({ topic = '', limit = 8 } = {})
     }),
   )
 
-  const scored = all
-    .map((item) => {
-      const hay = `${item.title} ${item.description}`.toLowerCase()
-      const hits = tokens.filter((t) => hay.includes(t)).length
-      return { ...item, hits }
-    })
-    .sort((a, b) => b.hits - a.hits || a.title.localeCompare(b.title))
-
-  const preferred = scored.filter((i) => i.hits > 0)
-  const pool = preferred.length ? preferred : scored
-  const seen = new Set()
-  const out = []
-  for (const item of pool) {
-    const key = item.title.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push({
-      desk: item.desk,
-      title: item.title.slice(0, 140),
-      description: item.description.slice(0, 240),
-      link: item.link.slice(0, 240),
-    })
-    if (out.length >= limit) break
-  }
-  return out
+  // Topic lock: never pad a Cuccurella brief with unrelated Fury/Joshua (or random) headlines.
+  return filterDeskItemsToTopic(all, topic, { limit, requireTopicHit: tokens.length > 0 }).map((item) => ({
+    desk: item.desk,
+    title: item.title.slice(0, 140),
+    description: item.description.slice(0, 240),
+    link: item.link.slice(0, 240),
+  }))
 }
 
 export function formatDeskHeadlinesForPrompt(headlines) {

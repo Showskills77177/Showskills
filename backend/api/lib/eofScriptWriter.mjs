@@ -452,8 +452,42 @@ function classifyScriptFailureProvider(detail) {
 const DRAFT_FLUFF_RE =
   /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
+/**
+ * Local hard gates (hot-take + directness + factuality + relevance).
+ * Used by softBest fallthrough, directed rewrites, and Adapt — never silent-pass bollox.
+ * @param {string} draft
+ * @param {{ topic?: string, format?: string, deskBrief?: string, context?: string }} [opts]
+ */
+export function scoreLocalScriptGates(draft, opts = {}) {
+  const format = opts.format || ''
+  const topic = opts.topic || ''
+  const orderedTopic = opts.orderedTopic || topic
+  const deskBrief = String(opts.deskBrief || opts.context || '')
+  const hot = scoreDraftHotTake(draft, { format, topic: orderedTopic })
+  const direct = scoreDraftDirectness(draft, { format, topic: orderedTopic })
+  const fact = scoreDraftFactuality(draft, {
+    format,
+    topic: orderedTopic,
+    deskBrief,
+  })
+  const rel = scoreDraftRelevance(draft, {
+    format,
+    topic: orderedTopic,
+    orderedTopic,
+    deskBrief,
+  })
+  const pass = Boolean(hot.pass && direct.pass && fact.pass && rel.pass)
+  const reasons = [
+    ...(rel.reasons || []),
+    ...(fact.reasons || []),
+    ...(hot.reasons || []),
+    ...(direct.reasons || []),
+  ]
+  return { pass, hot, direct, fact, rel, reasons: reasons.slice(0, 8) }
+}
+
 /** Prefer punchy Shorts VO — reject fluff, stubs, invented news, and off-topic free-association. */
-function isWeakDraft(text, format = '', topic = '', deskBrief = '') {
+function isWeakDraft(text, format = '', topic = '', deskBrief = '', orderedTopic = '') {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
   if (words < 45) return true
@@ -461,13 +495,25 @@ function isWeakDraft(text, format = '', topic = '', deskBrief = '') {
   if (DRAFT_FLUFF_RE.test(t)) return true
   if (/\bsoccer\b/i.test(t)) return true
   if (/\b(NFL|NBA|MLB|NHL)\b/.test(t)) return true
-  const direct = scoreDraftDirectness(t, { format, topic })
-  if (!direct.pass && direct.score < 5.5) return true
-  const fact = scoreDraftFactuality(t, { format, topic, deskBrief })
-  if (!fact.pass) return true
-  const rel = scoreDraftRelevance(t, { format, topic, deskBrief })
-  if (!rel.pass) return true
+  const gates = scoreLocalScriptGates(t, {
+    format,
+    topic,
+    orderedTopic: orderedTopic || topic,
+    deskBrief,
+  })
+  if (!gates.pass) return true
+  if (!gates.direct.pass && gates.direct.score < 5.5) return true
   return false
+}
+
+function buildScriptGateRejectError(topic, gates, failures = []) {
+  const why =
+    gates?.reasons?.[0] ||
+    gates?.rel?.reasons?.[0] ||
+    gates?.fact?.reasons?.[0] ||
+    'failed local quality gates (relevance / factuality / hot-take)'
+  const extra = Array.isArray(failures) && failures.length ? ` ${failures.slice(0, 2).join(' · ')}` : ''
+  return `Could not write a usable Shorts script for “${String(topic || '').slice(0, 60)}”: ${why}.${extra} Refusing off-topic, invented, or insult drafts — fix the topic or click Regenerate.`
 }
 
 /** Accept almost any real AI draft over the canned template. */
@@ -840,7 +886,7 @@ export async function writeEofPlainTextDraft({
     try {
       judge = await withBudget(
         judgeEofScriptDraft({
-          topic: t,
+          topic: rawTopic || t,
           draft: ai.plainTextDraft,
           format: fmt,
           deskBrief: deskBriefForJudge,
@@ -852,41 +898,32 @@ export async function writeEofPlainTextDraft({
     } catch (e) {
       console.warn('[eof-script] judge failed', writerId, e instanceof Error ? e.message : e)
       // Never auto-accept on judge API errors — local gates still block waffle / invented news / off-topic.
-      const local = scoreDraftDirectness(ai.plainTextDraft, { format: fmt, topic: t })
-      const hot = scoreDraftHotTake(ai.plainTextDraft, { format: fmt, topic: t })
-      const fact = scoreDraftFactuality(ai.plainTextDraft, {
+      const gates = scoreLocalScriptGates(ai.plainTextDraft, {
         format: fmt,
         topic: t,
-        deskBrief: deskBriefForJudge,
-      })
-      const rel = scoreDraftRelevance(ai.plainTextDraft, {
-        format: fmt,
-        topic: t,
+        orderedTopic: rawTopic,
         deskBrief: deskBriefForJudge,
       })
       judge = {
         skipped: false,
-        pass: local.pass && hot.pass && fact.pass && rel.pass,
-        overall: Math.min(local.score, hot.score, fact.score, rel.score),
-        merit: Math.min(local.score, fact.score, rel.score),
-        interest: hot.score,
-        value: Math.min(local.score, rel.score),
-        directness: local.score,
-        hotTake: hot.score,
-        factuality: fact.score,
-        relevance: rel.score,
+        pass: gates.pass,
+        overall: Math.min(gates.direct.score, gates.hot.score, gates.fact.score, gates.rel.score),
+        merit: Math.min(gates.direct.score, gates.fact.score, gates.rel.score),
+        interest: gates.hot.score,
+        value: Math.min(gates.direct.score, gates.rel.score),
+        directness: gates.direct.score,
+        hotTake: gates.hot.score,
+        factuality: gates.fact.score,
+        relevance: gates.rel.score,
         reasons: [
           'Judge API error — local directness + hot-take + factuality + relevance gates',
-          ...local.reasons,
-          ...hot.reasons,
-          ...fact.reasons,
-          ...rel.reasons,
+          ...gates.reasons,
         ].slice(0, 8),
         rewriteHints: [
-          ...local.rewriteHints,
-          ...hot.rewriteHints,
-          ...fact.rewriteHints,
-          ...rel.rewriteHints,
+          ...(gates.direct.rewriteHints || []),
+          ...(gates.hot.rewriteHints || []),
+          ...(gates.fact.rewriteHints || []),
+          ...(gates.rel.rewriteHints || []),
         ].slice(0, 7),
         judgeProvider: 'local-directness+hot-take+factuality+relevance',
         threshold: 6.5,
@@ -959,8 +996,14 @@ export async function writeEofPlainTextDraft({
         }
         continue
       }
-      // Producer chat direction: accept the usable rewrite immediately (no judge / similarity gates)
+      // Producer chat direction: still hard-gate relevance / drift / factuality (no silent bollox).
       if (note && wordCount(ai.plainTextDraft) >= 35) {
+        if (isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)) {
+          softBest = softBest || { ...ai, deskSources }
+          failures.push(`[${id}] directed draft failed local gates`)
+          console.warn('[eof-script] directed draft soft-weak', id, ai.plainTextDraft.slice(0, 80))
+          continue
+        }
         console.info('[eof-script] accepted directed draft', id, wordCount(ai.plainTextDraft), 'words')
         return {
           ...ai,
@@ -979,7 +1022,7 @@ export async function writeEofPlainTextDraft({
         softBest = softBest || { ...ai, deskSources }
         continue
       }
-      if (isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge)) {
+      if (isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)) {
         softBest = softBest || { ...ai, deskSources }
         failures.push(`[${id}] soft-weak draft kept as candidate`)
         console.warn('[eof-script] draft soft-weak, keeping as candidate', id, ai.plainTextDraft.slice(0, 80))
@@ -995,7 +1038,7 @@ export async function writeEofPlainTextDraft({
         )
         try {
           const rewrittenAi = await rewriteWithFeedback(id, ai.plainTextDraft, judge, 0.12)
-          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft, fmt, t, deskBriefForJudge)) {
+          if (rewrittenAi && !isWeakDraft(rewrittenAi.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)) {
             ;({ candidate, judge } = await scoreAndMaybeKeep(rewrittenAi, id))
             if (judge && !judge.skipped && judge.pass && (!autoMode || isExcellentJudge(judge, excellentMin))) {
               return candidate
@@ -1040,7 +1083,9 @@ export async function writeEofPlainTextDraft({
                 },
                 0.08,
               )
-              if (!escalated || isWeakDraft(escalated.plainTextDraft, fmt, t, deskBriefForJudge)) continue
+              if (!escalated || isWeakDraft(escalated.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)) {
+                continue
+              }
               const scored = await scoreAndMaybeKeep(escalated, nextId)
               baseText = scored.candidate.plainTextDraft
               baseJudge = scored.judge
@@ -1055,9 +1100,9 @@ export async function writeEofPlainTextDraft({
         }
       }
 
-      if (candidate && (judge?.pass || judge?.skipped || !judge)) {
-        // Accept best pass even if not "excellent" after escalation
-        if (judge?.pass || judge?.skipped || !judge) return softBest || candidate
+      if (candidate && judge?.pass) {
+        // Never prefer an unscored softBest over a judged pass
+        return candidate
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -1090,7 +1135,7 @@ export async function writeEofPlainTextDraft({
           `${id} auto-fallback draft`,
         )
         const ai = finalizeAiDraft(raw, t, resolvedTopic)
-        if (!ai || isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge)) continue
+        if (!ai || isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)) continue
         const { candidate, judge } = await scoreAndMaybeKeep(ai, id)
         if (isExcellentJudge(judge, excellentMin) || judge?.pass) return candidate
       } catch (e) {
@@ -1100,64 +1145,71 @@ export async function writeEofPlainTextDraft({
   }
 
   if (softBest) {
-    const hot = scoreDraftHotTake(softBest.plainTextDraft, { format: fmt, topic: t })
-    const direct = scoreDraftDirectness(softBest.plainTextDraft, { format: fmt, topic: t })
-    const fact = scoreDraftFactuality(softBest.plainTextDraft, {
+    const gates = scoreLocalScriptGates(softBest.plainTextDraft, {
       format: fmt,
       topic: t,
+      orderedTopic: rawTopic,
       deskBrief: deskBriefForJudge,
     })
-    const rel = scoreDraftRelevance(softBest.plainTextDraft, {
-      format: fmt,
-      topic: t,
-      deskBrief: deskBriefForJudge,
-    })
-    if (
-      productionBar &&
-      (!hot.pass || !direct.pass || !fact.pass || !rel.pass || softBest.source === 'template')
-    ) {
-      // Overnight Script Maker must not ship glue / waffle / invented news / off-topic.
-      throw new Error(
-        `Script Maker rejected soft draft for “${t.slice(0, 60)}”: ${(rel.reasons[0] || fact.reasons[0] || hot.reasons[0] || direct.reasons[0] || 'failed hot-take bar')}. ${failures.slice(0, 2).join(' · ')}`,
+    if (!gates.pass || softBest.source === 'template') {
+      // Production + Script Maker + Order script: never silent-pass drift / Fury / insults.
+      failures.push(
+        `softBest rejected: ${gates.reasons[0] || 'failed local quality gates'}`,
       )
-    }
-    return {
-      ...softBest,
-      deskSources: softBest.deskSources || deskSources,
-      qualityBar: productionBar ? 'production' : 'standard',
-      stages: ['research', 'draft', 'polish', 'hot-take-refine', 'judge'],
+    } else {
+      return {
+        ...softBest,
+        deskSources: softBest.deskSources || deskSources,
+        qualityBar: productionBar ? 'production' : 'standard',
+        stages: ['research', 'draft', 'polish', 'hot-take-refine', 'judge'],
+        judge: softBest.judge || {
+          pass: true,
+          skipped: false,
+          overall: Math.min(gates.rel.score, gates.fact.score, gates.hot.score, gates.direct.score),
+          reasons: ['Accepted after local gates (softBest)'],
+          judgeProvider: 'local-directness+hot-take+factuality+relevance',
+        },
+      }
     }
   }
 
-  // Directed rewrite failed: keep the previous draft instead of wiping it with a canned template
+  // Keep previous only when it still passes local gates (never re-ship Keegan/Fury bollox).
   if (prev && wordCount(prev) >= 40) {
-    return {
-      plainTextDraft: prev,
-      title: titleFromDraft(t, prev) || t.slice(0, 90),
-      source: 'previous',
-      resolvedTopic,
-      deskSources,
-      failureDetail: failures.length
-        ? `${failures.join(' · ')} — kept your previous draft`
-        : 'AI rewrite failed — kept your previous draft',
-      keptPrevious: true,
+    const prevGates = scoreLocalScriptGates(prev, {
+      format: fmt,
+      topic: t,
+      orderedTopic: rawTopic,
+      deskBrief: deskBriefForJudge,
+    })
+    if (prevGates.pass) {
+      return {
+        plainTextDraft: prev,
+        title: titleFromDraft(t, prev) || t.slice(0, 90),
+        source: 'previous',
+        resolvedTopic,
+        deskSources,
+        failureDetail: failures.length
+          ? `${failures.join(' · ')} — kept your previous draft`
+          : 'AI rewrite failed — kept your previous draft',
+        keptPrevious: true,
+      }
     }
   }
 
-  if (productionBar) {
-    throw new Error(
-      `Script Maker could not write a hot-take script for “${t.slice(0, 60)}” (refusing canned template). ${failures.slice(0, 3).join(' · ') || 'No AI provider returned a usable draft.'}`,
-    )
-  }
-
-  return {
-    plainTextDraft: templatePlainTextDraft(t, fmt),
-    title: t.slice(0, 90),
-    source: 'template',
-    resolvedTopic,
-    deskSources,
-    failureDetail: failures.length ? failures.join(' · ') : 'no AI provider returned a usable draft',
-  }
+  throw new Error(
+    buildScriptGateRejectError(
+      rawTopic || t,
+      softBest
+        ? scoreLocalScriptGates(softBest.plainTextDraft, {
+            format: fmt,
+            topic: t,
+            orderedTopic: rawTopic,
+            deskBrief: deskBriefForJudge,
+          })
+        : { reasons: failures.slice(0, 2) },
+      failures,
+    ),
+  )
 }
 
 /**
@@ -1169,6 +1221,13 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
   if (draft.length < 40) throw new Error('Plain-text draft is too short — write or generate a fuller script first.')
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
+
+  const adaptGates = scoreLocalScriptGates(draft, { format: fmt, topic: t, orderedTopic: t })
+  if (!adaptGates.pass) {
+    throw new Error(
+      `Cannot adapt this draft — ${adaptGates.reasons[0] || 'failed relevance/factuality gates'}. Fix or Regenerate the script first.`,
+    )
+  }
 
   // Faithful, deterministic split FIRST — keeps the approved script's exact words and
   // ties every scene image to the named player/club. AI paraphrase tends to butcher a
@@ -1209,8 +1268,14 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
  * One-shot (scheduler / legacy): draft then adapt.
  * @param {{ topic: string, format?: string, context?: string }} input
  */
-export async function writeEofProductionScript({ topic, format, context, scriptProvider }) {
-  const draftResult = await writeEofPlainTextDraft({ topic, format, context, scriptProvider })
+export async function writeEofProductionScript({ topic, format, context, scriptProvider, qualityBar = 'production' }) {
+  const draftResult = await writeEofPlainTextDraft({
+    topic,
+    format,
+    context,
+    scriptProvider,
+    qualityBar,
+  })
   const resolvedTopic = draftResult.resolvedTopic || topic
   const adapted = await adaptEofPlainTextToScenes({
     plainTextDraft: draftResult.plainTextDraft,
