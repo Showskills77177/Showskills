@@ -44,7 +44,7 @@ import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { normalizeEofMusicTrim } from '../../../shared/eofMusicTrim.mjs'
 import { parseEofQualityGate, parseEofQualityGateHistory } from './eofShortQualityGate.mjs'
-import { eofProductionJobDirPath } from './eofSceneTts.mjs'
+import { eofProductionJobDirPath } from './eofProductionPaths.mjs'
 import {
   writeEofProductionScript,
   writeEofPlainTextDraft,

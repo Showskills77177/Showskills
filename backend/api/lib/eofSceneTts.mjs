@@ -1,35 +1,16 @@
-import { mkdirSync, existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
 import { EdgeTTS } from 'node-edge-tts'
 import { EOF_VOICE_PRESETS, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
 import { resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { runFfmpeg, runFfprobe } from './eofFfmpeg.mjs'
 import { isEofElevenLabsConfigured, synthesizeElevenLabsSpeech } from './eofElevenLabsTts.mjs'
+import {
+  eofProductionJobDirPath,
+  eofProductionWorkDir,
+  eofProductionMixedAudioRelPath,
+} from './eofProductionPaths.mjs'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
-
-function eofProductionStorageRoot() {
-  if (process.env.EOF_PRODUCTION_WORK_ROOT) return process.env.EOF_PRODUCTION_WORK_ROOT
-  if (process.env.VERCEL) return join('/tmp', 'showskills-eof')
-  return join(root, 'storage', 'eof')
-}
-
-export function eofProductionJobDirPath(jobId) {
-  return join(eofProductionStorageRoot(), 'jobs', jobId)
-}
-
-export function eofProductionWorkDir(jobId) {
-  const dir = eofProductionJobDirPath(jobId)
-  mkdirSync(dir, { recursive: true })
-  return dir
-}
-
-/** Logical path stored on the job record (display / local dev). */
-export function eofProductionMixedAudioRelPath(jobId) {
-  if (process.env.VERCEL) return `tmp/showskills-eof/jobs/${jobId}/mixed.mp3`
-  return `storage/eof/jobs/${jobId}/mixed.mp3`
-}
+export { eofProductionJobDirPath, eofProductionWorkDir, eofProductionMixedAudioRelPath }
 
 function resolveVoicePreset(voicePreset) {
   const id = String(voicePreset || EOF_DEFAULT_VOICE_PRESET).trim()

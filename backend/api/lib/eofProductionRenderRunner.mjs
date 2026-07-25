@@ -19,7 +19,7 @@ import {
   estimateEofVideoRenderDurationSec,
   estimateEofVoiceoverRemuxDurationSec,
 } from '../../../shared/eofProduction.mjs'
-import { getEofArtifactFlags } from './eofProductionArtifacts.mjs'
+import { getEofArtifactFlags } from './eofProductionArtifactFlags.mjs'
 import {
   applyEofShortQualityPreflightToJob,
   EofQualityGateBlockedError,

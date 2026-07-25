@@ -12,21 +12,9 @@ import {
   deleteEofProductionJob,
   cancelEofProductionRender,
 } from '../lib/eofProductionJobs.mjs'
-import { withEofArtifactFlags } from '../lib/eofProductionArtifacts.mjs'
-import {
-  startEofProductionVideoRenderBackground,
-  startEofProductionFullBuildBackground,
-  startEofProductionVoiceoverRegenerationBackground,
-  startApplyEofProductionZapcapBackground,
-  startEofProductionMusicRemixBackground,
-  startEofProductionCaptionReplaceBackground,
-  startEofProductionEffectsApplyBackground,
-  startEofProductionStickersApplyBackground,
-} from '../lib/eofProductionRenderRunner.mjs'
-import { EofQualityGateBlockedError } from '../lib/eofShortQualityGateApply.mjs'
+import { withEofArtifactFlags } from '../lib/eofProductionArtifactFlags.mjs'
 import { normalizeEofCaptionLayout } from '../../../shared/eofCaptionLayout.mjs'
-import { isFfmpegAvailable } from '../lib/eofAudioMix.mjs'
-import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofSceneImages.mjs'
+import { eofImageSourceStatus, eofImagesConfigurationNote } from '../lib/eofImageSourceStatus.mjs'
 import {
   getEofImageProviderSettings,
   updateEofImageProviderSettings,
@@ -114,6 +102,25 @@ import {
 } from '../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../shared/eofVoiceRegeneration.mjs'
 
+/** Defer ffmpeg / remux graph until Build / remux actions (hub GET must stay light on Vercel). */
+async function loadEofRenderRunner() {
+  return import('../lib/eofProductionRenderRunner.mjs')
+}
+
+async function loadEofQualityGateBlockedError() {
+  const mod = await import('../lib/eofShortQualityGateApply.mjs')
+  return mod.EofQualityGateBlockedError
+}
+
+function isEofClientScriptError(message) {
+  const m = String(message || '')
+  return (
+    /Could not write a usable Shorts script|Cannot adapt this draft|Topic is required|plain-text script|too short|failed local quality|failed relevance|Adapt the plain-text/i.test(
+      m,
+    )
+  )
+}
+
 function parseScriptProvider(body) {
   const v = typeof body?.scriptProvider === 'string' ? body.scriptProvider.trim().toLowerCase() : ''
   if (v === 'claude') return 'anthropic'
@@ -154,6 +161,7 @@ export default async function handler(req, res) {
       }
 
       try {
+        const { isFfmpegAvailable } = await import('../lib/eofAudioMix.mjs')
         ffmpeg = await isFfmpegAvailable()
       } catch {
         ffmpeg = false
@@ -430,6 +438,7 @@ export default async function handler(req, res) {
                   : undefined,
             })
           }
+          const { startApplyEofProductionZapcapBackground } = await loadEofRenderRunner()
           await startApplyEofProductionZapcapBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -444,7 +453,7 @@ export default async function handler(req, res) {
         const existing = await getEofProductionJob(jobId)
         if (!existing) return json(res, 404, { error: 'Job not found.' })
         if (!(existing.script?.scenes?.length >= 1)) {
-          return json(res, 400, {
+          return json(res, 422, {
             error: 'Adapt the plain-text script to scenes before building the Short.',
           })
         }
@@ -459,14 +468,16 @@ export default async function handler(req, res) {
             : undefined
 
         try {
+          const runner = await loadEofRenderRunner()
           if (action === 'render-video') {
-            await startEofProductionVideoRenderBackground(jobId, { imageProvider })
+            await runner.startEofProductionVideoRenderBackground(jobId, { imageProvider })
           } else {
-            await startEofProductionFullBuildBackground(jobId, { imageProvider })
+            await runner.startEofProductionFullBuildBackground(jobId, { imageProvider })
           }
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job, imageProvider: imageProvider || null })
         } catch (e) {
+          const EofQualityGateBlockedError = await loadEofQualityGateBlockedError()
           if (e instanceof EofQualityGateBlockedError) {
             const job = await getEofProductionJob(jobId)
             return json(res, 422, {
@@ -475,7 +486,8 @@ export default async function handler(req, res) {
               job,
             })
           }
-          return json(res, 500, { error: e instanceof Error ? e.message : 'Build failed' })
+          const msg = e instanceof Error ? e.message : 'Build failed'
+          return json(res, isEofClientScriptError(msg) ? 422 : 500, { error: msg })
         }
       }
 
@@ -505,6 +517,7 @@ export default async function handler(req, res) {
             return json(res, 400, { error: regen.blockedReason || 'Voice regeneration is not available.' })
           }
 
+          const { startEofProductionVoiceoverRegenerationBackground } = await loadEofRenderRunner()
           await startEofProductionVoiceoverRegenerationBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -544,6 +557,7 @@ export default async function handler(req, res) {
                   : Number(body.musicEndSec)
                 : undefined,
           })
+          const { startEofProductionMusicRemixBackground } = await loadEofRenderRunner()
           await startEofProductionMusicRemixBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -574,6 +588,7 @@ export default async function handler(req, res) {
                 ? normalizeEofVideoEffects(body.videoEffects)
                 : undefined,
           })
+          const { startEofProductionEffectsApplyBackground } = await loadEofRenderRunner()
           await startEofProductionEffectsApplyBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -604,6 +619,7 @@ export default async function handler(req, res) {
             stickers:
               body.stickers !== undefined ? normalizeEofStickers(body.stickers) : undefined,
           })
+          const { startEofProductionStickersApplyBackground } = await loadEofRenderRunner()
           await startEofProductionStickersApplyBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -661,6 +677,7 @@ export default async function handler(req, res) {
                 ? body.zapcapTemplateId
                 : undefined,
           })
+          const { startEofProductionCaptionReplaceBackground } = await loadEofRenderRunner()
           await startEofProductionCaptionReplaceBackground(jobId)
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, job })
@@ -697,7 +714,8 @@ export default async function handler(req, res) {
             scriptWarning: buildEofScriptWarning(job),
           })
         } catch (e) {
-          return json(res, 400, { error: e instanceof Error ? e.message : 'Could not rewrite script' })
+          const msg = e instanceof Error ? e.message : 'Could not rewrite script'
+          return json(res, isEofClientScriptError(msg) ? 422 : 400, { error: msg })
         }
       }
 
@@ -731,7 +749,8 @@ export default async function handler(req, res) {
             scriptWarning: buildEofScriptWarning(job),
           })
         } catch (e) {
-          return json(res, 400, { error: e instanceof Error ? e.message : 'Could not regenerate draft' })
+          const msg = e instanceof Error ? e.message : 'Could not regenerate draft'
+          return json(res, isEofClientScriptError(msg) ? 422 : 400, { error: msg })
         }
       }
 
@@ -767,7 +786,8 @@ export default async function handler(req, res) {
             scriptProviderLabel: eofScriptProviderLabel(job.scriptSource || preferredEofScriptProvider()),
           })
         } catch (e) {
-          return json(res, 400, { error: e instanceof Error ? e.message : 'Could not adapt to scenes' })
+          const msg = e instanceof Error ? e.message : 'Could not adapt to scenes'
+          return json(res, isEofClientScriptError(msg) ? 422 : 400, { error: msg })
         }
       }
 
@@ -838,7 +858,8 @@ export default async function handler(req, res) {
           scriptWarning: buildEofScriptWarning(job),
         })
       } catch (e) {
-        return json(res, 400, { error: e instanceof Error ? e.message : 'Could not create job' })
+        const msg = e instanceof Error ? e.message : 'Could not create job'
+        return json(res, isEofClientScriptError(msg) ? 422 : 400, { error: msg })
       }
     }
 
