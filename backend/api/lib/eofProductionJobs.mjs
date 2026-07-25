@@ -289,10 +289,19 @@ export async function regenerateEofProductionDraft(
   const fmt = format || job.script?.format || null
   const previousDraft = String(job.script?.plainTextDraft || '').trim()
   const note = String(directorNote || '').trim().slice(0, 1200)
+  // Agent chat / directed rewrite: always seed topic (+ title) so Claude isn't writing generic VO.
+  const seededContext = [
+    String(context || '').trim(),
+    job.topic ? `Ordered topic: ${String(job.topic).trim()}` : '',
+    job.title && job.title !== job.topic ? `Working title: ${String(job.title).trim()}` : '',
+    job.script?.format || fmt ? `Format: ${fmt || job.script?.format}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
   const draft = await writeEofPlainTextDraft({
     topic: job.topic,
     format: fmt,
-    context,
+    context: seededContext || undefined,
     scriptProvider,
     regenerate: true,
     previousDraft,

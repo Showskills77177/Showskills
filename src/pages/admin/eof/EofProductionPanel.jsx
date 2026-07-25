@@ -827,6 +827,8 @@ function StickerPickerGrid({ title, hint, items, selectedIds, onPick, disabled }
 }
 
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
+/** One-time bump: older sessions stored Groq as default before Claude shipped. */
+const SCRIPT_PROVIDER_CLAUDE_MIGRATE_KEY = 'eof_script_provider_claude_v1'
 
 /** @returns {string|null} stored pick, or null when never set (server preferred applies). */
 function readStoredScriptProvider() {
@@ -837,6 +839,57 @@ function readStoredScriptProvider() {
     if (v === 'auto' || v === 'groq' || v === 'xai' || v === 'openai' || v === 'anthropic') return v
   } catch {
     /* ignore */
+  }
+  return null
+}
+
+function writeStoredScriptProvider(id) {
+  try {
+    localStorage.setItem(SCRIPT_PROVIDER_KEY, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Human label for the Script AI the agent chat / regenerate will hit. */
+function activeScriptAiLabel(scriptProvider, preferred, providers, options) {
+  const pick = scriptProvider === 'auto' || !scriptProvider ? preferred || 'auto' : scriptProvider
+  const fromOptions = Array.isArray(options) ? options.find((p) => p.id === pick)?.label : null
+  if (fromOptions && pick !== 'auto') return fromOptions
+  if (pick === 'anthropic' || (pick === 'auto' && providers?.anthropic)) {
+    return 'Claude Sonnet 5 (Anthropic)'
+  }
+  if (pick === 'groq' || (pick === 'auto' && providers?.groq)) return 'Groq (free)'
+  if (pick === 'openai' || (pick === 'auto' && providers?.openai)) return 'OpenAI'
+  if (pick === 'xai' || (pick === 'auto' && providers?.xai)) return 'xAI Grok'
+  if (pick === 'auto') return 'Auto (best quality)'
+  return String(pick || 'Script AI')
+}
+
+/**
+ * Default Script AI to Claude when keyed. One-time migrates stale Groq/Auto picks
+ * so "Send to AI" chat actually hits Anthropic after ANTHROPIC_API_KEY is deployed.
+ */
+function applyClaudeScriptProviderDefault(preferred, providers) {
+  if (!providers?.anthropic || preferred !== 'anthropic') return null
+  try {
+    const migrated = localStorage.getItem(SCRIPT_PROVIDER_CLAUDE_MIGRATE_KEY)
+    const stored = readStoredScriptProvider()
+    if (!migrated) {
+      localStorage.setItem(SCRIPT_PROVIDER_CLAUDE_MIGRATE_KEY, '1')
+      // Upgrade first-visit / Auto / legacy Groq → explicit Claude.
+      if (stored == null || stored === 'auto' || stored === 'groq') {
+        writeStoredScriptProvider('anthropic')
+        return 'anthropic'
+      }
+      return stored
+    }
+    if (stored == null) {
+      writeStoredScriptProvider('anthropic')
+      return 'anthropic'
+    }
+  } catch {
+    return 'anthropic'
   }
   return null
 }
@@ -1109,9 +1162,15 @@ export default function EofProductionPanel({
       setScriptProviderOptions(Array.isArray(j.scriptProviderOptions) ? j.scriptProviderOptions : [])
       if (j.preferredScriptProvider) {
         setPreferredScriptProvider(j.preferredScriptProvider)
-        // First visit (no stored pick): default Script AI to server preferred (Claude when keyed).
-        if (readStoredScriptProvider() == null && j.preferredScriptProvider !== 'template') {
+        const providers =
+          j.scriptProviders && typeof j.scriptProviders === 'object' ? j.scriptProviders : null
+        const claudeDefault = applyClaudeScriptProviderDefault(j.preferredScriptProvider, providers)
+        if (claudeDefault) {
+          setScriptProvider(claudeDefault)
+        } else if (readStoredScriptProvider() == null && j.preferredScriptProvider !== 'template') {
+          // First visit: server preferred (Claude when ANTHROPIC_API_KEY is set).
           setScriptProvider(j.preferredScriptProvider)
+          writeStoredScriptProvider(j.preferredScriptProvider)
         }
       }
       setScriptBillingNote(typeof j.scriptBillingNote === 'string' ? j.scriptBillingNote : '')
@@ -2828,16 +2887,30 @@ export default function EofProductionPanel({
     .trim()
     .split(/\s+/)
     .filter(Boolean).length
+  const chatScriptAiLabel = activeScriptAiLabel(
+    scriptProvider,
+    preferredScriptProvider,
+    scriptProviders,
+    scriptProviderOptions,
+  )
   const scriptSourceLabel =
     selected?.scriptSource && selected.scriptSource !== 'template'
       ? selected.scriptSource === 'xai'
         ? 'Grok'
-        : selected.scriptSource
+        : selected.scriptSource === 'anthropic'
+          ? 'Claude'
+          : selected.scriptSource === 'groq'
+            ? 'Groq'
+            : selected.scriptSource === 'openai'
+              ? 'OpenAI'
+              : selected.scriptSource
       : preferredScriptProvider === 'xai' && !selected?.scriptSource
         ? 'Grok'
-        : selected?.scriptSource === 'template'
-          ? 'template'
-          : null
+        : preferredScriptProvider === 'anthropic' && !selected?.scriptSource
+          ? 'Claude'
+          : selected?.scriptSource === 'template'
+            ? 'template'
+            : null
 
   const primaryAction = (() => {
     if (!selected || !draftScript) return null
@@ -2893,11 +2966,18 @@ export default function EofProductionPanel({
           <div className={`absolute right-0 z-20 mt-2 w-[min(100vw-2rem,20rem)] space-y-2 ${PX.surface} p-4 text-xs shadow-2xl`}>
             <p>
               Script AI:{' '}
-              {scriptProviders.groq ? 'Groq' : openAiScriptEnabled ? 'Configured' : 'Add GROQ_API_KEY'}
+              {scriptProviders.anthropic
+                ? 'Claude (default)'
+                : scriptProviders.groq
+                  ? 'Groq'
+                  : openAiScriptEnabled
+                    ? 'Configured'
+                    : 'Add ANTHROPIC_API_KEY or GROQ_API_KEY'}
+              {scriptProviders.anthropic && scriptProviders.groq ? ' · Groq' : ''}
               {scriptProviders.openai ? ' · OpenAI' : ''}
-              {scriptProviders.anthropic ? ' · Claude' : ''}
               {scriptProviders.xai ? ' · xAI' : ''}
             </p>
+            <p className="text-[#8eb4d8]">Active: {chatScriptAiLabel}</p>
             <p>
               Script judge:{' '}
               {scriptProviders.judge?.enabled
@@ -3115,11 +3195,7 @@ export default function EofProductionPanel({
                 onChange={(e) => {
                   const next = e.target.value
                   setScriptProvider(next)
-                  try {
-                    localStorage.setItem(SCRIPT_PROVIDER_KEY, next)
-                  } catch {
-                    /* ignore */
-                  }
+                  writeStoredScriptProvider(next)
                 }}
                 className={inputCls}
               >
@@ -4530,9 +4606,14 @@ export default function EofProductionPanel({
               </div>
 
               <div className="mt-3 rounded-xl border border-[#303030] bg-[#121212] p-3">
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#aaa]">
-                  Direct the AI · tell Groq how to write
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#aaa]">
+                    Direct the AI · rewrite with direction
+                  </p>
+                  <p className="text-[10px] font-medium text-[#8eb4d8]" title="Uses the Script AI picker above">
+                    {chatScriptAiLabel}
+                  </p>
+                </div>
                 {scriptChatLog.length ? (
                   <div className="mt-2 max-h-28 space-y-1.5 overflow-y-auto">
                     {scriptChatLog.map((row, i) => (
@@ -4574,7 +4655,11 @@ export default function EofProductionPanel({
                     {scriptBusy === 'draft' ? 'Writing…' : 'Send to AI'}
                   </button>
                 </div>
-                <p className="mt-1 text-[10px] text-[#717171]">⌘/Ctrl + Enter to send · uses your Script AI (Groq / Claude / OpenAI / xAI)</p>
+                <p className="mt-1 text-[10px] text-[#717171]">
+                  ⌘/Ctrl + Enter to send · active model: {chatScriptAiLabel}
+                  {selected?.topic ? ` · topic “${selected.topic}”` : ''}
+                  {' · desk brief + producer direction'}
+                </p>
               </div>
 
               <textarea

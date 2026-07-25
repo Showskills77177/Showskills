@@ -96,6 +96,14 @@ describe('eof script provider defaults (Claude first)', () => {
     assert.equal(preferredEofScriptProvider(), 'groq')
     assert.equal(resolveScriptProviderAttemptOrder(null)[0], 'groq')
   })
+
+  it('agent chat Script AI pick anthropic hits Claude first (even with Groq keyed)', () => {
+    clearScriptKeys()
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test'
+    process.env.GROQ_API_KEY = 'gsk-test'
+    assert.deepEqual(resolveScriptProviderAttemptOrder('anthropic')[0], 'anthropic')
+    assert.deepEqual(resolveScriptProviderAttemptOrder('claude')[0], 'anthropic')
+  })
 })
 
 describe('eof writer input bundle', () => {
@@ -127,6 +135,23 @@ describe('eof writer input bundle', () => {
     assert.match(user, /ONLY claim what is in the DESK BRIEF/)
     assert.match(user, /Cuccurella hits back/)
     assert.match(user, /No agree\/disagree spam/)
+  })
+
+  it('agent chat director note keeps topic + desk brief (not generic rewrite)', () => {
+    const { system, user } = buildDraftPrompt({
+      topic: 'Tuchel England XI selection row',
+      format: 'debate',
+      context: 'Ordered topic: Tuchel England XI selection row\nSOURCE HEADLINES:\n1. Tuchel names squad amid selection debate',
+      previousDraft: 'Old draft about England.',
+      directorNote: 'Open angry — name the XI fight — end asking who is wrong',
+    })
+    assert.match(system, /PRODUCER DIRECTION/)
+    assert.match(user, /## PRODUCER DIRECTION/)
+    assert.match(user, /Open angry/)
+    assert.match(user, /## TOPIC\nTuchel England XI/)
+    assert.match(user, /## DESK BRIEF \/ SOURCE FACTS/)
+    assert.match(user, /Tuchel names squad/)
+    assert.match(user, /CURRENT DRAFT/)
   })
 
   it('polish and refine prompts keep desk brief + hard locks', () => {
