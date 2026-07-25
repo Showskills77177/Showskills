@@ -268,26 +268,26 @@ export default async function handler(req, res) {
         scriptProviderLabel: eofScriptProviderLabel(preferredEofScriptProvider()),
         scriptBillingNote: (() => {
           const s = eofScriptProviderStatus()
+          if (s.anthropic) {
+            return 'Claude Sonnet 5 is the default Script AI when ANTHROPIC_API_KEY is set (Auto prefers Claude). EOF_SCRIPT_PROVIDER=anthropic is optional reinforce.'
+          }
           if (s.groq && (s.newsdata || s.guardian)) {
-            return 'Free stack ready: NewsData/Guardian + RSS sourcing, Groq writes the Short.'
+            return 'Free stack ready: NewsData/Guardian + RSS sourcing, Groq writes the Short. Add ANTHROPIC_API_KEY to default to Claude Sonnet.'
           }
           if (s.groq && !s.newsdata && !s.guardian) {
             return 'Groq is ready. Add NEWSDATA_API_KEY (newsdata.io) or GUARDIAN_API_KEY for richer article sourcing; RSS still works without them.'
           }
-          if (s.newsdata && !s.groq) {
-            return 'NewsData key is set, but scripts still need GROQ_API_KEY (or OpenAI/Claude/xAI) to write the voiceover.'
+          if (s.newsdata && !s.groq && !s.anthropic) {
+            return 'NewsData key is set, but scripts still need GROQ_API_KEY or ANTHROPIC_API_KEY to write the voiceover.'
           }
           if ((s.newsdata || s.guardian) && !s.groq && !s.openai && !s.xai && !s.anthropic) {
-            return 'Article sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
-          }
-          if (s.anthropic && !s.openai && !s.groq && !s.xai) {
-            return 'Claude Sonnet 5 (Anthropic) is ready for Script AI. Pick Claude in the Script AI dropdown, or set EOF_SCRIPT_PROVIDER=anthropic.'
+            return 'Article sourcing is set, but you still need ANTHROPIC_API_KEY (Claude) or free GROQ_API_KEY to write the Short.'
           }
           if (s.xai && !s.openai && !s.groq && !s.anthropic) {
-            return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'
+            return 'xAI key is set but needs credits (console.x.ai). Add ANTHROPIC_API_KEY or free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'
           }
           if (!s.openai && !s.xai && !s.groq && !s.anthropic) {
-            return 'No script AI configured. Add free GROQ_API_KEY at console.groq.com → Vercel env → redeploy.'
+            return 'No script AI configured. Add ANTHROPIC_API_KEY (Claude Sonnet default) or free GROQ_API_KEY → Vercel env → redeploy.'
           }
           return null
         })(),

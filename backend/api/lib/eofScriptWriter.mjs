@@ -7,7 +7,8 @@
  *   4) Second-tier judge (merit / interest / value / directness / hotTake) → rewrite/escalate
  *   5) Adapt draft → Short scenes (captions + image queries)
  *
- * Auto provider order when configured: Groq (free) → OpenAI → Anthropic Claude → xAI Grok.
+ * Auto provider order when configured: Anthropic Claude Sonnet → Groq → OpenAI → xAI Grok.
+ * When ANTHROPIC_API_KEY is set, Claude is the default even if EOF_SCRIPT_PROVIDER is unset.
  * UI can force a provider via scriptProvider (groq | xai | openai | anthropic | auto).
  * Script Maker uses qualityBar=production and refuses canned templates.
  *
@@ -108,7 +109,7 @@ function normalizeScriptProviderId(id) {
   return pick
 }
 
-/** UI + API: script AI options (Groq is the free tier). */
+/** UI + API: script AI options (Claude Sonnet first when keyed). */
 export function listEofScriptProviderOptions() {
   const status = eofScriptProviderStatus()
   return [
@@ -116,20 +117,22 @@ export function listEofScriptProviderOptions() {
       id: 'auto',
       label: 'Auto (best quality)',
       configured: true,
+      detail: status.anthropic
+        ? 'Prefers Claude Sonnet when ANTHROPIC_API_KEY is set, then escalates Groq/OpenAI/xAI. Judges merit/interest/value/factuality/relevance.'
+        : 'Tunes temps by format, judges merit/interest/value, then escalates Groq → OpenAI/Claude/xAI until the best script wins.',
+    },
+    {
+      id: 'anthropic',
+      label: 'Claude Sonnet 5 (Anthropic)',
+      configured: status.anthropic,
       detail:
-        'Tunes temps by format, judges merit/interest/value, then escalates Groq → OpenAI/Claude/xAI until the best script wins.',
+        'Default writer when ANTHROPIC_API_KEY is set (optional ANTHROPIC_MODEL=claude-sonnet-5). Also used for polish/refine.',
     },
     {
       id: 'groq',
       label: 'Groq — Llama 3.3 70B (free)',
       configured: status.groq,
       detail: 'Free writer at console.groq.com — set GROQ_API_KEY on Vercel.',
-    },
-    {
-      id: 'anthropic',
-      label: 'Claude Sonnet 5 (Anthropic)',
-      configured: status.anthropic,
-      detail: 'Writer or judge — set ANTHROPIC_API_KEY (optional ANTHROPIC_MODEL=claude-sonnet-5).',
     },
     {
       id: 'xai',
@@ -141,17 +144,17 @@ export function listEofScriptProviderOptions() {
       id: 'openai',
       label: 'OpenAI',
       configured: status.openai,
-      detail: 'Writer or judge — set OPENAI_API_KEY (best second-model judge for Groq drafts).',
+      detail: 'Writer or judge — set OPENAI_API_KEY (second-model judge when Claude wrote).',
     },
   ]
 }
 
-function defaultAutoProviderOrder(status) {
-  // Fast free draft first; paid models used as Auto escalation for best quality.
+/** Claude Sonnet first when keyed; then free Groq; then OpenAI / xAI. */
+export function defaultAutoProviderOrder(status = eofScriptProviderStatus()) {
   const order = []
+  if (status.anthropic) order.push('anthropic')
   if (status.groq) order.push('groq')
   if (status.openai) order.push('openai')
-  if (status.anthropic) order.push('anthropic')
   if (status.xai) order.push('xai')
   return order
 }
@@ -220,10 +223,15 @@ export function resolveScriptProviderAttemptOrder(scriptProvider) {
   const status = eofScriptProviderStatus()
   const configured = defaultAutoProviderOrder(status)
   const envPick = normalizeScriptProviderId(envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER'))
-  const pick = normalizeScriptProviderId(scriptProvider || envPick || 'auto')
+  // Explicit UI/arg wins; otherwise env; otherwise auto (Claude-first when keyed).
+  const rawPick =
+    scriptProvider != null && String(scriptProvider).trim() !== ''
+      ? scriptProvider
+      : envPick || 'auto'
+  const pick = normalizeScriptProviderId(rawPick)
 
   if (pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)) {
-    // Auto draft attempt: Groq first for speed; paid models kept for escalation in write loop
+    // Auto: Claude Sonnet first when ANTHROPIC_API_KEY is set, then Groq/OpenAI/xAI.
     return configured.filter((id, i, arr) => arr.indexOf(id) === i)
   }
 
@@ -231,9 +239,9 @@ export function resolveScriptProviderAttemptOrder(scriptProvider) {
   return [pick, ...configured.filter((id) => id !== pick)]
 }
 
-/** Primary LLM provider for new scripts. */
+/** Primary LLM provider for new scripts (env force, else Claude when keyed). */
 export function preferredEofScriptProvider() {
-  const order = resolveScriptProviderAttemptOrder('auto')
+  const order = resolveScriptProviderAttemptOrder(null)
   return order[0] || 'template'
 }
 
@@ -1221,7 +1229,46 @@ export async function writeEofProductionScript({ topic, format, context, scriptP
   return { ...adapted, resolvedTopic, failureDetail: draftResult.failureDetail || '' }
 }
 
-function buildDraftPrompt({ topic, format, context, previousDraft = '', regenerate = false, directorNote = '' }) {
+/** Merge desk context + live headlines so Claude always has source bullets as primary truth. */
+export function assembleWriterDeskContext({ context = '', headlinesText = '', researchBrief = '' } = {}) {
+  const parts = []
+  const ctx = String(context || '').trim()
+  const research = String(researchBrief || '').trim()
+  const headlines = String(headlinesText || '').trim()
+  if (ctx) parts.push(ctx)
+  if (research) parts.push(`DESK BRIEF (editor):\n${research}`)
+  if (headlines) {
+    parts.push(`SOURCE HEADLINES / FACTS (PRIMARY TRUTH — only claim what appears here):\n${headlines}`)
+  }
+  return parts.join('\n\n').trim()
+}
+
+const WRITER_SYSTEM_HARD_LOCKS = `HARD FACT LOCK (non-negotiable):
+- The DESK BRIEF / SOURCE HEADLINES are the ONLY allowed facts.
+- ONLY claim names, scores, clubs, fees, quotes, and career-status changes that appear there (or mark as opinion/question).
+- Do NOT invent transfers, retirements, comebacks, injuries, sackings, appointments, bans, or "breaking" claims.
+
+HARD TOPIC LOCK (non-negotiable):
+- Football worldwide only — call it football, never soccer. Never NFL / American football.
+- Stay inside THIS story. No boxing (Fury/Joshua), F1, UFC, tennis, NBA, Hollywood, or other cross-sport free-association unless already in the brief.
+- Named people must be grounded in the topic/brief (same-story cast only).
+
+VOICE / CTA:
+- Eyes Of Football desk — Sky Sports / BBC Sport energy. Hot, sharp, direct. No bollox waffle.
+- ONE fight CTA question at the end. No agree/disagree spam. Never insult the viewer.`
+
+/**
+ * Writer input bundle for draft / polish / refine prompts (testable).
+ * Ensures Claude always receives topic, desk brief, duration, voice, and hard locks.
+ */
+export function buildDraftPrompt({
+  topic,
+  format,
+  context,
+  previousDraft = '',
+  regenerate = false,
+  directorNote = '',
+}) {
   const angles = [
     'lead with the result and what it means next',
     'lead with the quote or claim, then the pushback',
@@ -1232,7 +1279,8 @@ function buildDraftPrompt({ topic, format, context, previousDraft = '', regenera
   const angle = angles[Math.floor(Date.now() / 1000) % angles.length]
   const note = String(directorNote || '').trim().slice(0, 1200)
   const prev = String(previousDraft || '').trim()
-  const desk = String(context || '').trim().slice(0, 1600)
+  const desk = String(context || '').trim().slice(0, 2800)
+  const fmt = resolveFormat(format)
 
   const system = `You write YouTube SHORTS voiceovers for Eyes Of Football — NOT articles, NOT book chapters, NOT news wire paste.
 
@@ -1240,6 +1288,8 @@ HARD SCOPE:
 ${EOF_FOOTBALL_SCOPE}
 
 OUTPUT = ONE continuous spoken script. Plain prose only. No JSON, bullets, scene labels, hashtags, or titles.
+
+${WRITER_SYSTEM_HARD_LOCKS}
 
 ${EOF_SHORTS_DIRECT_VOICE}
 
@@ -1249,18 +1299,13 @@ ${EOF_SHORTS_FACTUALITY_VOICE}
 
 ${EOF_SHORTS_RELEVANCE_VOICE}
 
-SHORTS LENGTH:
+SHORTS LENGTH / FORMAT:
 - 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
 - Short sentences. Average under 16 words. Max one clause per beat.
-- Sound like Sky Sports News / BBC Sport desk at 10pm — hot, sharp, direct.
 - FIRST SENTENCE must name the player/coach AND the claim or conflict.
-- FACT LOCK: Use ONLY names, scores, clubs, and claims in the DESK BRIEF / current draft. Do NOT invent scores, fees, fake quotes, transfers, retirements, comebacks, injuries, or sackings.
-- TOPIC LOCK: Stay inside this football story. Do NOT drag in boxing, F1, or unrelated celebs unless they are in the DESK BRIEF.
-- Do NOT invent news events. If unsure, do not claim it happened — prefer opinion/commentary framing.
 - Transform the desk brief into a spoken ARGUMENT. Never copy-paste an article.
 - If PRODUCER DIRECTION is provided, follow it closely while keeping Shorts length and fact lock.
-- Structure for format "${format}": ${draftFormatGuide(format)}
-- End with ONE sharp fight CTA — not agree/disagree spam, never insult the viewer.
+- Structure for format "${fmt}": ${draftFormatGuide(fmt)}
 
 BANNED forever:
 "here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", "raises questions", "speaks volumes", "a reminder that", "the narrative", "the journey", "fans are arguing about right now", "ignore the noise", "strip the noise", "that is the football story", "you nut job", "you idiot", literary metaphors, long subordinate clauses, cross-sport free-association not in the brief.
@@ -1268,40 +1313,71 @@ Never reply with meta chat ("Sure", "I'll rewrite", "Here is a plan"). Output th
 
   // Directed rewrite: keep the prompt lean so Groq free tier actually returns a full VO
   if (note) {
-    const user = `Topic / headline: ${topic}
+    const user = `## TOPIC
+${topic}
 
-PRODUCER DIRECTION (must follow — this is how they want the script written):
+## FORMAT / DURATION
+${fmt} — ${draftFormatGuide(fmt)}
+90–130 words (~35–45s). One continuous spoken VO.
+
+## PRODUCER DIRECTION (must follow)
 """
 ${note}
 """
-${prev ? `\nCURRENT DRAFT (rewrite this — do not copy sentence-by-sentence):\n"""\n${prev.slice(0, 700)}\n"""\n` : ''}
-${desk ? `\nDESK FACTS (do not invent beyond):\n${desk}\n` : ''}
+${prev ? `\n## CURRENT DRAFT (rewrite — do not copy sentence-by-sentence)\n"""\n${prev.slice(0, 700)}\n"""\n` : ''}
+## DESK BRIEF / SOURCE FACTS (PRIMARY TRUTH — only claim what appears here)
+${desk || '(none — invent NOTHING; cautious football commentary only)'}
+
+## HARD CONSTRAINTS
+- FACT LOCK + TOPIC LOCK: only the brief above. Football only. No Fury/Joshua/boxing free-association.
+- ONE fight CTA. No agree/disagree spam. No viewer insults.
+
 Write the FULL spoken Shorts voiceover now (90–130 words). Plain prose only. No preamble.`
     return { system, user }
   }
 
   const regenBlock =
     regenerate && prev
-      ? `\nREGENERATE — angle: ${angle}.
+      ? `\n## REGENERATE — angle: ${angle}
 Write a DIFFERENT voiceover: new opening line, new structure, new CTA question.
 Keep the same verified facts from the DESK BRIEF. Do not paraphrase the previous draft sentence-by-sentence.
 PREVIOUS DRAFT (avoid copying):\n"""\n${prev.slice(0, 700)}\n"""\n`
       : regenerate
-        ? `\nREGENERATE — angle: ${angle}. New opening line required. Stay inside the DESK BRIEF facts.\n`
+        ? `\n## REGENERATE — angle: ${angle}. New opening line required. Stay inside the DESK BRIEF facts.\n`
         : ''
 
-  const user = `Topic / headline: ${topic}
-${desk ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond these notes):\n${desk}\n` : '\nDESK BRIEF: (none returned — do not invent scores, quotes, transfers, retirements, comebacks, injuries, or sackings; keep it cautious commentary only.)\n'}${regenBlock}
-Write the spoken Shorts voiceover only. No preamble.`
+  const user = `## TOPIC
+${topic}
+
+## FORMAT / DURATION
+${fmt} — ${draftFormatGuide(fmt)}
+90–130 words (~35–45 seconds spoken). Short sentences. One continuous VO.
+
+## VOICE
+Eyes Of Football desk — hot, sharp, direct. Football only. ONE fight CTA. No agree/disagree spam. No viewer insults.
+
+## DESK BRIEF / SOURCE FACTS (PRIMARY TRUTH — only claim what appears here)
+${
+  desk ||
+  '(none returned — do not invent scores, quotes, transfers, retirements, comebacks, injuries, or sackings; cautious commentary only.)'
+}
+${regenBlock}
+## HARD CONSTRAINTS
+- ONLY claim what is in the DESK BRIEF / SOURCE FACTS above.
+- TOPIC LOCK: this football story only — no boxing/F1/unrelated celebs unless already in the brief.
+- Output the spoken Shorts voiceover only. No preamble.`
 
   return { system, user }
 }
 
-function buildPolishPrompt({ topic, format, draft, deskBrief = '' }) {
-  const desk = String(deskBrief || '').trim().slice(0, 1400)
+export function buildPolishPrompt({ topic, format, draft, deskBrief = '' }) {
+  const desk = String(deskBrief || '').trim().slice(0, 2800)
+  const fmt = resolveFormat(format)
   const system = `You are a ruthless YouTube Shorts editor for Eyes Of Football.
 
 Rewrite the draft into a DIRECT hot-take spoken voiceover. Keep EVERY name, score, club, and claim — do not invent new facts.
+
+${WRITER_SYSTEM_HARD_LOCKS}
 
 ${EOF_SHORTS_DIRECT_VOICE}
 
@@ -1320,12 +1396,19 @@ Rules:
 - Keep ONE fight CTA question at the end — no agree/disagree spam, no viewer insults.
 - TOPIC LOCK: drop any athlete/sport/celebrity not in the DESK BRIEF (no boxing/F1 free-association).
 - Do NOT invent transfers, retirements, comebacks, injuries, or sackings absent from the DESK BRIEF.
-- Format intent: ${format}. ${draftFormatGuide(format)}
+- Format intent: ${fmt}. ${draftFormatGuide(fmt)}
 - Output the FULL improved voiceover only.`
 
-  const user = `Topic: ${topic}
-${desk ? `\nDESK BRIEF (SOURCE OF TRUTH — do not invent beyond):\n${desk}\n` : ''}
-Draft to tighten into a hot take:
+  const user = `## TOPIC
+${topic}
+
+## FORMAT / DURATION
+${fmt} — 90–130 words (~35–45s).
+
+## DESK BRIEF / SOURCE FACTS (PRIMARY TRUTH — do not invent beyond)
+${desk || '(none — invent NOTHING)'}
+
+## DRAFT TO TIGHTEN
 """
 ${draft}
 """
@@ -1335,11 +1418,14 @@ Return only the improved FULL voiceover.`
   return { system, user }
 }
 
-function buildHotTakeRefinePrompt({ topic, format, draft, deskBrief = '' }) {
-  const desk = String(deskBrief || '').trim().slice(0, 1400)
+export function buildHotTakeRefinePrompt({ topic, format, draft, deskBrief = '' }) {
+  const desk = String(deskBrief || '').trim().slice(0, 2800)
+  const fmt = resolveFormat(format)
   const system = `Final Eyes Of Football pass — HOT TAKE refine only.
 
 You receive a draft that already passed a polish. Make it bite harder WITHOUT inventing facts.
+
+${WRITER_SYSTEM_HARD_LOCKS}
 
 ${EOF_SHORTS_HOT_TAKE_VOICE}
 
@@ -1356,12 +1442,19 @@ Rules:
 - TOPIC LOCK: remove any cross-sport / unrelated celebrity injection not in the desk brief.
 - Never invent retirements, comebacks, transfers, injuries, or sackings.
 - 90–130 words. One CTA question.
-- Format: ${format}.
+- Format: ${fmt}.
 - Output the FULL voiceover only.`
 
-  const user = `Topic: ${topic}
-${desk ? `\nDESK BRIEF (SOURCE OF TRUTH):\n${desk}\n` : ''}
-Draft:
+  const user = `## TOPIC
+${topic}
+
+## FORMAT / DURATION
+${fmt} — 90–130 words (~35–45s).
+
+## DESK BRIEF / SOURCE FACTS (PRIMARY TRUTH)
+${desk || '(none — invent NOTHING)'}
+
+## DRAFT
 """
 ${draft}
 """
@@ -1390,14 +1483,10 @@ async function writeDraftPipeline({
   forceHotTakeRefine = false,
 }) {
   let workingTopic = topic
-  let researchCtx = context
+  let researchCtx = assembleWriterDeskContext({ context, headlinesText })
   const isGroq = provider === 'groq'
   // Groq: never spend a JSON research call — use free desk pack / context only
-  if (isGroq) {
-    researchCtx = [context, headlinesText ? `DESK BRIEF / HEADLINES (SOURCE OF TRUTH):\n${headlinesText}` : '']
-      .filter(Boolean)
-      .join('\n\n')
-  } else {
+  if (!isGroq) {
     try {
       const research = await researchDeskBriefWithProvider({
         provider,
@@ -1409,7 +1498,12 @@ async function writeDraftPipeline({
       if (research) {
         const built = deskBriefToContext(research)
         if (built) {
-          researchCtx = [context, built].filter(Boolean).join('\n\n')
+          // Keep raw source headlines alongside the editor brief (primary truth).
+          researchCtx = assembleWriterDeskContext({
+            context,
+            researchBrief: built,
+            headlinesText,
+          })
           if (research.headline && String(research.headline).trim().length >= 12) {
             workingTopic = String(research.headline).trim().slice(0, 100)
           }

@@ -16,10 +16,20 @@ describe('eofScriptJudge', () => {
     Object.assign(process.env, prev)
   })
 
-  it('prefers a second model when Groq wrote', () => {
+  it('prefers Claude as second model when Groq wrote', () => {
     process.env.EOF_SCRIPT_JUDGE = 'auto'
     process.env.GROQ_API_KEY = 'g'
     process.env.OPENAI_API_KEY = 'o'
+    process.env.ANTHROPIC_API_KEY = 'a'
+    delete process.env.XAI_API_KEY
+    assert.equal(resolveScriptJudgeProvider('groq'), 'anthropic')
+  })
+
+  it('falls back to OpenAI judge when Claude is unset and Groq wrote', () => {
+    process.env.EOF_SCRIPT_JUDGE = 'auto'
+    process.env.GROQ_API_KEY = 'g'
+    process.env.OPENAI_API_KEY = 'o'
+    delete process.env.ANTHROPIC_API_KEY
     delete process.env.XAI_API_KEY
     assert.equal(resolveScriptJudgeProvider('groq'), 'openai')
   })

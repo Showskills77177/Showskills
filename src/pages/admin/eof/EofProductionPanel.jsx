@@ -828,15 +828,17 @@ function StickerPickerGrid({ title, hint, items, selectedIds, onPick, disabled }
 
 const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 
+/** @returns {string|null} stored pick, or null when never set (server preferred applies). */
 function readStoredScriptProvider() {
   try {
     const v = localStorage.getItem(SCRIPT_PROVIDER_KEY)
+    if (v == null || v === '') return null
     if (v === 'claude') return 'anthropic'
     if (v === 'auto' || v === 'groq' || v === 'xai' || v === 'openai' || v === 'anthropic') return v
   } catch {
     /* ignore */
   }
-  return 'auto'
+  return null
 }
 
 function readStoredSelectedId() {
@@ -955,7 +957,7 @@ export default function EofProductionPanel({
     judge: { enabled: false },
   })
   const [scriptProviderOptions, setScriptProviderOptions] = useState([])
-  const [scriptProvider, setScriptProvider] = useState(readStoredScriptProvider)
+  const [scriptProvider, setScriptProvider] = useState(() => readStoredScriptProvider() || 'auto')
   const [preferredScriptProvider, setPreferredScriptProvider] = useState('template')
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
@@ -1105,7 +1107,13 @@ export default function EofProductionPanel({
           : { xai: false, openai: false, groq: false, newsdata: false, guardian: false, perplexity: false },
       )
       setScriptProviderOptions(Array.isArray(j.scriptProviderOptions) ? j.scriptProviderOptions : [])
-      if (j.preferredScriptProvider) setPreferredScriptProvider(j.preferredScriptProvider)
+      if (j.preferredScriptProvider) {
+        setPreferredScriptProvider(j.preferredScriptProvider)
+        // First visit (no stored pick): default Script AI to server preferred (Claude when keyed).
+        if (readStoredScriptProvider() == null && j.preferredScriptProvider !== 'template') {
+          setScriptProvider(j.preferredScriptProvider)
+        }
+      }
       setScriptBillingNote(typeof j.scriptBillingNote === 'string' ? j.scriptBillingNote : '')
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
@@ -3119,8 +3127,8 @@ export default function EofProductionPanel({
                   ? scriptProviderOptions
                   : [
                       { id: 'auto', label: 'Auto (best quality)', configured: true },
-                      { id: 'groq', label: 'Groq (free)', configured: false },
                       { id: 'anthropic', label: 'Claude Sonnet 5 (Anthropic)', configured: false },
+                      { id: 'groq', label: 'Groq (free)', configured: false },
                       { id: 'xai', label: 'xAI Grok', configured: false },
                       { id: 'openai', label: 'OpenAI', configured: false },
                     ]

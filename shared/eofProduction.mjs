@@ -124,7 +124,7 @@ export const EOF_RENDER_STACK = {
     id: 'ai-or-template',
     label: 'Script writer (draft text → adapt to scenes)',
     detail:
-      'Multi-pass: NewsData + Guardian + BBC/Sky RSS → desk brief → Shorts voiceover → polish → Adapt to scenes. Set NEWSDATA_API_KEY + GROQ_API_KEY.',
+      'Multi-pass: NewsData + Guardian + BBC/Sky RSS → desk brief → Shorts voiceover → polish → Adapt to scenes. Claude Sonnet is default when ANTHROPIC_API_KEY is set; else Groq.',
   },
   host: {
     id: 'vercel',

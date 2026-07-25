@@ -92,17 +92,17 @@ export function resolveScriptJudgeProvider(writerProvider) {
     return null
   }
 
-  // auto — different model from writer when possible
+  // auto — prefer Claude Sonnet as judge when available; different model from writer when possible
   const order =
     writer === 'groq'
-      ? ['openai', 'anthropic', 'xai', 'groq']
+      ? ['anthropic', 'openai', 'xai', 'groq']
       : writer === 'openai'
         ? ['anthropic', 'xai', 'groq', 'openai']
         : writer === 'anthropic'
           ? ['openai', 'xai', 'groq', 'anthropic']
           : writer === 'xai'
-            ? ['openai', 'anthropic', 'groq', 'xai']
-            : ['openai', 'anthropic', 'xai', 'groq']
+            ? ['anthropic', 'openai', 'groq', 'xai']
+            : ['anthropic', 'openai', 'xai', 'groq']
 
   for (const id of order) {
     if (id === 'openai' && isOpenAiConfigured()) return 'openai'
