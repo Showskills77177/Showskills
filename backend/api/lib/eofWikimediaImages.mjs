@@ -46,9 +46,14 @@ export function isEofFootballNationQuery(topic, imageQuery = '') {
  * @param {string} path
  * @param {Record<string, string>} params
  */
+const WIKI_API_TIMEOUT_MS = Number(process.env.EOF_WIKIMEDIA_TIMEOUT_MS) || 8_000
+
 async function wikiApi(host, params) {
   const url = `${host}?${new URLSearchParams({ format: 'json', origin: '*', ...params })}`
-  const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
+  const res = await fetch(url, {
+    headers: { 'User-Agent': UA, Accept: 'application/json' },
+    signal: AbortSignal.timeout(WIKI_API_TIMEOUT_MS),
+  })
   if (!res.ok) throw new Error(`wiki ${res.status}`)
   return res.json()
 }

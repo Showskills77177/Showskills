@@ -52,6 +52,31 @@ describe('eofProduction render estimates', () => {
     assert.equal(sec, 25)
   })
 
+  it('maps 5-scene video stage sceneIndex 0 to 42% (scene clip encode)', () => {
+    const progress = buildEofRenderProgress({
+      stage: 'video',
+      sceneIndex: 0,
+      sceneCount: 5,
+      startedAt: new Date().toISOString(),
+      pipeline: 'video',
+    })
+    assert.equal(progress.percent, 42)
+    assert.match(progress.message, /scene clip 1 of 5/i)
+  })
+
+  it('accepts heartbeat message overrides without changing percent', () => {
+    const progress = buildEofRenderProgress({
+      stage: 'video',
+      sceneIndex: 0,
+      sceneCount: 5,
+      startedAt: new Date().toISOString(),
+      pipeline: 'video',
+      message: 'Encoding scene clip 1 of 5 (ffmpeg)…',
+    })
+    assert.equal(progress.percent, 42)
+    assert.match(progress.message, /ffmpeg/i)
+  })
+
   it('does not show 25 minute ETA at 6% progress after one minute', () => {
     const startedAt = new Date(Date.now() - 60_000).toISOString()
     const progress = buildEofRenderProgress({

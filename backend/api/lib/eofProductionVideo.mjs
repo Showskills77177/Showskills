@@ -67,6 +67,12 @@ const VIDEO_FPS = Number(process.env.EOF_VIDEO_FPS) || 24
 const VIDEO_PRESET = process.env.EOF_VIDEO_PRESET || 'ultrafast'
 const VIDEO_CRF = process.env.EOF_VIDEO_CRF || '28'
 const CLIP_CONCURRENCY = Number(process.env.EOF_VIDEO_CLIP_CONCURRENCY) || 2
+/** Cap threads on Vercel — `-threads 0` can thrash/hang serverless encodes (UI stuck ~42%). */
+const VIDEO_THREADS =
+  process.env.EOF_FFMPEG_THREADS ||
+  (process.env.VERCEL || process.env.VERCEL_ENV ? '2' : '0')
+const SCENE_CLIP_TIMEOUT_MS = Number(process.env.EOF_SCENE_CLIP_TIMEOUT_MS) || 60_000
+const MUX_TIMEOUT_MS = Number(process.env.EOF_MUX_TIMEOUT_MS) || 120_000
 
 function resolveCaptionFont() {
   for (const path of CAPTION_FONT_CANDIDATES) {
@@ -517,13 +523,13 @@ async function encodeSceneClip({
           '-crf',
           VIDEO_CRF,
           '-threads',
-          '0',
+          VIDEO_THREADS,
           '-pix_fmt',
           'yuv420p',
           '-an',
           clipPath,
         ],
-        { maxBuffer: 16 * 1024 * 1024 },
+        { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS },
       )
       return clipPath
     } catch (e) {
@@ -570,13 +576,13 @@ async function encodeSceneClip({
         '-crf',
         VIDEO_CRF,
         '-threads',
-        '0',
+        VIDEO_THREADS,
         '-pix_fmt',
         'yuv420p',
         '-an',
         clipPath,
       ],
-      { maxBuffer: 16 * 1024 * 1024 },
+      { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS },
     )
     return clipPath
   }
@@ -614,13 +620,13 @@ async function encodeSceneClip({
       '-crf',
       VIDEO_CRF,
       '-threads',
-      '0',
+      VIDEO_THREADS,
       '-pix_fmt',
       'yuv420p',
       '-an',
       clipPath,
     ],
-    { maxBuffer: 16 * 1024 * 1024 },
+    { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS },
   )
 
   return clipPath
@@ -668,7 +674,7 @@ async function stitchWithConcat({ clipPaths, mixedAudioPath, out }) {
         '+faststart',
         out,
       ]
-  await runFfmpeg(args, { maxBuffer: 16 * 1024 * 1024 })
+  await runFfmpeg(args, { maxBuffer: 16 * 1024 * 1024, timeoutMs: MUX_TIMEOUT_MS })
   return hasAudio
 }
 
@@ -710,7 +716,7 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
     '+faststart',
     out,
   )
-  await runFfmpeg(args, { maxBuffer: 32 * 1024 * 1024 })
+  await runFfmpeg(args, { maxBuffer: 32 * 1024 * 1024, timeoutMs: MUX_TIMEOUT_MS })
   return hasAudio
 }
 

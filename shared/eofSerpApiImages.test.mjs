@@ -151,6 +151,54 @@ describe('eofSerpApiImages', () => {
     }
   })
 
+  it('uses a tight default timeout so hung SerpAPI sockets fail fast', async () => {
+    const prevKey = process.env.SERPAPI_API_KEY
+    const prevTimeout = process.env.EOF_SERPAPI_TIMEOUT_MS
+    process.env.SERPAPI_API_KEY = 'mock-key'
+    delete process.env.EOF_SERPAPI_TIMEOUT_MS
+
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock.fn((_url, init = {}) => {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ images_results: [] }),
+            text: async () => '',
+          })
+        }, 30_000)
+        const onAbort = () => {
+          clearTimeout(timer)
+          const err = new Error('The operation was aborted')
+          err.name = 'AbortError'
+          reject(err)
+        }
+        if (init.signal?.aborted) onAbort()
+        else init.signal?.addEventListener('abort', onAbort, { once: true })
+      })
+    })
+
+    try {
+      const started = Date.now()
+      // Floor is 2s — still far below the old 45s Serp hang.
+      const { hits, health } = await searchSerpApiGoogleImagesWithStatus('Marc Cucurella hair', {
+        limit: 3,
+        timeoutMs: 2_000,
+      })
+      const elapsed = Date.now() - started
+      assert.equal(hits.length, 0)
+      assert.equal(health.status, 'timeout')
+      assert.ok(elapsed < 6_000, `expected fast fail, took ${elapsed}ms`)
+    } finally {
+      globalThis.fetch = originalFetch
+      if (prevKey == null) delete process.env.SERPAPI_API_KEY
+      else process.env.SERPAPI_API_KEY = prevKey
+      if (prevTimeout == null) delete process.env.EOF_SERPAPI_TIMEOUT_MS
+      else process.env.EOF_SERPAPI_TIMEOUT_MS = prevTimeout
+    }
+  })
+
   it('reports auth_failed health on 401 instead of silent empty hits', async () => {
     const prevKey = process.env.SERPAPI_API_KEY
     process.env.SERPAPI_API_KEY = 'bad-key'

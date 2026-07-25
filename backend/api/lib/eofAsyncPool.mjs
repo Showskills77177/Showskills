@@ -43,3 +43,22 @@ export function createThrottledWriter(write, minIntervalMs = 800) {
     inflight = null
   }
 }
+
+/**
+ * Fire-and-forget progress heartbeat so the Production UI doesn't freeze on a single %
+ * while SerpAPI / ffmpeg work with no scene-index advances.
+ * @param {() => Promise<void> | void} tick
+ * @param {number} [intervalMs]
+ * @returns {() => void} stop
+ */
+export function startProgressHeartbeat(tick, intervalMs = 4000) {
+  const ms = Math.max(1500, Number(intervalMs) || 4000)
+  const id = setInterval(() => {
+    try {
+      void Promise.resolve(tick()).catch(() => {})
+    } catch {
+      /* ignore */
+    }
+  }, ms)
+  return () => clearInterval(id)
+}

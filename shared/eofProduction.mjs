@@ -191,6 +191,7 @@ function formatEtaLabel(etaSeconds) {
  *   startedAt: string,
  *   estimatedTotalSec?: number,
  *   pipeline?: 'audio' | 'video',
+ *   message?: string,
  * }} input
  */
 export function buildEofRenderProgress(input) {
@@ -208,6 +209,7 @@ export function buildEofRenderProgress(input) {
       percent = Math.min(38, Math.round(((sceneIndex + 0.35) / sceneCount) * 38))
       message = `Fetching image ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount}…`
     } else if (input.stage === 'video') {
+      // 5 scenes @ sceneIndex 0 → 42% ("Building scene clip 1 of 5…")
       percent = 38 + Math.min(52, Math.round(((sceneIndex + 0.35) / sceneCount) * 52))
       message = `Building scene clip ${Math.min(sceneIndex + 1, sceneCount)} of ${sceneCount}…`
     } else if (input.stage === 'mux') {
@@ -228,6 +230,9 @@ export function buildEofRenderProgress(input) {
     percent = 100
     message = 'Render complete'
   }
+
+  const messageOverride = String(input.message || '').trim()
+  if (messageOverride) message = messageOverride
 
   const estimatedTotalSec =
     pipeline === 'video'

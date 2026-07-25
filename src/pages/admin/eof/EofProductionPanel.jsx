@@ -1503,7 +1503,11 @@ export default function EofProductionPanel({
   const isRenderStuck =
     (selected?.status === 'rendering' || selected?.status === 'rendering_video') &&
     displayProgress &&
-    displayProgress.elapsedSeconds > Math.max(240, (displayProgress.estimatedTotalSec || 60) * 2)
+    (displayProgress.elapsedSeconds > Math.max(240, (displayProgress.estimatedTotalSec || 60) * 2) ||
+      // Scene-clip encode (often stuck at ~42% for 5-scene Shorts) should not freeze the UI forever.
+      (displayProgress.pipeline === 'video' &&
+        displayProgress.stage === 'video' &&
+        displayProgress.elapsedSeconds > 180))
 
   useEffect(() => {
     if (!active || !selectedId) return undefined

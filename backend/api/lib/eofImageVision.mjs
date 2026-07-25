@@ -174,7 +174,7 @@ Score every index 1–${hits.length}.`,
           { role: 'user', content: userContent },
         ],
       }),
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(Number(process.env.EOF_IMAGE_VISION_TIMEOUT_MS) || 25_000),
     })
     if (!res.ok) {
       const err = await res.text().catch(() => '')

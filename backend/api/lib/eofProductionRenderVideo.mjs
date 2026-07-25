@@ -57,7 +57,7 @@ import {
   sortEofPoolHitsPreferScrape,
 } from './eofImageGen.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache, assertEofCleanPlateImagePath } from './eofProductionVideo.mjs'
-import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
+import { mapWithConcurrency, createThrottledWriter, startProgressHeartbeat } from './eofAsyncPool.mjs'
 import {
   ensureEofMixedAudioOnDisk,
   persistEofVideoArtifact,
@@ -68,8 +68,21 @@ import {
 } from './eofProductionArtifacts.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
+/** Cap whole scrape+vision+gen phase so Cucurella builds fail fast instead of freezing the UI. */
+const IMAGE_POOL_DEADLINE_MS = Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) || 75_000
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
+
+function withDeadline(promise, ms, label) {
+  const limit = Math.max(5_000, Number(ms) || 0)
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(limit / 1000)}s — retry Build`))
+    }, limit)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
 
 /**
  * Remux / remix / reuse-stills paths must not re-run stills preflight
@@ -277,7 +290,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     700,
   )
 
-  async function report(stage, sceneIndex = 0, { force = false } = {}) {
+  async function report(stage, sceneIndex = 0, { force = false, message } = {}) {
     await throttledProgress(
       buildEofRenderProgress({
         stage,
@@ -286,6 +299,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         startedAt: renderStartedAt,
         estimatedTotalSec,
         pipeline: 'video',
+        message,
       }),
       { force },
     )
@@ -482,186 +496,205 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         return pool
       }
 
-      const scrapePromise = fetchScrapeJobPool()
-      const genPromise = runEofImageGenAlongsideScrape({
-        mode: imageGenMode,
-        provider: imageGenProvider,
-        scrapePromise,
-        subject: leadSubject,
-        intent: leadIntent,
-        topic: job.topic,
-        workDir,
-        sceneCount: rows.length,
-        plainTextDraft: imageContext.plainTextDraft,
-      })
+      let imagePhaseNote = 'Searching Google Images (SerpAPI)…'
+      const stopImageHb = startProgressHeartbeat(async () => {
+        await report('images', 0, { force: true, message: imagePhaseNote })
+      }, 3500)
+      try {
+        await report('images', 0, { force: true, message: imagePhaseNote })
 
-      const [scrapePool, genHits] = await Promise.all([scrapePromise, genPromise])
-      oxyPool = scrapePool
-      imageFetchDiag.scrapeHitsBeforeFilter = oxyPool?.hits?.length || 0
-      imageFetchDiag.genHits = Array.isArray(genHits) ? genHits.length : 0
-
-      if (Array.isArray(genHits) && genHits.length) {
-        if (oxyPool?.hits?.length) {
-          oxyPool.hits = mergeEofScrapeAndGenHits(oxyPool.hits, genHits)
-        } else {
-          oxyPool = {
-            query: `ai-gen:${leadSubject}`,
-            hits: mergeEofScrapeAndGenHits([], genHits),
-            claimed: new Set(),
-            source: genHits[0]?.source || 'grok-imagine',
+        const poolWork = (async () => {
+          const scrapePromise = fetchScrapeJobPool()
+          const genPromise = runEofImageGenAlongsideScrape({
+            mode: imageGenMode,
+            provider: imageGenProvider,
+            scrapePromise,
+            subject: leadSubject,
+            intent: leadIntent,
+            topic: job.topic,
+            workDir,
+            sceneCount: rows.length,
             plainTextDraft: imageContext.plainTextDraft,
-            intent: leadIntent || null,
-            subject: leadSubject || null,
-          }
-        }
-        console.info(
-          '[eof-video] image gen merged',
-          `${genHits.length} gen hits`,
-          `pool=${oxyPool.hits.length}`,
-          `mode=${imageGenMode}`,
-        )
-      }
-
-      // Second credit only when the script names another person (Rooney + Tuchel).
-      const secondaryPeople = listSecondaryImageSubjects(
-        job.topic,
-        imageContext.plainTextDraft,
-      )
-      if (
-        oxyPool?.hits?.length &&
-        secondaryPeople.length &&
-        (oxyPool.source === 'serpapi' || oxyPool.source === 'oxylabs')
-      ) {
-        try {
-          const sec =
-            oxyPool.source === 'serpapi'
-              ? await fetchEofSerpApiSecondaryPool({
-                  topic: job.topic,
-                  plainTextDraft: imageContext.plainTextDraft,
-                })
-              : await fetchEofOxylabsSecondaryPool({
-                  topic: job.topic,
-                  plainTextDraft: imageContext.plainTextDraft,
-                })
-          if (sec?.hits?.length) {
-            oxyPool.secondaryHits = sec.hits.map((h) => ({
-              ...h,
-              source: h.source || oxyPool.source,
-            }))
-            oxyPool.secondarySubject = sec.subject
-            oxyPool.secondaryQuery = sec.query
-            oxyPool.secondaryClaimed = new Set()
-          }
-        } catch (e) {
-          console.warn('[eof-video] secondary image pool failed', e instanceof Error ? e.message : e)
-        }
-      }
-
-      // Grok vision: look at the stills (not just titles) — drop watermark / wrong era / wrong face.
-      // Prefer real scrape photos when vision scores tie (applyVisionScoresToHits).
-      // When vision is off/failed: NEVER take the first Google hit for a celebrity — require name cues.
-      if (oxyPool?.hits?.length && isEofImageVisionConfigured()) {
-        try {
-          const visionScores = await rankEofPoolHitsWithVision({
-            hits: oxyPool.hits,
-            subject: oxyPool.subject || leadSubject || job.topic,
-            intent: oxyPool.intent || leadIntent || 'neutral',
-            secondarySubjects: secondaryPeople,
-            maxImages: Math.min(8, oxyPool.hits.length),
           })
-          if (visionScores.size) {
-            oxyPool.hits = applyVisionScoresToHits(oxyPool.hits, visionScores)
+
+          const [scrapePool, genHits] = await Promise.all([scrapePromise, genPromise])
+          oxyPool = scrapePool
+          imageFetchDiag.scrapeHitsBeforeFilter = oxyPool?.hits?.length || 0
+          imageFetchDiag.genHits = Array.isArray(genHits) ? genHits.length : 0
+
+          if (Array.isArray(genHits) && genHits.length) {
+            if (oxyPool?.hits?.length) {
+              oxyPool.hits = mergeEofScrapeAndGenHits(oxyPool.hits, genHits)
+            } else {
+              oxyPool = {
+                query: `ai-gen:${leadSubject}`,
+                hits: mergeEofScrapeAndGenHits([], genHits),
+                claimed: new Set(),
+                source: genHits[0]?.source || 'grok-imagine',
+                plainTextDraft: imageContext.plainTextDraft,
+                intent: leadIntent || null,
+                subject: leadSubject || null,
+              }
+            }
             console.info(
-              '[eof-video] vision kept',
-              oxyPool.hits.length,
-              'stills for',
-              String(oxyPool.subject || leadSubject || '').slice(0, 40),
+              '[eof-video] image gen merged',
+              `${genHits.length} gen hits`,
+              `pool=${oxyPool.hits.length}`,
+              `mode=${imageGenMode}`,
             )
-          } else if (isNamedFootballSubject(leadSubject)) {
-            console.warn(
-              '[eof-video] vision returned no scores — strict subject-name filter for',
-              String(leadSubject).slice(0, 40),
-            )
-            oxyPool.hits = filterHitsRequiringSubjectNameCue(
-              oxyPool.hits,
-              oxyPool.subject || leadSubject,
-            )
-            oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
-          } else {
-            oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
           }
-          if (oxyPool.secondaryHits?.length) {
-            const secScores = await rankEofPoolHitsWithVision({
-              hits: oxyPool.secondaryHits,
-              subject: oxyPool.secondarySubject || secondaryPeople[0],
-              intent: 'coach',
-              maxImages: Math.min(6, oxyPool.secondaryHits.length),
-            })
-            if (secScores.size) {
-              oxyPool.secondaryHits = applyVisionScoresToHits(oxyPool.secondaryHits, secScores)
-            } else if (isNamedFootballSubject(oxyPool.secondarySubject || secondaryPeople[0])) {
-              oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
-                oxyPool.secondaryHits,
-                oxyPool.secondarySubject || secondaryPeople[0],
-              )
+
+          // Second credit only when the script names another person (Rooney + Tuchel).
+          const secondaryPeople = listSecondaryImageSubjects(
+            job.topic,
+            imageContext.plainTextDraft,
+          )
+          if (
+            oxyPool?.hits?.length &&
+            secondaryPeople.length &&
+            (oxyPool.source === 'serpapi' || oxyPool.source === 'oxylabs')
+          ) {
+            imagePhaseNote = 'Fetching secondary person stills…'
+            try {
+              const sec =
+                oxyPool.source === 'serpapi'
+                  ? await fetchEofSerpApiSecondaryPool({
+                      topic: job.topic,
+                      plainTextDraft: imageContext.plainTextDraft,
+                    })
+                  : await fetchEofOxylabsSecondaryPool({
+                      topic: job.topic,
+                      plainTextDraft: imageContext.plainTextDraft,
+                    })
+              if (sec?.hits?.length) {
+                oxyPool.secondaryHits = sec.hits.map((h) => ({
+                  ...h,
+                  source: h.source || oxyPool.source,
+                }))
+                oxyPool.secondarySubject = sec.subject
+                oxyPool.secondaryQuery = sec.query
+                oxyPool.secondaryClaimed = new Set()
+              }
+            } catch (e) {
+              console.warn('[eof-video] secondary image pool failed', e instanceof Error ? e.message : e)
             }
           }
-        } catch (e) {
-          console.warn('[eof-video] vision re-rank skipped', e instanceof Error ? e.message : e)
-          if (isNamedFootballSubject(leadSubject)) {
-            oxyPool.hits = filterHitsRequiringSubjectNameCue(
-              oxyPool.hits,
-              oxyPool.subject || leadSubject,
-            )
-          }
-          oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
-        }
-      } else if (oxyPool?.hits?.length) {
-        if (isNamedFootballSubject(leadSubject)) {
-          console.warn(
-            '[eof-video] vision not configured — strict subject-name filter for',
-            String(leadSubject).slice(0, 40),
-          )
-          oxyPool.hits = filterHitsRequiringSubjectNameCue(
-            oxyPool.hits,
-            oxyPool.subject || leadSubject,
-          )
-          if (oxyPool.secondaryHits?.length && oxyPool.secondarySubject) {
-            oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
-              oxyPool.secondaryHits,
-              oxyPool.secondarySubject,
-            )
-          }
-        }
-        oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
-      }
 
-      imageFetchDiag.scrapeHitsAfterFilter = oxyPool?.hits?.length || 0
-      console.info(
-        '[eof-video] google images pool',
-        oxyPool?.source || 'none',
-        oxyPool?.hits?.length ? `${oxyPool.hits.length} hits` : '0 hits',
-        oxyPool?.secondaryHits?.length ? `+${oxyPool.secondaryHits.length} secondary` : '',
-        oxyPool?.query ? `q=${String(oxyPool.query).slice(0, 80)}` : '',
-        imageFetchDiag.scrapeHitsBeforeFilter > imageFetchDiag.scrapeHitsAfterFilter
-          ? `(filtered ${imageFetchDiag.scrapeHitsBeforeFilter}→${imageFetchDiag.scrapeHitsAfterFilter})`
-          : '',
-      )
-      if (!oxyPool?.hits?.length) {
-        // Wikidata only when no Google Images job pool is available.
-        try {
-          wikiPool = await listWikimediaPersonImages(job.topic, {
-            limit: Math.max(8, rows.length + 3),
-          })
-        } catch (e) {
-          console.warn(
-            '[eof-video] wikimedia person pool failed',
-            job.topic,
-            e instanceof Error ? e.message : e,
+          // Grok vision: look at the stills (not just titles) — drop watermark / wrong era / wrong face.
+          // Prefer real scrape photos when vision scores tie (applyVisionScoresToHits).
+          // When vision is off/failed: NEVER take the first Google hit for a celebrity — require name cues.
+          if (oxyPool?.hits?.length && isEofImageVisionConfigured()) {
+            imagePhaseNote = 'Scoring stills with vision…'
+            await report('images', 0, { force: true, message: imagePhaseNote })
+            try {
+              const visionScores = await rankEofPoolHitsWithVision({
+                hits: oxyPool.hits,
+                subject: oxyPool.subject || leadSubject || job.topic,
+                intent: oxyPool.intent || leadIntent || 'neutral',
+                secondarySubjects: secondaryPeople,
+                maxImages: Math.min(8, oxyPool.hits.length),
+              })
+              if (visionScores.size) {
+                oxyPool.hits = applyVisionScoresToHits(oxyPool.hits, visionScores)
+                console.info(
+                  '[eof-video] vision kept',
+                  oxyPool.hits.length,
+                  'stills for',
+                  String(oxyPool.subject || leadSubject || '').slice(0, 40),
+                )
+              } else if (isNamedFootballSubject(leadSubject)) {
+                console.warn(
+                  '[eof-video] vision returned no scores — strict subject-name filter for',
+                  String(leadSubject).slice(0, 40),
+                )
+                oxyPool.hits = filterHitsRequiringSubjectNameCue(
+                  oxyPool.hits,
+                  oxyPool.subject || leadSubject,
+                )
+                oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
+              } else {
+                oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
+              }
+              if (oxyPool.secondaryHits?.length) {
+                const secScores = await rankEofPoolHitsWithVision({
+                  hits: oxyPool.secondaryHits,
+                  subject: oxyPool.secondarySubject || secondaryPeople[0],
+                  intent: 'coach',
+                  maxImages: Math.min(6, oxyPool.secondaryHits.length),
+                })
+                if (secScores.size) {
+                  oxyPool.secondaryHits = applyVisionScoresToHits(oxyPool.secondaryHits, secScores)
+                } else if (isNamedFootballSubject(oxyPool.secondarySubject || secondaryPeople[0])) {
+                  oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
+                    oxyPool.secondaryHits,
+                    oxyPool.secondarySubject || secondaryPeople[0],
+                  )
+                }
+              }
+            } catch (e) {
+              console.warn('[eof-video] vision re-rank skipped', e instanceof Error ? e.message : e)
+              if (isNamedFootballSubject(leadSubject)) {
+                oxyPool.hits = filterHitsRequiringSubjectNameCue(
+                  oxyPool.hits,
+                  oxyPool.subject || leadSubject,
+                )
+              }
+              oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
+            }
+          } else if (oxyPool?.hits?.length) {
+            if (isNamedFootballSubject(leadSubject)) {
+              console.warn(
+                '[eof-video] vision not configured — strict subject-name filter for',
+                String(leadSubject).slice(0, 40),
+              )
+              oxyPool.hits = filterHitsRequiringSubjectNameCue(
+                oxyPool.hits,
+                oxyPool.subject || leadSubject,
+              )
+              if (oxyPool.secondaryHits?.length && oxyPool.secondarySubject) {
+                oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
+                  oxyPool.secondaryHits,
+                  oxyPool.secondarySubject,
+                )
+              }
+            }
+            oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
+          }
+
+          imageFetchDiag.scrapeHitsAfterFilter = oxyPool?.hits?.length || 0
+          console.info(
+            '[eof-video] google images pool',
+            oxyPool?.source || 'none',
+            oxyPool?.hits?.length ? `${oxyPool.hits.length} hits` : '0 hits',
+            oxyPool?.secondaryHits?.length ? `+${oxyPool.secondaryHits.length} secondary` : '',
+            oxyPool?.query ? `q=${String(oxyPool.query).slice(0, 80)}` : '',
+            imageFetchDiag.scrapeHitsBeforeFilter > imageFetchDiag.scrapeHitsAfterFilter
+              ? `(filtered ${imageFetchDiag.scrapeHitsBeforeFilter}→${imageFetchDiag.scrapeHitsAfterFilter})`
+              : '',
           )
-          wikiPool = []
-        }
-        imageFetchDiag.wikiHits = Array.isArray(wikiPool) ? wikiPool.length : 0
+          if (!oxyPool?.hits?.length) {
+            imagePhaseNote = 'Searching Wikimedia Commons…'
+            await report('images', 0, { force: true, message: imagePhaseNote })
+            // Wikidata only when no Google Images job pool is available.
+            try {
+              wikiPool = await listWikimediaPersonImages(job.topic, {
+                limit: Math.max(8, rows.length + 3),
+              })
+            } catch (e) {
+              console.warn(
+                '[eof-video] wikimedia person pool failed',
+                job.topic,
+                e instanceof Error ? e.message : e,
+              )
+              wikiPool = []
+            }
+            imageFetchDiag.wikiHits = Array.isArray(wikiPool) ? wikiPool.length : 0
+          }
+        })()
+
+        await withDeadline(poolWork, IMAGE_POOL_DEADLINE_MS, 'Image search')
+      } finally {
+        stopImageHb()
       }
     }
 
@@ -766,7 +799,19 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
 
     scenesForVideo.sort((a, b) => a.index - b.index)
-    await report('video', 0, { force: true })
+    // 5-scene Shorts land at 42% here ("Building scene clip 1 of 5…") — heartbeat so UI isn't frozen.
+    let videoProgressIndex = 0
+    await report('video', 0, {
+      force: true,
+      message: `Building scene clip 1 of ${sceneCount} (ffmpeg)…`,
+    })
+    const stopVideoHb = startProgressHeartbeat(async () => {
+      const n = Math.min(videoProgressIndex + 1, sceneCount)
+      await report('video', videoProgressIndex, {
+        force: true,
+        message: `Encoding scene clip ${n} of ${sceneCount} (ffmpeg)…`,
+      })
+    }, 4000)
 
     const draftBlob = String(job.script?.plainTextDraft || '').trim()
     const secondaryPeople = listSecondaryImageSubjects(job.topic, draftBlob)
@@ -776,52 +821,61 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         ? Math.min(1, Math.max(0, sceneCountForOverlay - 2))
         : null
 
-    // Stills gate — stop before ffmpeg when placeholders / clickbait pop sources fail hard.
-    // Skipped on remux paths that reuse scene images (Remove song / remix / captions / effects).
-    if (!skipStillsPreflight) {
-      const stillsManifest = scenesForVideo.map((s) => ({
-        index: s.index,
-        durationSec: s.durationSec,
-        caption: s.caption,
-        imageSource: s.imageSource || null,
-        imageKey: s.imageKey || null,
-        imageTitle: s.imageTitle || null,
-        imageUrl: s.imageUrl || null,
-        sourcePage: s.sourcePage || null,
-        imageQuery: s.imageQueryUsed || s.imageQuery || null,
-        imageQueryUsed: s.imageQueryUsed || null,
-      }))
-      await applyEofShortQualityStillsPreflightToJob(jobId, {
-        mode: qualityGateMode,
-        blockOnFail: true,
-        jobSnapshot: { narrationManifest: stillsManifest },
-        renderMeta: {
-          hasSecondarySubject: secondaryPeople.length > 0,
-          secondarySceneIndex,
+    let relPath
+    let rendered
+    try {
+      // Stills gate — stop before ffmpeg when placeholders / clickbait pop sources fail hard.
+      // Skipped on remux paths that reuse scene images (Remove song / remix / captions / effects).
+      if (!skipStillsPreflight) {
+        const stillsManifest = scenesForVideo.map((s) => ({
+          index: s.index,
+          durationSec: s.durationSec,
+          caption: s.caption,
+          imageSource: s.imageSource || null,
+          imageKey: s.imageKey || null,
+          imageTitle: s.imageTitle || null,
+          imageUrl: s.imageUrl || null,
+          sourcePage: s.sourcePage || null,
+          imageQuery: s.imageQueryUsed || s.imageQuery || null,
+          imageQueryUsed: s.imageQueryUsed || null,
+        }))
+        await applyEofShortQualityStillsPreflightToJob(jobId, {
+          mode: qualityGateMode,
+          blockOnFail: true,
+          jobSnapshot: { narrationManifest: stillsManifest },
+          renderMeta: {
+            hasSecondarySubject: secondaryPeople.length > 0,
+            secondarySceneIndex,
+          },
+        })
+      }
+
+      rendered = await renderEofProductionVideo({
+        jobId,
+        scenes: scenesForVideo,
+        mixedAudioPath: mixedPath,
+        captionStyle: job.captionStyle,
+        captionLayout: job.captionLayout || job.script?.captionLayout || null,
+        zapcapTemplateId: job.zapcapTemplateId,
+        transitionStyle: job.transitionStyle,
+        colorGrade: job.colorGrade,
+        enhanceStyle: job.enhanceStyle,
+        format: job.script?.format,
+        captionMode,
+        overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
+        videoEffects: job.videoEffects,
+        stickers: job.stickers,
+        hasSecondarySubject: secondaryPeople.length > 0,
+        secondarySceneIndex,
+        onSceneProgress: async (done) => {
+          videoProgressIndex = done
+          await report('video', done)
         },
       })
+      relPath = rendered.relPath
+    } finally {
+      stopVideoHb()
     }
-
-    const rendered = await renderEofProductionVideo({
-      jobId,
-      scenes: scenesForVideo,
-      mixedAudioPath: mixedPath,
-      captionStyle: job.captionStyle,
-      captionLayout: job.captionLayout || job.script?.captionLayout || null,
-      zapcapTemplateId: job.zapcapTemplateId,
-      transitionStyle: job.transitionStyle,
-      colorGrade: job.colorGrade,
-      enhanceStyle: job.enhanceStyle,
-      format: job.script?.format,
-      captionMode,
-      overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
-      videoEffects: job.videoEffects,
-      stickers: job.stickers,
-      hasSecondarySubject: secondaryPeople.length > 0,
-      secondarySceneIndex,
-      onSceneProgress: async (done) => report('video', done),
-    })
-    const { relPath } = rendered
 
     await report('mux', sceneCount, { force: true })
     await updateEofProductionRenderProgress(jobId, null)

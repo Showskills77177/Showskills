@@ -56,6 +56,8 @@ function looksLikeImageBuffer(buf) {
   return false
 }
 
+const IMAGE_DOWNLOAD_TIMEOUT_MS = Number(process.env.EOF_IMAGE_DOWNLOAD_TIMEOUT_MS) || 12_000
+
 async function downloadImageToFile(imgUrl, outPath) {
   const headers = {
     // Browser-like UA — many news CDNs (and Google SERP hosts) reject bot UAs.
@@ -76,22 +78,37 @@ async function downloadImageToFile(imgUrl, outPath) {
   }
 
   const tryOnce = async (target) => {
-    const imgRes = await fetch(target, { headers, redirect: 'follow' })
-    if (!imgRes.ok) {
-      console.warn('[eof-scene-images] image download failed', imgRes.status, String(target).slice(0, 140))
+    try {
+      const imgRes = await fetch(target, {
+        headers,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS),
+      })
+      if (!imgRes.ok) {
+        console.warn('[eof-scene-images] image download failed', imgRes.status, String(target).slice(0, 140))
+        return false
+      }
+      const buf = Buffer.from(await imgRes.arrayBuffer())
+      if (buf.length < 8_000) {
+        console.warn('[eof-scene-images] image too small', buf.length, String(target).slice(0, 100))
+        return false
+      }
+      if (!looksLikeImageBuffer(buf)) {
+        console.warn('[eof-scene-images] not an image buffer', String(target).slice(0, 100))
+        return false
+      }
+      await writeFile(outPath, buf)
+      return true
+    } catch (e) {
+      const aborted = e?.name === 'AbortError' || e?.name === 'TimeoutError'
+      console.warn(
+        '[eof-scene-images] image download',
+        aborted ? 'timed out' : 'error',
+        String(target).slice(0, 120),
+        aborted ? '' : e instanceof Error ? e.message : e,
+      )
       return false
     }
-    const buf = Buffer.from(await imgRes.arrayBuffer())
-    if (buf.length < 8_000) {
-      console.warn('[eof-scene-images] image too small', buf.length, String(target).slice(0, 100))
-      return false
-    }
-    if (!looksLikeImageBuffer(buf)) {
-      console.warn('[eof-scene-images] not an image buffer', String(target).slice(0, 100))
-      return false
-    }
-    await writeFile(outPath, buf)
-    return true
   }
 
   if (await tryOnce(url)) return true

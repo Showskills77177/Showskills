@@ -28,7 +28,8 @@ import { filterBlockedStockImages, isBlockedStockImageUrl } from '../../../share
 
 const SERPAPI_SEARCH_URL = 'https://serpapi.com/search.json'
 const SERPAPI_ACCOUNT_URL = 'https://serpapi.com/account.json'
-const DEFAULT_TIMEOUT_MS = 45_000
+/** Fast-fail so Cucurella builds don't freeze waiting on a hung SerpAPI socket. */
+const DEFAULT_TIMEOUT_MS = Number(process.env.EOF_SERPAPI_TIMEOUT_MS) || 12_000
 const DEFAULT_LIMIT = 12
 /** Hard cap on billable Google Images queries per production job / rebuild. */
 export const EOF_SERPAPI_MAX_QUERIES_PER_JOB = 2
@@ -197,7 +198,8 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
   }
 
   const limit = Math.max(1, Math.min(40, Number(opts.limit) || DEFAULT_LIMIT))
-  const timeoutMs = Math.max(5_000, Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS)
+  // Allow tests / emergency overrides below 5s; production default is ~12s.
+  const timeoutMs = Math.max(2_000, Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS)
 
   const controller = new AbortController()
   const external = opts.signal
@@ -341,6 +343,7 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
   const { hits: rawHits, health } = await searchSerpApiGoogleImagesWithStatus(query, {
     limit: fetchLimit,
     signal: opts.signal,
+    timeoutMs: opts.timeoutMs || DEFAULT_TIMEOUT_MS,
   })
   const hits = filterBlockedStockImages(rawHits)
   const kept = hits.slice(0, Math.min(hits.length, need + 2))
@@ -385,7 +388,11 @@ export async function fetchEofSerpApiSecondaryPool(opts = {}) {
       ? `"${person}" manager sideline`
       : `"${person}" football portrait`
   const hits = filterBlockedStockImages(
-    await searchSerpApiGoogleImages(query, { limit: 8, signal: opts.signal }),
+    await searchSerpApiGoogleImages(query, {
+      limit: 8,
+      signal: opts.signal,
+      timeoutMs: opts.timeoutMs || DEFAULT_TIMEOUT_MS,
+    }),
   ).slice(0, 5)
   console.info('[eof-serpapi] secondary pool', person, `kept=${hits.length}`, '(+1 credit)')
   if (!hits.length) return null
