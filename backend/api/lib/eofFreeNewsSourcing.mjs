@@ -44,10 +44,18 @@ export async function fetchNewsdataFootballArticles({ topic = '', limit = 8 } = 
   const key = getNewsdataApiKey()
   if (!key) return []
 
-  const raw = String(topic || '').trim() || 'football'
+  const { normalizeFootballTopicQuery } = await import('./eofFootballDeskResearch.mjs')
+  const raw = normalizeFootballTopicQuery(String(topic || '').trim()) || 'football'
+  // Prefer a tight player+angle query first (typo-normalized), then looser retries.
+  const shortQ = raw
+    .replace(/[?“”"']/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3)
+    .slice(0, 8)
+    .join(' ')
   const attempts = [
-    { q: `${raw} football`.slice(0, 100), category: 'sports' },
-    { q: raw.slice(0, 100), category: 'sports' },
+    { q: `${shortQ || raw} football`.slice(0, 100), category: 'sports' },
+    { q: (shortQ || raw).slice(0, 100), category: 'sports' },
     { q: raw.slice(0, 100), category: '' },
   ]
 
@@ -142,7 +150,8 @@ export async function fetchGuardianFootballArticles({ topic = '', limit = 8 } = 
   const key = getGuardianApiKey()
   if (!key) return []
 
-  const q = String(topic || 'football').trim() || 'football'
+  const { normalizeFootballTopicQuery } = await import('./eofFootballDeskResearch.mjs')
+  const q = normalizeFootballTopicQuery(String(topic || 'football').trim()) || 'football'
   const url = new URL('https://content.guardianapis.com/search')
   url.searchParams.set('api-key', key)
   url.searchParams.set('section', 'football')
@@ -212,25 +221,30 @@ export function formatArticlesForPrompt(articles) {
  * Free research pack: NewsData (if keyed) + Guardian (if keyed) + RSS headlines.
  */
 export async function fetchFreeFootballDeskPack({ topic = '', limit = 8 } = {}) {
-  const { fetchFootballDeskHeadlines, filterDeskItemsToTopic } = await import(
-    './eofFootballDeskResearch.mjs'
-  )
+  const {
+    fetchFootballDeskHeadlines,
+    filterDeskItemsToTopic,
+    normalizeFootballTopicQuery,
+    seedKnownDeskNotesForTopic,
+  } = await import('./eofFootballDeskResearch.mjs')
+  const searchTopic = normalizeFootballTopicQuery(topic) || topic
   const [newsdataRaw, guardianRaw, rssRaw] = await Promise.all([
-    fetchNewsdataFootballArticles({ topic, limit: Math.max(limit, 12) }).catch((e) => {
+    fetchNewsdataFootballArticles({ topic: searchTopic, limit: Math.max(limit, 12) }).catch((e) => {
       console.warn('[eof-free-news] NewsData failed', e instanceof Error ? e.message : e)
       return []
     }),
-    fetchGuardianFootballArticles({ topic, limit: Math.max(limit, 12) }).catch((e) => {
+    fetchGuardianFootballArticles({ topic: searchTopic, limit: Math.max(limit, 12) }).catch((e) => {
       console.warn('[eof-free-news] Guardian failed', e instanceof Error ? e.message : e)
       return []
     }),
-    fetchFootballDeskHeadlines({ topic, limit: Math.max(limit, 12) }).catch(() => []),
+    fetchFootballDeskHeadlines({ topic: searchTopic, limit: Math.max(limit, 12) }).catch(() => []),
   ])
 
   // Drop cross-sport / off-topic rows before they enter the writer brief or judge source.
-  const newsdata = filterDeskItemsToTopic(newsdataRaw, topic, { limit })
-  const guardian = filterDeskItemsToTopic(guardianRaw, topic, { limit })
-  const rss = filterDeskItemsToTopic(rssRaw, topic, { limit })
+  // Filter against both raw + normalized topic so typo topics still lock to the right story.
+  const newsdata = filterDeskItemsToTopic(newsdataRaw, searchTopic, { limit })
+  const guardian = filterDeskItemsToTopic(guardianRaw, searchTopic, { limit })
+  const rss = filterDeskItemsToTopic(rssRaw, searchTopic, { limit })
 
   const seen = new Set()
   const merged = []
@@ -262,13 +276,20 @@ export async function fetchFreeFootballDeskPack({ topic = '', limit = 8 } = {}) 
     textParts.push('DESK RSS:\n' + formatArticlesForPrompt(rssOnly.slice(0, limit)))
   }
 
+  // Thin live pack + clear human-interest topic → seed widely reported notes (not invent live scores).
+  const known = seedKnownDeskNotesForTopic(searchTopic)
+  if (known && merged.length < 2) {
+    textParts.push(known)
+  }
+
   return {
     articles: merged,
-    text: textParts.join('\n\n') || formatArticlesForPrompt(merged),
+    text: textParts.join('\n\n') || formatArticlesForPrompt(merged) || known,
     sources: {
       newsdata: newsdata.length,
       guardian: guardian.length,
       rss: rss.length,
+      knownSeed: Boolean(known && merged.length < 2),
       newsdataConfigured: isNewsdataConfigured(),
       guardianConfigured: isGuardianConfigured(),
     },

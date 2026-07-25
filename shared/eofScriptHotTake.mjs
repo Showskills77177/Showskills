@@ -8,7 +8,8 @@ export const EOF_SHORTS_HOT_TAKE_VOICE = `HOT TAKE BAR (non-negotiable for Scrip
 - GOLD shapes (copy the energy, not the facts unless they are in the desk brief):
   1) "Thomas Tuchel's defensive setup cost England — according to Rio Ferdinand, that shape handed Argentina the win. Not a soft take: the midfield never pressed, the back line sat deep, and the game died. Was Rio right, or is that unfair on Tuchel?"
   2) "Jude Bellingham clarified he never said anything bad to Messi after cameras caught their on-pitch exchange. Heat of the moment, not a beef — that's his claim. Buy it, or still smell disrespect?"
-- Every script needs: (1) WHO + CONFLICT in line 1, (2) ONE concrete stake (selection, tactics, pride, result, quote), (3) ONE sharp fight CTA (not agree/disagree spam).
+  3) "Marc Cucurella hit back at long-hair criticism — he says it is a personal reason tied to his son, not a fashion stunt. Fair response, or still fair game to joke about the hair?"
+- Every script needs: (1) WHO + CONFLICT in line 1, (2) ONE concrete stake — tactics / selection / pride / result / quote row OR personal reason / backlash / criticism for human-interest stories, (3) ONE sharp fight CTA (not agree/disagree spam).
 - Do NOT paste or lightly rewrite an article. Transform the brief into a spoken argument.
 - TIMELY: prefer what just happened / what was just said. Avoid timeless career fluff unless the format is timeline.
 - TOPIC LOCK: stay inside the football story from the desk brief — no boxing/F1/unrelated celebrity free-association.
@@ -18,10 +19,11 @@ const ARTICLE_GLUE =
   /\b(that is the football story fans are arguing about|fans are arguing about right now|ignore the noise|strip (away )?the (tribal )?noise|the result changes the table talk|who comes out of this looking stronger|this is the football story|just another chapter|most fans still miss)\b/i
 
 const TIMELY =
-  /\b(just|today|tonight|this week|this morning|after|following|last night|hours ago|now|confirmed|hit back|responded|slammed|cost (us|them|england)|according to)\b/i
+  /\b(just|today|tonight|this week|this morning|after|following|last night|hours ago|now|confirmed|hit back|hits back|responded|slammed|cost (us|them|england)|according to)\b/i
 
+/** Tactics/selection AND human-interest stakes (pride, criticism, personal reason, quote verbs). */
 const STAKE =
-  /\b(cost|selection|tactics|dropped|benched|heat|pride|respect|disrespect|win|loss|defeat|final|press|shape|midfield|back line|quote|said|claim|row|beef|exchange)\b/i
+  /\b(cost|selection|tactics|dropped|benched|heat|pride|respect|disrespect|win|loss|defeat|final|press|shape|midfield|back[\s-]?line|quote|said|says|saying|claim(?:s|ed)?|row|beef|exchange|criticism|critics?|backlash|mock(?:ed|ing)?|joke(?:s|d)?|digs?|hair|locks|personal|family|son|daughter|autis(?:m|tic)|distraction|hit\s+back|hits\s+back|responded|slammed|pile-?on)\b/i
 
 /**
  * Local hot-take + timeliness score (0–10).
@@ -62,7 +64,9 @@ export function scoreDraftHotTake(draft, opts = {}) {
   if (topicCore.length >= 24 && draftLower.includes(topicCore.slice(0, 40)) && !STAKE.test(text)) {
     score -= 2
     reasons.push('Mostly restates the headline without a bite')
-    rewriteHints.push('Add the stake: tactics, selection, pride, result, or the exact quote fight')
+    rewriteHints.push(
+      'Add the stake: tactics, selection, pride, result, quote fight, or personal/backlash angle',
+    )
   }
 
   const timelyScore = TIMELY.test(text) ? 8 : 4
@@ -75,9 +79,11 @@ export function scoreDraftHotTake(draft, opts = {}) {
   const biteScore = STAKE.test(text) ? 8 : 3.5
   if (biteScore < 6) {
     score -= 2
-    reasons.push('No concrete stake (tactics / selection / pride / result / quote row)')
+    reasons.push(
+      'No concrete stake (tactics / selection / pride / result / quote row / personal reason / backlash)',
+    )
     rewriteHints.push(
-      'Example energy: Tuchel’s shape cost the win (Rio) · Bellingham denied Messi beef',
+      'Example energy: Tuchel shape cost the win · Bellingham denied Messi beef · Cucurella hair criticism / personal reason',
     )
   }
 

@@ -30,6 +30,16 @@ describe('eofScriptHotTake', () => {
     assert.ok(v.reasons.some((r) => /template|paste/i.test(r)), JSON.stringify(v.reasons))
   })
 
+  it('passes Cucurella hair / personal-reason human-interest stake without tactics words', () => {
+    const draft = `Marc Cucurella finally answered why he will not cut his hair. Critics keep mocking the long locks, but Cucurella says it is tied to his autistic son — a personal reason, not a fashion stunt. That hits back at the pile-on after weeks of online digs. Fair response from Cucurella, or still fair game to joke about the hair? Comment.`
+    const v = scoreDraftHotTake(draft, {
+      format: 'quote',
+      topic: "Why Mark Cuccorea doesn't cut his hair",
+    })
+    assert.ok(v.pass, JSON.stringify(v))
+    assert.ok(v.bite >= 6)
+  })
+
   it('merges hot-take fail into a soft model pass', () => {
     const hot = scoreDraftHotTake(
       `Wayne Rooney transfer talk — that is the football story fans are arguing about right now. Ignore the noise and strip the tribal noise. Who comes out of this looking stronger? Comment.`,

@@ -38,6 +38,8 @@ import {
   buildDeskResearchSystemPrompt,
   buildDeskResearchUserPrompt,
   deskBriefToContext,
+  normalizeFootballTopicQuery,
+  seedKnownDeskNotesForTopic,
 } from './eofFootballDeskResearch.mjs'
 import {
   shouldUsePerplexity,
@@ -506,14 +508,45 @@ function isWeakDraft(text, format = '', topic = '', deskBrief = '', orderedTopic
   return false
 }
 
+/** Map gate failure → what the user should do next (not a generic “everything failed”). */
+function actionableHintForGateReason(why = '', gates = null) {
+  const w = String(why || '')
+  if (/No concrete stake/i.test(w)) {
+    return 'Add a pride/personal reason, criticism/backlash angle, or a sourced quote row (not only tactics/selection).'
+  }
+  if (/Sensitive personal|disability detail/i.test(w)) {
+    return 'Add a quote or source for the personal/family angle in the desk brief, or drop that detail.'
+  }
+  if (/Topic drift|Off-topic|not grounded/i.test(w)) {
+    return 'Stay on the ordered football story — no Keegan/Fury/unrelated free-association.'
+  }
+  if (/invent|fabricat|transfer|retirement|comeback|injur|sack/i.test(w)) {
+    return 'Stick to the desk brief — do not invent transfers, retirements, or breaking news.'
+  }
+  if (/Insult|abusive/i.test(w)) {
+    return 'Rewrite without insulting the viewer.'
+  }
+  if (/template|paste|glue/i.test(w)) {
+    return 'Rewrite as a spoken hot take — kill canned “fans are arguing” glue.'
+  }
+  const hint =
+    gates?.hot?.rewriteHints?.[0] ||
+    gates?.rel?.rewriteHints?.[0] ||
+    gates?.fact?.rewriteHints?.[0] ||
+    gates?.direct?.rewriteHints?.[0]
+  return hint ? String(hint) : 'Fix the topic, add a source/quote, or click Regenerate.'
+}
+
 function buildScriptGateRejectError(topic, gates, failures = []) {
   const why =
     gates?.reasons?.[0] ||
     gates?.rel?.reasons?.[0] ||
     gates?.fact?.reasons?.[0] ||
+    gates?.hot?.reasons?.[0] ||
     'failed local quality gates (relevance / factuality / hot-take)'
+  const hint = actionableHintForGateReason(why, gates)
   const extra = Array.isArray(failures) && failures.length ? ` ${failures.slice(0, 2).join(' · ')}` : ''
-  return `Could not write a usable Shorts script for “${String(topic || '').slice(0, 60)}”: ${why}.${extra} Refusing off-topic, invented, or insult drafts — fix the topic or click Regenerate.`
+  return `Could not write a usable Shorts script for “${String(topic || '').slice(0, 60)}”: ${why}. Next: ${hint}${extra}`
 }
 
 /** Accept almost any real AI draft over the canned template. */
@@ -810,24 +843,49 @@ export async function writeEofPlainTextDraft({
   }
 
   // Free live sourcing: NewsData.io + Guardian + BBC/Sky/Guardian RSS
+  // Normalize common typos (Cuccorea → Cucurella) for search + known-story seeds.
+  const searchTopic = normalizeFootballTopicQuery(t) || t
   let headlinesText = ''
   try {
-    const pack = await withBudget(fetchFreeFootballDeskPack({ topic: t, limit: 8 }), 15000, 'free desk pack')
+    const pack = await withBudget(
+      fetchFreeFootballDeskPack({ topic: searchTopic, limit: 8 }),
+      15000,
+      'free desk pack',
+    )
     headlinesText = pack.text || ''
     deskSources = pack.sources || null
     if (headlinesText) {
       console.info('[eof-script] free desk pack', pack.sources)
     } else if (pack.sources?.newsdataConfigured && pack.sources.newsdata === 0) {
-      console.warn('[eof-script] NewsData keyed but returned 0 articles for', t.slice(0, 60))
+      console.warn('[eof-script] NewsData keyed but returned 0 articles for', searchTopic.slice(0, 60))
     }
   } catch (e) {
     console.warn('[eof-script] free desk pack skipped', e instanceof Error ? e.message : e)
     try {
-      const headlines = await withBudget(fetchFootballDeskHeadlines({ topic: t, limit: 8 }), 12000, 'desk RSS')
+      const headlines = await withBudget(
+        fetchFootballDeskHeadlines({ topic: searchTopic, limit: 8 }),
+        12000,
+        'desk RSS',
+      )
       headlinesText = formatDeskHeadlinesForPrompt(headlines)
-      deskSources = { newsdata: 0, guardian: 0, rss: headlines?.length || 0, newsdataConfigured: isNewsdataConfigured(), guardianConfigured: isGuardianConfigured() }
+      deskSources = {
+        newsdata: 0,
+        guardian: 0,
+        rss: headlines?.length || 0,
+        newsdataConfigured: isNewsdataConfigured(),
+        guardianConfigured: isGuardianConfigured(),
+      }
     } catch (e2) {
       console.warn('[eof-script] desk RSS skipped', e2 instanceof Error ? e2.message : e2)
+    }
+  }
+
+  // If live pack is empty, still ground known human-interest topics (hair/son etc.).
+  if (!String(headlinesText || '').trim()) {
+    const known = seedKnownDeskNotesForTopic(searchTopic || rawTopic)
+    if (known) {
+      headlinesText = known
+      deskSources = { ...(deskSources || {}), knownSeed: true }
     }
   }
 
@@ -964,7 +1022,7 @@ export async function writeEofPlainTextDraft({
         directorNote: note
           ? `${note}\n\nAlso fix the editor judge feedback above.`
           : autoMode
-            ? 'Auto quality pass: HOT TAKE desk VO — name who said what / who hit back, concrete stake (tactics/selection/pride/result), cut waffle, sharper CTA. Stay inside the desk brief. No article paste.'
+            ? 'Auto quality pass: HOT TAKE desk VO — name who said what / who hit back, concrete stake (tactics/selection/pride/result/quote/personal reason/backlash), cut waffle, sharper CTA. Stay inside the desk brief. No article paste.'
             : '',
         forceHotTakeRefine: true,
       }),
@@ -1000,6 +1058,66 @@ export async function writeEofPlainTextDraft({
       if (note && wordCount(ai.plainTextDraft) >= 35) {
         if (isWeakDraft(ai.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)) {
           softBest = softBest || { ...ai, deskSources }
+          // One clearer-brief rewrite before abandoning this writer (still refuse bollox).
+          try {
+            const failGates = scoreLocalScriptGates(ai.plainTextDraft, {
+              format: fmt,
+              topic: t,
+              orderedTopic: rawTopic,
+              deskBrief: deskBriefForJudge,
+            })
+            const rewrittenAi = await rewriteWithFeedback(
+              id,
+              ai.plainTextDraft,
+              {
+                pass: false,
+                skipped: false,
+                reasons: [
+                  'CLEARER BRIEF RETRY — fix local gates',
+                  ...(failGates.reasons || []).slice(0, 4),
+                  actionableHintForGateReason(failGates.reasons?.[0], failGates),
+                ].slice(0, 7),
+                rewriteHints: [
+                  'Stay on the ordered topic — pride / personal reason / criticism / backlash / quote row count as stake for human-interest stories',
+                  'Do NOT invent transfers/retirements/injuries; do NOT pivot to Keegan/Fury/boxing',
+                  ...(failGates.hot?.rewriteHints || []),
+                  ...(failGates.rel?.rewriteHints || []),
+                  'Name who + conflict + one concrete stake + one CTA',
+                ].slice(0, 6),
+                overall: 4,
+                threshold: 6.5,
+              },
+              0.1,
+            )
+            if (
+              rewrittenAi &&
+              !isWeakDraft(rewrittenAi.plainTextDraft, fmt, t, deskBriefForJudge, rawTopic)
+            ) {
+              console.info(
+                '[eof-script] accepted directed draft after gate retry',
+                id,
+                wordCount(rewrittenAi.plainTextDraft),
+                'words',
+              )
+              return {
+                ...rewrittenAi,
+                deskSources,
+                judge: null,
+                directed: true,
+                gateRetry: true,
+                autoMode,
+                autoTuned: autoMode
+                  ? { draftTemperature, polishTemperature, excellentMin, format: fmt }
+                  : null,
+              }
+            }
+          } catch (e) {
+            console.warn(
+              '[eof-script] directed gate retry failed',
+              id,
+              e instanceof Error ? e.message : e,
+            )
+          }
           failures.push(`[${id}] directed draft failed local gates`)
           console.warn('[eof-script] directed draft soft-weak', id, ai.plainTextDraft.slice(0, 80))
           continue
@@ -1501,7 +1619,7 @@ ${EOF_SHORTS_RELEVANCE_VOICE}
 Rules:
 - Keep every verified name/score/club/claim from the draft AND desk brief.
 - Line 1 must punch: who + conflict.
-- Ensure a concrete stake (tactics / selection / pride / result / quote).
+- Ensure a concrete stake (tactics / selection / pride / result / quote row / personal reason / backlash / criticism).
 - Ensure a “now” signal (just / after / according to / hit back…) ONLY when the brief supports a live event — otherwise use opinion energy, not fake breaking news.
 - Kill any remaining template glue, viewer insults, and agree/disagree spam.
 - TOPIC LOCK: remove any cross-sport / unrelated celebrity injection not in the desk brief.

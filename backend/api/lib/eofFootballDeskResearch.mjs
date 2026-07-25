@@ -4,6 +4,7 @@
  * the Shorts writer must follow (so drafts are sourced, not book essays).
  */
 import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
+import { tokensLooselyEqual } from '../../../shared/eofScriptRelevance.mjs'
 
 const RSS_FEEDS = [
   { desk: 'BBC Sport', url: 'https://feeds.bbci.co.uk/sport/football/rss.xml' },
@@ -38,11 +39,40 @@ function parseRssItems(xml, desk) {
   return items
 }
 
+/**
+ * Fix common player-name typos so NewsData / Guardian / RSS matching works.
+ * Cuccorea / Cuccurella → Cucurella; Mark Cucurella → Marc Cucurella.
+ * @param {string} topic
+ */
+export function normalizeFootballTopicQuery(topic) {
+  let t = String(topic || '').trim()
+  if (!t) return t
+  t = t.replace(/\bcuccorea\b/gi, 'Cucurella')
+  t = t.replace(/\bcuccurella\b/gi, 'Cucurella')
+  t = t.replace(/\bmark\s+(cucurella)\b/gi, 'Marc $1')
+  return t
+}
+
 function topicTokens(topic) {
-  return String(topic || '')
+  const normalized = normalizeFootballTopicQuery(topic)
+  return String(normalized || '')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 3 && !/^(the|and|for|with|from|this|that|news|latest|update|world|cup|football)$/.test(w))
+    .filter(
+      (w) =>
+        w.length >= 3 &&
+        !/^(the|and|for|with|from|this|that|news|latest|update|world|cup|football|why|his|her|doesn|dont|will|not|cut)$/.test(
+          w,
+        ),
+    )
+}
+
+function tokenMatchesHay(token, hayWords, hayJoined) {
+  if (!token) return false
+  if (hayJoined.includes(token)) return true
+  // Fuzzy surname: Cuccorea ≈ Cucurella
+  if (token.length >= 5 && hayWords.some((w) => tokensLooselyEqual(w, token))) return true
+  return false
 }
 
 /** Cross-sport people / combat sports — never feed into a football-topic brief unless the topic already names them. */
@@ -57,7 +87,7 @@ const CROSS_SPORT_HEADLINE_RE =
 export function isOffTopicCrossSportDeskItem(text, topic = '') {
   const hay = String(text || '')
   if (!CROSS_SPORT_HEADLINE_RE.test(hay)) return false
-  const topicHay = String(topic || '')
+  const topicHay = normalizeFootballTopicQuery(topic)
   // Topic itself is cross-sport / crossover — allow matching figures.
   if (CROSS_SPORT_HEADLINE_RE.test(topicHay)) return false
   return true
@@ -82,7 +112,8 @@ export function filterDeskItemsToTopic(items, topic = '', opts = {}) {
         return { item, hits: -1, drop: true }
       }
       const low = hay.toLowerCase()
-      const hits = tokens.filter((t) => low.includes(t)).length
+      const hayWords = low.split(/[^a-z0-9]+/).filter((w) => w.length >= 4)
+      const hits = tokens.filter((t) => tokenMatchesHay(t, hayWords, low)).length
       return { item, hits, drop: false }
     })
     .filter((row) => !row.drop)
@@ -101,6 +132,29 @@ export function filterDeskItemsToTopic(items, topic = '', opts = {}) {
     if (out.length >= limit) break
   }
   return out
+}
+
+/**
+ * When live RSS is thin but the ordered topic clearly names a known human-interest
+ * football story, seed widely reported desk notes so the writer/gates are grounded.
+ * @param {string} topic
+ * @returns {string}
+ */
+export function seedKnownDeskNotesForTopic(topic = '') {
+  const t = normalizeFootballTopicQuery(topic).toLowerCase()
+  if (/\bcucurella\b/.test(t) && /\b(hair|locks|cut|long[\s-]?hair)\b/.test(t)) {
+    return [
+      'KNOWN PUBLIC DESK NOTES (use when live headlines miss this story):',
+      'Headline: Marc Cucurella on why he will not cut his hair',
+      'Facts:',
+      '- Marc Cucurella has publicly hit back at criticism of his long hair',
+      '- He has said the look is a personal reason tied to his autistic son — not a fashion stunt',
+      '- Online backlash / jokes about the hair sparked the response',
+      'Stakes: personal pride and family support versus whether fans keep mocking the hair',
+      'Avoid: inventing new quotes, medical details beyond what he has said publicly, or pivoting to unrelated players',
+    ].join('\n')
+  }
+  return ''
 }
 
 /**

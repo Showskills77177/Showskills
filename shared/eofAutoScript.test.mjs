@@ -210,5 +210,19 @@ Facts:
     })
     assert.equal(gates.pass, false, JSON.stringify(gates.reasons))
   })
+
+  it('passes Cuccorea typo hair topic when brief has hair/son/criticism', () => {
+    const ordered = "Why Mark Cuccorea doesn't cut his hair"
+    const draft = `Marc Cucurella finally answered why he will not cut his hair. Critics keep mocking the long locks, but Cucurella says it is tied to his autistic son — a personal reason, not a fashion stunt. That hits back at the pile-on after weeks of online digs. Fair response from Cucurella, or still fair game to joke about the hair? Comment.`
+    const gates = scoreLocalScriptGates(draft, {
+      topic: ordered,
+      orderedTopic: ordered,
+      format: 'quote',
+      deskBrief: brief,
+    })
+    assert.equal(gates.pass, true, JSON.stringify(gates.reasons))
+    assert.ok(gates.hot.pass, JSON.stringify(gates.hot))
+    assert.ok(gates.rel.pass, JSON.stringify(gates.rel))
+  })
 })
 
