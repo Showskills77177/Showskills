@@ -378,6 +378,8 @@ export function looksLikeSoloPortraitCue(title = '', url = '') {
 export function filterHitsRequiringSubjectNameCue(hits, subject, opts = {}) {
   if (!Array.isArray(hits) || !hits.length) return []
   if (!isNamedFootballSubject(subject)) return hits
+  // When the Serp/Oxylabs query already names the person, empty-title hits (CDN URLs) stay usable.
+  const queryNamesSubject = hitMentionsSubject(subject, String(opts.query || ''), '')
   const kept = []
   for (const hit of hits) {
     const src = String(hit?.source || '')
@@ -389,6 +391,11 @@ export function filterHitsRequiringSubjectNameCue(hits, subject, opts = {}) {
       continue
     }
     if (!hitMentionsSubject(subject, title, url)) {
+      // Person was in the Serp query + title empty → keep (Google often omits titles).
+      if (queryNamesSubject && !title.trim() && url) {
+        kept.push(hit)
+        continue
+      }
       if (opts.log !== false) {
         console.info(
           '[eof-images] reject no subject cue',
@@ -951,6 +958,8 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '', opts = {})
   // Generic World Cup / stadium with no person hit already rejected above
   if (COMP_NOISE_RE.test(hay) && !strongHit) score -= 10
   if (!strongHit && tokens.some((t) => t.length >= 5 || t.includes(' '))) score -= 6
+  // Named person already in the title: never leave the scene gate (score < 2) on fluff tokens.
+  if (namedStarHit && score < 2) score = 2
   // Meme/quote graphics already have captions in the pixels — never prefer them.
   if (/\b(meme|mematic|imgflip|quote\s*card|viral\s*quote|has\s+very\s+strong|\bsperm\b)\b/i.test(hay)) {
     score -= 40

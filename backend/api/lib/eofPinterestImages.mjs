@@ -127,6 +127,7 @@ async function searchPartnerPins(query, token, country) {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
     },
+    signal: AbortSignal.timeout(12_000),
   })
   const bodyText = await res.text().catch(() => '')
   let data = {}
@@ -160,6 +161,7 @@ async function searchUserPins(query, token) {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
     },
+    signal: AbortSignal.timeout(12_000),
   })
   const bodyText = await res.text().catch(() => '')
   let data = {}

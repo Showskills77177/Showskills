@@ -14,6 +14,7 @@ import {
   filterHitsRequiringSubjectNameCue,
   primaryImageEntities,
   splitGluedPersonClubEntity,
+  entityMentionsInHaystack,
 } from './eofSceneImageQueries.mjs'
 import { normalizeFootballTopicQuery } from './eofFootballTopicNormalize.mjs'
 
@@ -276,5 +277,51 @@ describe('eofSceneImageQueries', () => {
       { intent: 'neutral' },
     )
     assert.ok(clubOnly < 0, `club-only title must not pass person gate, got ${clubOnly}`)
+  })
+
+  it('accepts realistic Cucurella Serp titles that the old glued-entity gate emptied', () => {
+    const topic = "Why Mark Cuccorea doesn't cut his hair"
+    const query = '"Marc Cucurella" Chelsea hair'
+    const subject = resolveImageSubject(topic)
+    const titles = [
+      'Marc Cucurella of Chelsea FC celebrates',
+      "Chelsea's Marc Cucurella with long hair",
+      'Marc Cucurella Chelsea long hair',
+    ]
+    for (const title of titles) {
+      const score = scoreImageRelevance(subject, title, query, {
+        intent: 'neutral',
+        plainTextDraft: topic,
+      })
+      assert.ok(score >= 2, `title must pass scene gate (≥2), got ${score} for “${title}”`)
+      assert.ok(
+        hitMentionsSubject(subject, title, 'https://cdn.example.com/photo.jpg'),
+        `subject cue must match “${title}”`,
+      )
+    }
+    // Old glued entity "Marc Cucurella Chelsea" must NOT be required as a contiguous string.
+    assert.equal(
+      entityMentionsInHaystack('Marc Cucurella Chelsea', 'marc cucurella of chelsea fc celebrates'),
+      true,
+      'split/part-wise match must accept “of Chelsea” titles',
+    )
+    const kept = filterHitsRequiringSubjectNameCue(
+      titles.map((title, i) => ({
+        url: `https://cdn.example.com/c${i}.jpg`,
+        title,
+        source: 'serpapi',
+      })),
+      subject,
+      { log: false, query },
+    )
+    assert.equal(kept.length, titles.length, 'all real Cucurella titles must survive the pool filter')
+
+    // Empty title + person query: keep (Google Images often omits title).
+    const emptyKept = filterHitsRequiringSubjectNameCue(
+      [{ url: 'https://cdn.example.com/anon.jpg', title: '', source: 'serpapi' }],
+      subject,
+      { log: false, query },
+    )
+    assert.equal(emptyKept.length, 1, 'empty-title hit from a person Serp query must be kept')
   })
 })

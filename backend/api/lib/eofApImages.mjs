@@ -154,6 +154,7 @@ export async function searchApMediaPicture(query, index = 0, opts = {}) {
   const res = await fetch(url.toString(), {
     headers: apHeaders(key),
     redirect: 'follow',
+    signal: AbortSignal.timeout(12_000),
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
@@ -217,6 +218,7 @@ export async function downloadApRenditionToFile(hit, outPath) {
       'User-Agent': 'ShowSkillsEOF/1.0 (https://showskills.co.uk; eof-production@showskills.co.uk)',
     },
     redirect: 'follow',
+    signal: AbortSignal.timeout(12_000),
   })
   if (!res.ok) {
     console.warn('[eof-ap-images] download failed', res.status, href.slice(0, 120))

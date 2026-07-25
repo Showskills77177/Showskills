@@ -43,7 +43,7 @@ export async function searchGoogleCseImages(query, index = 0) {
   url.searchParams.set('imgType', 'photo')
   url.searchParams.set('safe', 'active')
 
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(12_000) })
   if (!res.ok) return null
 
   const data = await res.json()

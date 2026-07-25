@@ -3,6 +3,7 @@ import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mj
 import { requireEofSession, requireEofOwner, eofSessionInfo } from '../lib/eofYoutubeAuth.mjs'
 import {
   listEofProductionJobs,
+  failStaleEofProductionRenders,
   createEofProductionJob,
   getEofProductionJob,
   updateEofProductionJob,
@@ -155,6 +156,10 @@ export default async function handler(req, res) {
       let ffmpeg = false
 
       try {
+        // Unstick Cucurella builds killed mid-waitUntil (Hobby) — poll marks them failed.
+        await failStaleEofProductionRenders().catch((e) => {
+          console.warn('[eof-production] stale render sweep failed', e instanceof Error ? e.message : e)
+        })
         jobs = await withEofArtifactFlags(await listEofProductionJobs())
       } catch (e) {
         console.error('[eof-production] jobs', e)

@@ -567,6 +567,61 @@ export async function markEofProductionJobFailed(id, message) {
   })
 }
 
+/**
+ * Max age for a stuck rendering_* job before poll auto-fails it.
+ * Covers silent Vercel waitUntil death (Hobby) where no catch runs and UI freezes forever.
+ */
+export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 120
+/** No progress DB write (heartbeat) for this long → treat as hung/killed. */
+export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 75
+
+/**
+ * Pure helper — decide whether a rendering job should be force-failed.
+ * @param {{ status?: string, updatedAt?: string|null, renderProgress?: { startedAt?: string|null }|null }} job
+ * @param {{ now?: number, maxAgeSec?: number, maxQuietSec?: number }} [opts]
+ */
+export function isEofRenderStale(job, opts = {}) {
+  const status = String(job?.status || '')
+  if (status !== EOF_PRODUCTION_JOB_STATUS.RENDERING && status !== EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO) {
+    return false
+  }
+  const now = Number.isFinite(opts.now) ? opts.now : Date.now()
+  const maxAgeSec = Math.max(60, Number(opts.maxAgeSec) || EOF_STALE_RENDER_SEC)
+  const maxQuietSec = Math.max(30, Number(opts.maxQuietSec) || EOF_STALE_PROGRESS_SEC)
+  const startedRaw = job?.renderProgress?.startedAt || job?.updatedAt
+  const startedMs = startedRaw ? Date.parse(String(startedRaw)) : NaN
+  const updatedMs = job?.updatedAt ? Date.parse(String(job.updatedAt)) : NaN
+  const ageSec = Number.isFinite(startedMs) ? (now - startedMs) / 1000 : Infinity
+  const quietSec = Number.isFinite(updatedMs) ? (now - updatedMs) / 1000 : ageSec
+  return ageSec >= maxAgeSec || quietSec >= maxQuietSec
+}
+
+/**
+ * Auto-fail jobs stuck in rendering / rendering_video (Vercel waitUntil killed mid-build).
+ * Called from Production GET poll so the UI unblocks without a manual cancel.
+ * @param {{ maxAgeSec?: number, maxQuietSec?: number }} [opts]
+ * @returns {Promise<string[]>} failed job ids
+ */
+export async function failStaleEofProductionRenders(opts = {}) {
+  const jobs = await listEofProductionJobs(80)
+  const failed = []
+  const now = Date.now()
+  for (const job of jobs) {
+    if (!isEofRenderStale(job, { ...opts, now })) continue
+    const startedRaw = job?.renderProgress?.startedAt || job?.updatedAt
+    const ageSec = startedRaw
+      ? Math.round((now - Date.parse(String(startedRaw))) / 1000)
+      : EOF_STALE_RENDER_SEC
+    const message =
+      `Render stuck / timed out after ${ageSec}s (background work hung or Vercel waitUntil stopped). ` +
+      `Hit Cancel if needed, then Rebuild video — images will re-fetch from SerpAPI.`
+    console.warn(`[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s`)
+    await markEofProductionJobFailed(job.id, message)
+    failed.push(job.id)
+  }
+  return failed
+}
+
 export async function updateEofProductionRenderProgress(id, progress) {
   await ensureEofProductionSchema()
   await query(

@@ -57,7 +57,12 @@ import {
   sortEofPoolHitsPreferScrape,
 } from './eofImageGen.mjs'
 import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache, assertEofCleanPlateImagePath } from './eofProductionVideo.mjs'
-import { mapWithConcurrency, createThrottledWriter, startProgressHeartbeat } from './eofAsyncPool.mjs'
+import {
+  mapWithConcurrency,
+  createThrottledWriter,
+  startProgressHeartbeat,
+  withDeadline,
+} from './eofAsyncPool.mjs'
 import {
   ensureEofMixedAudioOnDisk,
   persistEofVideoArtifact,
@@ -70,18 +75,20 @@ import {
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 /** Cap whole scrape+vision+gen phase so Cucurella builds fail fast instead of freezing the UI. */
 const IMAGE_POOL_DEADLINE_MS = Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) || 75_000
+/** Cap per-scene download / slow fallback waterfall after the Serp pool. */
+const SCENE_ASSIGN_DEADLINE_MS = Number(process.env.EOF_SCENE_ASSIGN_DEADLINE_MS) || 90_000
+/** Cap ffmpeg scene clips + mux so UI never sits at ~42% forever. */
+const VIDEO_ENCODE_DEADLINE_MS = Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) || 180_000
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 
-function withDeadline(promise, ms, label) {
-  const limit = Math.max(5_000, Number(ms) || 0)
-  let timer
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${Math.round(limit / 1000)}s — retry Build`))
-    }, limit)
-  })
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+/** True when prior stills were placeholders — Rebuild must not treat them as reusable history. */
+export function priorStillsWerePlaceholders(manifest) {
+  const rows = Array.isArray(manifest) ? manifest : []
+  if (!rows.length) return false
+  const withSource = rows.filter((m) => m && (m.imageSource || m.imageKey))
+  if (!withSource.length) return false
+  return withSource.every((m) => String(m.imageSource || '').startsWith('placeholder'))
 }
 
 /**
@@ -610,6 +617,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 oxyPool.hits = filterHitsRequiringSubjectNameCue(
                   oxyPool.hits,
                   oxyPool.subject || leadSubject,
+                  { query: oxyPool.query || '' },
                 )
                 oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
               } else {
@@ -628,6 +636,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                   oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
                     oxyPool.secondaryHits,
                     oxyPool.secondarySubject || secondaryPeople[0],
+                    { query: oxyPool.secondaryQuery || '' },
                   )
                 }
               }
@@ -637,6 +646,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 oxyPool.hits = filterHitsRequiringSubjectNameCue(
                   oxyPool.hits,
                   oxyPool.subject || leadSubject,
+                  { query: oxyPool.query || '' },
                 )
               }
               oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
@@ -650,11 +660,13 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
               oxyPool.hits = filterHitsRequiringSubjectNameCue(
                 oxyPool.hits,
                 oxyPool.subject || leadSubject,
+                { query: oxyPool.query || '' },
               )
               if (oxyPool.secondaryHits?.length && oxyPool.secondarySubject) {
                 oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
                   oxyPool.secondaryHits,
                   oxyPool.secondarySubject,
+                  { query: oxyPool.secondaryQuery || '' },
                 )
               }
             }
@@ -706,81 +718,101 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       }
     }
 
-    const scenesForVideo = await mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
-      const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
-      let imageMeta
-      let resolvedImagePath = imagePath
-      const prior = priorManifest.find((m) => m.index === row.index) || priorManifest[row.index]
-      const priorHistory = Array.isArray(prior?.imageKeyHistory)
-        ? prior.imageKeyHistory.filter(Boolean)
-        : prior?.imageKey
-          ? [prior.imageKey]
-          : []
-      // A prior image render means this is a rebuild → rotate to a fresh candidate.
-      const hadPriorImage = Boolean(
-        prior && (prior.imageKey || prior.imageSource || prior.imageAttempt !== undefined),
+    // Rebuild after a failed/placeholder job must re-search Serp — never stick to dead avoidKeys.
+    const forceFreshImages = !reuseSceneImages && priorStillsWerePlaceholders(priorManifest)
+    if (forceFreshImages) {
+      console.warn(
+        `[eof-video] prior stills were placeholders for job ${jobId} — forcing fresh Serp fetch (clearing avoid history)`,
       )
-      let imageKey = prior?.imageKey || null
-      let imageAttempt = Number(prior?.imageAttempt) || 0
-      let imageKeyHistory = priorHistory
-      if (reuseSceneImages) {
-        const restored = await ensureEofSceneImageOnDisk(jobId, row.index + 1)
-        if (!restored || !existsSync(restored)) {
-          throw new Error(
-            `Scene ${row.index + 1} image is missing. Run Build Short once before regenerating voiceover only.`,
-          )
+    }
+
+    const scenesForVideo = await withDeadline(
+      mapWithConcurrency(rows, IMAGE_CONCURRENCY, async (row) => {
+        const imagePath = join(workDir, `scene-${row.index + 1}.jpg`)
+        let imageMeta
+        let resolvedImagePath = imagePath
+        const prior = priorManifest.find((m) => m.index === row.index) || priorManifest[row.index]
+        const priorHistory = Array.isArray(prior?.imageKeyHistory)
+          ? prior.imageKeyHistory.filter(Boolean)
+          : prior?.imageKey
+            ? [prior.imageKey]
+            : []
+        // Placeholders / failed builds: do not carry avoidKeys — force a real Serp claim.
+        const avoidKeys = forceFreshImages ? [] : priorHistory
+        // A prior image render means this is a rebuild → rotate to a fresh candidate.
+        const hadPriorImage =
+          !forceFreshImages &&
+          Boolean(prior && (prior.imageKey || prior.imageSource || prior.imageAttempt !== undefined))
+        let imageKey = forceFreshImages ? null : prior?.imageKey || null
+        let imageAttempt = forceFreshImages ? 0 : Number(prior?.imageAttempt) || 0
+        let imageKeyHistory = forceFreshImages ? [] : priorHistory
+        if (reuseSceneImages) {
+          const restored = await ensureEofSceneImageOnDisk(jobId, row.index + 1)
+          if (!restored || !existsSync(restored)) {
+            throw new Error(
+              `Scene ${row.index + 1} image is missing. Run Build Short once before regenerating voiceover only.`,
+            )
+          }
+          assertEofCleanPlateImagePath(restored)
+          resolvedImagePath = restored
+          imageMeta = {
+            source: prior?.imageSource || 'cache',
+            imageQuery: row.imageQuery,
+            imageTitle: prior?.imageTitle || null,
+            imageUrl: prior?.imageUrl || null,
+            sourcePage: prior?.sourcePage || null,
+          }
+        } else {
+          const attempt = hadPriorImage ? imageAttempt + 1 : 0
+          imageMeta = await fetchEofSceneImage({
+            topic: job.topic,
+            imageQuery: row.imageQuery,
+            caption: row.caption,
+            outPath: imagePath,
+            index: row.index,
+            refresh: true,
+            attempt,
+            avoidKeys,
+            wikiPool,
+            oxyPool,
+            plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
+            intent: oxyPool?.intent || null,
+            // After a Serp job pool, skip AP/CSE/Pexels hangs — fail fast to placeholder/error.
+            skipSlowFallbacks: Boolean(oxyPool),
+          })
+          imageAttempt = attempt
+          imageKey = imageMeta.imageKey || null
+          // Track real (non-placeholder) keys so repeated rebuilds keep trying new photos.
+          if (
+            imageKey &&
+            imageMeta.source !== 'placeholder' &&
+            imageMeta.source !== 'placeholder-no-image-keys'
+          ) {
+            imageKeyHistory = appendEofImageKeyHistory(avoidKeys, imageKey)
+          }
         }
-        assertEofCleanPlateImagePath(restored)
-        resolvedImagePath = restored
-        imageMeta = {
-          source: prior?.imageSource || 'cache',
-          imageQuery: row.imageQuery,
-          imageTitle: prior?.imageTitle || null,
-          imageUrl: prior?.imageUrl || null,
-          sourcePage: prior?.sourcePage || null,
-        }
-      } else {
-        const attempt = hadPriorImage ? imageAttempt + 1 : 0
-        imageMeta = await fetchEofSceneImage({
-          topic: job.topic,
-          imageQuery: row.imageQuery,
-          caption: row.caption,
-          outPath: imagePath,
+        imagesDone += 1
+        await report(reuseSceneImages ? 'video' : 'images', imagesDone)
+        return {
           index: row.index,
-          refresh: true,
-          attempt,
-          avoidKeys: priorHistory,
-          wikiPool,
-          oxyPool,
-          plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
-          intent: oxyPool?.intent || null,
-        })
-        imageAttempt = attempt
-        imageKey = imageMeta.imageKey || null
-        // Track real (non-placeholder) keys so repeated rebuilds keep trying new photos.
-        if (imageKey && imageMeta.source !== 'placeholder' && imageMeta.source !== 'placeholder-no-image-keys') {
-          imageKeyHistory = appendEofImageKeyHistory(priorHistory, imageKey)
+          durationSec: row.durationSec,
+          caption: row.caption,
+          narration: row.narration,
+          imagePath: resolvedImagePath,
+          imageSource: imageMeta.source,
+          imageQueryUsed: imageMeta.imageQuery || row.imageQuery,
+          imageKey,
+          imageAttempt,
+          imageKeyHistory,
+          imageTitle: imageMeta.imageTitle || imageMeta.pinTitle || prior?.imageTitle || null,
+          imageUrl: imageMeta.imageUrl || prior?.imageUrl || null,
+          sourcePage: imageMeta.sourcePage || prior?.sourcePage || null,
+          imageYear: imageMeta.imageYear || null,
         }
-      }
-      imagesDone += 1
-      await report(reuseSceneImages ? 'video' : 'images', imagesDone)
-      return {
-        index: row.index,
-        durationSec: row.durationSec,
-        caption: row.caption,
-        narration: row.narration,
-        imagePath: resolvedImagePath,
-        imageSource: imageMeta.source,
-        imageQueryUsed: imageMeta.imageQuery || row.imageQuery,
-        imageKey,
-        imageAttempt,
-        imageKeyHistory,
-        imageTitle: imageMeta.imageTitle || imageMeta.pinTitle || prior?.imageTitle || null,
-        imageUrl: imageMeta.imageUrl || prior?.imageUrl || null,
-        sourcePage: imageMeta.sourcePage || prior?.sourcePage || null,
-        imageYear: imageMeta.imageYear || null,
-      }
-    })
+      }),
+      SCENE_ASSIGN_DEADLINE_MS,
+      'Scene image assign',
+    )
 
     const placeholderCount = scenesForVideo.filter((s) =>
       String(s.imageSource || '').startsWith('placeholder'),
@@ -858,28 +890,32 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         })
       }
 
-      rendered = await renderEofProductionVideo({
-        jobId,
-        scenes: scenesForVideo,
-        mixedAudioPath: mixedPath,
-        captionStyle: job.captionStyle,
-        captionLayout: job.captionLayout || job.script?.captionLayout || null,
-        zapcapTemplateId: job.zapcapTemplateId,
-        transitionStyle: job.transitionStyle,
-        colorGrade: job.colorGrade,
-        enhanceStyle: job.enhanceStyle,
-        format: job.script?.format,
-        captionMode,
-        overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
-        videoEffects: job.videoEffects,
-        stickers: job.stickers,
-        hasSecondarySubject: secondaryPeople.length > 0,
-        secondarySceneIndex,
-        onSceneProgress: async (done) => {
-          videoProgressIndex = done
-          await report('video', done)
-        },
-      })
+      rendered = await withDeadline(
+        renderEofProductionVideo({
+          jobId,
+          scenes: scenesForVideo,
+          mixedAudioPath: mixedPath,
+          captionStyle: job.captionStyle,
+          captionLayout: job.captionLayout || job.script?.captionLayout || null,
+          zapcapTemplateId: job.zapcapTemplateId,
+          transitionStyle: job.transitionStyle,
+          colorGrade: job.colorGrade,
+          enhanceStyle: job.enhanceStyle,
+          format: job.script?.format,
+          captionMode,
+          overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
+          videoEffects: job.videoEffects,
+          stickers: job.stickers,
+          hasSecondarySubject: secondaryPeople.length > 0,
+          secondarySceneIndex,
+          onSceneProgress: async (done) => {
+            videoProgressIndex = done
+            await report('video', done)
+          },
+        }),
+        VIDEO_ENCODE_DEADLINE_MS,
+        'Video encode (ffmpeg)',
+      )
       relPath = rendered.relPath
     } finally {
       stopVideoHb()

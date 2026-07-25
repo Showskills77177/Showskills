@@ -57,6 +57,19 @@ function looksLikeImageBuffer(buf) {
 }
 
 const IMAGE_DOWNLOAD_TIMEOUT_MS = Number(process.env.EOF_IMAGE_DOWNLOAD_TIMEOUT_MS) || 12_000
+/** Hard cap per scene so AP/CSE/Pexels waterfalls cannot freeze Rebuild. */
+const SCENE_IMAGE_DEADLINE_MS = Number(process.env.EOF_SCENE_IMAGE_DEADLINE_MS) || 35_000
+
+async function withSceneDeadline(promise, label) {
+  const limit = Math.max(5_000, SCENE_IMAGE_DEADLINE_MS)
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(limit / 1000)}s`))
+    }, limit)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
 
 async function downloadImageToFile(imgUrl, outPath) {
   const headers = {
@@ -136,7 +149,10 @@ async function materializeClaimedHit(claimed, outPath) {
 async function searchPexelsPhoto(query, index, key) {
   const page = Math.floor(index / 12) + 1
   const searchUrl = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=15&page=${page}&orientation=portrait`
-  const res = await fetch(searchUrl, { headers: { Authorization: key } })
+  const res = await fetch(searchUrl, {
+    headers: { Authorization: key },
+    signal: AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS),
+  })
   if (!res.ok) return null
   const data = await res.json()
   const photos = data.photos || []
@@ -193,9 +209,43 @@ const IMAGE_ROTATE_MAX_TRIES = 8
  * (image keys already used for this scene) so we pull a DIFFERENT photo each time instead
  * of re-downloading the same top-ranked result. Returns `imageKey` so the caller can
  * record what was used and avoid it next time.
- * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string, source?: string, plainTextDraft?: string, intent?: string } | null, plainTextDraft?: string, intent?: string }} opts
+ * @param {{ imageQuery: string, topic?: string, caption?: string, outPath: string, index?: number, refresh?: boolean, attempt?: number, avoidKeys?: string[], wikiPool?: Array, oxyPool?: { hits?: Array, claimed?: Set<string>, query?: string, source?: string, plainTextDraft?: string, intent?: string } | null, plainTextDraft?: string, intent?: string, skipSlowFallbacks?: boolean }} opts
  */
-export async function fetchEofSceneImage({
+export async function fetchEofSceneImage(opts) {
+  try {
+    return await withSceneDeadline(fetchEofSceneImageInner(opts), `Scene ${(opts?.index ?? 0) + 1} image`)
+  } catch (e) {
+    // Deadline / unexpected: write placeholder so the job can fail-fast with a clear all-placeholder error
+    // instead of hanging the Production UI on a single scene.
+    const outPath = opts?.outPath
+    if (outPath) {
+      console.warn(
+        '[eof-scene-images] scene fetch aborted',
+        e instanceof Error ? e.message : e,
+        String(opts?.topic || '').slice(0, 40),
+      )
+      try {
+        mkdirSync(dirname(outPath), { recursive: true })
+        const fallbackQuery = String(opts?.imageQuery || opts?.topic || 'football')
+        await writeLabeledPlaceholder({
+          outPath,
+          color: paletteForQuery(fallbackQuery, opts?.index || 0),
+          label: fallbackQuery.split(/\s+/).slice(0, 3).join(' '),
+        })
+        return {
+          path: outPath,
+          source: 'placeholder',
+          imageQuery: fallbackQuery,
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    throw e
+  }
+}
+
+async function fetchEofSceneImageInner({
   imageQuery,
   topic,
   caption = '',
@@ -208,6 +258,7 @@ export async function fetchEofSceneImage({
   oxyPool = null,
   plainTextDraft = '',
   intent = null,
+  skipSlowFallbacks = false,
 }) {
   mkdirSync(dirname(outPath), { recursive: true })
   if (!refresh && existsSync(outPath)) {
@@ -242,6 +293,8 @@ export async function fetchEofSceneImage({
     intent: roleIntent,
   })
   const custom = String(anchoredQuery || '').trim()
+  // After Serp/Oxylabs job pool: skip unbounded AP/CSE/Pexels (common Cucurella hang).
+  const slowOk = skipSlowFallbacks !== true
 
   const avoid = new Set((avoidKeys || []).filter(Boolean))
   const rot = Math.max(0, Number(attempt) || 0)
@@ -437,105 +490,108 @@ export async function fetchEofSceneImage({
 
   // Search order after Google Images pool: AP → CSE → Pexels → Pinterest → Wikimedia last.
   // Do NOT short-circuit named people through Wikidata portraits — that was forcing old Commons stills.
-  for (const query of queries) {
-    if (isPinterestPinUrl(query)) continue
+  // When a Serp/Oxylabs job pool already ran, skip these — hung CSE/Pexels sockets were freezing Rebuild.
+  if (slowOk) {
+    for (const query of queries) {
+      if (isPinterestPinUrl(query)) continue
 
-    // AP editorial — licensed breaking-news stills when keyed
-    if (isEofApImagesConfigured()) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchApMediaPicture(query, eff, { topic })
-        if (!hit) return null
-        const score =
-          typeof hit.relevance === 'number'
-            ? hit.relevance
-            : scoreImageRelevance(topic || query, hit.title || '', query)
-        if (score < 4) return null // require a real topic/entity hit — never accept random AP stock
-        return {
-          key: `ap:${hit.apItemId || hit.title || hit.imgUrl || eff}`,
-          meta: {
-            path: outPath,
-            source: 'ap',
-            imageQuery: query,
-            imageTitle: hit.title,
-            imageUrl: hit.imgUrl || null,
-            apItemId: hit.apItemId,
-            apRole: hit.role,
-            relevance: score,
-          },
-          download: () => downloadApRenditionToFile(hit, outPath),
-        }
-      })
-      if (meta) return meta
-    }
+      // AP editorial — licensed breaking-news stills when keyed
+      if (isEofApImagesConfigured()) {
+        const meta = await rotateSource(async (eff) => {
+          const hit = await searchApMediaPicture(query, eff, { topic })
+          if (!hit) return null
+          const score =
+            typeof hit.relevance === 'number'
+              ? hit.relevance
+              : scoreImageRelevance(topic || query, hit.title || '', query)
+          if (score < 4) return null // require a real topic/entity hit — never accept random AP stock
+          return {
+            key: `ap:${hit.apItemId || hit.title || hit.imgUrl || eff}`,
+            meta: {
+              path: outPath,
+              source: 'ap',
+              imageQuery: query,
+              imageTitle: hit.title,
+              imageUrl: hit.imgUrl || null,
+              apItemId: hit.apItemId,
+              apRole: hit.role,
+              relevance: score,
+            },
+            download: () => downloadApRenditionToFile(hit, outPath),
+          }
+        })
+        if (meta) return meta
+      }
 
-    if (isEofGoogleCseConfigured()) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchGoogleCseImages(query, eff)
-        if (!hit) return null
-        const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`, query)
-        if (score < 6) return null
-        return {
-          key: `google:${hit.imgUrl}`,
-          meta: {
-            path: outPath,
-            source: 'google',
-            imageQuery: query,
-            imageTitle: hit.title,
-            imageUrl: hit.imgUrl || null,
-            sourcePage: hit.sourcePage,
-            relevance: score,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
-        }
-      })
-      if (meta) return meta
-    }
+      if (isEofGoogleCseConfigured()) {
+        const meta = await rotateSource(async (eff) => {
+          const hit = await searchGoogleCseImages(query, eff)
+          if (!hit) return null
+          const score = scoreImageRelevance(topic || query, `${hit.title || ''} ${hit.sourcePage || ''}`, query)
+          if (score < 6) return null
+          return {
+            key: `google:${hit.imgUrl}`,
+            meta: {
+              path: outPath,
+              source: 'google',
+              imageQuery: query,
+              imageTitle: hit.title,
+              imageUrl: hit.imgUrl || null,
+              sourcePage: hit.sourcePage,
+              relevance: score,
+            },
+            download: () => downloadImageToFile(hit.imgUrl, outPath),
+          }
+        })
+        if (meta) return meta
+      }
 
-    if (pexelsKey) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchPexelsPhoto(query, eff, pexelsKey)
-        if (!hit) return null
-        const score =
-          typeof hit.relevance === 'number'
-            ? hit.relevance
-            : scoreImageRelevance(topic || query, hit.alt || '', query)
-        if (score < 6) return null
-        return {
-          key: `pexels:${hit.pexelsId}`,
-          meta: {
-            path: outPath,
-            source: 'pexels',
-            imageQuery: query,
-            photographer: hit.photographer,
-            pexelsId: hit.pexelsId,
-            relevance: score,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
-        }
-      })
-      if (meta) return meta
-    }
+      if (pexelsKey) {
+        const meta = await rotateSource(async (eff) => {
+          const hit = await searchPexelsPhoto(query, eff, pexelsKey)
+          if (!hit) return null
+          const score =
+            typeof hit.relevance === 'number'
+              ? hit.relevance
+              : scoreImageRelevance(topic || query, hit.alt || '', query)
+          if (score < 6) return null
+          return {
+            key: `pexels:${hit.pexelsId}`,
+            meta: {
+              path: outPath,
+              source: 'pexels',
+              imageQuery: query,
+              photographer: hit.photographer,
+              pexelsId: hit.pexelsId,
+              relevance: score,
+            },
+            download: () => downloadImageToFile(hit.imgUrl, outPath),
+          }
+        })
+        if (meta) return meta
+      }
 
-    // Pinterest — only if token present (often unauthorized for catalog search)
-    if (pinterestToken) {
-      const meta = await rotateSource(async (eff) => {
-        const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
-        if (!hit || (hit.relevance ?? 0) < 6) return null
-        return {
-          key: `pin:${hit.pinId || hit.imgUrl}`,
-          meta: {
-            path: outPath,
-            source: 'pinterest',
-            imageQuery: query,
-            pinId: hit.pinId,
-            pinTitle: hit.title,
-            imageUrl: hit.imgUrl || null,
-            relevance: hit.relevance,
-          },
-          download: () => downloadImageToFile(hit.imgUrl, outPath),
-        }
-      })
-      if (meta) return meta
+      // Pinterest — only if token present (often unauthorized for catalog search)
+      if (pinterestToken) {
+        const meta = await rotateSource(async (eff) => {
+          const hit = await searchPinterestPartnerPins(query, eff, pinterestToken, { topic })
+          if (!hit || (hit.relevance ?? 0) < 6) return null
+          return {
+            key: `pin:${hit.pinId || hit.imgUrl}`,
+            meta: {
+              path: outPath,
+              source: 'pinterest',
+              imageQuery: query,
+              pinId: hit.pinId,
+              pinTitle: hit.title,
+              imageUrl: hit.imgUrl || null,
+              relevance: hit.relevance,
+            },
+            download: () => downloadImageToFile(hit.imgUrl, outPath),
+          }
+        })
+        if (meta) return meta
+      }
     }
   }
 

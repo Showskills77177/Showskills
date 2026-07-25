@@ -62,3 +62,22 @@ export function startProgressHeartbeat(tick, intervalMs = 4000) {
   }, ms)
   return () => clearInterval(id)
 }
+
+/**
+ * Race a promise against a hard deadline so Cucurella builds never hang the UI forever.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+export function withDeadline(promise, ms, label) {
+  const limit = Math.max(100, Number(ms) || 0)
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(limit / 1000)}s — retry Build`))
+    }, limit)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}

@@ -21,8 +21,11 @@ import {
   assertEofVideoPersisted,
   shouldSkipEofStillsPreflight,
   formatEofNoSceneImagesError,
+  priorStillsWerePlaceholders,
   EOF_IMAGE_KEY_HISTORY_LIMIT,
 } from '../backend/api/lib/eofProductionRenderVideo.mjs'
+import { withDeadline } from '../backend/api/lib/eofAsyncPool.mjs'
+import { isEofRenderStale } from '../backend/api/lib/eofProductionJobs.mjs'
 
 function mockHits(n) {
   return Array.from({ length: n }, (_, i) => ({
@@ -454,6 +457,72 @@ describe('eof remux stills-preflight skip (P0)', () => {
       true,
     )
     assert.equal(shouldSkipEofStillsPreflight({ reuseSceneImages: false }), false)
+  })
+})
+
+describe('eof hang fail-fast + placeholder rebuild', () => {
+  it('detects prior placeholder stills so Rebuild forces a fresh Serp fetch', () => {
+    assert.equal(priorStillsWerePlaceholders([]), false)
+    assert.equal(
+      priorStillsWerePlaceholders([
+        { imageSource: 'serpapi', imageKey: 'serpapi:https://a.jpg' },
+        { imageSource: 'placeholder', imageKey: 'p' },
+      ]),
+      false,
+    )
+    assert.equal(
+      priorStillsWerePlaceholders([
+        { imageSource: 'placeholder', imageKey: 'p0' },
+        { imageSource: 'placeholder-no-image-keys', imageKey: 'p1' },
+      ]),
+      true,
+    )
+  })
+
+  it('marks rendering jobs stale when quiet or over max age (waitUntil death)', () => {
+    const now = Date.now()
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 10_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 10_000).toISOString() },
+        },
+        { now, maxAgeSec: 120, maxQuietSec: 75 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 80_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 80_000).toISOString() },
+        },
+        { now, maxAgeSec: 120, maxQuietSec: 75 },
+      ),
+      true,
+      'quiet > 75s must stale (silent waitUntil kill)',
+    )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 130_000).toISOString() },
+        },
+        { now, maxAgeSec: 120, maxQuietSec: 75 },
+      ),
+      true,
+      'overall age > 120s must stale even with heartbeats',
+    )
+  })
+
+  it('withDeadline rejects hung work instead of freezing forever', async () => {
+    await assert.rejects(
+      () => withDeadline(new Promise(() => {}), 50, 'Test stage'),
+      /Test stage timed out after/,
+    )
   })
 })
 
