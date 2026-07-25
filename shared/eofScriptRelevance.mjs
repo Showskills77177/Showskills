@@ -235,15 +235,28 @@ export function extractPersonLikeNames(text) {
   return [...new Set(out)]
 }
 
-function nameGroundedInSource(name, sourceText) {
+/**
+ * @param {string} name
+ * @param {string} sourceText
+ * @param {string[]} [topicAnchors] ordered-topic person tokens — always count as grounded (typo-tolerant)
+ */
+function nameGroundedInSource(name, sourceText, topicAnchors = []) {
   const hay = normalizeHay(sourceText)
-  if (!hay) return false
   const full = cleanNameToken(name)
-  if (full && hay.includes(full)) return true
   const parts = full.split(/\s+/).filter((p) => p.length >= 4)
+  // Primary topic entities (ordered topic/title) always ground the hero — even with Marc/Mark or Cuc* typos.
+  if (
+    parts.length &&
+    Array.isArray(topicAnchors) &&
+    topicAnchors.some((a) => parts.some((p) => tokensLooselyEqual(p, a)))
+  ) {
+    return true
+  }
+  if (!hay) return false
+  if (full && hay.includes(full)) return true
   // Surname (last token ≥4) or any distinctive token in the brief is enough.
   if (parts.length && parts.some((p) => hay.includes(p))) return true
-  // Fuzzy: Cuccorea ≈ Cuccurella / Cucurella (common AI misspells)
+  // Fuzzy: Cuccorea ≈ Cuccurella / Cucurella / Cuccorella (common AI misspells)
   const hayToks = hay.split(/\s+/).filter((p) => p.length >= 4)
   if (parts.some((p) => hayToks.some((h) => tokensLooselyEqual(p, h)))) return true
   return false
@@ -254,8 +267,37 @@ function cleanNameToken(s) {
   return normalizeHay(s).replace(/['’]s\b/g, '').replace(/['’]/g, '')
 }
 
+/** Collapse consecutive duplicate letters (Cuccurella → Cucurela) for typo-tolerant surname match. */
+function collapseLetterRepeats(s) {
+  return String(s || '').replace(/(.)\1+/g, '$1')
+}
+
+/** Small Levenshtein for name-token fuzzy match (surnames / Marc↔Mark). */
+function editDistance(a, b) {
+  const x = String(a || '')
+  const y = String(b || '')
+  if (x === y) return 0
+  const n = x.length
+  const m = y.length
+  if (!n) return m
+  if (!m) return n
+  const prev = new Array(m + 1)
+  const cur = new Array(m + 1)
+  for (let j = 0; j <= m; j++) prev[j] = j
+  for (let i = 1; i <= n; i++) {
+    cur[0] = i
+    const ca = x.charCodeAt(i - 1)
+    for (let j = 1; j <= m; j++) {
+      const cost = ca === y.charCodeAt(j - 1) ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+    }
+    for (let j = 0; j <= m; j++) prev[j] = cur[j]
+  }
+  return prev[m]
+}
+
 /**
- * Loose surname match (Cuccorea ≈ Cuccurella / Cucurella).
+ * Loose surname / given-name match (Cuccorea ≈ Cuccurella / Cucurella / Cuccorella; Marc ≈ Mark).
  * @param {string} a
  * @param {string} b
  */
@@ -265,7 +307,31 @@ export function tokensLooselyEqual(a, b) {
   if (!x || !y) return false
   if (x === y) return true
   if (x.includes(y) || y.includes(x)) return true
+
+  const cx = collapseLetterRepeats(x)
+  const cy = collapseLetterRepeats(y)
+  if (cx && cy && (cx === cy || cx.includes(cy) || cy.includes(cx))) return true
+
+  const maxLen = Math.max(x.length, y.length)
+  const minLen = Math.min(x.length, y.length)
+  if (minLen >= 4 && Math.abs(x.length - y.length) <= 3) {
+    const dist = editDistance(x, y)
+    const distCollapsed = cx && cy ? editDistance(cx, cy) : dist
+    // Marc↔Mark (1), Cucurella↔Cuccorea / Cuccurella (2–3 after collapse)
+    if (dist <= 1 || distCollapsed <= 1) return true
+    if (maxLen >= 7 && (dist <= 3 || distCollapsed <= 2)) return true
+  }
+
   if (x.length >= 5 && y.length >= 5 && x.slice(0, 4) === y.slice(0, 4) && Math.abs(x.length - y.length) <= 3) {
+    return true
+  }
+  // Shared 3-letter prefix + similar length covers Cuc* surname family when 4-letter prefix drifts (cucu vs cucc)
+  if (
+    minLen >= 6 &&
+    Math.abs(x.length - y.length) <= 3 &&
+    x.slice(0, 3) === y.slice(0, 3) &&
+    (editDistance(x, y) <= 3 || editDistance(cx, cy) <= 2)
+  ) {
     return true
   }
   return false
@@ -350,7 +416,7 @@ export function detectTopicDrift(draft, topic) {
     const matchesAnchor = parts.some((p) => anchors.some((a) => tokensLooselyEqual(p, a)))
     if (matchesAnchor) continue
     // Same-story cast still in the ordered topic string (club etc. already filtered by extract)
-    if (nameGroundedInSource(name, ordered)) continue
+    if (nameGroundedInSource(name, ordered, anchors)) continue
     foreign.push(name)
   }
 
@@ -401,6 +467,7 @@ export function scoreDraftRelevance(draft, opts = {}) {
   }
 
   // A0) Topic drift — ordered topic only (desk RSS must not unlock a Keegan pivot)
+  const topicAnchors = extractTopicAnchorTokens(topic)
   const drift = detectTopicDrift(text, topic)
   if (drift.drift) {
     score = Math.min(score, 1.5)
@@ -442,7 +509,7 @@ export function scoreDraftRelevance(draft, opts = {}) {
   const names = extractPersonLikeNames(text)
   const ungrounded = []
   for (const name of names) {
-    if (nameGroundedInSource(name, sourceText)) continue
+    if (nameGroundedInSource(name, sourceText, topicAnchors)) continue
     // Skip if already captured as a known cross-sport figure
     if (
       CROSS_SPORT_FIGURES.some((fig) =>

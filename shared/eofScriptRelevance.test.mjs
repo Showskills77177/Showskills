@@ -5,6 +5,7 @@ import {
   mergeRelevanceIntoVerdict,
   extractPersonLikeNames,
   detectTopicDrift,
+  tokensLooselyEqual,
   EOF_SHORTS_RELEVANCE_VOICE,
 } from './eofScriptRelevance.mjs'
 
@@ -81,6 +82,37 @@ Live desk headlines:
     assert.equal(v.offTopic.length, 0, JSON.stringify(v.offTopic))
   })
 
+  it('grounds Marc Cucurella when topic uses Mark Cuccorea typo (adapt must not fail)', () => {
+    const topic = "Why Mark Cuccorea doesn't cut his hair"
+    const draft = `Marc Cucurella keeps his long hair for a reason tied to family, not fashion. Critics say it is a distraction on the pitch. That is the stake: personal pride versus focus in games. Fair from Cucurella, or still a pitch issue? Comment.`
+
+    const v = scoreDraftRelevance(draft, {
+      topic,
+      orderedTopic: topic,
+      // Adapt path often has empty desk brief — topic anchors alone must ground the hero
+      deskBrief: '',
+      format: 'news',
+    })
+    assert.ok(v.pass, JSON.stringify(v))
+    assert.ok(
+      !v.offTopic.some((o) => o.kind === 'ungrounded_name'),
+      JSON.stringify(v.offTopic),
+    )
+    assert.ok(!v.reasons.some((r) => /not grounded/i.test(r)), JSON.stringify(v.reasons))
+  })
+
+  it('still blocks Fury when hair topic never mentions boxing', () => {
+    const topic = "Why Mark Cuccorea doesn't cut his hair"
+    const draft = `Marc Cucurella hit back on the hair row. Then Tyson Fury questioned Anthony Joshua's pride for no reason in this story. Fair from Cucurella? Comment.`
+
+    const v = scoreDraftRelevance(draft, { topic, orderedTopic: topic, deskBrief: '' })
+    assert.equal(v.pass, false, JSON.stringify(v))
+    assert.ok(
+      v.offTopic.some((o) => /fury|joshua/i.test(o.label) || /fury|joshua/i.test(o.id)),
+      JSON.stringify(v.offTopic),
+    )
+  })
+
   it('fails boxing lexeme free-association even without named boxers', () => {
     const draft = `Marc Cuccurella hit back at long-hair criticism tied to his autistic son. He says it is support, not a distraction. This is basically boxing energy — pride fights dressed up as image talk. Buy Cuccurella's claim, or still call the hair a pitch issue? Comment.`
 
@@ -123,6 +155,15 @@ Stakes: Cross-over pride debate (sourced)`
     assert.ok(names.some((n) => /Cuccurella/i.test(n)))
     assert.ok(names.some((n) => /Fury/i.test(n)))
     assert.ok(!names.some((n) => /Premier League/i.test(n)))
+  })
+
+  it('fuzzy-matches Cuc* surname typos and Marc↔Mark', () => {
+    assert.ok(tokensLooselyEqual('Cucurella', 'Cuccorea'))
+    assert.ok(tokensLooselyEqual('Cucurella', 'Cuccorella'))
+    assert.ok(tokensLooselyEqual('Cucurella', 'Cuccurella'))
+    assert.ok(tokensLooselyEqual('Marc', 'Mark'))
+    assert.ok(!tokensLooselyEqual('Cucurella', 'Keegan'))
+    assert.ok(!tokensLooselyEqual('Fury', 'Cuccorea'))
   })
 
   it('merges relevance fail into a soft model pass', () => {
