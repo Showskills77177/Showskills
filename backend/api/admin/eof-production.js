@@ -281,7 +281,7 @@ export default async function handler(req, res) {
             return 'Article sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
           }
           if (s.anthropic && !s.openai && !s.groq && !s.xai) {
-            return 'Claude (Anthropic) is ready for Script AI. Pick Claude in the Script AI dropdown, or set EOF_SCRIPT_PROVIDER=anthropic.'
+            return 'Claude Sonnet 5 (Anthropic) is ready for Script AI. Pick Claude in the Script AI dropdown, or set EOF_SCRIPT_PROVIDER=anthropic.'
           }
           if (s.xai && !s.openai && !s.groq && !s.anthropic) {
             return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'

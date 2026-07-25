@@ -3120,7 +3120,7 @@ export default function EofProductionPanel({
                   : [
                       { id: 'auto', label: 'Auto (best quality)', configured: true },
                       { id: 'groq', label: 'Groq (free)', configured: false },
-                      { id: 'anthropic', label: 'Claude (Anthropic)', configured: false },
+                      { id: 'anthropic', label: 'Claude Sonnet 5 (Anthropic)', configured: false },
                       { id: 'xai', label: 'xAI Grok', configured: false },
                       { id: 'openai', label: 'OpenAI', configured: false },
                     ]

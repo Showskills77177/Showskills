@@ -127,9 +127,9 @@ export function listEofScriptProviderOptions() {
     },
     {
       id: 'anthropic',
-      label: 'Claude (Anthropic)',
+      label: 'Claude Sonnet 5 (Anthropic)',
       configured: status.anthropic,
-      detail: 'Writer or judge — set ANTHROPIC_API_KEY (optional ANTHROPIC_MODEL).',
+      detail: 'Writer or judge — set ANTHROPIC_API_KEY (optional ANTHROPIC_MODEL=claude-sonnet-5).',
     },
     {
       id: 'xai',
@@ -243,7 +243,7 @@ export function eofScriptProviderLabel(provider) {
   if (id === 'openai') return 'OpenAI'
   if (id === 'anthropic') {
     const model = anthropicModelCandidates()[0]
-    return model ? `Claude (${model})` : 'Claude (Anthropic)'
+    return model ? `Claude (${model})` : 'Claude Sonnet 5 (Anthropic)'
   }
   if (id === 'local-split') return 'Draft split (local)'
   if (id === 'groq') {

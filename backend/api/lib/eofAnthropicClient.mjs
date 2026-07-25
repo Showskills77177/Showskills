@@ -3,7 +3,7 @@
  *
  * Env:
  *   ANTHROPIC_API_KEY / EOF_ANTHROPIC_API_KEY
- *   ANTHROPIC_MODEL / EOF_ANTHROPIC_MODEL / CLAUDE_MODEL  (default claude-sonnet-4-6)
+ *   ANTHROPIC_MODEL / EOF_ANTHROPIC_MODEL / CLAUDE_MODEL  (default claude-sonnet-5)
  */
 function envKey(...names) {
   for (const name of names) {
@@ -21,10 +21,10 @@ export function isAnthropicConfigured() {
   return Boolean(getAnthropicApiKey())
 }
 
-/** Preferred model order — Sonnet 4.6 first, then adjacent aliases. */
+/** Preferred model order — Sonnet 5 first, then prior Sonnet aliases. */
 export function anthropicModelCandidates() {
   const configured = envKey('ANTHROPIC_MODEL', 'EOF_ANTHROPIC_MODEL', 'CLAUDE_MODEL')
-  const defaults = ['claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-sonnet-5']
+  const defaults = ['claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5']
   if (!configured) return defaults
   return [configured, ...defaults.filter((m) => m !== configured)]
 }
