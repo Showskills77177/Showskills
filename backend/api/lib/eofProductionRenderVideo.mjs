@@ -111,7 +111,7 @@ export function formatEofNoSceneImagesError(info = {}) {
   const attempts = Array.isArray(info.providerAttempts) ? info.providerAttempts : []
 
   if (!order.length && !attempts.length) {
-    parts.push('SerpAPI/Oxylabs were not configured (missing SERPAPI_API_KEY and/or OXYLABS_USERNAME+OXYLABS_PASSWORD)')
+    parts.push('SerpAPI was not configured (missing SERPAPI_API_KEY)')
   } else {
     for (const provider of order.length ? order : attempts.map((a) => a.provider)) {
       const a = attempts.find((x) => x.provider === provider)
@@ -129,7 +129,7 @@ export function formatEofNoSceneImagesError(info = {}) {
       } else if (status === 'not_configured') {
         parts.push(
           provider === 'oxylabs'
-            ? 'Oxylabs not configured (OXYLABS_USERNAME / OXYLABS_PASSWORD)'
+            ? 'Oxylabs not configured (need OXYLABS_ENABLED=1 + OXYLABS_USERNAME / OXYLABS_PASSWORD)'
             : 'SerpAPI not configured (SERPAPI_API_KEY)',
         )
       } else if (status === 'ok' && Number(a.hits) > 0) {
@@ -323,7 +323,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
 
     let imagesDone = 0
     // Google Images pool: exactly ONE billable query for the whole Short.
-    // Order follows admin imageProvider (auto / serpapi / oxylabs), then AP/CSE per scene.
+    // Order follows admin imageProvider (auto / serpapi / oxylabs opt-in), then AP/CSE per scene.
     let oxyPool = null
     let wikiPool = []
     /** @type {{ providerOrder: string[], providerAttempts: Array<{ provider: string, status?: string, detail?: string, hits?: number, query?: string }>, scrapeHitsBeforeFilter: number, scrapeHitsAfterFilter: number, wikiHits: number|null, genHits: number, subject: string|null }} */

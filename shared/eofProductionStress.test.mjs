@@ -506,7 +506,7 @@ describe('EOF stress — jobs / schema / history / notify', () => {
     }
   })
 
-  it('Oxylabs health notes distinguish missing vs auth down', () => {
+  it('Oxylabs health notes distinguish missing vs auth down vs opt-in off', () => {
     assert.match(
       formatOxylabsSearchHealthNote({
         status: 'not_configured',
@@ -514,6 +514,15 @@ describe('EOF stress — jobs / schema / history / notify', () => {
         softFallback: true,
       }),
       /credentials missing|soft-falling/i,
+    )
+    assert.match(
+      formatOxylabsSearchHealthNote({
+        status: 'not_configured',
+        disabled: true,
+        detail: 'Oxylabs disabled (set OXYLABS_ENABLED=1 to opt in when trial renewed)',
+        softFallback: true,
+      }),
+      /opt-in|OXYLABS_ENABLED/i,
     )
     assert.match(
       formatOxylabsSearchHealthNote({

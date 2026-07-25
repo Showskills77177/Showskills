@@ -1,6 +1,9 @@
 /**
  * Oxylabs Realtime API — Google Images search for EOF Shorts scene photos.
  *
+ * Opt-in only (trial ended): requires OXYLABS_ENABLED=1 AND credentials.
+ * Stale Vercel username/password alone must NOT trigger API calls or probes.
+ *
  * Billing rule: at most ONE Google Images query per Short rebuild. All scenes
  * share that SERP pool (6–7 stills ≠ 6–7 credits).
  *
@@ -8,6 +11,8 @@
  * Auth: Basic Auth (OXYLABS_USERNAME / OXYLABS_PASSWORD). Never log credentials.
  *
  * Env:
+ *   OXYLABS_ENABLED=1       (required opt-in; omit/0 = skip entirely)
+ *   OXYLABS_DISABLED=1      (optional hard off even if ENABLED)
  *   OXYLABS_USERNAME
  *   OXYLABS_PASSWORD
  *   OXYLABS_GEO_LOCATION   (optional, default "United States")
@@ -39,6 +44,11 @@ function envTrim(name) {
   return String(process.env[name] || '').trim()
 }
 
+function envFlagOn(name) {
+  const v = envTrim(name).toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on'
+}
+
 export function getOxylabsCredentials() {
   const username = envTrim('OXYLABS_USERNAME') || envTrim('OXYLABS_USER')
   const password = envTrim('OXYLABS_PASSWORD') || envTrim('OXYLABS_PASS')
@@ -46,8 +56,18 @@ export function getOxylabsCredentials() {
   return { username, password }
 }
 
+/** Explicit opt-in. Without this, stale credentials on Vercel are ignored. */
+export function isEofOxylabsEnabled() {
+  if (envFlagOn('OXYLABS_DISABLED')) return false
+  return envFlagOn('OXYLABS_ENABLED')
+}
+
+/**
+ * Ready to use Oxylabs in the image pipeline.
+ * Requires OXYLABS_ENABLED=1 (or true/on/yes) AND username+password.
+ */
 export function isEofOxylabsConfigured() {
-  return Boolean(getOxylabsCredentials())
+  return isEofOxylabsEnabled() && Boolean(getOxylabsCredentials())
 }
 
 function oxylabsGeoLocation() {
@@ -250,6 +270,9 @@ export function extractOxylabsImageRows(payload) {
 export function formatOxylabsSearchHealthNote(health) {
   if (!health) return null
   if (health.status === 'not_configured') {
+    if (health.disabled || String(health.detail || '').includes('OXYLABS_ENABLED')) {
+      return 'Oxylabs: off (opt-in only — set OXYLABS_ENABLED=1 + credentials when trial renewed).'
+    }
     return 'Oxylabs: credentials missing (OXYLABS_USERNAME / OXYLABS_PASSWORD) — soft-falling back to next image source.'
   }
   if (health.status === 'auth_failed') {
@@ -281,6 +304,17 @@ export function formatOxylabsSearchHealthNote(health) {
  * }>}
  */
 export async function searchOxylabsGoogleImagesWithStatus(query, opts = {}) {
+  if (!isEofOxylabsEnabled()) {
+    return {
+      hits: [],
+      health: {
+        status: 'not_configured',
+        disabled: true,
+        detail: 'Oxylabs disabled (set OXYLABS_ENABLED=1 to opt in when trial renewed)',
+        softFallback: true,
+      },
+    }
+  }
   const creds = getOxylabsCredentials()
   if (!creds) {
     return {
@@ -851,6 +885,15 @@ export function claimOxylabsPoolHit(opts = {}) {
  * @returns {Promise<{ configured: boolean, ok: boolean, status?: number, detail?: string }>}
  */
 export async function probeEofOxylabsApi() {
+  if (!isEofOxylabsEnabled()) {
+    return {
+      configured: false,
+      ok: false,
+      disabled: true,
+      detail:
+        'Oxylabs off (opt-in). Trial ended — set OXYLABS_ENABLED=1 + credentials only when renewed. Safe to remove OXYLABS_* from Vercel.',
+    }
+  }
   const creds = getOxylabsCredentials()
   if (!creds) {
     return { configured: false, ok: false, detail: 'OXYLABS_USERNAME / OXYLABS_PASSWORD not set' }

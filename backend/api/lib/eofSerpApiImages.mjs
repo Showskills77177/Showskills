@@ -1,5 +1,5 @@
 /**
- * SerpAPI Google Images for EOF Shorts scene photos (cheaper Oxylabs alternative).
+ * SerpAPI Google Images for EOF Shorts scene photos (primary Google Images source).
  *
  * Billing: 1 Google Images query for the lead subject pool (+ optional 1 for a
  * secondary person). Scenes share pools — not one credit per scene.

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   isEofOxylabsConfigured,
+  isEofOxylabsEnabled,
   extractOxylabsImageRows,
   pickOxylabsImageFromHits,
   listOxylabsImageCandidates,
@@ -14,6 +15,7 @@ import {
   formatOxylabsSearchHealthNote,
   EOF_OXYLABS_MAX_QUERIES_PER_JOB,
 } from '../backend/api/lib/eofOxylabsImages.mjs'
+import { resolveEofImageProviderAttemptOrder } from '../backend/api/lib/eofImageProviderSettings.mjs'
 import {
   appendEofImageKeyHistory,
   assertEofVideoPersisted,
@@ -151,19 +153,52 @@ describe('eofOxylabsImages', () => {
     assert.ok(portrait > wide, `portrait (${portrait}) should beat wide (${wide})`)
   })
 
-  it('reports configured from OXYLABS_USERNAME + OXYLABS_PASSWORD', () => {
-    const prevUser = process.env.OXYLABS_USERNAME
-    const prevPass = process.env.OXYLABS_PASSWORD
+  it('is opt-in: credentials alone do not configure; needs OXYLABS_ENABLED=1', () => {
+    const prev = {
+      user: process.env.OXYLABS_USERNAME,
+      pass: process.env.OXYLABS_PASSWORD,
+      enabled: process.env.OXYLABS_ENABLED,
+      disabled: process.env.OXYLABS_DISABLED,
+    }
     delete process.env.OXYLABS_USERNAME
     delete process.env.OXYLABS_PASSWORD
+    delete process.env.OXYLABS_ENABLED
+    delete process.env.OXYLABS_DISABLED
+    assert.equal(isEofOxylabsEnabled(), false)
     assert.equal(isEofOxylabsConfigured(), false)
+
     process.env.OXYLABS_USERNAME = 'test-user'
     process.env.OXYLABS_PASSWORD = 'test-pass'
+    // Stale Vercel keys without opt-in must stay off
+    assert.equal(isEofOxylabsConfigured(), false)
+
+    process.env.OXYLABS_ENABLED = '1'
+    assert.equal(isEofOxylabsEnabled(), true)
     assert.equal(isEofOxylabsConfigured(), true)
-    if (prevUser == null) delete process.env.OXYLABS_USERNAME
-    else process.env.OXYLABS_USERNAME = prevUser
-    if (prevPass == null) delete process.env.OXYLABS_PASSWORD
-    else process.env.OXYLABS_PASSWORD = prevPass
+
+    process.env.OXYLABS_DISABLED = '1'
+    assert.equal(isEofOxylabsConfigured(), false)
+
+    for (const [k, v] of Object.entries({
+      OXYLABS_USERNAME: prev.user,
+      OXYLABS_PASSWORD: prev.pass,
+      OXYLABS_ENABLED: prev.enabled,
+      OXYLABS_DISABLED: prev.disabled,
+    })) {
+      if (v == null) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+
+  it('provider order skips Oxylabs when not opted in (SerpAPI only)', () => {
+    assert.deepEqual(
+      resolveEofImageProviderAttemptOrder('auto', { serpapi: true, oxylabs: false }),
+      ['serpapi'],
+    )
+    assert.deepEqual(
+      resolveEofImageProviderAttemptOrder('oxylabs', { serpapi: true, oxylabs: false }),
+      ['serpapi'],
+    )
   })
 
   it('extracts image URLs from Oxylabs organic payload', () => {
@@ -301,15 +336,58 @@ describe('eofOxylabsImages', () => {
 })
 
 describe('eofOxylabs search health messaging', () => {
-  it('reports not_configured clearly when credentials are missing', async () => {
+  it('skips network when opt-in is off even if stale credentials exist', async () => {
+    const prev = {
+      user: process.env.OXYLABS_USERNAME,
+      pass: process.env.OXYLABS_PASSWORD,
+      enabled: process.env.OXYLABS_ENABLED,
+      disabled: process.env.OXYLABS_DISABLED,
+    }
+    process.env.OXYLABS_USERNAME = 'stale-user'
+    process.env.OXYLABS_PASSWORD = 'stale-pass'
+    delete process.env.OXYLABS_ENABLED
+    delete process.env.OXYLABS_DISABLED
+    let fetchCalled = false
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async () => {
+      fetchCalled = true
+      throw new Error('should not call Oxylabs')
+    }
+    try {
+      assert.equal(isEofOxylabsConfigured(), false)
+      const { hits, health } = await searchOxylabsGoogleImagesWithStatus('England kit')
+      assert.deepEqual(hits, [])
+      assert.equal(health.status, 'not_configured')
+      assert.equal(health.disabled, true)
+      assert.equal(fetchCalled, false)
+      assert.match(formatOxylabsSearchHealthNote(health), /opt-in|OXYLABS_ENABLED/i)
+    } finally {
+      globalThis.fetch = originalFetch
+      for (const [k, v] of Object.entries({
+        OXYLABS_USERNAME: prev.user,
+        OXYLABS_PASSWORD: prev.pass,
+        OXYLABS_ENABLED: prev.enabled,
+        OXYLABS_DISABLED: prev.disabled,
+      })) {
+        if (v == null) delete process.env[k]
+        else process.env[k] = v
+      }
+    }
+  })
+
+  it('reports not_configured clearly when enabled but credentials are missing', async () => {
     const prevUser = process.env.OXYLABS_USERNAME
     const prevPass = process.env.OXYLABS_PASSWORD
     const prevUserAlias = process.env.OXYLABS_USER
     const prevPassAlias = process.env.OXYLABS_PASS
+    const prevEnabled = process.env.OXYLABS_ENABLED
+    const prevDisabled = process.env.OXYLABS_DISABLED
     delete process.env.OXYLABS_USERNAME
     delete process.env.OXYLABS_PASSWORD
     delete process.env.OXYLABS_USER
     delete process.env.OXYLABS_PASS
+    delete process.env.OXYLABS_DISABLED
+    process.env.OXYLABS_ENABLED = '1'
     try {
       assert.equal(isEofOxylabsConfigured(), false)
       const { hits, health } = await searchOxylabsGoogleImagesWithStatus('England kit')
@@ -326,14 +404,22 @@ describe('eofOxylabs search health messaging', () => {
       else process.env.OXYLABS_USER = prevUserAlias
       if (prevPassAlias == null) delete process.env.OXYLABS_PASS
       else process.env.OXYLABS_PASS = prevPassAlias
+      if (prevEnabled == null) delete process.env.OXYLABS_ENABLED
+      else process.env.OXYLABS_ENABLED = prevEnabled
+      if (prevDisabled == null) delete process.env.OXYLABS_DISABLED
+      else process.env.OXYLABS_DISABLED = prevDisabled
     }
   })
 
   it('maps 401 responses to auth_failed SEARCH DOWN (soft-fallback)', async () => {
     const prevUser = process.env.OXYLABS_USERNAME
     const prevPass = process.env.OXYLABS_PASSWORD
+    const prevEnabled = process.env.OXYLABS_ENABLED
+    const prevDisabled = process.env.OXYLABS_DISABLED
     process.env.OXYLABS_USERNAME = 'eof-test-user'
     process.env.OXYLABS_PASSWORD = 'eof-test-pass'
+    process.env.OXYLABS_ENABLED = '1'
+    delete process.env.OXYLABS_DISABLED
     const originalFetch = globalThis.fetch
     globalThis.fetch = async () =>
       new Response('unauthorized', { status: 401, headers: { 'Content-Type': 'text/plain' } })
@@ -350,6 +436,10 @@ describe('eofOxylabs search health messaging', () => {
       else process.env.OXYLABS_USERNAME = prevUser
       if (prevPass == null) delete process.env.OXYLABS_PASSWORD
       else process.env.OXYLABS_PASSWORD = prevPass
+      if (prevEnabled == null) delete process.env.OXYLABS_ENABLED
+      else process.env.OXYLABS_ENABLED = prevEnabled
+      if (prevDisabled == null) delete process.env.OXYLABS_DISABLED
+      else process.env.OXYLABS_DISABLED = prevDisabled
     }
   })
 })

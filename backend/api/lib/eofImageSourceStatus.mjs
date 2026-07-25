@@ -40,8 +40,8 @@ export function eofImagesConfigurationNote(preferredProvider = 'auto') {
   if (providerNote) return providerNote
   if (ap || google || pexels || pinterestApi || serpapi || oxylabs) {
     return pinterestApi && !ap && !google && !pexels && !serpapi && !oxylabs
-      ? 'Pinterest token is set, but pin search needs Pinterest app approval. Add SERPAPI_API_KEY or Oxylabs for Google Images hit-rate.'
+      ? 'Pinterest token is set, but pin search needs Pinterest app approval. Add SERPAPI_API_KEY for Google Images hit-rate.'
       : null
   }
-  return 'No SerpAPI/Oxylabs/AP/CSE/Pexels keys — falling back to Wikidata + Wikimedia Commons.'
+  return 'No SerpAPI/AP/CSE/Pexels keys — falling back to Wikidata + Wikimedia Commons (Oxylabs is opt-in only).'
 }

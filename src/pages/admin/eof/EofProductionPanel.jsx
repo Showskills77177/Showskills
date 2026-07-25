@@ -1045,9 +1045,9 @@ export default function EofProductionPanel({
   const [imagesNote, setImagesNote] = useState('')
   const [imageProvider, setImageProvider] = useState('auto')
   const [imageProviderOptions, setImageProviderOptions] = useState([
-    { id: 'auto', label: 'Auto (SerpAPI → Oxylabs)', configured: true },
+    { id: 'auto', label: 'Auto (SerpAPI → gen → Wikimedia)', configured: true },
     { id: 'serpapi', label: 'SerpAPI', configured: false },
-    { id: 'oxylabs', label: 'Oxylabs', configured: false },
+    { id: 'oxylabs', label: 'Oxylabs (opt-in)', configured: false },
   ])
   /** Per-build override for Google Images on Build / Rebuild (defaults to the saved admin preference). */
   const [rebuildImageProvider, setRebuildImageProvider] = useState('auto')
@@ -1256,10 +1256,10 @@ export default function EofProductionPanel({
         if (typeof j.imagesNote === 'string') setImagesNote(j.imagesNote)
         setSuccess(
           j.imageProvider === 'oxylabs'
-            ? 'Google Images provider: Oxylabs'
+            ? 'Google Images provider: Oxylabs (opt-in)'
             : j.imageProvider === 'serpapi'
               ? 'Google Images provider: SerpAPI'
-              : 'Google Images provider: Auto (SerpAPI → Oxylabs)',
+              : 'Google Images provider: Auto (SerpAPI → gen → Wikimedia)',
         )
       } catch (e) {
         setImageProvider(prev)
@@ -3077,7 +3077,7 @@ export default function EofProductionPanel({
             ) : null}
             {imageProvider === 'oxylabs' && !imageSources.oxylabs ? (
               <p className="text-[#ff9b95]">
-                Oxylabs selected but OXYLABS_USERNAME / OXYLABS_PASSWORD are not configured.
+                Oxylabs selected but off — needs OXYLABS_ENABLED=1 + credentials (opt-in when trial renewed).
               </p>
             ) : null}
             {imageGenProvider === 'grok' && !imageSources.grokImagine ? (
@@ -3113,17 +3113,15 @@ export default function EofProductionPanel({
                 Oxylabs:{' '}
                 {oxylabsStatus.ok
                   ? `ready${oxylabsStatus.detail ? ` — ${String(oxylabsStatus.detail).slice(0, 60)}` : ''}`
-                  : `SEARCH DOWN (${oxylabsStatus.status || 'error'}) — soft-fallback to SerpAPI/AP/Wikimedia${
+                  : `SEARCH DOWN (${oxylabsStatus.status || 'error'}) — soft-fallback to SerpAPI/gen/Wikimedia${
                       oxylabsStatus.detail ? `. ${String(oxylabsStatus.detail).slice(0, 100)}` : ''
                     }`}
               </p>
             ) : (
               <p className="text-[#8a8a8a]">
-                Oxylabs: not set — add <code className="text-[#aaa]">OXYLABS_USERNAME</code> +{' '}
-                <code className="text-[#aaa]">OXYLABS_PASSWORD</code> (aliases{' '}
-                <code className="text-[#aaa]">OXYLABS_USER</code>/<code className="text-[#aaa]">OXYLABS_PASS</code>
-                ) on Vercel staging and redeploy. Optional:{' '}
-                <code className="text-[#aaa]">OXYLABS_GEO_LOCATION</code>. Builds soft-fall back without keys.
+                Oxylabs: off (trial ended) — pipeline uses SerpAPI → gen → Wikimedia. Opt in later with{' '}
+                <code className="text-[#aaa]">OXYLABS_ENABLED=1</code> + credentials; safe to remove{' '}
+                <code className="text-[#aaa]">OXYLABS_*</code> from Vercel for now.
               </p>
             )}
             {pinterestStatus?.configured ? (
@@ -3290,13 +3288,13 @@ export default function EofProductionPanel({
           </div>
           {imageProvider === 'serpapi' && !imageSources.serpapi ? (
             <p className={`text-xs ${PX.muted} text-[#ff9b95]`}>
-              SerpAPI is selected but not keyed — add SERPAPI_API_KEY and redeploy, or pick Oxylabs / Auto.
+              SerpAPI is selected but not keyed — add SERPAPI_API_KEY and redeploy, or pick Auto.
             </p>
           ) : null}
           {imageProvider === 'oxylabs' && !imageSources.oxylabs ? (
             <p className={`text-xs ${PX.muted} text-[#ff9b95]`}>
-              Oxylabs is selected but not keyed — add OXYLABS_USERNAME + OXYLABS_PASSWORD and redeploy, or pick
-              SerpAPI / Auto.
+              Oxylabs is selected but off (opt-in) — set OXYLABS_ENABLED=1 + credentials when trial renewed, or
+              pick SerpAPI / Auto.
             </p>
           ) : null}
           {imageGenProvider === 'grok' && !imageSources.grokImagine ? (
@@ -4912,13 +4910,13 @@ export default function EofProductionPanel({
                   {rebuildImageProvider === 'serpapi' && !imageSources.serpapi ? (
                     <p className="text-[11px] text-[#ff9b95]">
                       SerpAPI selected but SERPAPI_API_KEY is missing on the server — add it and redeploy,
-                      or pick Auto / Oxylabs.
+                      or pick Auto.
                     </p>
                   ) : null}
                   {rebuildImageProvider === 'oxylabs' && !imageSources.oxylabs ? (
                     <p className="text-[11px] text-[#ff9b95]">
-                      Oxylabs selected but credentials are missing — add OXYLABS_USERNAME +
-                      OXYLABS_PASSWORD and redeploy, or pick Auto / SerpAPI.
+                      Oxylabs selected but off (need OXYLABS_ENABLED=1 + credentials) — or pick Auto /
+                      SerpAPI.
                     </p>
                   ) : null}
                   {selected.status === 'video_rendered' ? (

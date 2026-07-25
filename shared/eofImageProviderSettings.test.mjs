@@ -78,6 +78,8 @@ describe('listEofImageProviderOptions + notes', () => {
       'OXYLABS_USER',
       'OXYLABS_PASSWORD',
       'OXYLABS_PASS',
+      'OXYLABS_ENABLED',
+      'OXYLABS_DISABLED',
     ]) {
       prev[k] = process.env[k]
       delete process.env[k]
@@ -95,6 +97,8 @@ describe('listEofImageProviderOptions + notes', () => {
     process.env.SERPAPI_API_KEY = 'test-serp-key'
     process.env.OXYLABS_USERNAME = 'oxy-user'
     process.env.OXYLABS_PASSWORD = 'oxy-pass'
+    process.env.OXYLABS_ENABLED = '1'
+    delete process.env.OXYLABS_DISABLED
     const opts = listEofImageProviderOptions()
     assert.equal(opts.find((o) => o.id === 'serpapi')?.configured, true)
     assert.equal(opts.find((o) => o.id === 'oxylabs')?.configured, true)
@@ -102,13 +106,26 @@ describe('listEofImageProviderOptions + notes', () => {
     assert.match(eofImageProviderConfigurationNote('oxylabs'), /Oxylabs preferred/i)
   })
 
+  it('keeps Oxylabs unconfigured when credentials exist but OXYLABS_ENABLED is unset', () => {
+    process.env.SERPAPI_API_KEY = 'test-serp-key'
+    process.env.OXYLABS_USERNAME = 'oxy-user'
+    process.env.OXYLABS_PASSWORD = 'oxy-pass'
+    delete process.env.OXYLABS_ENABLED
+    delete process.env.OXYLABS_DISABLED
+    const opts = listEofImageProviderOptions()
+    assert.equal(opts.find((o) => o.id === 'oxylabs')?.configured, false)
+    assert.match(opts.find((o) => o.id === 'auto')?.label || '', /SerpAPI/i)
+    assert.doesNotMatch(opts.find((o) => o.id === 'auto')?.label || '', /→ Oxylabs/)
+  })
+
   it('warns when preferred provider credentials are missing', () => {
     delete process.env.SERPAPI_API_KEY
     delete process.env.SERP_API_KEY
     delete process.env.OXYLABS_USERNAME
     delete process.env.OXYLABS_PASSWORD
+    delete process.env.OXYLABS_ENABLED
     assert.match(eofImageProviderConfigurationNote('serpapi'), /missing/i)
-    assert.match(eofImageProviderConfigurationNote('oxylabs'), /missing/i)
+    assert.match(eofImageProviderConfigurationNote('oxylabs'), /off|OXYLABS_ENABLED/i)
   })
 })
 

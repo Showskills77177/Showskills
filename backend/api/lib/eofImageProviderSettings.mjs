@@ -33,7 +33,7 @@ export function normalizeEofImageProvider(value) {
 /**
  * Ordered Google Images job-pool providers (1 billable query each).
  * Preferred provider first when configured; other configured provider remains as fallback.
- * `auto` = SerpAPI then Oxylabs (current default).
+ * `auto` = SerpAPI first; Oxylabs only when explicitly opted in (OXYLABS_ENABLED=1).
  */
 export function resolveEofImageProviderAttemptOrder(
   preferred,
@@ -51,7 +51,7 @@ export function resolveEofImageProviderAttemptOrder(
   if (pick === 'oxylabs' && oxylabs) {
     return ['oxylabs', ...available.filter((id) => id !== 'oxylabs')]
   }
-  // auto, or preferred not keyed → SerpAPI-first when both available
+  // auto, or preferred not keyed → SerpAPI-first when available
   return available
 }
 
@@ -61,25 +61,25 @@ export function listEofImageProviderOptions() {
   return [
     {
       id: 'auto',
-      label: 'Auto (SerpAPI → Oxylabs)',
+      label: 'Auto (SerpAPI → gen → Wikimedia)',
       configured: true,
-      detail: 'Try SerpAPI first when keyed, then Oxylabs, then AP/CSE/…',
+      detail: 'SerpAPI first when keyed, then AI gen (if configured), then Wikimedia. Oxylabs only if opted in.',
     },
     {
       id: 'serpapi',
       label: 'SerpAPI',
       configured: serpapi,
       detail: serpapi
-        ? 'Prefer SerpAPI for the Google Images job pool (Oxylabs still falls back).'
+        ? 'Prefer SerpAPI for the Google Images job pool (gen/Wikimedia fallback).'
         : 'Add SERPAPI_API_KEY on Vercel staging and redeploy.',
     },
     {
       id: 'oxylabs',
-      label: 'Oxylabs',
+      label: 'Oxylabs (opt-in)',
       configured: oxylabs,
       detail: oxylabs
         ? 'Prefer Oxylabs for the Google Images job pool (SerpAPI still falls back).'
-        : 'Add OXYLABS_USERNAME + OXYLABS_PASSWORD on Vercel staging and redeploy.',
+        : 'Off by default (trial ended). Opt in with OXYLABS_ENABLED=1 + username/password when renewed.',
     },
   ]
 }
@@ -95,20 +95,22 @@ export function eofImageProviderConfigurationNote(preferred = 'auto') {
       return 'Google Images: SerpAPI selected but SERPAPI_API_KEY is missing — using the next available source.'
     }
     return oxylabs
-      ? 'Google Images: SerpAPI preferred (1 search/Short). Oxylabs + AP/CSE fallback when needed.'
-      : 'Google Images: SerpAPI preferred (1 search/Short). Oxylabs not keyed — AP/CSE/Pexels next.'
+      ? 'Google Images: SerpAPI preferred (1 search/Short). Oxylabs + gen/Wikimedia fallback when needed.'
+      : 'Google Images: SerpAPI preferred (1 search/Short). Then AI gen (if configured) → Wikimedia.'
   }
   if (pick === 'oxylabs') {
     if (!oxylabs) {
-      return 'Google Images: Oxylabs selected but credentials are missing — using the next available source.'
+      return 'Google Images: Oxylabs selected but off (need OXYLABS_ENABLED=1 + credentials) — using SerpAPI/gen/Wikimedia.'
     }
     return serpapi
-      ? 'Google Images: Oxylabs preferred (1 search/Short). SerpAPI + AP/CSE fallback when needed.'
-      : 'Google Images: Oxylabs preferred (1 search/Short). SerpAPI not keyed — AP/CSE/Pexels next.'
+      ? 'Google Images: Oxylabs preferred (1 search/Short). SerpAPI + gen/Wikimedia fallback when needed.'
+      : 'Google Images: Oxylabs preferred (1 search/Short). SerpAPI not keyed — gen/Wikimedia next.'
   }
 
   if (order[0] === 'serpapi') {
-    return 'Google Images: Auto — SerpAPI first (1 search/Short), then Oxylabs/AP/CSE when needed.'
+    return oxylabs
+      ? 'Google Images: Auto — SerpAPI first (1 search/Short), then Oxylabs/gen/Wikimedia when needed.'
+      : 'Google Images: Auto — SerpAPI first (1 search/Short), then AI gen → Wikimedia.'
   }
   if (order[0] === 'oxylabs') {
     return 'Google Images: Auto — Oxylabs (1 search/Short). Wikimedia last-resort when empty.'
