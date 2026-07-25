@@ -12,7 +12,8 @@ export const EOF_SHORTS_FACTUALITY_VOICE = `FACTUALITY / GROUNDING (non-negotiab
   OK: "Was Bale the best Wales ever produced?" / "Does his Real Madrid peak still set the bar?"
   NOT OK: "Gareth Bale is coming back from retirement" when the brief never says that.
 - If the brief is thin: argue about reputation, tactics, pride, or a known public claim already in the brief — do not fill gaps with fake news.
-- FACT LOCK: names, clubs, scores, fees, quotes, and career-status changes must appear in the DESK BRIEF / topic (or be clearly marked as opinion/question, not asserted fact).`
+- FACT LOCK: names, clubs, scores, fees, quotes, and career-status changes must appear in the DESK BRIEF / topic (or be clearly marked as opinion/question, not asserted fact).
+- Do not invent sensitive personal details (family, disability, health) beyond the brief; if the brief includes them, keep the framing respectful and factual.`
 
 /**
  * Breaking career / status claim families.

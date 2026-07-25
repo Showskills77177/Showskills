@@ -11,10 +11,12 @@ export const EOF_SHORTS_DIRECT_VOICE = `DIRECT SHORTS VOICE (non-negotiable):
   Example shape: "Jude Bellingham hit back at Thomas Tuchel after Tuchel questioned his performance. Bellingham said Tuchel doesn't know what it's like to play in that heat. Fair response — or disrespect? Comment."
 - HOT TAKE energy: tactics cost a win, selection rows, pride/respect, on-pitch exchanges — not soft news paste.
 - Never "tell the story of a career". Never soft framing ("a reminder that…", "raises questions about…", "speaks volumes…") without the actual claim.
+- Never insult the viewer ("you nut job", "you idiot"). One sharp CTA — no agree/disagree spam.
+- Stay on the football story in the brief — no cross-sport free-association (boxing, F1, etc.) unless sourced.
 - Association football only — the game with the feet. Always "football", never soccer / NFL.`
 
 const BANNED_SOFT =
-  /\b(here'?s what we know|the key detail fans need|why it matters|just another chapter|global superstar|raw talent|unforgettable nights|most fans still miss|it is important to note|throughout (his|her|their) career|in conclusion|as we all know|a testament to|indelible|woven into the fabric|cannot be overstated|in today'?s footballing landscape|raises (big )?questions|speaks volumes|a reminder that|the narrative|the story of|once upon|in many ways|at the end of the day|needless to say|when all is said|that is the football story fans are arguing about|fans are arguing about right now|ignore the noise|strip (away )?the (tribal )?noise|who comes out of this looking stronger)\b/i
+  /\b(here'?s what we know|the key detail fans need|why it matters|just another chapter|global superstar|raw talent|unforgettable nights|most fans still miss|it is important to note|throughout (his|her|their) career|in conclusion|as we all know|a testament to|indelible|woven into the fabric|cannot be overstated|in today'?s footballing landscape|raises (big )?questions|speaks volumes|a reminder that|the narrative|the story of|once upon|in many ways|at the end of the day|needless to say|when all is said|that is the football story fans are arguing about|fans are arguing about right now|ignore the noise|strip (away )?the (tribal )?noise|who comes out of this looking stronger|you\s+nut\s*jobs?|you\s+(idiot|moron|fool|muppet|clown)s?)\b/i
 
 const DIRECT_VERBS =
   /\b(said|says|told|hit back|responded|responded back|fired back|claimed|claims|accused|slammed|denied|confirmed|revealed|admitted|insisted|warned|blamed|questioned|criticis[ee]d|praised|dropped|recalled|benched|selected)\b/i

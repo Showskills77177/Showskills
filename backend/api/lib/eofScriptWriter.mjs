@@ -60,6 +60,10 @@ import {
   EOF_SHORTS_FACTUALITY_VOICE,
   scoreDraftFactuality,
 } from '../../../shared/eofScriptFactuality.mjs'
+import {
+  EOF_SHORTS_RELEVANCE_VOICE,
+  scoreDraftRelevance,
+} from '../../../shared/eofScriptRelevance.mjs'
 
 const FORMAT_IDS = new Set(EOF_SCRIPT_FORMATS.map((f) => f.id))
 
@@ -406,7 +410,7 @@ function classifyScriptFailureProvider(detail) {
 const DRAFT_FLUFF_RE =
   /here'?s what we know so far|the result or move that matters|why clubs and fans care|just another chapter|global superstar energy|rewrote elite|unforgettable nights|raw talent|most fans still miss|it is important to note|throughout (his|her|their|the) (career|history)|in conclusion|as we all know|the beautiful game of|a testament to|indelible mark|woven into the fabric|cannot be overstated|in today'?s footballing landscape/i
 
-/** Prefer punchy Shorts VO — reject fluff, stubs, vague bookish copy, and invented news. */
+/** Prefer punchy Shorts VO — reject fluff, stubs, invented news, and off-topic free-association. */
 function isWeakDraft(text, format = '', topic = '', deskBrief = '') {
   const t = String(text || '').trim()
   const words = t.split(/\s+/).filter(Boolean).length
@@ -419,6 +423,8 @@ function isWeakDraft(text, format = '', topic = '', deskBrief = '') {
   if (!direct.pass && direct.score < 5.5) return true
   const fact = scoreDraftFactuality(t, { format, topic, deskBrief })
   if (!fact.pass) return true
+  const rel = scoreDraftRelevance(t, { format, topic, deskBrief })
+  if (!rel.pass) return true
   return false
 }
 
@@ -803,7 +809,7 @@ export async function writeEofPlainTextDraft({
       )
     } catch (e) {
       console.warn('[eof-script] judge failed', writerId, e instanceof Error ? e.message : e)
-      // Never auto-accept on judge API errors — local gates still block waffle / invented news.
+      // Never auto-accept on judge API errors — local gates still block waffle / invented news / off-topic.
       const local = scoreDraftDirectness(ai.plainTextDraft, { format: fmt, topic: t })
       const hot = scoreDraftHotTake(ai.plainTextDraft, { format: fmt, topic: t })
       const fact = scoreDraftFactuality(ai.plainTextDraft, {
@@ -811,24 +817,36 @@ export async function writeEofPlainTextDraft({
         topic: t,
         deskBrief: deskBriefForJudge,
       })
+      const rel = scoreDraftRelevance(ai.plainTextDraft, {
+        format: fmt,
+        topic: t,
+        deskBrief: deskBriefForJudge,
+      })
       judge = {
         skipped: false,
-        pass: local.pass && hot.pass && fact.pass,
-        overall: Math.min(local.score, hot.score, fact.score),
-        merit: Math.min(local.score, fact.score),
+        pass: local.pass && hot.pass && fact.pass && rel.pass,
+        overall: Math.min(local.score, hot.score, fact.score, rel.score),
+        merit: Math.min(local.score, fact.score, rel.score),
         interest: hot.score,
-        value: local.score,
+        value: Math.min(local.score, rel.score),
         directness: local.score,
         hotTake: hot.score,
         factuality: fact.score,
+        relevance: rel.score,
         reasons: [
-          'Judge API error — local directness + hot-take + factuality gates',
+          'Judge API error — local directness + hot-take + factuality + relevance gates',
           ...local.reasons,
           ...hot.reasons,
           ...fact.reasons,
+          ...rel.reasons,
+        ].slice(0, 8),
+        rewriteHints: [
+          ...local.rewriteHints,
+          ...hot.rewriteHints,
+          ...fact.rewriteHints,
+          ...rel.rewriteHints,
         ].slice(0, 7),
-        rewriteHints: [...local.rewriteHints, ...hot.rewriteHints, ...fact.rewriteHints].slice(0, 6),
-        judgeProvider: 'local-directness+hot-take+factuality',
+        judgeProvider: 'local-directness+hot-take+factuality+relevance',
         threshold: 6.5,
       }
     }
@@ -1047,10 +1065,18 @@ export async function writeEofPlainTextDraft({
       topic: t,
       deskBrief: deskBriefForJudge,
     })
-    if (productionBar && (!hot.pass || !direct.pass || !fact.pass || softBest.source === 'template')) {
-      // Overnight Script Maker must not ship glue templates / soft waffle / invented news.
+    const rel = scoreDraftRelevance(softBest.plainTextDraft, {
+      format: fmt,
+      topic: t,
+      deskBrief: deskBriefForJudge,
+    })
+    if (
+      productionBar &&
+      (!hot.pass || !direct.pass || !fact.pass || !rel.pass || softBest.source === 'template')
+    ) {
+      // Overnight Script Maker must not ship glue / waffle / invented news / off-topic.
       throw new Error(
-        `Script Maker rejected soft draft for “${t.slice(0, 60)}”: ${(fact.reasons[0] || hot.reasons[0] || direct.reasons[0] || 'failed hot-take bar')}. ${failures.slice(0, 2).join(' · ')}`,
+        `Script Maker rejected soft draft for “${t.slice(0, 60)}”: ${(rel.reasons[0] || fact.reasons[0] || hot.reasons[0] || direct.reasons[0] || 'failed hot-take bar')}. ${failures.slice(0, 2).join(' · ')}`,
       )
     }
     return {
@@ -1186,20 +1212,23 @@ ${EOF_SHORTS_HOT_TAKE_VOICE}
 
 ${EOF_SHORTS_FACTUALITY_VOICE}
 
+${EOF_SHORTS_RELEVANCE_VOICE}
+
 SHORTS LENGTH:
 - 90–130 words. Spoken in ~35–45 seconds. If you write more, cut it.
 - Short sentences. Average under 16 words. Max one clause per beat.
 - Sound like Sky Sports News / BBC Sport desk at 10pm — hot, sharp, direct.
 - FIRST SENTENCE must name the player/coach AND the claim or conflict.
 - FACT LOCK: Use ONLY names, scores, clubs, and claims in the DESK BRIEF / current draft. Do NOT invent scores, fees, fake quotes, transfers, retirements, comebacks, injuries, or sackings.
+- TOPIC LOCK: Stay inside this football story. Do NOT drag in boxing, F1, or unrelated celebs unless they are in the DESK BRIEF.
 - Do NOT invent news events. If unsure, do not claim it happened — prefer opinion/commentary framing.
 - Transform the desk brief into a spoken ARGUMENT. Never copy-paste an article.
 - If PRODUCER DIRECTION is provided, follow it closely while keeping Shorts length and fact lock.
 - Structure for format "${format}": ${draftFormatGuide(format)}
-- End with ONE sharp agree/disagree CTA.
+- End with ONE sharp fight CTA — not agree/disagree spam, never insult the viewer.
 
 BANNED forever:
-"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", "raises questions", "speaks volumes", "a reminder that", "the narrative", "the journey", "fans are arguing about right now", "ignore the noise", "strip the noise", "that is the football story", literary metaphors, long subordinate clauses.
+"here's what we know so far", "the key detail fans need", "why it matters for the club", "just another chapter", "global superstar energy", "raw talent", "unforgettable nights", "most fans still miss", "it is important to note", "throughout his career", "in conclusion", "as we all know", "a testament to", "indelible mark", "woven into the fabric", "cannot be overstated", "in today's footballing landscape", "raises questions", "speaks volumes", "a reminder that", "the narrative", "the journey", "fans are arguing about right now", "ignore the noise", "strip the noise", "that is the football story", "you nut job", "you idiot", literary metaphors, long subordinate clauses, cross-sport free-association not in the brief.
 Never reply with meta chat ("Sure", "I'll rewrite", "Here is a plan"). Output the FULL voiceover only.`
 
   // Directed rewrite: keep the prompt lean so Groq free tier actually returns a full VO
@@ -1245,13 +1274,16 @@ ${EOF_SHORTS_HOT_TAKE_VOICE}
 
 ${EOF_SHORTS_FACTUALITY_VOICE}
 
+${EOF_SHORTS_RELEVANCE_VOICE}
+
 Rules:
 - 90–130 words. Cut every soft phrase, career waffle, and article glue.
 - First line: names + the conflict (who hit back / what cost the win / what was just said).
 - Add or sharpen ONE concrete stake: tactics, selection, pride, result, or quote row.
 - Short spoken sentences. No book language.
 - Always football, never soccer. Never NFL.
-- Keep one fight CTA question at the end.
+- Keep ONE fight CTA question at the end — no agree/disagree spam, no viewer insults.
+- TOPIC LOCK: drop any athlete/sport/celebrity not in the DESK BRIEF (no boxing/F1 free-association).
 - Do NOT invent transfers, retirements, comebacks, injuries, or sackings absent from the DESK BRIEF.
 - Format intent: ${format}. ${draftFormatGuide(format)}
 - Output the FULL improved voiceover only.`
@@ -1278,12 +1310,15 @@ ${EOF_SHORTS_HOT_TAKE_VOICE}
 
 ${EOF_SHORTS_FACTUALITY_VOICE}
 
+${EOF_SHORTS_RELEVANCE_VOICE}
+
 Rules:
 - Keep every verified name/score/club/claim from the draft AND desk brief.
 - Line 1 must punch: who + conflict.
 - Ensure a concrete stake (tactics / selection / pride / result / quote).
 - Ensure a “now” signal (just / after / according to / hit back…) ONLY when the brief supports a live event — otherwise use opinion energy, not fake breaking news.
-- Kill any remaining template glue.
+- Kill any remaining template glue, viewer insults, and agree/disagree spam.
+- TOPIC LOCK: remove any cross-sport / unrelated celebrity injection not in the desk brief.
 - Never invent retirements, comebacks, transfers, injuries, or sackings.
 - 90–130 words. One CTA question.
 - Format: ${format}.
