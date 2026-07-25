@@ -7,8 +7,11 @@
  * Docs: https://serpapi.com/google-images-api
  * Key: https://serpapi.com/manage-api-key
  *
- * Env:
- *   SERPAPI_API_KEY   (primary; alias SERP_API_KEY)
+ * Env (first non-empty wins):
+ *   SERPAPI_API_KEY   (primary)
+ *   SERP_API_KEY      (alias)
+ *   SERPAPI_KEY       (common alias)
+ *   EOF_SERPAPI_API_KEY
  *   SERPAPI_ENGINE    (optional, default google_images)
  *   SERPAPI_GL        (optional country, e.g. uk)
  *   SERPAPI_HL        (optional language, e.g. en)
@@ -28,22 +31,60 @@ import { filterBlockedStockImages, isBlockedStockImageUrl } from '../../../share
 
 const SERPAPI_SEARCH_URL = 'https://serpapi.com/search.json'
 const SERPAPI_ACCOUNT_URL = 'https://serpapi.com/account.json'
+/** Accepted env names — wrong alias was a common reason Serp was skipped entirely. */
+export const EOF_SERPAPI_KEY_ENV_NAMES = [
+  'SERPAPI_API_KEY',
+  'SERP_API_KEY',
+  'SERPAPI_KEY',
+  'EOF_SERPAPI_API_KEY',
+]
 /** Fast-fail so Cucurella builds don't freeze waiting on a hung SerpAPI socket. */
 const DEFAULT_TIMEOUT_MS = Number(process.env.EOF_SERPAPI_TIMEOUT_MS) || 12_000
 const DEFAULT_LIMIT = 12
 /** Hard cap on billable Google Images queries per production job / rebuild. */
 export const EOF_SERPAPI_MAX_QUERIES_PER_JOB = 2
 
+/** @type {{ at: string, query: string, status: string, hits: number, detail?: string, httpStatus?: number } | null} */
+let lastSerpApiAttempt = null
+
 function envTrim(name) {
   return String(process.env[name] || '').trim()
 }
 
+/**
+ * Resolve SerpAPI key + which env name matched (never log the key itself).
+ * @returns {{ key: string, envName: string|null }}
+ */
+export function resolveSerpApiKey() {
+  for (const name of EOF_SERPAPI_KEY_ENV_NAMES) {
+    const key = envTrim(name)
+    if (key) return { key, envName: name }
+  }
+  return { key: '', envName: null }
+}
+
 export function getSerpApiKey() {
-  return envTrim('SERPAPI_API_KEY') || envTrim('SERP_API_KEY') || ''
+  return resolveSerpApiKey().key
 }
 
 export function isEofSerpApiConfigured() {
   return Boolean(getSerpApiKey())
+}
+
+/** Last live search attempt (for admin Setup — proves whether Build hit SerpAPI). */
+export function getEofSerpApiLastAttempt() {
+  return lastSerpApiAttempt ? { ...lastSerpApiAttempt } : null
+}
+
+function recordSerpApiAttempt(partial) {
+  lastSerpApiAttempt = {
+    at: new Date().toISOString(),
+    query: String(partial.query || '').slice(0, 120),
+    status: String(partial.status || 'unknown'),
+    hits: Number(partial.hits) || 0,
+    detail: partial.detail ? String(partial.detail).slice(0, 180) : undefined,
+    httpStatus: partial.httpStatus,
+  }
 }
 
 export function serpApiEngine() {
@@ -179,6 +220,7 @@ export function formatSerpApiSearchHealthNote(health) {
 export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
   const apiKey = getSerpApiKey()
   if (!apiKey) {
+    recordSerpApiAttempt({ query, status: 'not_configured', hits: 0, detail: 'SERPAPI_API_KEY not set' })
     return {
       hits: [],
       health: {
@@ -191,6 +233,7 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
 
   const q = String(query || '').trim()
   if (!q) {
+    recordSerpApiAttempt({ query: '', status: 'empty', hits: 0, detail: 'empty query' })
     return {
       hits: [],
       health: { status: 'empty', detail: 'empty query', softFallback: true },
@@ -212,7 +255,9 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
 
   try {
     const url = buildSerpApiImagesSearchUrl(q, { apiKey })
-    const res = await fetch(url, {
+    // Proof line for Vercel logs — emitted before the network call.
+    console.info(`eof:serp search q=${q.slice(0, 100)}`)
+    const res = await fetch(url.toString(), {
       method: 'GET',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
@@ -226,6 +271,12 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
           res.status,
           '— SERPAPI_API_KEY rejected (check https://serpapi.com/manage-api-key).',
         )
+        recordSerpApiAttempt({
+          query: q,
+          status: 'auth_failed',
+          hits: 0,
+          detail: `Unauthorized HTTP ${res.status}`,
+        })
         return {
           hits: [],
           health: {
@@ -237,6 +288,12 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
         }
       }
       console.warn('[eof-serpapi] search failed', res.status, body.slice(0, 180))
+      recordSerpApiAttempt({
+        query: q,
+        status: 'http_error',
+        hits: 0,
+        detail: `API error HTTP ${res.status}`,
+      })
       return {
         hits: [],
         health: {
@@ -253,6 +310,12 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
       const errText = String(data.error).slice(0, 180)
       console.warn('[eof-serpapi] API error', errText)
       const authish = /invalid api key|unauthorized|forbidden|api_key/i.test(errText)
+      recordSerpApiAttempt({
+        query: q,
+        status: authish ? 'auth_failed' : 'api_error',
+        hits: 0,
+        detail: errText,
+      })
       return {
         hits: [],
         health: {
@@ -263,20 +326,46 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
       }
     }
 
+    const rawCount = Array.isArray(data?.images_results) ? data.images_results.length : 0
     const rows = extractSerpApiImageRows(data)
+    console.info(
+      `eof:serp results q=${q.slice(0, 60)} raw=${rawCount} kept=${rows.length}`,
+    )
     console.info('[eof-serpapi] google images', q.slice(0, 60), '→', rows.length, 'urls')
     if (!rows.length) {
-      console.warn('[eof-serpapi] parsed 0 image URLs for', q.slice(0, 60))
+      console.warn(
+        '[eof-serpapi] parsed 0 image URLs for',
+        q.slice(0, 60),
+        `(SerpAPI returned ${rawCount} images_results — stock/meme filter emptied the pool)`,
+      )
+      recordSerpApiAttempt({
+        query: q,
+        status: 'empty',
+        hits: 0,
+        detail:
+          rawCount > 0
+            ? `0 usable after stock filter (${rawCount} raw)`
+            : '0 image URLs parsed',
+      })
       return {
         hits: [],
         health: {
           status: 'empty',
-          detail: 'auth ok but 0 image URLs parsed',
+          detail:
+            rawCount > 0
+              ? `auth ok but 0 usable URLs after stock filter (${rawCount} raw)`
+              : 'auth ok but 0 image URLs parsed',
           softFallback: true,
         },
       }
     }
 
+    recordSerpApiAttempt({
+      query: q,
+      status: 'ok',
+      hits: Math.min(rows.length, limit),
+      detail: `${rows.length} urls (${rawCount} raw)`,
+    })
     return {
       hits: rows.slice(0, limit).map((r) => ({
         url: r.url,
@@ -287,7 +376,7 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
       })),
       health: {
         status: 'ok',
-        detail: `${rows.length} urls`,
+        detail: `${rows.length} urls (${rawCount} raw)`,
         softFallback: false,
       },
     }
@@ -298,6 +387,12 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
     } else {
       console.warn('[eof-serpapi] search error', e instanceof Error ? e.message : e)
     }
+    recordSerpApiAttempt({
+      query: q,
+      status: aborted ? 'timeout' : 'error',
+      hits: 0,
+      detail: aborted ? 'search timed out or aborted' : e instanceof Error ? e.message : 'search failed',
+    })
     return {
       hits: [],
       health: {

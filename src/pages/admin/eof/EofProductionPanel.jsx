@@ -3112,6 +3112,20 @@ export default function EofProductionPanel({
                 ) and redeploy.
               </p>
             )}
+            {imageSources?.serpapiLastAttempt ? (
+              <p className="text-[#8a8a8a]">
+                Serp last search:{' '}
+                <span className="text-[#ccc]">
+                  {String(imageSources.serpapiLastAttempt.status || '?')}
+                  {imageSources.serpapiLastAttempt.hits != null
+                    ? ` · ${imageSources.serpapiLastAttempt.hits} hits`
+                    : ''}
+                  {imageSources.serpapiLastAttempt.query
+                    ? ` · q=${String(imageSources.serpapiLastAttempt.query).slice(0, 50)}`
+                    : ''}
+                </span>
+              </p>
+            ) : null}
             {oxylabsStatus?.configured ? (
               <p className={oxylabsStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
                 Oxylabs:{' '}

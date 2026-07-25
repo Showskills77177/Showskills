@@ -12,6 +12,8 @@ import {
   detectImageRoleIntent,
   hitMentionsSubject,
   filterHitsRequiringSubjectNameCue,
+  primaryImageEntities,
+  splitGluedPersonClubEntity,
 } from './eofSceneImageQueries.mjs'
 import { normalizeFootballTopicQuery } from './eofFootballTopicNormalize.mjs'
 
@@ -231,5 +233,48 @@ describe('eofSceneImageQueries', () => {
       { log: false },
     )
     assert.equal(kept.length, 1)
+  })
+
+  it('does not glue club onto Cucurella required entity (Serp job query)', () => {
+    // Regression: subject "Marc Cucurella" + query `"Marc Cucurella" Chelsea hair` produced
+    // required entity "Marc Cucurella Chelsea" → contiguous includes() rejected real titles
+    // like "Marc Cucurella of Chelsea with long hair" (score -2) → every scene placeholder.
+    const entities = primaryImageEntities('Marc Cucurella', '"Marc Cucurella" Chelsea hair')
+    assert.ok(
+      entities.some((e) => /^marc cucurella$/i.test(e)),
+      `expected person entity, got ${JSON.stringify(entities)}`,
+    )
+    assert.ok(
+      !entities.some((e) => /cucurella\s+chelsea/i.test(e)),
+      `club must not glue onto person: ${JSON.stringify(entities)}`,
+    )
+    assert.deepEqual(splitGluedPersonClubEntity('Marc Cucurella Chelsea'), [
+      'Marc Cucurella',
+      'Chelsea',
+    ])
+
+    const title = 'Marc Cucurella of Chelsea with long hair'
+    const score = scoreImageRelevance('Marc Cucurella', title, '"Marc Cucurella" Chelsea hair', {
+      intent: 'neutral',
+      plainTextDraft: "Why Mark Cuccorea doesn't cut his hair",
+    })
+    assert.ok(score >= 2, `real Cucurella Serp title must score ≥2 for scene gate, got ${score}`)
+
+    const topicScore = scoreImageRelevance(
+      "Why Mark Cuccorea doesn't cut his hair",
+      title,
+      '"Marc Cucurella" Chelsea hair',
+      { intent: 'neutral' },
+    )
+    assert.ok(topicScore >= 2, `topic+query score must accept real still, got ${topicScore}`)
+
+    // Club-only titles must still hard-reject (Chelsea alone ≠ Cucurella).
+    const clubOnly = scoreImageRelevance(
+      'Marc Cucurella',
+      'Chelsea star shows off flowing locks',
+      '"Marc Cucurella" Chelsea hair',
+      { intent: 'neutral' },
+    )
+    assert.ok(clubOnly < 0, `club-only title must not pass person gate, got ${clubOnly}`)
   })
 })

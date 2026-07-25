@@ -672,6 +672,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
               ? `(filtered ${imageFetchDiag.scrapeHitsBeforeFilter}→${imageFetchDiag.scrapeHitsAfterFilter})`
               : '',
           )
+          if (
+            imageFetchDiag.scrapeHitsBeforeFilter > 0 &&
+            imageFetchDiag.scrapeHitsAfterFilter === 0
+          ) {
+            console.warn(
+              `eof:serp pool emptied after subject/vision filter subject=${String(leadSubject || '').slice(0, 40)} before=${imageFetchDiag.scrapeHitsBeforeFilter}`,
+            )
+          }
           if (!oxyPool?.hits?.length) {
             imagePhaseNote = 'Searching Wikimedia Commons…'
             await report('images', 0, { force: true, message: imagePhaseNote })

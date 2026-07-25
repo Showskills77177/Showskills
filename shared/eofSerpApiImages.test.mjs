@@ -17,8 +17,12 @@ describe('eofSerpApiImages', () => {
   it('detects SERPAPI_API_KEY and SERP_API_KEY alias', () => {
     const prevPrimary = process.env.SERPAPI_API_KEY
     const prevAlias = process.env.SERP_API_KEY
+    const prevShort = process.env.SERPAPI_KEY
+    const prevEof = process.env.EOF_SERPAPI_API_KEY
     delete process.env.SERPAPI_API_KEY
     delete process.env.SERP_API_KEY
+    delete process.env.SERPAPI_KEY
+    delete process.env.EOF_SERPAPI_API_KEY
     assert.equal(isEofSerpApiConfigured(), false)
     assert.equal(getSerpApiKey(), '')
 
@@ -29,10 +33,19 @@ describe('eofSerpApiImages', () => {
     process.env.SERPAPI_API_KEY = 'primary-key'
     assert.equal(getSerpApiKey(), 'primary-key')
 
+    delete process.env.SERPAPI_API_KEY
+    delete process.env.SERP_API_KEY
+    process.env.SERPAPI_KEY = 'short-alias'
+    assert.equal(getSerpApiKey(), 'short-alias')
+
     if (prevPrimary == null) delete process.env.SERPAPI_API_KEY
     else process.env.SERPAPI_API_KEY = prevPrimary
     if (prevAlias == null) delete process.env.SERP_API_KEY
     else process.env.SERP_API_KEY = prevAlias
+    if (prevShort == null) delete process.env.SERPAPI_KEY
+    else process.env.SERPAPI_KEY = prevShort
+    if (prevEof == null) delete process.env.EOF_SERPAPI_API_KEY
+    else process.env.EOF_SERPAPI_API_KEY = prevEof
   })
 
   it('builds google_images URL with optional gl/hl and never logs the key in path alone', () => {

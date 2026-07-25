@@ -654,6 +654,74 @@ function entityRank(token) {
 }
 
 /**
+ * Look / kit / fluff words from job queries — never required as primary entities.
+ * (e.g. `"Marc Cucurella" Chelsea hair` must not require the title to contain "hair".)
+ */
+const WEAK_IMAGE_ATTR_RE =
+  /^(hair|locks?|beard|mullet|kit|jersey|suit|portrait|photo|image|football|soccer|action|celebrating|celebration|match|training|studio|pundit)$/i
+
+/**
+ * Split glued "Marc Cucurella Chelsea" tokens so club/attr words are not part of the
+ * required person string (real titles often say "Marc Cucurella of Chelsea…").
+ * @param {string} entity
+ * @returns {string[]}
+ */
+export function splitGluedPersonClubEntity(entity) {
+  const parts = String(entity || '')
+    .split(/\s+/)
+    .filter(Boolean)
+  if (parts.length < 3) return [String(entity || '').trim()].filter(Boolean)
+
+  let surnameIdx = -1
+  for (let i = 0; i < parts.length; i += 1) {
+    const p = parts[i]
+    if (KNOWN_PLAYER_RE.test(p) || KNOWN_COACH_RE.test(p) || expandPlayerFullName(p)) {
+      surnameIdx = i
+      break
+    }
+  }
+  if (surnameIdx < 0) return [parts.join(' ')]
+
+  // Keep given name(s) + surname as the person; leftover capitalized tokens are club/attrs.
+  const person = parts.slice(0, surnameIdx + 1).join(' ')
+  const rest = parts.slice(surnameIdx + 1).filter((p) => !WEAK_IMAGE_ATTR_RE.test(p))
+  return [person, ...rest].filter(Boolean)
+}
+
+/**
+ * True when hay mentions a required entity — contiguous full string OR person surname /
+ * all significant parts (so "Marc Cucurella of Chelsea" matches entity "Marc Cucurella Chelsea").
+ * @param {string} entity
+ * @param {string} hay lowercase haystack
+ */
+export function entityMentionsInHaystack(entity, hay) {
+  const e = String(entity || '')
+    .trim()
+    .toLowerCase()
+  const h = String(hay || '').toLowerCase()
+  if (!e || !h.trim()) return false
+  if (h.includes(e)) return true
+
+  const parts = e.split(/\s+/).filter((p) => p.length >= 3 && !WEAK_IMAGE_ATTR_RE.test(p))
+  if (!parts.length) return false
+
+  // Known player/coach token alone is enough (Cucurella / Tuchel / Rooney).
+  if (parts.some((p) => (KNOWN_PLAYER_RE.test(p) || KNOWN_COACH_RE.test(p)) && new RegExp(`\\b${escapeRe(p)}\\b`, 'i').test(h))) {
+    return true
+  }
+
+  // Multi-word: every significant part appears (order-independent; allows "of"/"with" between).
+  const strong = parts.filter((p) => p.length >= 4)
+  if (strong.length >= 2 && strong.every((p) => h.includes(p))) return true
+
+  // Surname-only fallback for 2+ word names.
+  const surname = parts[parts.length - 1]
+  if (surname.length >= 5 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(h)) return true
+
+  return false
+}
+
+/**
  * Primary people/clubs that MUST appear in an image title for a match.
  * @param {string} topic
  * @param {string} [imageQuery]
@@ -677,22 +745,29 @@ export function primaryImageEntities(topic, imageQuery = '') {
     if (/^\d{4}$/.test(t)) return false
     if (STOP.has(t.toLowerCase())) return false
     if (NAME_BREAK_RE.test(t)) return false
+    if (WEAK_IMAGE_ATTR_RE.test(t)) return false
     return t.length >= 4 || KNOWN_PLAYER_RE.test(t) || KNOWN_COACH_RE.test(t)
   })
   // Collapse accidental duplicated names ("Thomas Tuchel Thomas Tuchel")
-  const cleaned = entities.map((e) => {
+  const cleaned = []
+  for (const e of entities) {
     const parts = e.split(/\s+/).filter(Boolean)
     const half = Math.floor(parts.length / 2)
+    let base = e
     if (
       half >= 2 &&
       parts.length === half * 2 &&
       parts.slice(0, half).join(' ').toLowerCase() === parts.slice(half).join(' ').toLowerCase()
     ) {
-      return parts.slice(0, half).join(' ')
+      base = parts.slice(0, half).join(' ')
     }
-    return e
-  })
-  return cleaned.length ? cleaned.slice(0, 4) : tokens.slice(0, 2)
+    // "Marc Cucurella Chelsea" → person + club (not one impossible contiguous required string)
+    for (const piece of splitGluedPersonClubEntity(base)) {
+      if (WEAK_IMAGE_ATTR_RE.test(piece)) continue
+      if (!cleaned.some((c) => c.toLowerCase() === piece.toLowerCase())) cleaned.push(piece)
+    }
+  }
+  return cleaned.length ? cleaned.slice(0, 4) : tokens.filter((t) => !WEAK_IMAGE_ATTR_RE.test(t)).slice(0, 2)
 }
 
 const PLAYER_ANGLES = [
@@ -812,19 +887,39 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '', opts = {})
   })
 
   const required = primaryImageEntities(topic, imageQuery)
-  const mustHit = required.filter((t) => t.length >= 4 || KNOWN_PLAYER_RE.test(t) || KNOWN_COACH_RE.test(t))
+  const mustHit = required.filter(
+    (t) =>
+      !WEAK_IMAGE_ATTR_RE.test(t) &&
+      (t.length >= 4 || KNOWN_PLAYER_RE.test(t) || KNOWN_COACH_RE.test(t)),
+  )
   if (mustHit.length) {
-    const hit = mustHit.some((t) => hay.includes(t.toLowerCase()))
+    // Prefer person/coach entities over clubs — "Chelsea" alone must not satisfy a
+    // Cucurella Short (real titles need Cucurella/Marc Cucurella).
+    const personMust = mustHit.filter((t) => {
+      const parts = String(t)
+        .split(/\s+/)
+        .filter(Boolean)
+      return parts.some(
+        (p) => KNOWN_PLAYER_RE.test(p) || KNOWN_COACH_RE.test(p) || Boolean(expandPlayerFullName(p)),
+      )
+    })
+    const gate = personMust.length ? personMust : mustHit
+    // Contiguous OR person-surname / part-wise — "Marc Cucurella of Chelsea" must match
+    // a person entity even when the job query also carried "Chelsea hair".
+    const hit = gate.some((t) => entityMentionsInHaystack(t, hay))
     if (!hit) return -25
   }
 
-  const tokens = extractTopicImageTokens(`${topic || ''} ${imageQuery || ''}`).map((t) => t.toLowerCase())
+  const tokens = extractTopicImageTokens(`${topic || ''} ${imageQuery || ''}`)
+    .flatMap((t) => splitGluedPersonClubEntity(t))
+    .filter((t) => !WEAK_IMAGE_ATTR_RE.test(t))
+    .map((t) => t.toLowerCase())
   if (!tokens.length) return 0
 
   let score = 0
   let strongHit = false
   for (const t of tokens) {
-    if (!hay.includes(t)) continue
+    if (!entityMentionsInHaystack(t, hay) && !hay.includes(t)) continue
     score += Math.min(12, Math.max(4, t.length))
     if (t.length >= 5 || t.includes(' ') || KNOWN_PLAYER_RE.test(t)) strongHit = true
   }
@@ -846,7 +941,7 @@ export function scoreImageRelevance(topic, haystack, imageQuery = '', opts = {})
   else if (hay.includes(String(year - 1))) score += 5
   // Soften year bias for playing-career legends (best Google hits are often 2000s–2010s).
   // Pundit / coach scripts need current/studio stills — keep the hard legacy penalty.
-  const namedStarHit = mustHit.some((t) => hay.includes(t.toLowerCase()))
+  const namedStarHit = mustHit.some((t) => entityMentionsInHaystack(t, hay))
   const softLegacyYears =
     namedStarHit && intent !== 'coach' && intent !== 'pundit' && (intent === 'playing' || intent === 'neutral')
   if (/\b(throwback|archive|young|childhood|retro)\b/i.test(hay)) score -= softLegacyYears ? 4 : 14

@@ -3,7 +3,7 @@
  * Kept separate from eofSceneImages.mjs so listing jobs does not import ffmpeg.
  */
 import { isEofApImagesConfigured } from './eofApImages.mjs'
-import { isEofSerpApiConfigured } from './eofSerpApiImages.mjs'
+import { isEofSerpApiConfigured, getEofSerpApiLastAttempt } from './eofSerpApiImages.mjs'
 import { isEofOxylabsConfigured } from './eofOxylabsImages.mjs'
 import { isEofGoogleCseConfigured } from './eofGoogleImages.mjs'
 import { isEofPinterestApiConfigured } from './eofPinterestImages.mjs'
@@ -30,6 +30,7 @@ export function eofImageSourceStatus() {
     wikimedia: true,
     grokImagine: isEofGrokImagineConfigured(),
     freeGen: isEofFreeGenConfigured(),
+    serpapiLastAttempt: getEofSerpApiLastAttempt(),
   }
 }
 

@@ -343,13 +343,30 @@ export async function fetchEofSceneImage({
         continue
       }
       // Score the TITLE for the scene — job query alone must not rubber-stamp weak stills.
+      // Prefer topic (full headline) over bare subject so job-query clubs/attrs don't tank scores.
       const score = scoreImageRelevance(
-        activeSubject || topic || anchoredQuery || '',
+        topic || activeSubject || anchoredQuery || '',
         claimed.title || '',
         anchoredQuery || caption || '',
         { plainTextDraft: draft, captions: caption, intent: roleIntent },
       )
-      if (score < 2 && claimed.title && !(Number(claimed.sceneScore) > 40)) {
+      const subjectNamed =
+        isNamedFootballSubject(activeSubject) &&
+        hitMentionsSubject(activeSubject, claimed.title || '', claimed.imgUrl || '')
+      // Named-subject stills that already pass the name cue must not be discarded for a weak
+      // token score (Cucurella: `"Marc Cucurella" Chelsea hair` used to score real titles at -2).
+      if (
+        score < 2 &&
+        claimed.title &&
+        !(Number(claimed.sceneScore) > 40) &&
+        !subjectNamed
+      ) {
+        console.info(
+          '[eof-scene-images] reject claimed still — weak title score',
+          String(activeSubject || topic || '').slice(0, 40),
+          `score=${score}`,
+          String(claimed.title || '').slice(0, 90),
+        )
         // Release so another scene can try a better-titled hit (vision-scored rows can keep weak titles).
         activeClaimed.delete?.(claimed.key)
         continue

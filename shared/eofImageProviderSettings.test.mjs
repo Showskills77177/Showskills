@@ -65,6 +65,21 @@ describe('resolveEofImageProviderAttemptOrder', () => {
   it('returns empty when neither Google Images provider is keyed', () => {
     assert.deepEqual(resolveEofImageProviderAttemptOrder('auto', { serpapi: false, oxylabs: false }), [])
   })
+
+  it('configured Serp → serp first; unconfigured Serp → skip (Oxylabs opt-in off)', () => {
+    assert.deepEqual(
+      resolveEofImageProviderAttemptOrder('auto', { serpapi: true, oxylabs: false }),
+      ['serpapi'],
+    )
+    assert.deepEqual(
+      resolveEofImageProviderAttemptOrder('auto', { serpapi: false, oxylabs: false }),
+      [],
+    )
+    assert.deepEqual(
+      resolveEofImageProviderAttemptOrder('serpapi', { serpapi: true, oxylabs: false }),
+      ['serpapi'],
+    )
+  })
 })
 
 describe('listEofImageProviderOptions + notes', () => {
