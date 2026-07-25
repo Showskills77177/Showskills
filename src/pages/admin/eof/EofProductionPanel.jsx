@@ -831,7 +831,8 @@ const SCRIPT_PROVIDER_KEY = 'eof_script_provider'
 function readStoredScriptProvider() {
   try {
     const v = localStorage.getItem(SCRIPT_PROVIDER_KEY)
-    if (v === 'auto' || v === 'groq' || v === 'xai' || v === 'openai') return v
+    if (v === 'claude') return 'anthropic'
+    if (v === 'auto' || v === 'groq' || v === 'xai' || v === 'openai' || v === 'anthropic') return v
   } catch {
     /* ignore */
   }
@@ -946,6 +947,7 @@ export default function EofProductionPanel({
   const [scriptProviders, setScriptProviders] = useState({
     xai: false,
     openai: false,
+    anthropic: false,
     groq: false,
     newsdata: false,
     guardian: false,
@@ -2885,6 +2887,7 @@ export default function EofProductionPanel({
               Script AI:{' '}
               {scriptProviders.groq ? 'Groq' : openAiScriptEnabled ? 'Configured' : 'Add GROQ_API_KEY'}
               {scriptProviders.openai ? ' · OpenAI' : ''}
+              {scriptProviders.anthropic ? ' · Claude' : ''}
               {scriptProviders.xai ? ' · xAI' : ''}
             </p>
             <p>
@@ -3117,6 +3120,7 @@ export default function EofProductionPanel({
                   : [
                       { id: 'auto', label: 'Auto (best quality)', configured: true },
                       { id: 'groq', label: 'Groq (free)', configured: false },
+                      { id: 'anthropic', label: 'Claude (Anthropic)', configured: false },
                       { id: 'xai', label: 'xAI Grok', configured: false },
                       { id: 'openai', label: 'OpenAI', configured: false },
                     ]
@@ -4562,7 +4566,7 @@ export default function EofProductionPanel({
                     {scriptBusy === 'draft' ? 'Writing…' : 'Send to AI'}
                   </button>
                 </div>
-                <p className="mt-1 text-[10px] text-[#717171]">⌘/Ctrl + Enter to send · uses your Script AI (Groq / OpenAI / xAI)</p>
+                <p className="mt-1 text-[10px] text-[#717171]">⌘/Ctrl + Enter to send · uses your Script AI (Groq / Claude / OpenAI / xAI)</p>
               </div>
 
               <textarea

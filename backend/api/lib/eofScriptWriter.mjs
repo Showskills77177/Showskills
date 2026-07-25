@@ -7,8 +7,8 @@
  *   4) Second-tier judge (merit / interest / value / directness / hotTake) → rewrite/escalate
  *   5) Adapt draft → Short scenes (captions + image queries)
  *
- * Auto provider order when configured: Groq (free) → OpenAI → xAI Grok.
- * UI can force a provider via scriptProvider (groq | xai | openai | auto).
+ * Auto provider order when configured: Groq (free) → OpenAI → Anthropic Claude → xAI Grok.
+ * UI can force a provider via scriptProvider (groq | xai | openai | anthropic | auto).
  * Script Maker uses qualityBar=production and refuses canned templates.
  *
  * Scope: football worldwide (World Cup, all leagues) — call it football, never soccer.
@@ -24,6 +24,12 @@ import {
 } from '../../../shared/eofScriptTemplates.mjs'
 import { adaptPlainTextDraftToScenesLocally, unwrapAdaptJson } from '../../../shared/eofSceneAdapt.mjs'
 import { isXaiConfigured, xaiJsonCompletion, xaiTextCompletion } from './eofXaiClient.mjs'
+import {
+  isAnthropicConfigured,
+  anthropicJsonCompletion,
+  anthropicTextCompletion,
+  anthropicModelCandidates,
+} from './eofAnthropicClient.mjs'
 import { resolveEofScriptBrief } from './eofNewsTopics.mjs'
 import {
   fetchFootballDeskHeadlines,
@@ -84,6 +90,7 @@ export function eofScriptProviderStatus() {
   return {
     xai: isXaiConfigured(),
     openai: Boolean(envKey('OPENAI_API_KEY')),
+    anthropic: isAnthropicConfigured(),
     groq: Boolean(envKey('GROQ_API_KEY', 'EOF_GROQ_API_KEY')),
     newsdata: isNewsdataConfigured(),
     guardian: isGuardianConfigured(),
@@ -92,7 +99,14 @@ export function eofScriptProviderStatus() {
   }
 }
 
-const SCRIPT_PROVIDER_IDS = new Set(['auto', 'groq', 'xai', 'openai'])
+const SCRIPT_PROVIDER_IDS = new Set(['auto', 'groq', 'xai', 'openai', 'anthropic', 'claude'])
+
+/** Normalize UI/env aliases (claude → anthropic). */
+function normalizeScriptProviderId(id) {
+  const pick = String(id || '').toLowerCase().trim()
+  if (pick === 'claude') return 'anthropic'
+  return pick
+}
 
 /** UI + API: script AI options (Groq is the free tier). */
 export function listEofScriptProviderOptions() {
@@ -103,13 +117,19 @@ export function listEofScriptProviderOptions() {
       label: 'Auto (best quality)',
       configured: true,
       detail:
-        'Tunes temps by format, judges merit/interest/value, then escalates Groq → OpenAI/xAI until the best script wins.',
+        'Tunes temps by format, judges merit/interest/value, then escalates Groq → OpenAI/Claude/xAI until the best script wins.',
     },
     {
       id: 'groq',
       label: 'Groq — Llama 3.3 70B (free)',
       configured: status.groq,
       detail: 'Free writer at console.groq.com — set GROQ_API_KEY on Vercel.',
+    },
+    {
+      id: 'anthropic',
+      label: 'Claude (Anthropic)',
+      configured: status.anthropic,
+      detail: 'Writer or judge — set ANTHROPIC_API_KEY (optional ANTHROPIC_MODEL).',
     },
     {
       id: 'xai',
@@ -131,13 +151,14 @@ function defaultAutoProviderOrder(status) {
   const order = []
   if (status.groq) order.push('groq')
   if (status.openai) order.push('openai')
+  if (status.anthropic) order.push('anthropic')
   if (status.xai) order.push('xai')
   return order
 }
 
 export function isAutoScriptMode(scriptProvider) {
-  const envPick = envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER').toLowerCase()
-  const pick = String(scriptProvider || envPick || 'auto').toLowerCase()
+  const envPick = normalizeScriptProviderId(envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER'))
+  const pick = normalizeScriptProviderId(scriptProvider || envPick || 'auto')
   return pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)
 }
 
@@ -198,11 +219,11 @@ function isExcellentJudge(judge, excellentMin) {
 export function resolveScriptProviderAttemptOrder(scriptProvider) {
   const status = eofScriptProviderStatus()
   const configured = defaultAutoProviderOrder(status)
-  const envPick = envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER').toLowerCase()
-  const pick = String(scriptProvider || envPick || 'auto').toLowerCase()
+  const envPick = normalizeScriptProviderId(envKey('EOF_SCRIPT_PROVIDER', 'EOF_DEFAULT_SCRIPT_PROVIDER'))
+  const pick = normalizeScriptProviderId(scriptProvider || envPick || 'auto')
 
   if (pick === 'auto' || !SCRIPT_PROVIDER_IDS.has(pick)) {
-    // Auto draft attempt: Groq first for speed; openai/xai kept for escalation in write loop
+    // Auto draft attempt: Groq first for speed; paid models kept for escalation in write loop
     return configured.filter((id, i, arr) => arr.indexOf(id) === i)
   }
 
@@ -217,10 +238,15 @@ export function preferredEofScriptProvider() {
 }
 
 export function eofScriptProviderLabel(provider) {
-  if (provider === 'xai') return 'xAI Grok 4.5'
-  if (provider === 'openai') return 'OpenAI'
-  if (provider === 'local-split') return 'Draft split (local)'
-  if (provider === 'groq') {
+  const id = normalizeScriptProviderId(provider)
+  if (id === 'xai') return 'xAI Grok 4.5'
+  if (id === 'openai') return 'OpenAI'
+  if (id === 'anthropic') {
+    const model = anthropicModelCandidates()[0]
+    return model ? `Claude (${model})` : 'Claude (Anthropic)'
+  }
+  if (id === 'local-split') return 'Draft split (local)'
+  if (id === 'groq') {
     const model = groqModelCandidates()[0]
     return model.includes('llama-3.3')
       ? 'Groq Llama 3.3 70B (free)'
@@ -234,7 +260,7 @@ export function eofScriptProviderLabel(provider) {
 /** True when any LLM script provider is configured. */
 export function isEofOpenAiScriptConfigured() {
   const s = eofScriptProviderStatus()
-  return s.xai || s.openai || s.groq
+  return s.xai || s.openai || s.groq || s.anthropic
 }
 
 function formatGuide(format) {
@@ -354,6 +380,10 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
     return `OpenAI failed (${detail.slice(0, 140)}). Pick Groq (free) in Script AI, or check OPENAI_API_KEY.`
   }
 
+  if (blamed === 'anthropic') {
+    return `Claude/Anthropic failed (${detail.slice(0, 140)}). Check ANTHROPIC_API_KEY / ANTHROPIC_MODEL, or pick Groq in Script AI.`
+  }
+
   if (blamed === 'groq' || providers.groq) {
     if (/401|invalid.?api.?key|incorrect.?api.?key|wrong.?api.?key/i.test(detail)) {
       return `Groq rejected the API key (${detail.slice(0, 120)}). Fix GROQ_API_KEY on Vercel at console.groq.com, then Redeploy.`
@@ -388,7 +418,7 @@ export function buildEofScriptWarning(jobOrSource, providers = eofScriptProvider
   if (providers.xai) {
     return 'xAI Grok failed — usually no credits on your xAI team (console.x.ai). Add free GROQ_API_KEY on Vercel, pick Groq in Script AI, and Generate again.'
   }
-  if (!providers.openai && !providers.groq) {
+  if (!providers.openai && !providers.groq && !providers.anthropic) {
     return 'No working AI script provider. Set free GROQ_API_KEY at console.groq.com → Vercel env → Redeploy.'
   }
   return 'AI script providers failed — using a built-in fallback draft. Check API keys and billing.'
@@ -399,9 +429,13 @@ function classifyScriptFailureProvider(detail) {
   const d = String(detail || '')
   if (!d) return null
   // Prefer explicit [provider] tags from the draft loop
-  const tagged = /\[(groq|openai|xai)\]/gi.exec(d)
-  if (tagged) return tagged[1].toLowerCase()
+  const tagged = /\[(groq|openai|xai|anthropic|claude)\]/gi.exec(d)
+  if (tagged) {
+    const id = tagged[1].toLowerCase()
+    return id === 'claude' ? 'anthropic' : id
+  }
   if (/xai|grok-|\bGrok\b|console\.x\.ai|team doesn't have any credits/i.test(d)) return 'xai'
+  if (/anthropic|claude-|api\.anthropic/i.test(d)) return 'anthropic'
   if (/groq|api\.groq|llama-3|gpt-oss-20b/i.test(d)) return 'groq'
   if (/openai|api\.openai|gpt-4/i.test(d)) return 'openai'
   return null
@@ -768,7 +802,7 @@ export async function writeEofPlainTextDraft({
 
   const attempts = []
   for (const id of primaryOrder) {
-    if (id === 'xai' || id === 'openai' || id === 'groq') {
+    if (id === 'xai' || id === 'openai' || id === 'groq' || id === 'anthropic') {
       attempts.push({
         id,
         run: () =>
@@ -973,7 +1007,7 @@ export async function writeEofPlainTextDraft({
         let baseText = candidate?.plainTextDraft || ai.plainTextDraft
         let baseJudge = judge
         for (const nextId of escalateOrder) {
-          if (nextId === 'xai' || nextId === 'openai' || nextId === 'groq') {
+          if (nextId === 'xai' || nextId === 'openai' || nextId === 'groq' || nextId === 'anthropic') {
             try {
               console.info('[eof-script] auto escalate writer', id, '→', nextId)
               const escalated = await rewriteWithFeedback(
@@ -1141,6 +1175,7 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
   for (const id of order) {
     if (id === 'xai') attempts.push(() => adaptWithXai({ draft, topic: t, format: fmt }))
     if (id === 'openai') attempts.push(() => adaptWithOpenAi({ draft, topic: t, format: fmt }))
+    if (id === 'anthropic') attempts.push(() => adaptWithAnthropic({ draft, topic: t, format: fmt }))
     if (id === 'groq') attempts.push(() => adaptWithGroq({ draft, topic: t, format: fmt }))
   }
 
@@ -1490,6 +1525,9 @@ async function researchDeskBriefWithProvider({ provider, topic, format, context,
       timeoutMs: 45000,
     })
   }
+  if (provider === 'anthropic') {
+    return anthropicJsonCompletion({ system, user, temperature: 0.25 })
+  }
   if (provider === 'groq') {
     return groqChatJson({ system, user, temperature: 0.25, timeoutMs: 40000 })
   }
@@ -1511,6 +1549,9 @@ async function writeDraftWithProvider({
   }
   if (provider === 'openai') {
     return writeDraftWithOpenAi({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
+  }
+  if (provider === 'anthropic') {
+    return writeDraftWithAnthropic({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
   }
   if (provider === 'groq') {
     return writeDraftWithGroq({ topic, format, context, temperature, previousDraft, regenerate, directorNote })
@@ -1549,6 +1590,9 @@ async function hotTakeRefineWithProvider({
       }),
     )
   }
+  if (provider === 'anthropic') {
+    return cleanDraftText(await anthropicTextCompletion({ system, user, temperature }))
+  }
   if (provider === 'groq') {
     return cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 45000 }))
   }
@@ -1585,6 +1629,9 @@ async function polishDraftWithProvider({
         timeoutMs: 45000,
       }),
     )
+  }
+  if (provider === 'anthropic') {
+    return cleanDraftText(await anthropicTextCompletion({ system, user, temperature }))
   }
   if (provider === 'groq') {
     return cleanDraftText(await groqChatText({ system, user, temperature, timeoutMs: 40000 }))
@@ -1777,6 +1824,28 @@ async function writeDraftWithOpenAi({
   return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'openai' }
 }
 
+async function writeDraftWithAnthropic({
+  topic,
+  format,
+  context,
+  temperature = 0.45,
+  previousDraft = '',
+  regenerate = false,
+  directorNote = '',
+}) {
+  const { system, user } = buildDraftPrompt({
+    topic,
+    format,
+    context,
+    previousDraft,
+    regenerate,
+    directorNote,
+  })
+  const text = cleanDraftText(await anthropicTextCompletion({ system, user, temperature }))
+  if (text.length < 40) throw new Error('draft too short')
+  return { plainTextDraft: text, title: titleFromDraft(topic, text), source: 'anthropic' }
+}
+
 async function writeDraftWithGroq({
   topic,
   format,
@@ -1867,6 +1936,12 @@ async function adaptWithOpenAi({ draft, topic, format }) {
     },
   })
   return finalizeScript(parsed, topic, format, 'openai', draft)
+}
+
+async function adaptWithAnthropic({ draft, topic, format }) {
+  const { system, user } = buildAdaptPrompt({ draft, topic, format })
+  const parsed = await anthropicJsonCompletion({ system, user, temperature: 0.35 })
+  return finalizeScript(parsed, topic, format, 'anthropic', draft)
 }
 
 async function adaptWithGroq({ draft, topic, format }) {

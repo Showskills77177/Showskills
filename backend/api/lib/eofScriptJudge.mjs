@@ -3,11 +3,12 @@
  * Writer (usually Groq) drafts; a different model scores merit + interest + real value.
  *
  * Env:
- *   EOF_SCRIPT_JUDGE=auto|openai|xai|groq|off  (default auto)
+ *   EOF_SCRIPT_JUDGE=auto|openai|xai|groq|anthropic|off  (default auto)
  *   EOF_SCRIPT_JUDGE_MIN=6.5                   overall pass threshold 0–10
- *   OPENAI_API_KEY / XAI_API_KEY / GROQ_API_KEY
+ *   OPENAI_API_KEY / XAI_API_KEY / GROQ_API_KEY / ANTHROPIC_API_KEY
  */
 import { isXaiConfigured, xaiJsonCompletion } from './eofXaiClient.mjs'
+import { isAnthropicConfigured, anthropicJsonCompletion } from './eofAnthropicClient.mjs'
 import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
 import {
   EOF_SHORTS_DIRECT_VOICE,
@@ -47,54 +48,65 @@ function isGroqConfigured() {
 }
 
 export function eofScriptJudgeStatus() {
-  const mode = (envKey('EOF_SCRIPT_JUDGE') || 'auto').toLowerCase()
+  const modeRaw = (envKey('EOF_SCRIPT_JUDGE') || 'auto').toLowerCase()
+  const mode = modeRaw === 'claude' ? 'anthropic' : modeRaw
   return {
-    mode: ['off', 'auto', 'openai', 'xai', 'groq'].includes(mode) ? mode : 'auto',
+    mode: ['off', 'auto', 'openai', 'xai', 'groq', 'anthropic'].includes(mode) ? mode : 'auto',
     openai: isOpenAiConfigured(),
     xai: isXaiConfigured(),
     groq: isGroqConfigured(),
-    enabled: mode !== 'off' && (isOpenAiConfigured() || isXaiConfigured() || isGroqConfigured()),
+    anthropic: isAnthropicConfigured(),
+    enabled:
+      mode !== 'off' &&
+      (isOpenAiConfigured() || isXaiConfigured() || isGroqConfigured() || isAnthropicConfigured()),
     note:
       mode === 'off'
         ? 'Script judge off (EOF_SCRIPT_JUDGE=off) — local directness gate still runs.'
-        : isOpenAiConfigured() || isXaiConfigured()
+        : isOpenAiConfigured() || isXaiConfigured() || isAnthropicConfigured()
           ? 'Second-tier judge ready — merit / interest / value / directness / factuality / relevance (rejects waffle, invented news, off-topic free-association).'
           : isGroqConfigured()
-            ? 'Only Groq keyed — judge can run on Groq; OpenAI/xAI is better as a second model. Local directness + factuality + relevance always run.'
-            : 'Local directness + factuality + relevance gates are on. Add OPENAI_API_KEY or XAI_API_KEY for a stronger second-model judge.',
+            ? 'Only Groq keyed — judge can run on Groq; OpenAI/Claude/xAI is better as a second model. Local directness + factuality + relevance always run.'
+            : 'Local directness + factuality + relevance gates are on. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, or XAI_API_KEY for a stronger second-model judge.',
   }
 }
 
 /**
  * Prefer a different model than the writer.
  * @param {string} writerProvider
- * @returns {'openai'|'xai'|'groq'|null}
+ * @returns {'openai'|'xai'|'groq'|'anthropic'|null}
  */
 export function resolveScriptJudgeProvider(writerProvider) {
-  const mode = (envKey('EOF_SCRIPT_JUDGE') || 'auto').toLowerCase()
+  const modeRaw = (envKey('EOF_SCRIPT_JUDGE') || 'auto').toLowerCase()
+  const mode = modeRaw === 'claude' ? 'anthropic' : modeRaw
   if (mode === 'off' || mode === 'none' || mode === '0') return null
 
-  const writer = String(writerProvider || '').toLowerCase()
-  const forced = mode === 'openai' || mode === 'xai' || mode === 'groq' ? mode : null
+  const writerRaw = String(writerProvider || '').toLowerCase()
+  const writer = writerRaw === 'claude' ? 'anthropic' : writerRaw
+  const forced =
+    mode === 'openai' || mode === 'xai' || mode === 'groq' || mode === 'anthropic' ? mode : null
   if (forced) {
     if (forced === 'openai' && isOpenAiConfigured()) return 'openai'
     if (forced === 'xai' && isXaiConfigured()) return 'xai'
     if (forced === 'groq' && isGroqConfigured()) return 'groq'
+    if (forced === 'anthropic' && isAnthropicConfigured()) return 'anthropic'
     return null
   }
 
   // auto — different model from writer when possible
   const order =
     writer === 'groq'
-      ? ['openai', 'xai', 'groq']
+      ? ['openai', 'anthropic', 'xai', 'groq']
       : writer === 'openai'
-        ? ['xai', 'groq', 'openai']
-        : writer === 'xai'
-          ? ['openai', 'groq', 'xai']
-          : ['openai', 'xai', 'groq']
+        ? ['anthropic', 'xai', 'groq', 'openai']
+        : writer === 'anthropic'
+          ? ['openai', 'xai', 'groq', 'anthropic']
+          : writer === 'xai'
+            ? ['openai', 'anthropic', 'groq', 'xai']
+            : ['openai', 'anthropic', 'xai', 'groq']
 
   for (const id of order) {
     if (id === 'openai' && isOpenAiConfigured()) return 'openai'
+    if (id === 'anthropic' && isAnthropicConfigured()) return 'anthropic'
     if (id === 'xai' && isXaiConfigured()) return 'xai'
     if (id === 'groq' && isGroqConfigured()) return 'groq'
   }
@@ -401,6 +413,8 @@ export async function judgeEofScriptDraft(input = {}) {
     raw = await xaiJsonCompletion({ system, user, temperature: 0.2 })
   } else if (judgeProvider === 'openai') {
     raw = await judgeWithOpenAi({ system, user })
+  } else if (judgeProvider === 'anthropic') {
+    raw = await anthropicJsonCompletion({ system, user, temperature: 0.2 })
   } else {
     raw = await judgeWithGroq({ system, user })
   }

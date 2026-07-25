@@ -116,7 +116,8 @@ import { eofVoiceRegenerationStatus } from '../../../shared/eofVoiceRegeneration
 
 function parseScriptProvider(body) {
   const v = typeof body?.scriptProvider === 'string' ? body.scriptProvider.trim().toLowerCase() : ''
-  return v === 'groq' || v === 'xai' || v === 'openai' || v === 'auto' ? v : null
+  if (v === 'claude') return 'anthropic'
+  return v === 'groq' || v === 'xai' || v === 'openai' || v === 'anthropic' || v === 'auto' ? v : null
 }
 
 /** GET hub data · POST create/render/update production jobs */
@@ -274,15 +275,18 @@ export default async function handler(req, res) {
             return 'Groq is ready. Add NEWSDATA_API_KEY (newsdata.io) or GUARDIAN_API_KEY for richer article sourcing; RSS still works without them.'
           }
           if (s.newsdata && !s.groq) {
-            return 'NewsData key is set, but scripts still need GROQ_API_KEY (or OpenAI/xAI) to write the voiceover.'
+            return 'NewsData key is set, but scripts still need GROQ_API_KEY (or OpenAI/Claude/xAI) to write the voiceover.'
           }
-          if ((s.newsdata || s.guardian) && !s.groq && !s.openai && !s.xai) {
+          if ((s.newsdata || s.guardian) && !s.groq && !s.openai && !s.xai && !s.anthropic) {
             return 'Article sourcing is set, but you still need free GROQ_API_KEY to write the Short.'
           }
-          if (s.xai && !s.openai && !s.groq) {
+          if (s.anthropic && !s.openai && !s.groq && !s.xai) {
+            return 'Claude (Anthropic) is ready for Script AI. Pick Claude in the Script AI dropdown, or set EOF_SCRIPT_PROVIDER=anthropic.'
+          }
+          if (s.xai && !s.openai && !s.groq && !s.anthropic) {
             return 'xAI key is set but needs credits (console.x.ai). Add free GROQ_API_KEY on Vercel for AI scripts without xAI billing.'
           }
-          if (!s.openai && !s.xai && !s.groq) {
+          if (!s.openai && !s.xai && !s.groq && !s.anthropic) {
             return 'No script AI configured. Add free GROQ_API_KEY at console.groq.com → Vercel env → redeploy.'
           }
           return null
