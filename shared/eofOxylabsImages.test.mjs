@@ -488,7 +488,7 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
           updatedAt: new Date(now - 10_000).toISOString(),
           renderProgress: { startedAt: new Date(now - 10_000).toISOString() },
         },
-        { now, maxAgeSec: 120, maxQuietSec: 75 },
+        { now, maxAgeSec: 280, maxQuietSec: 50 },
       ),
       false,
     )
@@ -496,25 +496,37 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
       isEofRenderStale(
         {
           status: 'rendering_video',
-          updatedAt: new Date(now - 80_000).toISOString(),
-          renderProgress: { startedAt: new Date(now - 80_000).toISOString() },
+          updatedAt: new Date(now - 55_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 55_000).toISOString() },
         },
-        { now, maxAgeSec: 120, maxQuietSec: 75 },
+        { now, maxAgeSec: 280, maxQuietSec: 50 },
       ),
       true,
-      'quiet > 75s must stale (silent waitUntil kill)',
+      'quiet > 50s must stale (silent isolate kill)',
     )
     assert.equal(
       isEofRenderStale(
         {
           status: 'rendering_video',
           updatedAt: new Date(now - 5_000).toISOString(),
-          renderProgress: { startedAt: new Date(now - 130_000).toISOString() },
+          renderProgress: { startedAt: new Date(now - 150_000).toISOString() },
         },
-        { now, maxAgeSec: 120, maxQuietSec: 75 },
+        { now, maxAgeSec: 280, maxQuietSec: 50 },
+      ),
+      false,
+      'healthy heartbeats at 150s must NOT stale (encode can still finish under 280s)',
+    )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 290_000).toISOString() },
+        },
+        { now, maxAgeSec: 280, maxQuietSec: 50 },
       ),
       true,
-      'overall age > 120s must stale even with heartbeats',
+      'overall age > 280s must stale even with heartbeats (past Hobby maxDuration headroom)',
     )
   })
 

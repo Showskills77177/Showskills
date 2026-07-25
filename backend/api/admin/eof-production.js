@@ -480,7 +480,19 @@ export default async function handler(req, res) {
             await runner.startEofProductionFullBuildBackground(jobId, { imageProvider })
           }
           const job = await getEofProductionJob(jobId)
-          return json(res, 202, { ok: true, accepted: true, job, imageProvider: imageProvider || null })
+          // Sync serverless builds finish in-request → 200 with ready job.
+          // Local fire-and-forget still returns 202 while status is rendering_*.
+          const done =
+            job?.status === 'video_rendered' ||
+            job?.status === 'failed' ||
+            job?.status === 'rendered'
+          return json(res, done ? 200 : 202, {
+            ok: true,
+            accepted: !done,
+            finished: job?.status === 'video_rendered',
+            job,
+            imageProvider: imageProvider || null,
+          })
         } catch (e) {
           const EofQualityGateBlockedError = await loadEofQualityGateBlockedError()
           if (e instanceof EofQualityGateBlockedError) {

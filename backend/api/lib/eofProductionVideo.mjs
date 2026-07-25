@@ -47,6 +47,7 @@ import {
 import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 import { mixOverlaySfxIntoAudio, resolveEofWhooshSfxPath } from './eofAudioMix.mjs'
+import { isEofServerlessEnv } from './eofProductionServerless.mjs'
 
 const __eofLibDir = dirname(fileURLToPath(import.meta.url))
 
@@ -66,13 +67,26 @@ const CAPTION_FONT_CANDIDATES = [
 const VIDEO_FPS = Number(process.env.EOF_VIDEO_FPS) || 24
 const VIDEO_PRESET = process.env.EOF_VIDEO_PRESET || 'ultrafast'
 const VIDEO_CRF = process.env.EOF_VIDEO_CRF || '28'
-const CLIP_CONCURRENCY = Number(process.env.EOF_VIDEO_CLIP_CONCURRENCY) || 2
+const CLIP_CONCURRENCY_DEFAULT = Number(process.env.EOF_VIDEO_CLIP_CONCURRENCY) || 2
 /** Cap threads on Vercel — `-threads 0` can thrash/hang serverless encodes (UI stuck ~42%). */
 const VIDEO_THREADS =
   process.env.EOF_FFMPEG_THREADS ||
   (process.env.VERCEL || process.env.VERCEL_ENV ? '2' : '0')
-const SCENE_CLIP_TIMEOUT_MS = Number(process.env.EOF_SCENE_CLIP_TIMEOUT_MS) || 60_000
-const MUX_TIMEOUT_MS = Number(process.env.EOF_MUX_TIMEOUT_MS) || 120_000
+const SCENE_CLIP_TIMEOUT_MS =
+  Number(process.env.EOF_SCENE_CLIP_TIMEOUT_MS) ||
+  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 45_000 : 60_000)
+const MUX_TIMEOUT_MS =
+  Number(process.env.EOF_MUX_TIMEOUT_MS) ||
+  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 90_000 : 120_000)
+
+function clipConcurrency() {
+  if (process.env.EOF_VIDEO_CLIP_CONCURRENCY) return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
+  // Serial clips on Hobby — parallel ffmpeg fights for CPU and hangs more often.
+  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.EOF_SERVERLESS_SLIM === '1') {
+    return 1
+  }
+  return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
+}
 
 function resolveCaptionFont() {
   for (const path of CAPTION_FONT_CANDIDATES) {
@@ -786,9 +800,13 @@ export async function renderEofProductionVideo({
   const videoEffects = normalizeEofVideoEffects(videoEffectsRaw)
   const effectFilters = videoEffectsFilterChain(videoEffects)
   const stickers = normalizeEofStickers(stickersRaw)
-  const useXfade = look.perCutTransitions.length > 0 && sorted.length > 1
-  const kenBurns = Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1'
-  const overlayMode = resolveEofOverlayMoments(overlayMomentsMode)
+  const serverlessSlim = isEofServerlessEnv()
+  // Hobby: hard cuts only — xfade filtergraphs + re-encode fallbacks blow the time budget.
+  const useXfade =
+    !serverlessSlim && look.perCutTransitions.length > 0 && sorted.length > 1
+  const kenBurns =
+    !serverlessSlim && (Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1')
+  const overlayMode = serverlessSlim ? 'off' : resolveEofOverlayMoments(overlayMomentsMode)
   const overlayPlan = planEofOverlayMoments({
     mode: overlayMode,
     scenes: sorted,
@@ -809,15 +827,15 @@ export async function renderEofProductionVideo({
   console.info(
     '[eof-video] look',
     'transition',
-    look.transitionStyle,
+    serverlessSlim ? 'cut' : look.transitionStyle,
     'cuts',
-    look.perCutTransitions.join(',') || 'hard',
+    useXfade ? look.perCutTransitions.join(',') || 'hard' : 'hard',
     'enhance',
     look.enhanceStyle,
     'color',
     look.colorGrade,
     'td',
-    look.transitionSec,
+    useXfade ? look.transitionSec : 0,
     'kenBurns',
     kenBurns,
     'overlayMoments',
@@ -827,6 +845,7 @@ export async function renderEofProductionVideo({
     eofVideoEffectIds(videoEffects).join(',') || 'none',
     'stickers',
     eofStickerIds(stickers).join(',') || 'none',
+    serverlessSlim ? 'serverlessSlim=1' : 'serverlessSlim=0',
   )
 
   const engine = plan.engine
@@ -864,7 +883,7 @@ export async function renderEofProductionVideo({
   const encodeDurs = graph?.paddedDurations || contentDurs
 
   let clipsDone = 0
-  const clipPaths = await mapWithConcurrency(sorted, CLIP_CONCURRENCY, async (scene) => {
+  const clipPaths = await mapWithConcurrency(sorted, clipConcurrency(), async (scene) => {
     const i = sorted.findIndex((s) => s.index === scene.index)
     if (!scene.imagePath || !existsSync(scene.imagePath)) {
       throw new Error(`Scene ${scene.index + 1} image is missing.`)

@@ -130,7 +130,7 @@ export const EOF_RENDER_STACK = {
     id: 'vercel',
     label: 'ShowSkills staging API (Vercel serverless)',
     detail:
-      'TTS + image fetch + ffmpeg run in the background (waitUntil). Finished MP4 and scene stills are stored in the database so previews work across instances.',
+      'On Vercel, Build Short runs in-request (await) under maxDuration with slim ffmpeg + ≤4 scenes — waitUntil was unreliable on Hobby and left jobs stuck in rendering_video. Finished MP4 and stills are stored in the database.',
   },
   video: {
     id: 'ffmpeg-capcut-captions',

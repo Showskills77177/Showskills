@@ -71,14 +71,25 @@ import {
   clearEofVideoArtifact,
   clearEofVideoOnlyArtifact,
 } from './eofProductionArtifacts.mjs'
+import {
+  isEofServerlessEnv,
+  capEofScriptScenesForServerless,
+  eofServerlessSlimRenderOpts,
+} from './eofProductionServerless.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 /** Cap whole scrape+vision+gen phase so Cucurella builds fail fast instead of freezing the UI. */
-const IMAGE_POOL_DEADLINE_MS = Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) || 75_000
+const IMAGE_POOL_DEADLINE_MS =
+  Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) ||
+  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 50_000 : 75_000)
 /** Cap per-scene download / slow fallback waterfall after the Serp pool. */
-const SCENE_ASSIGN_DEADLINE_MS = Number(process.env.EOF_SCENE_ASSIGN_DEADLINE_MS) || 90_000
+const SCENE_ASSIGN_DEADLINE_MS =
+  Number(process.env.EOF_SCENE_ASSIGN_DEADLINE_MS) ||
+  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 60_000 : 90_000)
 /** Cap ffmpeg scene clips + mux so UI never sits at ~42% forever. */
-const VIDEO_ENCODE_DEADLINE_MS = Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) || 180_000
+const VIDEO_ENCODE_DEADLINE_MS =
+  Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) ||
+  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 140_000 : 180_000)
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 
@@ -258,8 +269,21 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       ? normalizeEofImageProvider(opts.imageProvider)
       : null
   const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
-  const job = await getEofProductionJob(jobId)
+  let job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
+
+  // Fresh video builds on Hobby: cap scenes so encode finishes under maxDuration.
+  // Remux paths keep existing still count (reuseSceneImages).
+  if (isEofServerlessEnv() && !reuseSceneImages && job.script?.scenes?.length) {
+    const capped = capEofScriptScenesForServerless(job.script)
+    if (capped.trimmed) {
+      console.warn(
+        `[eof-video] capping scenes ${capped.before}→${capped.after} for serverless encode`,
+        jobId,
+      )
+      job = await updateEofProductionJob(jobId, { script: capped.script })
+    }
+  }
 
   const scriptScenes = job.script?.scenes || []
   if (!scriptScenes.length) {
@@ -898,12 +922,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           captionStyle: job.captionStyle,
           captionLayout: job.captionLayout || job.script?.captionLayout || null,
           zapcapTemplateId: job.zapcapTemplateId,
-          transitionStyle: job.transitionStyle,
-          colorGrade: job.colorGrade,
-          enhanceStyle: job.enhanceStyle,
+          ...eofServerlessSlimRenderOpts({
+            transitionStyle: job.transitionStyle,
+            colorGrade: job.colorGrade,
+            enhanceStyle: job.enhanceStyle,
+            overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
+          }),
           format: job.script?.format,
           captionMode,
-          overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
           videoEffects: job.videoEffects,
           stickers: job.stickers,
           hasSecondarySubject: secondaryPeople.length > 0,

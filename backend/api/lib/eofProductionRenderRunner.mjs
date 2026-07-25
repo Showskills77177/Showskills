@@ -24,6 +24,40 @@ import {
   applyEofShortQualityPreflightToJob,
   EofQualityGateBlockedError,
 } from './eofShortQualityGateApply.mjs'
+import {
+  isEofServerlessEnv,
+  capEofScriptScenesForServerless,
+} from './eofProductionServerless.mjs'
+
+/**
+ * On Vercel Hobby, detached waitUntil dies silently — await the work in-request
+ * so maxDuration covers TTS + Serp + ffmpeg and we can write status=video_rendered.
+ * @param {() => Promise<unknown>} run
+ */
+async function runEofProductionWork(run) {
+  if (isEofServerlessEnv()) {
+    await run()
+    return
+  }
+  void run()
+}
+
+/**
+ * Cap scenes for Hobby before TTS/encode so the job fits under maxDuration.
+ * @param {string} jobId
+ */
+async function maybeCapScenesForServerlessBuild(jobId) {
+  if (!isEofServerlessEnv()) return
+  const job = await getEofProductionJob(jobId)
+  if (!job?.script?.scenes?.length) return
+  const capped = capEofScriptScenesForServerless(job.script)
+  if (!capped.trimmed) return
+  console.warn(
+    `[eof-production] capping scenes ${capped.before}→${capped.after} for serverless build`,
+    jobId,
+  )
+  await updateEofProductionJob(jobId, { script: capped.script })
+}
 
 function estimateFullBuildSec(script) {
   const scenes = script?.scenes?.length || 5
@@ -43,6 +77,7 @@ export async function renderEofProductionFullBuild(jobId, opts = {}) {
   const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
 
   try {
+    await maybeCapScenesForServerlessBuild(jobId)
     // Plan-time gate — stop before TTS / image credits / ffmpeg on hard fails.
     await applyEofShortQualityPreflightToJob(jobId, {
       mode: qualityGateMode,
@@ -105,17 +140,7 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
       console.error('[eof-production] full Short build failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for full build', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -128,17 +153,7 @@ export async function startEofProductionRenderBackground(jobId) {
       console.error('[eof-production] background render failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable, falling back to inline render', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -210,17 +225,7 @@ export async function startEofProductionVoiceoverRegenerationBackground(jobId) {
       console.error('[eof-production] voiceover regeneration failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for voiceover regen', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -267,17 +272,7 @@ export async function startApplyEofProductionZapcapBackground(jobId) {
       console.error('[eof-production] ZapCap apply failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for ZapCap apply', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -374,17 +369,7 @@ export async function startEofProductionStickersApplyBackground(jobId) {
       console.error('[eof-production] apply stickers failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for apply stickers', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /** @param {string} jobId */
@@ -417,17 +402,7 @@ export async function startEofProductionEffectsApplyBackground(jobId) {
       console.error('[eof-production] apply effects failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for apply effects', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -494,17 +469,7 @@ export async function startEofProductionCaptionReplaceBackground(jobId) {
       console.error('[eof-production] caption replace failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for caption replace', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -576,17 +541,7 @@ export async function startEofProductionMusicRemixBackground(jobId) {
       console.error('[eof-production] music remix failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for music remix', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }
 
 /**
@@ -626,26 +581,19 @@ export async function startEofProductionVideoRenderBackground(jobId, opts = {}) 
   )
 
   const run = () =>
-    renderEofProductionVideoJob(jobId, {
-      includeAudioIfPresent: true,
-      captionMode: 'free',
-      imageProvider: opts.imageProvider,
-      qualityGateMode,
-      skipPlanPreflight: true,
-    }).catch((e) => {
+    (async () => {
+      await maybeCapScenesForServerlessBuild(jobId)
+      return renderEofProductionVideoJob(jobId, {
+        includeAudioIfPresent: true,
+        captionMode: 'free',
+        imageProvider: opts.imageProvider,
+        qualityGateMode,
+        skipPlanPreflight: true,
+      })
+    })().catch((e) => {
       if (e instanceof EofQualityGateBlockedError) return
       console.error('[eof-production] background video render failed', jobId, e)
     })
 
-  if (process.env.VERCEL) {
-    try {
-      const { waitUntil } = await import('@vercel/functions')
-      waitUntil(run())
-      return
-    } catch (e) {
-      console.warn('[eof-production] waitUntil unavailable for video', e)
-    }
-  }
-
-  void run()
+  await runEofProductionWork(run)
 }

@@ -569,11 +569,12 @@ export async function markEofProductionJobFailed(id, message) {
 
 /**
  * Max age for a stuck rendering_* job before poll auto-fails it.
- * Covers silent Vercel waitUntil death (Hobby) where no catch runs and UI freezes forever.
+ * Must sit under vercel.json maxDuration (300s) but ABOVE a healthy slim encode
+ * (prior 120s ceiling killed heartbeating builds before ffmpeg finished).
  */
-export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 120
-/** No progress DB write (heartbeat) for this long → treat as hung/killed. */
-export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 75
+export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 280
+/** No progress DB write (heartbeat) for this long → waitUntil/isolate died. */
+export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 50
 
 /**
  * Pure helper — decide whether a rendering job should be force-failed.
@@ -613,8 +614,8 @@ export async function failStaleEofProductionRenders(opts = {}) {
       ? Math.round((now - Date.parse(String(startedRaw))) / 1000)
       : EOF_STALE_RENDER_SEC
     const message =
-      `Render stuck / timed out after ${ageSec}s (background work hung or Vercel waitUntil stopped). ` +
-      `Hit Cancel if needed, then Rebuild video — images will re-fetch from SerpAPI.`
+      `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
+      `Cancel if the job is stuck, then Rebuild — Serp stills re-fetch; keep scripts to ≤4 scenes on Hobby.`
     console.warn(`[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s`)
     await markEofProductionJobFailed(job.id, message)
     failed.push(job.id)
