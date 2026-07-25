@@ -28,6 +28,14 @@ import {
   normalizeEofImageGenProvider,
 } from '../lib/eofImageProviderSettings.mjs'
 import {
+  getEofBuildModeSettings,
+  updateEofBuildModeSettings,
+  listEofBuildModeOptions,
+  normalizeEofBuildMode,
+  eofBuildModeNote,
+} from '../lib/eofBuildModeSettings.mjs'
+import { EOF_SERVERLESS_MAX_SCENES } from '../lib/eofProductionServerless.mjs'
+import {
   EOF_VOICE_PRESETS,
   EOF_RENDER_STACK,
   EOF_DEFAULT_VOICE_PRESET,
@@ -142,10 +150,20 @@ export default async function handler(req, res) {
   }
 
   let session
+  let cronContinue = false
   try {
     session = await requireEofSession(req)
   } catch (e) {
-    return json(res, e.statusCode || 401, { error: 'Unauthorized' })
+    const cronSecret = (process.env.CRON_SECRET || process.env.EOF_CRON_SECRET || '').trim()
+    const auth = String(req.headers?.authorization || '')
+    const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+    // Hobby/slim continue-build self-fetch uses CRON_SECRET. Action checked after body read.
+    if (cronSecret && bearer && bearer === cronSecret && req.method === 'POST') {
+      cronContinue = true
+      session = { role: 'cron', user: 'eof-continue' }
+    } else {
+      return json(res, e.statusCode || 401, { error: 'Unauthorized' })
+    }
   }
 
   const info = eofSessionInfo(session)
@@ -156,7 +174,7 @@ export default async function handler(req, res) {
       let ffmpeg = false
 
       try {
-        // Unstick Cucurella builds killed mid-waitUntil (Hobby) — poll marks them failed.
+        // Unstick builds killed mid-waitUntil — poll marks them failed.
         await failStaleEofProductionRenders().catch((e) => {
           console.warn('[eof-production] stale render sweep failed', e instanceof Error ? e.message : e)
         })
@@ -208,6 +226,13 @@ export default async function handler(req, res) {
         imageProvider: 'auto',
         imageGenMode: 'auto',
         imageGenProvider: 'auto',
+        updatedAt: null,
+      }))
+
+      const buildModeSettings = await getEofBuildModeSettings().catch(() => ({
+        buildMode: 'pro',
+        envForcedSlim: false,
+        effectiveMode: 'pro',
         updatedAt: null,
       }))
 
@@ -326,6 +351,14 @@ export default async function handler(req, res) {
           mode: imageProviderSettings.imageGenMode,
           provider: imageProviderSettings.imageGenProvider,
         }),
+        buildMode: buildModeSettings.effectiveMode || buildModeSettings.buildMode || 'pro',
+        buildModeSaved: buildModeSettings.buildMode || 'pro',
+        buildModeOptions: listEofBuildModeOptions(),
+        buildModeEnvForced: Boolean(buildModeSettings.envForcedSlim),
+        buildModeNote: eofBuildModeNote(buildModeSettings.buildMode, {
+          envForced: Boolean(buildModeSettings.envForcedSlim),
+        }),
+        buildModeMaxScenesHobby: EOF_SERVERLESS_MAX_SCENES,
         pinterest: pinterestProbe,
         serpapi: serpapiProbe,
         oxylabs: oxylabsProbe,
@@ -337,6 +370,85 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = await readJsonBody(req)
       const action = typeof body.action === 'string' ? body.action : 'create'
+
+      if (cronContinue && action !== 'continue-build') {
+        return json(res, 401, { error: 'Unauthorized' })
+      }
+
+      if (action === 'continue-build') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        if (
+          existing.status !== 'rendering' &&
+          existing.status !== 'rendering_video'
+        ) {
+          return json(res, 200, { ok: true, skipped: true, job: existing })
+        }
+        const imageProvider =
+          body.imageProvider !== undefined && body.imageProvider !== null && String(body.imageProvider).trim()
+            ? normalizeEofImageProvider(body.imageProvider)
+            : undefined
+        const step =
+          body.step === 'audio' || body.step === 'video' ? body.step : 'auto'
+        try {
+          const runner = await loadEofRenderRunner()
+          // Slim/Hobby path: await this step only (TTS **or** Serp+encode); next step self-chains.
+          await runner.continueEofProductionBuild(jobId, {
+            step,
+            imageProvider,
+            qualityGateMode: 'manual',
+          })
+          const job = await getEofProductionJob(jobId)
+          return json(res, 200, { ok: true, continued: true, step, job })
+        } catch (e) {
+          const EofQualityGateBlockedError = await loadEofQualityGateBlockedError()
+          if (e instanceof EofQualityGateBlockedError) {
+            const job = await getEofProductionJob(jobId)
+            return json(res, 422, {
+              error: e.message,
+              qualityGate: e.gate,
+              job,
+            })
+          }
+          const msg = e instanceof Error ? e.message : 'Continue build failed'
+          return json(res, isEofClientScriptError(msg) ? 422 : 500, { error: msg })
+        }
+      }
+
+      if (action === 'update-build-mode' || action === 'build-mode') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, {
+            error: 'Only the channel owner can change the build mode.',
+          })
+        }
+        const raw =
+          body.buildMode !== undefined
+            ? body.buildMode
+            : body.mode !== undefined
+              ? body.mode
+              : null
+        if (raw === undefined || raw === null || String(raw).trim() === '') {
+          return json(res, 400, { error: 'buildMode is required (pro | hobby).' })
+        }
+        const buildMode = normalizeEofBuildMode(raw)
+        const settings = await updateEofBuildModeSettings({ buildMode })
+        return json(res, 200, {
+          ok: true,
+          settings,
+          buildMode: settings.effectiveMode || settings.buildMode,
+          buildModeSaved: settings.buildMode,
+          buildModeOptions: listEofBuildModeOptions(),
+          buildModeEnvForced: Boolean(settings.envForcedSlim),
+          buildModeNote: eofBuildModeNote(settings.buildMode, {
+            envForced: Boolean(settings.envForcedSlim),
+          }),
+          buildModeMaxScenesHobby: EOF_SERVERLESS_MAX_SCENES,
+        })
+      }
 
       if (action === 'update-image-provider' || action === 'image-provider') {
         try {

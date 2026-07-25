@@ -1066,6 +1066,16 @@ export default function EofProductionPanel({
   ])
   const [imageGenNote, setImageGenNote] = useState('')
   const [imageGenBusy, setImageGenBusy] = useState(false)
+  const [buildMode, setBuildMode] = useState('pro')
+  const [buildModeSaved, setBuildModeSaved] = useState('pro')
+  const [buildModeOptions, setBuildModeOptions] = useState([
+    { id: 'pro', label: 'Pro' },
+    { id: 'hobby', label: 'Hobby (slim)' },
+  ])
+  const [buildModeEnvForced, setBuildModeEnvForced] = useState(false)
+  const [buildModeNote, setBuildModeNote] = useState('')
+  const [buildModeMaxScenesHobby, setBuildModeMaxScenesHobby] = useState(4)
+  const [buildModeBusy, setBuildModeBusy] = useState(false)
   const [pinterestStatus, setPinterestStatus] = useState(null)
   const [serpapiStatus, setSerpapiStatus] = useState(null)
   const [oxylabsStatus, setOxylabsStatus] = useState(null)
@@ -1212,6 +1222,20 @@ export default function EofProductionPanel({
         setImageGenProviderOptions(j.imageGenProviderOptions)
       }
       setImageGenNote(typeof j.imageGenNote === 'string' ? j.imageGenNote : '')
+      if (typeof j.buildMode === 'string' && j.buildMode.trim()) {
+        setBuildMode(j.buildMode.trim().toLowerCase())
+      }
+      if (typeof j.buildModeSaved === 'string' && j.buildModeSaved.trim()) {
+        setBuildModeSaved(j.buildModeSaved.trim().toLowerCase())
+      }
+      if (Array.isArray(j.buildModeOptions) && j.buildModeOptions.length) {
+        setBuildModeOptions(j.buildModeOptions)
+      }
+      setBuildModeEnvForced(Boolean(j.buildModeEnvForced))
+      setBuildModeNote(typeof j.buildModeNote === 'string' ? j.buildModeNote : '')
+      if (Number.isFinite(Number(j.buildModeMaxScenesHobby))) {
+        setBuildModeMaxScenesHobby(Math.max(1, Number(j.buildModeMaxScenesHobby)))
+      }
       setPinterestStatus(j.pinterest && typeof j.pinterest === 'object' ? j.pinterest : null)
       setSerpapiStatus(j.serpapi && typeof j.serpapi === 'object' ? j.serpapi : null)
       setOxylabsStatus(j.oxylabs && typeof j.oxylabs === 'object' ? j.oxylabs : null)
@@ -1231,6 +1255,48 @@ export default function EofProductionPanel({
       /* background */
     }
   }, [fetchProduction])
+
+  const saveBuildMode = useCallback(
+    async (next) => {
+      const value = String(next || '').trim().toLowerCase()
+      if (!value || value === buildModeSaved) return
+      if (buildModeEnvForced) {
+        setErr('Build mode is locked to Hobby (slim) by EOF_FORCE_SLIM on the server.')
+        return
+      }
+      const prev = buildModeSaved
+      setBuildMode(value)
+      setBuildModeSaved(value)
+      setBuildModeBusy(true)
+      setErr('')
+      try {
+        const res = await apiFetch('/api/admin/eof-production', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'update-build-mode', buildMode: value }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error || 'Could not save build mode')
+        if (typeof j.buildMode === 'string') setBuildMode(j.buildMode)
+        if (typeof j.buildModeSaved === 'string') setBuildModeSaved(j.buildModeSaved)
+        if (Array.isArray(j.buildModeOptions)) setBuildModeOptions(j.buildModeOptions)
+        setBuildModeEnvForced(Boolean(j.buildModeEnvForced))
+        if (typeof j.buildModeNote === 'string') setBuildModeNote(j.buildModeNote)
+        setSuccess(
+          (j.buildMode || value) === 'hobby'
+            ? 'Build mode: Hobby (slim) — 4-scene cap, hard cuts'
+            : 'Build mode: Pro — full quality pipeline',
+        )
+      } catch (e) {
+        setBuildMode(prev)
+        setBuildModeSaved(prev)
+        setErr(e instanceof Error ? e.message : 'Could not save build mode')
+      } finally {
+        setBuildModeBusy(false)
+      }
+    },
+    [buildModeSaved, buildModeEnvForced],
+  )
 
   const saveImageProvider = useCallback(
     async (next) => {
@@ -3002,6 +3068,34 @@ export default function EofProductionPanel({
               {' · RSS'}
             </p>
             <p>Video: {ffmpegAvailable ? 'Ready' : renderNote || 'ffmpeg missing'}</p>
+            <div className="space-y-1.5">
+              <span className="text-[#aaaaaa]">Build mode</span>
+              <div className="flex overflow-hidden rounded-lg border border-[#303030]">
+                {buildModeOptions.map((opt) => {
+                  const active = buildMode === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={buildModeBusy || buildModeEnvForced}
+                      title={opt.detail || opt.label}
+                      onClick={() => saveBuildMode(opt.id)}
+                      className={`flex-1 px-2.5 py-1.5 text-[11px] font-medium transition ${
+                        active
+                          ? 'bg-[#3a3a3a] text-white'
+                          : 'bg-[#121212] text-[#8a8a8a] hover:bg-[#1c1c1c] hover:text-[#ccc]'
+                      } disabled:opacity-50`}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+              {buildModeNote ? <p className="text-[#8ab4f8]">{buildModeNote}</p> : null}
+              {buildModeEnvForced ? (
+                <p className="text-[#fbbf24]">Locked by EOF_FORCE_SLIM on the server.</p>
+              ) : null}
+            </div>
             <p>
               Images:{' '}
               {[
@@ -4105,6 +4199,11 @@ export default function EofProductionPanel({
                     </select>
                   </label>
                 ) : null}
+                {buildMode === 'hobby' && sceneCount > buildModeMaxScenesHobby ? (
+                  <p className="mt-3 max-w-[14rem] text-[10px] leading-snug text-[#fbbf24]">
+                    Hobby build uses first {buildModeMaxScenesHobby} scenes
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   disabled={busy || isRendering || sceneCount < 1}
@@ -4935,6 +5034,11 @@ export default function EofProductionPanel({
                     <p className="text-[11px] text-[#ff9b95]">
                       Oxylabs selected but off (need OXYLABS_ENABLED=1 + credentials) — or pick Auto /
                       SerpAPI.
+                    </p>
+                  ) : null}
+                  {buildMode === 'hobby' && sceneCount > buildModeMaxScenesHobby ? (
+                    <p className="text-[11px] text-[#fbbf24]">
+                      Hobby build uses first {buildModeMaxScenesHobby} scenes
                     </p>
                   ) : null}
                   {selected.status === 'video_rendered' ? (

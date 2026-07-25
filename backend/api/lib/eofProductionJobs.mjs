@@ -569,12 +569,15 @@ export async function markEofProductionJobFailed(id, message) {
 
 /**
  * Max age for a stuck rendering_* job before poll auto-fails it.
- * Must sit under vercel.json maxDuration (300s) but ABOVE a healthy slim encode
+ * Must sit under vercel.json maxDuration (300s) but ABOVE a healthy Pro encode
  * (prior 120s ceiling killed heartbeating builds before ffmpeg finished).
  */
 export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 280
-/** No progress DB write (heartbeat) for this long → waitUntil/isolate died. */
-export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 50
+/**
+ * No progress DB write (heartbeat) for this long → waitUntil/isolate died.
+ * Keep loose enough that a long ffmpeg mux on Pro (~60–90s without a tick) isn't killed.
+ */
+export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 90
 
 /**
  * Pure helper — decide whether a rendering job should be force-failed.
@@ -615,7 +618,7 @@ export async function failStaleEofProductionRenders(opts = {}) {
       : EOF_STALE_RENDER_SEC
     const message =
       `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
-      `Cancel if the job is stuck, then Rebuild — Serp stills re-fetch; keep scripts to ≤4 scenes on Hobby.`
+      `Cancel if the job is stuck, then Rebuild — Serp stills re-fetch. On Hobby set EOF_FORCE_SLIM=1.`
     console.warn(`[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s`)
     await markEofProductionJobFailed(job.id, message)
     failed.push(job.id)

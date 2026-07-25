@@ -47,7 +47,7 @@ import {
 import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 import { mixOverlaySfxIntoAudio, resolveEofWhooshSfxPath } from './eofAudioMix.mjs'
-import { isEofServerlessEnv } from './eofProductionServerless.mjs'
+import { isEofForceSlim, isEofVercelRuntime } from './eofProductionServerless.mjs'
 
 const __eofLibDir = dirname(fileURLToPath(import.meta.url))
 
@@ -71,20 +71,20 @@ const CLIP_CONCURRENCY_DEFAULT = Number(process.env.EOF_VIDEO_CLIP_CONCURRENCY) 
 /** Cap threads on Vercel — `-threads 0` can thrash/hang serverless encodes (UI stuck ~42%). */
 const VIDEO_THREADS =
   process.env.EOF_FFMPEG_THREADS ||
-  (process.env.VERCEL || process.env.VERCEL_ENV ? '2' : '0')
+  (isEofVercelRuntime() ? '2' : '0')
 const SCENE_CLIP_TIMEOUT_MS =
   Number(process.env.EOF_SCENE_CLIP_TIMEOUT_MS) ||
-  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 45_000 : 60_000)
+  (isEofForceSlim() ? 45_000 : 60_000)
 const MUX_TIMEOUT_MS =
   Number(process.env.EOF_MUX_TIMEOUT_MS) ||
-  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 90_000 : 120_000)
+  (isEofForceSlim() ? 90_000 : 120_000)
 
 function clipConcurrency() {
   if (process.env.EOF_VIDEO_CLIP_CONCURRENCY) return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
-  // Serial clips on Hobby — parallel ffmpeg fights for CPU and hangs more often.
-  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.EOF_SERVERLESS_SLIM === '1') {
-    return 1
-  }
+  // Serial clips on Hobby slim — parallel ffmpeg fights for CPU and hangs more often.
+  if (isEofForceSlim()) return 1
+  // Pro serverless: allow modest parallelism with capped threads.
+  if (isEofVercelRuntime()) return Math.min(2, Math.max(1, CLIP_CONCURRENCY_DEFAULT))
   return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
 }
 
@@ -777,6 +777,7 @@ export async function renderEofProductionVideo({
   hasSecondarySubject = false,
   secondarySceneIndex = null,
   onSceneProgress,
+  forceSlim = undefined,
 }) {
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
   if (!sorted.length) throw new Error('No scenes to render.')
@@ -800,8 +801,8 @@ export async function renderEofProductionVideo({
   const videoEffects = normalizeEofVideoEffects(videoEffectsRaw)
   const effectFilters = videoEffectsFilterChain(videoEffects)
   const stickers = normalizeEofStickers(stickersRaw)
-  const serverlessSlim = isEofServerlessEnv()
-  // Hobby: hard cuts only — xfade filtergraphs + re-encode fallbacks blow the time budget.
+  const serverlessSlim = forceSlim === undefined ? isEofForceSlim() : Boolean(forceSlim)
+  // Hobby slim: hard cuts only — xfade filtergraphs + re-encode fallbacks blow the time budget.
   const useXfade =
     !serverlessSlim && look.perCutTransitions.length > 0 && sorted.length > 1
   const kenBurns =

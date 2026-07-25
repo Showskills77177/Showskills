@@ -25,35 +25,43 @@ import {
   EofQualityGateBlockedError,
 } from './eofShortQualityGateApply.mjs'
 import {
-  isEofServerlessEnv,
   capEofScriptScenesForServerless,
+  scheduleEofBuildContinue,
 } from './eofProductionServerless.mjs'
+import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
 
 /**
- * On Vercel Hobby, detached waitUntil dies silently — await the work in-request
- * so maxDuration covers TTS + Serp + ffmpeg and we can write status=video_rendered.
+ * Start background work and return immediately (202).
+ * On Vercel Pro: waitUntil keeps the full Short alive after the response (maxDuration 300).
+ * Locally: fire-and-forget. Never await the whole encode in the HTTP request
+ * (browser/proxy aborts would kill Serp→ffmpeg mid-flight).
  * @param {() => Promise<unknown>} run
  */
 async function runEofProductionWork(run) {
-  if (isEofServerlessEnv()) {
-    await run()
-    return
+  if (process.env.VERCEL) {
+    try {
+      const { waitUntil } = await import('@vercel/functions')
+      waitUntil(run())
+      return
+    } catch (e) {
+      console.warn('[eof-production] waitUntil unavailable', e instanceof Error ? e.message : e)
+    }
   }
   void run()
 }
 
 /**
- * Cap scenes for Hobby before TTS/encode so the job fits under maxDuration.
+ * Cap scenes when Hobby slim is on (UI setting or EOF_FORCE_SLIM).
  * @param {string} jobId
  */
 async function maybeCapScenesForServerlessBuild(jobId) {
-  if (!isEofServerlessEnv()) return
+  if (!(await isEofSlimBuildEnabled())) return
   const job = await getEofProductionJob(jobId)
   if (!job?.script?.scenes?.length) return
   const capped = capEofScriptScenesForServerless(job.script)
   if (!capped.trimmed) return
   console.warn(
-    `[eof-production] capping scenes ${capped.before}→${capped.after} for serverless build`,
+    `[eof-production] capping scenes ${capped.before}→${capped.after} for slim/Hobby build`,
     jobId,
   )
   await updateEofProductionJob(jobId, { script: capped.script })
@@ -65,9 +73,9 @@ function estimateFullBuildSec(script) {
 }
 
 /**
- * Full Short: narration (Edge TTS) + images + captions + mux.
+ * Full Short end-to-end: narration + images + captions + mux (Pro default path).
  * @param {string} jobId
- * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual' }} [opts]
+ * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual', skipPlanPreflight?: boolean }} [opts]
  */
 export async function renderEofProductionFullBuild(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
@@ -79,10 +87,12 @@ export async function renderEofProductionFullBuild(jobId, opts = {}) {
   try {
     await maybeCapScenesForServerlessBuild(jobId)
     // Plan-time gate — stop before TTS / image credits / ffmpeg on hard fails.
-    await applyEofShortQualityPreflightToJob(jobId, {
-      mode: qualityGateMode,
-      blockOnFail: true,
-    })
+    if (!opts.skipPlanPreflight) {
+      await applyEofShortQualityPreflightToJob(jobId, {
+        mode: qualityGateMode,
+        blockOnFail: true,
+      })
+    }
     await renderEofProductionAudio(jobId)
     return await renderEofProductionVideoJob(jobId, {
       includeAudioIfPresent: true,
@@ -91,6 +101,93 @@ export async function renderEofProductionFullBuild(jobId, opts = {}) {
       qualityGateMode,
       skipPlanPreflight: true,
     })
+  } catch (e) {
+    if (e instanceof EofQualityGateBlockedError) throw e
+    const message = e instanceof Error ? e.message : 'Build failed'
+    await markEofProductionJobFailed(jobId, message)
+    throw e
+  }
+}
+
+/**
+ * One Hobby/slim step of a Short build (TTS **or** Serp+encode).
+ * When Hobby slim is on, schedules the next step via continue-build self-fetch.
+ * Without slim, runs the remaining work in the same invocation.
+ * @param {string} jobId
+ * @param {{ step?: 'audio'|'video'|'auto', imageProvider?: string|null, qualityGateMode?: 'auto'|'manual', forceFreshImages?: boolean }} [opts]
+ */
+export async function continueEofProductionBuild(jobId, opts = {}) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+
+  const status = String(job.status || '')
+  if (
+    status === EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED ||
+    status === EOF_PRODUCTION_JOB_STATUS.FAILED
+  ) {
+    return job
+  }
+  if (
+    status !== EOF_PRODUCTION_JOB_STATUS.RENDERING &&
+    status !== EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO
+  ) {
+    return job
+  }
+
+  const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
+  const flags = await getEofArtifactFlags(jobId)
+  const stage = String(job.renderProgress?.stage || 'tts')
+  let step = opts.step === 'audio' || opts.step === 'video' ? opts.step : 'auto'
+  if (step === 'auto') {
+    step = flags.hasDurableAudio ? 'video' : 'audio'
+  }
+
+  try {
+    await maybeCapScenesForServerlessBuild(jobId)
+
+    if (step === 'audio') {
+      if (!flags.hasDurableAudio) {
+        console.info('[eof-production] continue step=audio', jobId)
+        await updateEofProductionJob(jobId, {
+          status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
+          errorMessage: null,
+        })
+        await renderEofProductionAudio(jobId)
+      } else {
+        console.info('[eof-production] continue audio already done → video', jobId)
+      }
+      // Hobby/slim only: fresh invocation for Serp + ffmpeg.
+      if (await isEofSlimBuildEnabled()) {
+        await scheduleEofBuildContinue(jobId, 'video', {
+          imageProvider: opts.imageProvider,
+        })
+        return getEofProductionJob(jobId)
+      }
+      step = 'video'
+    }
+
+    if (step === 'video') {
+      console.info('[eof-production] continue step=video', jobId, `stage=${stage}`)
+      await updateEofProductionJob(jobId, {
+        status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+        errorMessage: null,
+      })
+      const reuse =
+        flags.hasDurableSceneImages &&
+        (stage === 'video' || stage === 'mux') &&
+        !opts.forceFreshImages
+      return await renderEofProductionVideoJob(jobId, {
+        includeAudioIfPresent: true,
+        captionMode: 'free',
+        imageProvider: opts.imageProvider,
+        qualityGateMode,
+        skipPlanPreflight: true,
+        reuseSceneImages: reuse,
+      })
+    }
+
+    return getEofProductionJob(jobId)
   } catch (e) {
     if (e instanceof EofQualityGateBlockedError) throw e
     const message = e instanceof Error ? e.message : 'Build failed'
@@ -134,12 +231,28 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
     }),
   )
 
+  // Pro default: whole Short in one waitUntil. Slim/Hobby: chunked continue-build.
   const run = () =>
-    renderEofProductionFullBuild(jobId, { ...opts, qualityGateMode }).catch((e) => {
+    (async () => {
+      const slim = await isEofSlimBuildEnabled()
+      if (slim) {
+        return continueEofProductionBuild(jobId, {
+          step: 'audio',
+          imageProvider: opts.imageProvider,
+          qualityGateMode,
+        })
+      }
+      return renderEofProductionFullBuild(jobId, {
+        ...opts,
+        qualityGateMode,
+        skipPlanPreflight: true,
+      })
+    })().catch((e) => {
       if (e instanceof EofQualityGateBlockedError) return
       console.error('[eof-production] full Short build failed', jobId, e)
     })
 
+  // Always return quickly → API 202; work continues via waitUntil (Pro) or continue-build (slim).
   await runEofProductionWork(run)
 }
 
@@ -583,6 +696,14 @@ export async function startEofProductionVideoRenderBackground(jobId, opts = {}) 
   const run = () =>
     (async () => {
       await maybeCapScenesForServerlessBuild(jobId)
+      if (await isEofSlimBuildEnabled()) {
+        return continueEofProductionBuild(jobId, {
+          step: 'video',
+          imageProvider: opts.imageProvider,
+          qualityGateMode,
+          forceFreshImages: true,
+        })
+      }
       return renderEofProductionVideoJob(jobId, {
         includeAudioIfPresent: true,
         captionMode: 'free',

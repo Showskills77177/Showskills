@@ -72,24 +72,25 @@ import {
   clearEofVideoOnlyArtifact,
 } from './eofProductionArtifacts.mjs'
 import {
-  isEofServerlessEnv,
+  isEofForceSlim,
   capEofScriptScenesForServerless,
   eofServerlessSlimRenderOpts,
 } from './eofProductionServerless.mjs'
+import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
 
 const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
-/** Cap whole scrape+vision+gen phase so Cucurella builds fail fast instead of freezing the UI. */
+/** Cap whole scrape+vision+gen phase so builds fail fast instead of freezing the UI. */
 const IMAGE_POOL_DEADLINE_MS =
   Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) ||
-  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 50_000 : 75_000)
+  (isEofForceSlim() ? 50_000 : 75_000)
 /** Cap per-scene download / slow fallback waterfall after the Serp pool. */
 const SCENE_ASSIGN_DEADLINE_MS =
   Number(process.env.EOF_SCENE_ASSIGN_DEADLINE_MS) ||
-  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 60_000 : 90_000)
-/** Cap ffmpeg scene clips + mux so UI never sits at ~42% forever. */
+  (isEofForceSlim() ? 60_000 : 90_000)
+/** Cap ffmpeg scene clips + mux so UI never sits forever. Pro gets a longer budget. */
 const VIDEO_ENCODE_DEADLINE_MS =
   Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) ||
-  (process.env.VERCEL || process.env.EOF_SERVERLESS_SLIM === '1' ? 140_000 : 180_000)
+  (isEofForceSlim() ? 140_000 : 180_000)
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 
@@ -272,13 +273,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
   let job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
 
-  // Fresh video builds on Hobby: cap scenes so encode finishes under maxDuration.
+  // Fresh video builds on Hobby/slim: cap scenes so encode finishes under maxDuration.
   // Remux paths keep existing still count (reuseSceneImages).
-  if (isEofServerlessEnv() && !reuseSceneImages && job.script?.scenes?.length) {
+  const slimBuild = await isEofSlimBuildEnabled()
+  if (slimBuild && !reuseSceneImages && job.script?.scenes?.length) {
     const capped = capEofScriptScenesForServerless(job.script)
     if (capped.trimmed) {
       console.warn(
-        `[eof-video] capping scenes ${capped.before}→${capped.after} for serverless encode`,
+        `[eof-video] capping scenes ${capped.before}→${capped.after} for slim/Hobby encode`,
         jobId,
       )
       job = await updateEofProductionJob(jobId, { script: capped.script })
@@ -922,12 +924,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           captionStyle: job.captionStyle,
           captionLayout: job.captionLayout || job.script?.captionLayout || null,
           zapcapTemplateId: job.zapcapTemplateId,
-          ...eofServerlessSlimRenderOpts({
-            transitionStyle: job.transitionStyle,
-            colorGrade: job.colorGrade,
-            enhanceStyle: job.enhanceStyle,
-            overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
-          }),
+          forceSlim: slimBuild,
+          ...eofServerlessSlimRenderOpts(
+            {
+              transitionStyle: job.transitionStyle,
+              colorGrade: job.colorGrade,
+              enhanceStyle: job.enhanceStyle,
+              overlayMoments: resolveEofOverlayMoments(job.overlayMoments),
+            },
+            slimBuild,
+          ),
           format: job.script?.format,
           captionMode,
           videoEffects: job.videoEffects,

@@ -1,15 +1,21 @@
 /**
- * Unit tests for Hobby/serverless Short build helpers + import smoke.
+ * Unit tests for Pro/Hobby Short build helpers + import smoke.
  */
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   EOF_SERVERLESS_MAX_SCENES,
   EOF_SERVERLESS_MAX_DURATION_SEC,
+  isEofForceSlim,
   isEofServerlessEnv,
   capEofScriptScenesForServerless,
   eofServerlessSlimRenderOpts,
 } from '../backend/api/lib/eofProductionServerless.mjs'
+import {
+  normalizeEofBuildMode,
+  listEofBuildModeOptions,
+  eofBuildModeNote,
+} from '../backend/api/lib/eofBuildModeSettings.mjs'
 import { isEofRenderStale, EOF_STALE_RENDER_SEC, EOF_STALE_PROGRESS_SEC } from '../backend/api/lib/eofProductionJobs.mjs'
 import { withDeadline } from '../backend/api/lib/eofAsyncPool.mjs'
 
@@ -30,10 +36,40 @@ describe('eofProductionServerless', () => {
     assert.equal(capEofScriptScenesForServerless({ scenes: [{}, {}, {}] }).trimmed, false)
   })
 
-  it('forces slim encode opts on serverless', () => {
-    const prev = process.env.EOF_SERVERLESS_SLIM
-    process.env.EOF_SERVERLESS_SLIM = '1'
+  it('does not slim by default (Pro path) even when VERCEL is set', () => {
+    const prevVercel = process.env.VERCEL
+    const prevForce = process.env.EOF_FORCE_SLIM
+    const prevLegacy = process.env.EOF_SERVERLESS_SLIM
+    process.env.VERCEL = '1'
+    delete process.env.EOF_FORCE_SLIM
+    delete process.env.EOF_SERVERLESS_SLIM
     try {
+      assert.equal(isEofForceSlim(), false)
+      assert.equal(isEofServerlessEnv(), false)
+      const untouched = eofServerlessSlimRenderOpts({
+        transitionStyle: 'dissolve',
+        overlayMoments: 'always',
+      })
+      assert.equal(untouched.transitionStyle, 'dissolve')
+      assert.equal(untouched.overlayMoments, 'always')
+      assert.equal(untouched.kenBurns, undefined)
+    } finally {
+      if (prevVercel === undefined) delete process.env.VERCEL
+      else process.env.VERCEL = prevVercel
+      if (prevForce === undefined) delete process.env.EOF_FORCE_SLIM
+      else process.env.EOF_FORCE_SLIM = prevForce
+      if (prevLegacy === undefined) delete process.env.EOF_SERVERLESS_SLIM
+      else process.env.EOF_SERVERLESS_SLIM = prevLegacy
+    }
+  })
+
+  it('forces slim encode opts when EOF_FORCE_SLIM=1', () => {
+    const prev = process.env.EOF_FORCE_SLIM
+    const prevLegacy = process.env.EOF_SERVERLESS_SLIM
+    process.env.EOF_FORCE_SLIM = '1'
+    delete process.env.EOF_SERVERLESS_SLIM
+    try {
+      assert.equal(isEofForceSlim(), true)
       assert.equal(isEofServerlessEnv(), true)
       const slim = eofServerlessSlimRenderOpts({
         transitionStyle: 'dissolve',
@@ -45,14 +81,25 @@ describe('eofProductionServerless', () => {
       assert.equal(slim.kenBurns, false)
       assert.equal(slim.colorGrade, 'cold')
     } finally {
-      if (prev === undefined) delete process.env.EOF_SERVERLESS_SLIM
-      else process.env.EOF_SERVERLESS_SLIM = prev
+      if (prev === undefined) delete process.env.EOF_FORCE_SLIM
+      else process.env.EOF_FORCE_SLIM = prev
+      if (prevLegacy === undefined) delete process.env.EOF_SERVERLESS_SLIM
+      else process.env.EOF_SERVERLESS_SLIM = prevLegacy
     }
   })
 
-  it('default stale windows leave room for a slim Hobby encode', () => {
+  it('applies slim when explicit slim flag is passed (UI Hobby mode)', () => {
+    const slim = eofServerlessSlimRenderOpts({ transitionStyle: 'dissolve' }, true)
+    assert.equal(slim.transitionStyle, 'cut')
+    assert.equal(slim.overlayMoments, 'off')
+    const full = eofServerlessSlimRenderOpts({ transitionStyle: 'dissolve' }, false)
+    assert.equal(full.transitionStyle, 'dissolve')
+  })
+
+  it('default stale windows leave room for a long Pro encode', () => {
     assert.ok(EOF_STALE_RENDER_SEC >= 240, `max age ${EOF_STALE_RENDER_SEC} too aggressive`)
-    assert.ok(EOF_STALE_PROGRESS_SEC <= 60, `quiet ${EOF_STALE_PROGRESS_SEC} too loose`)
+    assert.ok(EOF_STALE_PROGRESS_SEC >= 60, `quiet ${EOF_STALE_PROGRESS_SEC} too tight for Pro mux`)
+    assert.ok(EOF_STALE_PROGRESS_SEC <= 120, `quiet ${EOF_STALE_PROGRESS_SEC} too loose`)
     const now = Date.now()
     assert.equal(
       isEofRenderStale(
@@ -69,16 +116,31 @@ describe('eofProductionServerless', () => {
   })
 })
 
+describe('eofBuildModeSettings', () => {
+  it('normalizes build mode ids and defaults to pro', () => {
+    assert.equal(normalizeEofBuildMode('pro'), 'pro')
+    assert.equal(normalizeEofBuildMode('hobby'), 'hobby')
+    assert.equal(normalizeEofBuildMode('slim'), 'hobby')
+    assert.equal(normalizeEofBuildMode(''), 'pro')
+    assert.equal(listEofBuildModeOptions().length, 2)
+    assert.match(eofBuildModeNote('hobby'), /first 4 scenes/i)
+    assert.match(eofBuildModeNote('pro', { envForced: true }), /EOF_FORCE_SLIM/i)
+  })
+})
+
 describe('eof production render import smoke', () => {
   it('loads render modules without executing ffmpeg', async () => {
     const video = await import('../backend/api/lib/eofProductionRenderVideo.mjs')
     const runner = await import('../backend/api/lib/eofProductionRenderRunner.mjs')
     const ffmpeg = await import('../backend/api/lib/eofFfmpeg.mjs')
+    const handler = await import('../backend/api/admin/eof-production.js')
     assert.equal(typeof video.renderEofProductionVideoJob, 'function')
     assert.equal(typeof video.assertEofVideoPersisted, 'function')
     assert.equal(typeof runner.renderEofProductionFullBuild, 'function')
+    assert.equal(typeof runner.continueEofProductionBuild, 'function')
     assert.equal(typeof runner.startEofProductionFullBuildBackground, 'function')
     assert.equal(typeof ffmpeg.runFfmpeg, 'function')
+    assert.equal(typeof handler.default, 'function')
     await assert.rejects(() => withDeadline(new Promise(() => {}), 40, 'Smoke'), /Smoke timed out/)
   })
 })
