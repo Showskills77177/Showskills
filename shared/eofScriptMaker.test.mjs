@@ -6,6 +6,9 @@ import { dirname, join } from 'node:path'
 import {
   scriptMakerFormatQuota,
   topicKey,
+  isEofScriptMakerJobDeletable,
+  getEofScriptRetentionDays,
+  EOF_SCRIPT_RETENTION_DAYS_DEFAULT,
 } from '../backend/api/lib/eofScriptMakerScheduler.mjs'
 import { buildEofDraftShell } from '../backend/api/lib/eofScriptWriter.mjs'
 import { routes } from '../lib/vercelApiDispatch.mjs'
@@ -14,6 +17,137 @@ import {
   londonCalendarDayKey,
   sameLondonCalendarDay,
 } from './eofScriptMakerSchedule.mjs'
+import { EOF_PRODUCTION_JOB_STATUS } from './eofProduction.mjs'
+
+describe('eof Script Maker retention', () => {
+  const now = Date.parse('2026-07-26T00:00:00.000Z')
+  const daysAgo = (n) => new Date(now - n * 24 * 60 * 60 * 1000).toISOString()
+
+  it('defaults retention to 7 days and honours EOF_SCRIPT_RETENTION_DAYS', () => {
+    assert.equal(EOF_SCRIPT_RETENTION_DAYS_DEFAULT, 7)
+    assert.equal(getEofScriptRetentionDays({}), 7)
+    assert.equal(getEofScriptRetentionDays({ EOF_SCRIPT_RETENTION_DAYS: '14' }), 14)
+    assert.equal(getEofScriptRetentionDays({ EOF_SCRIPT_RETENTION_DAYS: '0' }), 7)
+    assert.equal(getEofScriptRetentionDays({ EOF_SCRIPT_RETENTION_DAYS: '999' }), 90)
+  })
+
+  it('deletes old unused Script Maker drafts only', () => {
+    const base = {
+      createdBy: 'eof-script-maker',
+      status: EOF_PRODUCTION_JOB_STATUS.DRAFT,
+      createdAt: daysAgo(8),
+      youtubeProjectId: null,
+      script: {},
+    }
+    assert.equal(isEofScriptMakerJobDeletable(base, { now, retentionDays: 7 }), true)
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        { ...base, createdBy: 'eof-script-maker:owner' },
+        { now, retentionDays: 7 },
+      ),
+      true,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable({ ...base, createdAt: daysAgo(3) }, { now, retentionDays: 7 }),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable({ ...base, createdBy: 'eof-scheduler' }, { now, retentionDays: 7 }),
+      false,
+    )
+  })
+
+  it('never deletes published, rendering, built, or approved drafts', () => {
+    const old = {
+      createdBy: 'eof-script-maker',
+      createdAt: daysAgo(30),
+      youtubeProjectId: null,
+      script: {},
+    }
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        { ...old, status: EOF_PRODUCTION_JOB_STATUS.PUBLISHED },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        { ...old, status: EOF_PRODUCTION_JOB_STATUS.RENDERING },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        { ...old, status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        { ...old, status: EOF_PRODUCTION_JOB_STATUS.VIDEO_RENDERED },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        { ...old, status: EOF_PRODUCTION_JOB_STATUS.RENDERED },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        {
+          ...old,
+          status: EOF_PRODUCTION_JOB_STATUS.DRAFT,
+          youtubeProjectId: 'yt-proj-1',
+        },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        {
+          ...old,
+          status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+          script: { scriptMakerApproved: true },
+        },
+        { now, retentionDays: 7 },
+      ),
+      false,
+    )
+  })
+
+  it('allows deleting failed / ready_script leftovers past retention', () => {
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        {
+          createdBy: 'eof-script-maker',
+          status: EOF_PRODUCTION_JOB_STATUS.FAILED,
+          createdAt: daysAgo(10),
+        },
+        { now, retentionDays: 7 },
+      ),
+      true,
+    )
+    assert.equal(
+      isEofScriptMakerJobDeletable(
+        {
+          createdBy: 'eof-script-maker',
+          status: EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+          createdAt: daysAgo(7),
+        },
+        { now, retentionDays: 7 },
+      ),
+      true,
+    )
+  })
+})
 
 describe('eof Script Maker quotas', () => {
   it('splits mixed batches hot-take heavy (≈half quotes)', () => {

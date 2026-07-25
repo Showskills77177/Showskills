@@ -436,6 +436,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
   const [drafts, setDrafts] = useState([])
   const [note, setNote] = useState('')
   const [scheduleNote, setScheduleNote] = useState('')
+  const [cleanupNote, setCleanupNote] = useState('')
   const [schedulerAlignment, setSchedulerAlignment] = useState(null)
   const [previewTopics, setPreviewTopics] = useState([])
   const [err, setErr] = useState('')
@@ -455,6 +456,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
       setDrafts(Array.isArray(j.drafts) ? j.drafts : [])
       setNote(typeof j.note === 'string' ? j.note : '')
       setScheduleNote(typeof j.scheduleNote === 'string' ? j.scheduleNote : '')
+      setCleanupNote(typeof j.cleanupNote === 'string' ? j.cleanupNote : '')
       setSchedulerAlignment(j.schedulerAlignment || null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Error')
@@ -601,6 +603,14 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
           {scheduleNote ||
             'Schedule: UK midnight (Europe/London). Hobby cron shares /api/eof-daily-cron at 23:00 UTC (BST); only the local-midnight window runs Script Maker.'}
         </p>
+        {cleanupNote ? (
+          <p className={`mt-2 text-xs ${EOF.muted}`}>{cleanupNote}</p>
+        ) : (
+          <p className={`mt-2 text-xs ${EOF.muted}`}>
+            Auto-cleanup: unused drafts older than 7 days are removed on each overnight run (override with
+            EOF_SCRIPT_RETENTION_DAYS). Published, rendering, and Send-to-Production drafts are kept.
+          </p>
+        )}
         {schedulerAlignment ? (
           <p className={`mt-2 text-xs ${EOF.muted}`}>
             Paired Auto-publish:{' '}
@@ -724,7 +734,7 @@ function ScriptMakerTab({ isOwner, onOpenJob }) {
         </div>
         <p className={`mt-1 text-xs ${EOF.muted}`}>
           Full polished voiceovers below. Use Send to Production to open that job with the script ready to Adapt /
-          Build.
+          Build. Stale unused drafts are auto-cleaned overnight.
         </p>
         {drafts.length ? (
           <ul className="mt-3 space-y-4">

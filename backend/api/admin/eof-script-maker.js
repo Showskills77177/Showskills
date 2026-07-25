@@ -10,6 +10,8 @@ import {
   listEofScriptMakerDrafts,
   pickScriptMakerTopics,
   openScriptMakerDraftToProduction,
+  getEofScriptRetentionDays,
+  EOF_SCRIPT_RETENTION_DAYS_DEFAULT,
 } from '../lib/eofScriptMakerScheduler.mjs'
 import { isLondonLocalMidnightHour } from '../../../shared/eofScriptMakerSchedule.mjs'
 import {
@@ -91,10 +93,13 @@ export default async function handler(req, res) {
         minuteUtc: scheduler.minuteUtc,
         autoPublishEnabled: scheduler.enabled,
       })
+      const retentionDays = getEofScriptRetentionDays()
       return json(res, 200, {
         ok: true,
         settings,
         drafts,
+        retentionDays,
+        retentionDaysDefault: EOF_SCRIPT_RETENTION_DAYS_DEFAULT,
         schedulerAlignment: {
           autoPublishEnabled: Boolean(scheduler.enabled),
           autoPublishHourUtc: scheduler.hourUtc,
@@ -107,6 +112,7 @@ export default async function handler(req, res) {
           'Script Maker writes judged draft voiceovers at UK midnight (Europe/London; no video, no YouTube). Send to Production opens the job with the full script so you can Adapt / Build / post.',
         scheduleNote:
           'Runs at UK midnight via /api/eof-daily-cron (Hobby: ≤2 once-daily jobs). Second slot is 23:00 UTC for BST; swap to 00:00 UTC for GMT winters. Handler only proceeds during Europe/London 00:00 hour.',
+        cleanupNote: `Auto-cleanup: unused Script Maker drafts older than ${retentionDays} day(s) are deleted on each overnight run (env EOF_SCRIPT_RETENTION_DAYS). Published, rendering, and Send-to-Production drafts are kept.`,
       })
     }
 

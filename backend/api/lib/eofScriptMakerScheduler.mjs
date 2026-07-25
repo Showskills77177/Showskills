@@ -4,6 +4,7 @@
  */
 import {
   createEofProductionJob,
+  deleteEofProductionJob,
   getEofProductionJob,
   listEofProductionJobs,
   updateEofProductionJob,
@@ -19,9 +20,97 @@ import { sameLondonCalendarDay } from '../../../shared/eofScriptMakerSchedule.mj
 
 const CREATED_BY = 'eof-script-maker'
 
+/** Default days to keep unused Script Maker drafts before nightly cleanup. */
+export const EOF_SCRIPT_RETENTION_DAYS_DEFAULT = 7
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+/** Statuses that are still "unused drafts" — safe to purge when stale. */
+const SCRIPT_MAKER_DELETABLE_STATUSES = new Set([
+  EOF_PRODUCTION_JOB_STATUS.DRAFT,
+  EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT,
+  EOF_PRODUCTION_JOB_STATUS.FAILED,
+  EOF_PRODUCTION_JOB_STATUS.SCRIPTING,
+])
+
 function alreadyRanToday(lastRunAt) {
   if (!lastRunAt) return false
   return sameLondonCalendarDay(lastRunAt, new Date())
+}
+
+/**
+ * Read retention window from EOF_SCRIPT_RETENTION_DAYS (1–90). Default 7.
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function getEofScriptRetentionDays(env = process.env) {
+  const raw = Number(env?.EOF_SCRIPT_RETENTION_DAYS)
+  if (!Number.isFinite(raw) || raw <= 0) return EOF_SCRIPT_RETENTION_DAYS_DEFAULT
+  return Math.min(90, Math.max(1, Math.floor(raw)))
+}
+
+export function isEofScriptMakerCreatedBy(createdBy) {
+  const s = String(createdBy || '')
+  return s === CREATED_BY || s.includes('script-maker')
+}
+
+/**
+ * Pure retention decision: unused Script Maker drafts older than N days.
+ * Never deletes published/uploaded Shorts, rendering jobs, built video, or owner-approved drafts.
+ *
+ * @param {{ createdBy?: string|null, status?: string, createdAt?: string|null, youtubeProjectId?: string|null, script?: { scriptMakerApproved?: boolean }|null }} job
+ * @param {{ now?: number|Date, retentionDays?: number }} [opts]
+ */
+export function isEofScriptMakerJobDeletable(job, opts = {}) {
+  if (!job || !isEofScriptMakerCreatedBy(job.createdBy)) return false
+  if (job.youtubeProjectId) return false
+  if (job.script?.scriptMakerApproved) return false
+
+  const status = String(job.status || '')
+  if (!SCRIPT_MAKER_DELETABLE_STATUSES.has(status)) return false
+
+  const retentionDays = Math.max(1, Number(opts.retentionDays) || getEofScriptRetentionDays())
+  const nowMs =
+    opts.now instanceof Date
+      ? opts.now.getTime()
+      : Number.isFinite(opts.now)
+        ? Number(opts.now)
+        : Date.now()
+  const createdMs = job.createdAt ? Date.parse(String(job.createdAt)) : NaN
+  if (!Number.isFinite(createdMs)) return false
+  return nowMs - createdMs >= retentionDays * MS_PER_DAY
+}
+
+/**
+ * Delete stale unused Script Maker jobs (nightly retention).
+ * @param {{ retentionDays?: number, limit?: number, now?: number|Date }} [opts]
+ * @returns {Promise<{ retentionDays: number, scanned: number, deletedIds: string[] }>}
+ */
+export async function cleanupExpiredEofScriptMakerJobs(opts = {}) {
+  const retentionDays =
+    opts.retentionDays !== undefined
+      ? Math.max(1, Math.min(90, Math.floor(Number(opts.retentionDays) || EOF_SCRIPT_RETENTION_DAYS_DEFAULT)))
+      : getEofScriptRetentionDays()
+  const limit = Math.min(200, Math.max(40, Number(opts.limit) || 120))
+  const jobs = await listEofProductionJobs(limit)
+  const deletedIds = []
+  for (const job of jobs) {
+    if (!isEofScriptMakerJobDeletable(job, { retentionDays, now: opts.now })) continue
+    try {
+      const ok = await deleteEofProductionJob(job.id)
+      if (ok) {
+        deletedIds.push(job.id)
+        console.info(
+          `[eof-script-maker] retention deleted job=${job.id} age>=${retentionDays}d status=${job.status}`,
+        )
+      }
+    } catch (e) {
+      console.warn(
+        `[eof-script-maker] retention delete failed job=${job.id}`,
+        e instanceof Error ? e.message : e,
+      )
+    }
+  }
+  return { retentionDays, scanned: jobs.length, deletedIds }
 }
 
 export function topicKey(topic) {
@@ -139,14 +228,37 @@ export async function pickScriptMakerTopics({ count = 5, formatMix = 'mixed' } =
 }
 
 /**
- * @param {{ force?: boolean, createdBy?: string }} [opts]
+ * @param {{ force?: boolean, createdBy?: string, skipCleanup?: boolean }} [opts]
  */
 export async function runEofScriptMakerPipeline(opts = {}) {
   const force = opts.force === true
+
+  /** Always sweep stale drafts on cron/run (even when disabled / already ran). */
+  let cleanup = {
+    retentionDays: getEofScriptRetentionDays(),
+    scanned: 0,
+    deletedIds: [],
+  }
+  if (opts.skipCleanup !== true) {
+    try {
+      cleanup = await cleanupExpiredEofScriptMakerJobs()
+    } catch (e) {
+      console.warn(
+        '[eof-script-maker] retention cleanup failed',
+        e instanceof Error ? e.message : e,
+      )
+    }
+  }
+
   const settings = await getEofScriptMakerSettings()
 
   if (!force && !settings.enabled) {
-    return { ok: false, skipped: true, reason: 'Script Maker is disabled.' }
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'Script Maker is disabled.',
+      cleanup,
+    }
   }
 
   if (!force && alreadyRanToday(settings.lastRunAt) && settings.lastStatus === 'ok') {
@@ -155,15 +267,14 @@ export async function runEofScriptMakerPipeline(opts = {}) {
       skipped: true,
       reason: 'Script Maker already prepared a batch today (UK calendar day).',
       jobIds: settings.lastJobIds,
+      cleanup,
     }
   }
 
   const createdBy = opts.createdBy || CREATED_BY
   const existing = await listEofProductionJobs(40)
   const recentKeys = new Set(
-    existing
-      .filter((j) => j.createdBy === CREATED_BY || String(j.createdBy || '').includes('script-maker'))
-      .map((j) => topicKey(j.topic)),
+    existing.filter((j) => isEofScriptMakerCreatedBy(j.createdBy)).map((j) => topicKey(j.topic)),
   )
 
   let topics
@@ -247,6 +358,7 @@ export async function runEofScriptMakerPipeline(opts = {}) {
     jobIds,
     jobs,
     errors,
+    cleanup,
     message: `Prepared ${jobs.length} judged draft script(s) for morning review.`,
   }
 }
@@ -257,7 +369,7 @@ export async function listEofScriptMakerDrafts(limit = 12) {
   return jobs
     .filter(
       (j) =>
-        (j.createdBy === CREATED_BY || String(j.createdBy || '').includes('script-maker')) &&
+        isEofScriptMakerCreatedBy(j.createdBy) &&
         (j.status === EOF_PRODUCTION_JOB_STATUS.DRAFT ||
           j.status === EOF_PRODUCTION_JOB_STATUS.READY_SCRIPT),
     )
@@ -282,7 +394,7 @@ export async function listEofScriptMakerDrafts(limit = 12) {
 export async function getEofScriptMakerDraft(id) {
   const job = await getEofProductionJob(id)
   if (!job) return null
-  if (job.createdBy !== CREATED_BY && !String(job.createdBy || '').includes('script-maker')) {
+  if (!isEofScriptMakerCreatedBy(job.createdBy)) {
     return null
   }
   return job
