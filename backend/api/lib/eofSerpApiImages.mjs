@@ -126,17 +126,75 @@ export function extractSerpApiImageRows(payload) {
 }
 
 /**
- * Search Google Images via SerpAPI.
+ * @typedef {'ok'|'empty'|'auth_failed'|'not_configured'|'http_error'|'timeout'|'error'|'api_error'} EofSerpApiSearchStatus
+ * @typedef {{
+ *   status: EofSerpApiSearchStatus,
+ *   detail: string,
+ *   httpStatus?: number,
+ *   softFallback: boolean,
+ * }} EofSerpApiSearchHealth
+ */
+
+/**
+ * Ops-facing note for SerpAPI soft-fallback (mirrors Oxylabs).
+ * @param {EofSerpApiSearchHealth | null | undefined} health
+ */
+export function formatSerpApiSearchHealthNote(health) {
+  if (!health) return null
+  if (health.status === 'not_configured') {
+    return 'SerpAPI: SERPAPI_API_KEY not set — soft-falling back to next image source.'
+  }
+  if (health.status === 'auth_failed') {
+    return `SerpAPI: auth failed (${health.httpStatus || 401}) — soft-falling back. Re-copy SERPAPI_API_KEY from https://serpapi.com/manage-api-key and redeploy.`
+  }
+  if (health.status === 'http_error') {
+    return `SerpAPI: HTTP ${health.httpStatus || '?'} — soft-falling back. ${health.detail || ''}`.trim()
+  }
+  if (health.status === 'api_error') {
+    return `SerpAPI: API error — soft-falling back. ${health.detail || ''}`.trim()
+  }
+  if (health.status === 'timeout') {
+    return 'SerpAPI: search timed out — soft-falling back to next image source.'
+  }
+  if (health.status === 'error') {
+    return `SerpAPI: search error — soft-falling back. ${health.detail || ''}`.trim()
+  }
+  if (health.status === 'empty') {
+    return 'SerpAPI: auth OK but Google Images returned 0 usable URLs — soft-falling back.'
+  }
+  return null
+}
+
+/**
+ * Search Google Images via SerpAPI (structured health for ops / user errors).
+ * Soft-fails to empty hits; never throws on auth/HTTP errors.
  * @param {string} query
  * @param {{ limit?: number, signal?: AbortSignal, timeoutMs?: number }} [opts]
- * @returns {Promise<Array<{ url: string, width?: number, height?: number, title?: string|null, source: 'serpapi' }>>}
+ * @returns {Promise<{
+ *   hits: Array<{ url: string, width?: number, height?: number, title?: string|null, source: 'serpapi' }>,
+ *   health: EofSerpApiSearchHealth,
+ * }>}
  */
-export async function searchSerpApiGoogleImages(query, opts = {}) {
+export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
   const apiKey = getSerpApiKey()
-  if (!apiKey) return []
+  if (!apiKey) {
+    return {
+      hits: [],
+      health: {
+        status: 'not_configured',
+        detail: 'SERPAPI_API_KEY not set',
+        softFallback: true,
+      },
+    }
+  }
 
   const q = String(query || '').trim()
-  if (!q) return []
+  if (!q) {
+    return {
+      hits: [],
+      health: { status: 'empty', detail: 'empty query', softFallback: true },
+    }
+  }
 
   const limit = Math.max(1, Math.min(40, Number(opts.limit) || DEFAULT_LIMIT))
   const timeoutMs = Math.max(5_000, Number(opts.timeoutMs) || DEFAULT_TIMEOUT_MS)
@@ -166,42 +224,101 @@ export async function searchSerpApiGoogleImages(query, opts = {}) {
           res.status,
           '— SERPAPI_API_KEY rejected (check https://serpapi.com/manage-api-key).',
         )
-      } else {
-        console.warn('[eof-serpapi] search failed', res.status, body.slice(0, 180))
+        return {
+          hits: [],
+          health: {
+            status: 'auth_failed',
+            detail: 'Unauthorized — API key rejected',
+            httpStatus: res.status,
+            softFallback: true,
+          },
+        }
       }
-      return []
+      console.warn('[eof-serpapi] search failed', res.status, body.slice(0, 180))
+      return {
+        hits: [],
+        health: {
+          status: 'http_error',
+          detail: `API error HTTP ${res.status}`,
+          httpStatus: res.status,
+          softFallback: true,
+        },
+      }
     }
 
     const data = await res.json()
     if (data?.error) {
-      console.warn('[eof-serpapi] API error', String(data.error).slice(0, 180))
-      return []
+      const errText = String(data.error).slice(0, 180)
+      console.warn('[eof-serpapi] API error', errText)
+      const authish = /invalid api key|unauthorized|forbidden|api_key/i.test(errText)
+      return {
+        hits: [],
+        health: {
+          status: authish ? 'auth_failed' : 'api_error',
+          detail: errText,
+          softFallback: true,
+        },
+      }
     }
 
     const rows = extractSerpApiImageRows(data)
     console.info('[eof-serpapi] google images', q.slice(0, 60), '→', rows.length, 'urls')
     if (!rows.length) {
       console.warn('[eof-serpapi] parsed 0 image URLs for', q.slice(0, 60))
+      return {
+        hits: [],
+        health: {
+          status: 'empty',
+          detail: 'auth ok but 0 image URLs parsed',
+          softFallback: true,
+        },
+      }
     }
 
-    return rows.slice(0, limit).map((r) => ({
-      url: r.url,
-      width: r.width,
-      height: r.height,
-      title: r.title || null,
-      source: 'serpapi',
-    }))
+    return {
+      hits: rows.slice(0, limit).map((r) => ({
+        url: r.url,
+        width: r.width,
+        height: r.height,
+        title: r.title || null,
+        source: 'serpapi',
+      })),
+      health: {
+        status: 'ok',
+        detail: `${rows.length} urls`,
+        softFallback: false,
+      },
+    }
   } catch (e) {
-    if (e?.name === 'AbortError') {
+    const aborted = e?.name === 'AbortError'
+    if (aborted) {
       console.warn('[eof-serpapi] search timed out or aborted')
     } else {
       console.warn('[eof-serpapi] search error', e instanceof Error ? e.message : e)
     }
-    return []
+    return {
+      hits: [],
+      health: {
+        status: aborted ? 'timeout' : 'error',
+        detail: aborted ? 'search timed out or aborted' : e instanceof Error ? e.message : 'search failed',
+        softFallback: true,
+      },
+    }
   } finally {
     clearTimeout(timer)
     if (external) external.removeEventListener('abort', onAbort)
   }
+}
+
+/**
+ * Search Google Images via SerpAPI.
+ * @param {string} query
+ * @param {{ limit?: number, signal?: AbortSignal, timeoutMs?: number }} [opts]
+ * @returns {Promise<Array<{ url: string, width?: number, height?: number, title?: string|null, source: 'serpapi' }>>}
+ */
+export async function searchSerpApiGoogleImages(query, opts = {}) {
+  const { hits } = await searchSerpApiGoogleImagesWithStatus(query, opts)
+  return hits
 }
 
 /**
@@ -221,19 +338,21 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
 
   const need = Math.max(3, sceneCount + 1)
   const fetchLimit = Math.min(24, Math.max(10, need * 2))
-  const hits = filterBlockedStockImages(
-    await searchSerpApiGoogleImages(query, {
-      limit: fetchLimit,
-      signal: opts.signal,
-    }),
-  )
+  const { hits: rawHits, health } = await searchSerpApiGoogleImagesWithStatus(query, {
+    limit: fetchLimit,
+    signal: opts.signal,
+  })
+  const hits = filterBlockedStockImages(rawHits)
   const kept = hits.slice(0, Math.min(hits.length, need + 2))
+  const healthNote = formatSerpApiSearchHealthNote(health)
+  if (healthNote) console.warn('[eof-serpapi] job pool', healthNote)
   console.info(
     '[eof-serpapi] job pool',
     query.slice(0, 60),
     `intent=${intent}`,
     `scenes=${sceneCount}`,
     `kept=${kept.length}/${fetchLimit}`,
+    `health=${health.status}`,
     `(≤${EOF_SERPAPI_MAX_QUERIES_PER_JOB} queries/Short — not per scene)`,
   )
   return {
@@ -241,6 +360,8 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
     intent,
     source: 'serpapi',
     subject: resolveImageSubject(opts.topic || '') || null,
+    health,
+    healthNote,
     hits: kept.map((h) => ({
       url: h.url,
       title: h.title || null,

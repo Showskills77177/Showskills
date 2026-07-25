@@ -5,6 +5,9 @@
  */
 import { EOF_FOOTBALL_SCOPE } from '../../../shared/eofScriptTemplates.mjs'
 import { tokensLooselyEqual } from '../../../shared/eofScriptRelevance.mjs'
+import { normalizeFootballTopicQuery } from '../../../shared/eofFootballTopicNormalize.mjs'
+
+export { normalizeFootballTopicQuery }
 
 const RSS_FEEDS = [
   { desk: 'BBC Sport', url: 'https://feeds.bbci.co.uk/sport/football/rss.xml' },
@@ -37,20 +40,6 @@ function parseRssItems(xml, desk) {
     if (title.length >= 8) items.push({ desk, title, description, link })
   }
   return items
-}
-
-/**
- * Fix common player-name typos so NewsData / Guardian / RSS matching works.
- * Cuccorea / Cuccurella → Cucurella; Mark Cucurella → Marc Cucurella.
- * @param {string} topic
- */
-export function normalizeFootballTopicQuery(topic) {
-  let t = String(topic || '').trim()
-  if (!t) return t
-  t = t.replace(/\bcuccorea\b/gi, 'Cucurella')
-  t = t.replace(/\bcuccurella\b/gi, 'Cucurella')
-  t = t.replace(/\bmark\s+(cucurella)\b/gi, 'Marc $1')
-  return t
 }
 
 function topicTokens(topic) {

@@ -10,7 +10,10 @@ import {
   anchorSceneImageQuery,
   imageAngleFromCaption,
   detectImageRoleIntent,
+  hitMentionsSubject,
+  filterHitsRequiringSubjectNameCue,
 } from './eofSceneImageQueries.mjs'
+import { normalizeFootballTopicQuery } from './eofFootballTopicNormalize.mjs'
 
 describe('eofSceneImageQueries', () => {
   it('extracts topic tokens from headlines', () => {
@@ -204,5 +207,29 @@ describe('eofSceneImageQueries', () => {
     })
     assert.ok(qs.some((q) => /pundit|studio|Sky Sports/i.test(q)), `expected pundit queries, got ${qs}`)
     assert.ok(!qs.some((q) => /celebrating football/i.test(q)))
+  })
+
+  it('normalizes Cuccorea typo to Marc Cucurella for image search + subject cues', () => {
+    const topic = "Why Mark Cuccorea doesn't cut his hair"
+    assert.match(normalizeFootballTopicQuery(topic), /Marc Cucurella/i)
+    assert.doesNotMatch(normalizeFootballTopicQuery(topic), /Cuccorea/i)
+    assert.match(sanitizeTopicForImageSearch(topic), /Cucurella/i)
+    assert.equal(resolveImageSubject(topic), 'Marc Cucurella')
+    assert.ok(
+      hitMentionsSubject(topic, 'Marc Cucurella Chelsea long hair', 'https://cdn.example.com/cucurella.jpg'),
+      'real Cucurella photo titles must match typo topics',
+    )
+    const kept = filterHitsRequiringSubjectNameCue(
+      [
+        {
+          url: 'https://cdn.example.com/cucurella.jpg',
+          title: 'Marc Cucurella of Chelsea with long hair',
+          source: 'serpapi',
+        },
+      ],
+      resolveImageSubject(topic),
+      { log: false },
+    )
+    assert.equal(kept.length, 1)
   })
 })

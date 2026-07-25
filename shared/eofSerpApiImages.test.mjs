@@ -7,6 +7,8 @@ import {
   extractSerpApiImageRows,
   claimSerpApiPoolHit,
   searchSerpApiGoogleImages,
+  searchSerpApiGoogleImagesWithStatus,
+  formatSerpApiSearchHealthNote,
   EOF_SERPAPI_MAX_QUERIES_PER_JOB,
   serpApiEngine,
 } from '../backend/api/lib/eofSerpApiImages.mjs'
@@ -142,6 +144,28 @@ describe('eofSerpApiImages', () => {
       assert.match(calledUrl, /serpapi\.com\/search\.json/)
       assert.match(calledUrl, /engine=google_images/)
       assert.doesNotMatch(calledUrl, /oxylabs/)
+    } finally {
+      globalThis.fetch = originalFetch
+      if (prevKey == null) delete process.env.SERPAPI_API_KEY
+      else process.env.SERPAPI_API_KEY = prevKey
+    }
+  })
+
+  it('reports auth_failed health on 401 instead of silent empty hits', async () => {
+    const prevKey = process.env.SERPAPI_API_KEY
+    process.env.SERPAPI_API_KEY = 'bad-key'
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+      text: async () => 'Unauthorized',
+    }))
+    try {
+      const { hits, health } = await searchSerpApiGoogleImagesWithStatus('Marc Cucurella', { limit: 3 })
+      assert.equal(hits.length, 0)
+      assert.equal(health.status, 'auth_failed')
+      assert.match(formatSerpApiSearchHealthNote(health), /auth failed/i)
     } finally {
       globalThis.fetch = originalFetch
       if (prevKey == null) delete process.env.SERPAPI_API_KEY

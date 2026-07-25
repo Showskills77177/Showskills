@@ -18,6 +18,7 @@ import {
   appendEofImageKeyHistory,
   assertEofVideoPersisted,
   shouldSkipEofStillsPreflight,
+  formatEofNoSceneImagesError,
   EOF_IMAGE_KEY_HISTORY_LIMIT,
 } from '../backend/api/lib/eofProductionRenderVideo.mjs'
 
@@ -36,6 +37,47 @@ describe('eofOxylabsImages', () => {
     assert.match(buildOxylabsJobQuery('Rooney', 0), /"Wayne Rooney" football/)
     assert.match(buildOxylabsJobQuery('Rooney', 1), /portrait/)
     assert.doesNotMatch(buildOxylabsJobQuery('Rooney', 2), /manager/i)
+  })
+
+  it('normalizes Cuccorea hair topics to Marc Cucurella Chelsea hair queries', () => {
+    const topic = "Why Mark Cuccorea doesn't cut his hair"
+    const q0 = buildOxylabsJobQuery(topic, 0)
+    const q1 = buildOxylabsJobQuery(topic, 1)
+    assert.match(q0, /Marc Cucurella/i)
+    assert.match(q0, /Chelsea hair/i)
+    assert.doesNotMatch(q0, /Cuccorea/i)
+    assert.match(q1, /long hair|Chelsea/i)
+  })
+
+  it('surfaces Oxylabs auth failure (not only Wikimedia) in no-images errors', () => {
+    const msg = formatEofNoSceneImagesError({
+      topic: "Why Mark Cuccorea doesn't cut his hair",
+      providerOrder: ['serpapi', 'oxylabs'],
+      providerAttempts: [
+        { provider: 'serpapi', status: 'auth_failed', detail: 'Unauthorized', hits: 0 },
+        { provider: 'oxylabs', status: 'auth_failed', detail: 'Unauthorized', hits: 0 },
+      ],
+      wikiHits: 0,
+      subject: 'Marc Cucurella',
+    })
+    assert.match(msg, /SerpAPI auth failed/i)
+    assert.match(msg, /Oxylabs auth failed/i)
+    assert.match(msg, /Wikimedia\/Commons/i)
+    assert.doesNotMatch(msg, /^No real scene images.*Wikidata\/Commons returned nothing usable$/)
+  })
+
+  it('mentions subject-name filter when scrape hits were emptied post-filter', () => {
+    const msg = formatEofNoSceneImagesError({
+      topic: 'Test',
+      providerOrder: ['serpapi'],
+      providerAttempts: [{ provider: 'serpapi', status: 'ok', hits: 8, query: '"Marc Cucurella" Chelsea hair' }],
+      scrapeHitsBeforeFilter: 8,
+      scrapeHitsAfterFilter: 0,
+      wikiHits: 0,
+      subject: 'Marc Cucurella',
+    })
+    assert.match(msg, /post-filter emptied|subject-name\/vision filter dropped/i)
+    assert.match(msg, /Marc Cucurella/)
   })
 
   it('biases job queries toward pundit stills when the script is a TV take', () => {

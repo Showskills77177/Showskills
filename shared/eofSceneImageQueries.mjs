@@ -2,6 +2,8 @@
  * Scene image search queries for EOF Shorts.
  * Prefer the PERSON / club named in the topic (Messi, Tuchel, …) — never generic World Cup stock.
  */
+import { normalizeFootballTopicQuery } from './eofFootballTopicNormalize.mjs'
+import { tokensLooselyEqual } from './eofScriptRelevance.mjs'
 
 /** Vision re-rank: stills below this score are dropped (correct face or fail). */
 export const MIN_EOF_VISION_SCORE = 6
@@ -105,7 +107,7 @@ const PUNDIT_HIT_DEMOTE_RE =
 
 /** High-signal football surnames / mononyms for hard entity matching. */
 const KNOWN_PLAYER_RE =
-  /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|lewa(ndowski)?|ney(mar)?|benzema|modric|de\s*bruyne|rodri|yamal|pedri|gavi|osimhen|lookman|palmer|rice|son|heung|lavelle|putellas|rooney|beckham|giggs|shearer|drogba|henry|torres|aguero|suarez|iniesta|xavi|zidane|ronaldinho|owen|gerrard|lampard|terry|ferdinand|scholes|neville|cole|ashley\s*cole)\b/i
+  /\b(messi|ronaldo|mbapp[eé]|haaland|salah|vinicius|bellingham|saka|foden|kane|lewa(ndowski)?|ney(mar)?|benzema|modric|de\s*bruyne|rodri|yamal|pedri|gavi|osimhen|lookman|palmer|rice|son|heung|lavelle|putellas|rooney|cucurella|beckham|giggs|shearer|drogba|henry|torres|aguero|suarez|iniesta|xavi|zidane|ronaldinho|owen|gerrard|lampard|terry|ferdinand|scholes|neville|cole|ashley\s*cole)\b/i
 
 /** Common football mononyms → full name (helps Wikimedia / Pexels / Google find the player). */
 const PLAYER_FULL_NAMES = [
@@ -133,6 +135,7 @@ const PLAYER_FULL_NAMES = [
   [/^lookman$/i, 'Ademola Lookman'],
   [/^son$/i, 'Son Heung-min'],
   [/^rooney$/i, 'Wayne Rooney'],
+  [/^cucurella$/i, 'Marc Cucurella'],
   [/^beckham$/i, 'David Beckham'],
   [/^giggs$/i, 'Ryan Giggs'],
   [/^shearer$/i, 'Alan Shearer'],
@@ -297,10 +300,28 @@ export function hitMentionsSubject(subject, title = '', url = '') {
   if (!hay.trim()) return false
   if (full && hay.includes(full.toLowerCase())) return true
   if (surname.length >= 4 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(hay)) return true
+  // Fuzzy surname: Cuccorea (topic typo) ≈ Cucurella (real photo titles).
+  if (surname.length >= 5) {
+    const hayToks = hay.split(/[^a-z0-9à-ÿ]+/i).filter((t) => t.length >= 4)
+    if (hayToks.some((t) => tokensLooselyEqual(surname, t))) return true
+  }
   // Two given-name tokens (e.g. "kylian mbappe" in slug) without relying on short surnames alone.
   if (tokens.length >= 2) {
     const joined = tokens.map((t) => t.toLowerCase())
     if (joined.every((t) => hay.includes(t))) return true
+    // Fuzzy: Mark≈Marc + Cuccorea≈Cucurella across title tokens.
+    if (
+      tokens.every((tok) => {
+        if (tok.length < 3) return true
+        if (hay.includes(tok.toLowerCase())) return true
+        return hay
+          .split(/[^a-z0-9à-ÿ]+/i)
+          .filter((t) => t.length >= 3)
+          .some((t) => tokensLooselyEqual(tok, t))
+      })
+    ) {
+      return true
+    }
   }
   return false
 }
@@ -561,7 +582,9 @@ const NAME_BREAK_RE =
  * @param {string} topic
  */
 export function sanitizeTopicForImageSearch(topic) {
-  let t = String(topic || '')
+  // Normalize name typos first (Cuccorea → Cucurella) so Google/Wikimedia
+  // and subject-name filters use the real player spelling.
+  let t = normalizeFootballTopicQuery(String(topic || ''))
   // Remove quoted dialogue entirely (straight + curly quotes)
   t = t.replace(/[\u201C\u201D"']([^\"\u201C\u201D']*)[\u201C\u201D"']/g, ' ')
   // Drop trailing subtitle after colon/dash once quotes are gone

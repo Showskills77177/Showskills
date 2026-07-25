@@ -89,6 +89,88 @@ export function shouldSkipEofPlanPreflight(opts = {}) {
 }
 
 /**
+ * User-facing error when every scene fell back to placeholders.
+ * Names each Google Images provider tried (auth vs empty vs filtered) — not only Wikimedia.
+ *
+ * @param {{
+ *   topic?: string,
+ *   providerOrder?: string[],
+ *   providerAttempts?: Array<{ provider: string, status?: string, detail?: string, hits?: number, query?: string }>,
+ *   scrapeHitsBeforeFilter?: number,
+ *   scrapeHitsAfterFilter?: number,
+ *   wikiHits?: number,
+ *   genHits?: number,
+ *   subject?: string|null,
+ * }} [info]
+ */
+export function formatEofNoSceneImagesError(info = {}) {
+  const topic = String(info.topic || 'this topic').trim() || 'this topic'
+  const subject = String(info.subject || '').trim()
+  const parts = []
+  const order = Array.isArray(info.providerOrder) ? info.providerOrder : []
+  const attempts = Array.isArray(info.providerAttempts) ? info.providerAttempts : []
+
+  if (!order.length && !attempts.length) {
+    parts.push('SerpAPI/Oxylabs were not configured (missing SERPAPI_API_KEY and/or OXYLABS_USERNAME+OXYLABS_PASSWORD)')
+  } else {
+    for (const provider of order.length ? order : attempts.map((a) => a.provider)) {
+      const a = attempts.find((x) => x.provider === provider)
+      if (!a) {
+        parts.push(`${provider}: not attempted`)
+        continue
+      }
+      const status = String(a.status || 'unknown')
+      if (status === 'auth_failed') {
+        parts.push(
+          provider === 'oxylabs'
+            ? 'Oxylabs auth failed (check OXYLABS_USERNAME / OXYLABS_PASSWORD on Vercel)'
+            : 'SerpAPI auth failed (check SERPAPI_API_KEY on Vercel)',
+        )
+      } else if (status === 'not_configured') {
+        parts.push(
+          provider === 'oxylabs'
+            ? 'Oxylabs not configured (OXYLABS_USERNAME / OXYLABS_PASSWORD)'
+            : 'SerpAPI not configured (SERPAPI_API_KEY)',
+        )
+      } else if (status === 'ok' && Number(a.hits) > 0) {
+        parts.push(`${provider}: returned ${a.hits} hit(s) then post-filter emptied the pool`)
+      } else if (status === 'empty' || Number(a.hits) === 0) {
+        parts.push(`${provider}: ${a.detail || '0 usable image URLs'}`)
+      } else {
+        parts.push(`${provider}: ${status}${a.detail ? ` — ${a.detail}` : ''}`)
+      }
+    }
+  }
+
+  const before = Number(info.scrapeHitsBeforeFilter)
+  const after = Number(info.scrapeHitsAfterFilter)
+  if (Number.isFinite(before) && before > 0 && Number.isFinite(after) && after === 0) {
+    parts.push(
+      `subject-name/vision filter dropped all ${before} scrape hit(s)${
+        subject ? ` for “${subject}”` : ''
+      }`,
+    )
+  }
+
+  if (info.wikiHits != null && Number.isFinite(Number(info.wikiHits))) {
+    const wikiHits = Number(info.wikiHits)
+    parts.push(
+      wikiHits > 0
+        ? `Wikimedia: ${wikiHits} candidate(s) but none downloaded`
+        : 'Wikimedia/Commons: nothing usable',
+    )
+  }
+
+  const genHits = Number(info.genHits)
+  if (Number.isFinite(genHits) && genHits > 0) {
+    parts.push(`AI gen produced ${genHits} still(s) but none were usable for scenes`)
+  }
+
+  const tried = parts.length ? parts.join('; ') : 'no image sources produced usable stills'
+  return `No real scene images could be downloaded for “${topic}”. Tried: ${tried}. Check server logs / Vercel env, then Rebuild video again.`
+}
+
+/**
  * Canonical remux video opts — reuse stills, skip both preflight phases.
  * @param {{ captionMode?: 'auto'|'free'|'zapcap-only', includeAudioIfPresent?: boolean }} [extra]
  */
@@ -244,6 +326,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     // Order follows admin imageProvider (auto / serpapi / oxylabs), then AP/CSE per scene.
     let oxyPool = null
     let wikiPool = []
+    /** @type {{ providerOrder: string[], providerAttempts: Array<{ provider: string, status?: string, detail?: string, hits?: number, query?: string }>, scrapeHitsBeforeFilter: number, scrapeHitsAfterFilter: number, wikiHits: number|null, genHits: number, subject: string|null }} */
+    const imageFetchDiag = {
+      providerOrder: [],
+      providerAttempts: [],
+      scrapeHitsBeforeFilter: 0,
+      scrapeHitsAfterFilter: 0,
+      wikiHits: null,
+      genHits: 0,
+      subject: null,
+    }
     if (!reuseSceneImages) {
       const maxAttempt = Math.max(
         0,
@@ -266,6 +358,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         serpapi: isEofSerpApiConfigured(),
         oxylabs: isEofOxylabsConfigured(),
       })
+      imageFetchDiag.providerOrder = [...providerOrder]
       console.info(
         '[eof-video] image provider',
         preferredProvider,
@@ -274,12 +367,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         providerOrder.join(' → ') || '(none keyed)',
         `| gen=${imageGenMode}/${imageGenProvider}`,
         `| topic=${String(job.topic || '').slice(0, 80)}`,
+        `| subject=${String(resolveImageSubject(job.topic) || '').slice(0, 40)}`,
       )
       const imageContext = {
         plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
         captions: rows.map((r) => r.caption).filter(Boolean),
       }
       const leadSubject = resolveImageSubject(job.topic) || String(job.topic || '').trim()
+      imageFetchDiag.subject = leadSubject || null
       const leadIntent = detectImageRoleIntent({
         topic: job.topic,
         plainTextDraft: imageContext.plainTextDraft,
@@ -298,7 +393,22 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 attempt: maxAttempt,
                 ...imageContext,
               })
-              if (scraped.hits?.length) {
+              const hitCount = scraped.hits?.length || 0
+              imageFetchDiag.providerAttempts.push({
+                provider: 'serpapi',
+                status: scraped.health?.status || (hitCount ? 'ok' : 'empty'),
+                detail: scraped.healthNote || scraped.health?.detail || '',
+                hits: hitCount,
+                query: scraped.query || '',
+              })
+              if (scraped.healthNote || scraped.health?.softFallback) {
+                console.warn(
+                  '[eof-video] serpapi pool soft-fallback',
+                  scraped.health?.status || 'unknown',
+                  scraped.healthNote || scraped.health?.detail || '',
+                )
+              }
+              if (hitCount) {
                 pool = {
                   query: scraped.query,
                   hits: scraped.hits.map((h) => ({ ...h, source: h.source || 'serpapi' })),
@@ -307,10 +417,18 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                   plainTextDraft: imageContext.plainTextDraft,
                   intent: scraped.intent || leadIntent || null,
                   subject: scraped.subject || leadSubject || null,
+                  health: scraped.health || null,
                 }
               }
             } catch (e) {
-              console.warn('[eof-video] serpapi job pool failed', e instanceof Error ? e.message : e)
+              const detail = e instanceof Error ? e.message : String(e)
+              console.warn('[eof-video] serpapi job pool failed', detail)
+              imageFetchDiag.providerAttempts.push({
+                provider: 'serpapi',
+                status: 'error',
+                detail,
+                hits: 0,
+              })
             }
             continue
           }
@@ -322,6 +440,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 attempt: maxAttempt,
                 ...imageContext,
               })
+              const hitCount = scraped.hits?.length || 0
+              imageFetchDiag.providerAttempts.push({
+                provider: 'oxylabs',
+                status: scraped.health?.status || (hitCount ? 'ok' : 'empty'),
+                detail: scraped.healthNote || scraped.health?.detail || '',
+                hits: hitCount,
+                query: scraped.query || '',
+              })
               if (scraped.healthNote || scraped.health?.softFallback) {
                 console.warn(
                   '[eof-video] oxylabs pool soft-fallback',
@@ -329,7 +455,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                   scraped.healthNote || scraped.health?.detail || '',
                 )
               }
-              if (scraped.hits?.length) {
+              if (hitCount) {
                 pool = {
                   query: scraped.query,
                   hits: scraped.hits.map((h) => ({ ...h, source: h.source || 'oxylabs' })),
@@ -342,7 +468,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 }
               }
             } catch (e) {
-              console.warn('[eof-video] oxylabs job pool failed', e instanceof Error ? e.message : e)
+              const detail = e instanceof Error ? e.message : String(e)
+              console.warn('[eof-video] oxylabs job pool failed', detail)
+              imageFetchDiag.providerAttempts.push({
+                provider: 'oxylabs',
+                status: 'error',
+                detail,
+                hits: 0,
+              })
             }
           }
         }
@@ -364,6 +497,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
 
       const [scrapePool, genHits] = await Promise.all([scrapePromise, genPromise])
       oxyPool = scrapePool
+      imageFetchDiag.scrapeHitsBeforeFilter = oxyPool?.hits?.length || 0
+      imageFetchDiag.genHits = Array.isArray(genHits) ? genHits.length : 0
 
       if (Array.isArray(genHits) && genHits.length) {
         if (oxyPool?.hits?.length) {
@@ -501,12 +636,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
       }
 
+      imageFetchDiag.scrapeHitsAfterFilter = oxyPool?.hits?.length || 0
       console.info(
         '[eof-video] google images pool',
         oxyPool?.source || 'none',
         oxyPool?.hits?.length ? `${oxyPool.hits.length} hits` : '0 hits',
         oxyPool?.secondaryHits?.length ? `+${oxyPool.secondaryHits.length} secondary` : '',
         oxyPool?.query ? `q=${String(oxyPool.query).slice(0, 80)}` : '',
+        imageFetchDiag.scrapeHitsBeforeFilter > imageFetchDiag.scrapeHitsAfterFilter
+          ? `(filtered ${imageFetchDiag.scrapeHitsBeforeFilter}→${imageFetchDiag.scrapeHitsAfterFilter})`
+          : '',
       )
       if (!oxyPool?.hits?.length) {
         // Wikidata only when no Google Images job pool is available.
@@ -522,6 +661,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           )
           wikiPool = []
         }
+        imageFetchDiag.wikiHits = Array.isArray(wikiPool) ? wikiPool.length : 0
       }
     }
 
@@ -612,7 +752,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
     if (placeholderCount === scenesForVideo.length && scenesForVideo.length > 0) {
       throw new Error(
-        `No real scene images could be downloaded for “${job.topic}”. Wikidata/Commons returned nothing usable — check server logs / network, then Rebuild video again.`,
+        formatEofNoSceneImagesError({
+          topic: job.topic,
+          providerOrder: imageFetchDiag.providerOrder,
+          providerAttempts: imageFetchDiag.providerAttempts,
+          scrapeHitsBeforeFilter: imageFetchDiag.scrapeHitsBeforeFilter,
+          scrapeHitsAfterFilter: imageFetchDiag.scrapeHitsAfterFilter,
+          wikiHits: imageFetchDiag.wikiHits,
+          genHits: imageFetchDiag.genHits,
+          subject: imageFetchDiag.subject,
+        }),
       )
     }
 

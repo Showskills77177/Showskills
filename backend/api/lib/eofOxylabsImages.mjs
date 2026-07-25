@@ -97,9 +97,16 @@ export function scoreImageCandidate(url, width = 0, height = 0) {
  * @param {number} [attempt]
  * @param {{ plainTextDraft?: string, captions?: string|string[], intent?: string }} [context]
  */
+/** Human-interest hair / look topics (Cucurella locks, etc.) — bias Google Images. */
+const HAIR_TOPIC_RE = /\b(hair|hairstyle|locks?|dreadlocks?|beard|mullet|cut\s+his\s+hair|cut\s+her\s+hair|doesn'?t\s+cut)\b/i
+
 export function buildOxylabsJobQuery(topic, attempt = 0, context = {}) {
   const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
   const year = new Date().getFullYear()
+  const blob = [topic, context.plainTextDraft, context.captions]
+    .flat()
+    .map((s) => String(s || ''))
+    .join(' ')
   const intent = detectImageRoleIntent({
     topic,
     plainTextDraft: context.plainTextDraft,
@@ -107,6 +114,18 @@ export function buildOxylabsJobQuery(topic, attempt = 0, context = {}) {
     intent: context.intent,
   })
   const n = Math.max(0, Number(attempt) || 0) % 3
+
+  // Hair / look stories: search the real player + hair cue (not the typo headline).
+  if (HAIR_TOPIC_RE.test(blob) && /cucurella/i.test(subject)) {
+    if (n === 1) return `"${subject}" Chelsea long hair`
+    if (n === 2) return `"${subject}" hair portrait football`
+    return `"${subject}" Chelsea hair`
+  }
+  if (HAIR_TOPIC_RE.test(blob) && isNamedFootballSubject(subject)) {
+    if (n === 1) return `"${subject}" hair portrait`
+    if (n === 2) return `"${subject}" football portrait`
+    return `"${subject}" hair football`
+  }
 
   if (intent === 'pundit') {
     if (n === 1) return `"${subject}" TV studio ${year}`
