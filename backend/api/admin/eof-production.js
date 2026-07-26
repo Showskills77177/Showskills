@@ -580,22 +580,29 @@ export default async function handler(req, res) {
           return json(res, 202, { ok: true, accepted: true, job: existing })
         }
 
-        // Explicit human Build Short resets the ElevenLabs per-narration synth budget.
-        // The a23cad2 credit guard caps re-TTS at 3 per narration hash to stop the old
-        // stale-kill → auto-Rebuild → re-synth loop. But a job that already burned its 3
-        // synths during that loop (e.g. the ~40-attempt Cucurella job) could no longer be
-        // built at all — the guard threw "credit guard: already synthesized 3/3" on every
-        // Build. A deliberate click is not a silent retry, so give it a fresh budget; the
-        // guard still caps runaway synths WITHIN a single build (synthIncrements) and
-        // durable-audio reuse still short-circuits when a good mix already exists.
+        // Explicit human Build Short unsticks poisoned jobs (Cucurella ~40-attempt loop):
+        // 1) reset ElevenLabs per-narration synth budget (a23cad2 credit guard)
+        // 2) wipe Serp avoidKeys / imageKeyHistory so claim is not exhausted
+        // 3) pass forceFreshImages so video encode does not reuse dead avoid history
+        //    (placeholder-only wipe was not enough when prior claims were real Serp keys)
         if (action === 'build-short' || action === 'render') {
-          await updateEofProductionJob(jobId, { ttsSynthCount: 0 }).catch((e) => {
+          try {
+            const { clearEofImageAvoidHistoryFromManifest } = await import(
+              '../lib/eofProductionRenderVideo.mjs'
+            )
+            await updateEofProductionJob(jobId, {
+              ttsSynthCount: 0,
+              narrationManifest: clearEofImageAvoidHistoryFromManifest(existing.narrationManifest),
+              errorMessage: null,
+            })
+          } catch (e) {
             console.warn(
-              '[eof-production] could not reset tts synth budget',
+              '[eof-production] could not reset build poison state',
               jobId,
               e instanceof Error ? e.message : e,
             )
-          })
+            await updateEofProductionJob(jobId, { ttsSynthCount: 0 }).catch(() => {})
+          }
         }
 
         // Optional per-build override of Google Images provider (auto | serpapi | oxylabs).
@@ -607,9 +614,15 @@ export default async function handler(req, res) {
         try {
           const runner = await loadEofRenderRunner()
           if (action === 'render-video') {
-            await runner.startEofProductionVideoRenderBackground(jobId, { imageProvider })
+            await runner.startEofProductionVideoRenderBackground(jobId, {
+              imageProvider,
+              forceFreshImages: true,
+            })
           } else {
-            await runner.startEofProductionFullBuildBackground(jobId, { imageProvider })
+            await runner.startEofProductionFullBuildBackground(jobId, {
+              imageProvider,
+              forceFreshImages: true,
+            })
           }
           const job = await getEofProductionJob(jobId)
           // Sync serverless builds finish in-request → 200 with ready job.
@@ -949,6 +962,38 @@ export default async function handler(req, res) {
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
         const job = await cancelEofProductionRender(jobId)
         return json(res, 200, { ok: true, job })
+      }
+
+      if (action === 'reset-build-state') {
+        try {
+          await requireEofOwner(req)
+        } catch (e) {
+          return json(res, e.statusCode || 403, { error: 'Only the channel owner can reset build state.' })
+        }
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        // Cancel mid-flight first so the next Build Short is not a 202 no-op.
+        if (existing.status === 'rendering' || existing.status === 'rendering_video') {
+          await cancelEofProductionRender(jobId)
+        }
+        const { clearEofImageAvoidHistoryFromManifest } = await import(
+          '../lib/eofProductionRenderVideo.mjs'
+        )
+        const refreshed = await getEofProductionJob(jobId)
+        const backStatus = refreshed?.mixedAudioPath
+          ? 'rendered'
+          : refreshed?.script?.scenes?.length
+            ? 'ready_script'
+            : refreshed?.status || 'ready_script'
+        const job = await updateEofProductionJob(jobId, {
+          status: backStatus,
+          ttsSynthCount: 0,
+          narrationManifest: clearEofImageAvoidHistoryFromManifest(refreshed?.narrationManifest),
+          errorMessage: null,
+        })
+        return json(res, 200, { ok: true, job, reset: true })
       }
 
       const topic = typeof body.topic === 'string' ? body.topic.trim() : ''

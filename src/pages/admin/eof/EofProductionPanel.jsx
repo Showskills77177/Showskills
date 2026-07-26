@@ -1641,6 +1641,30 @@ export default function EofProductionPanel({
     }
   }
 
+  async function resetBuildState() {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset-build-state', jobId: selectedId }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not reset build state')
+      setRenderProgress(null)
+      if (j.job) upsertJob(j.job)
+      setSuccess(
+        'Build state cleared (TTS budget + Serp avoid history). Click Build Short once in Pro mode.',
+      )
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function markDraftDirty() {
     setDraftDirty(true)
   }
@@ -5181,9 +5205,25 @@ export default function EofProductionPanel({
             </details>
 
             {selected.status === 'failed' && selected.errorMessage ? (
-              <p className="rounded-xl border border-[#ff4e45]/40 bg-[#2a1515] px-4 py-3 text-sm text-[#ff9b95]">
-                Build failed: {selected.errorMessage}
-              </p>
+              <div className="space-y-2">
+                <p className="rounded-xl border border-[#ff4e45]/40 bg-[#2a1515] px-4 py-3 text-sm text-[#ff9b95]">
+                  Build failed: {selected.errorMessage}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || isRendering}
+                    onClick={resetBuildState}
+                    className={PX.btnGhost}
+                    title="Clears TTS synth budget and Serp avoidKeys so Build Short can claim fresh stills"
+                  >
+                    Reset build state
+                  </button>
+                  <span className="text-[11px] text-[#8a8a8a]">
+                    Unsticks poisoned jobs (burned TTS budget / exhausted Serp avoid history). Then Build Short once.
+                  </span>
+                </div>
+              </div>
             ) : null}
 
             {selected.qualityGate && selected.qualityGate.mode !== 'off' ? (

@@ -22,6 +22,8 @@ import {
   shouldSkipEofStillsPreflight,
   formatEofNoSceneImagesError,
   priorStillsWerePlaceholders,
+  clearEofImageAvoidHistoryFromManifest,
+  shouldForceFreshEofSceneImages,
   EOF_IMAGE_KEY_HISTORY_LIMIT,
 } from '../backend/api/lib/eofProductionRenderVideo.mjs'
 import { withDeadline } from '../backend/api/lib/eofAsyncPool.mjs'
@@ -88,6 +90,37 @@ describe('eofOxylabsImages', () => {
     })
     assert.ok(claimed, 'must claim the empty-title Cucurella Serp hit')
     assert.match(claimed.imgUrl, /cuc-cdn-1/)
+  })
+
+  it('still claims empty-title Cucurella hits that carry a low visionScore', () => {
+    // Name-cue fallback can leave hits with visionScore=2–3 from Grok on tiny CDN thumbs.
+    // Old scorer hard-rejected any vision < MIN even when emptyTitleQueryOk — Build still failed.
+    const query = '"Marc Cucurella" Chelsea hair'
+    const hit = {
+      url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-low-vision',
+      title: '',
+      source: 'serpapi',
+      visionScore: 3,
+      width: 800,
+      height: 1200,
+    }
+    const score = scoreOxylabsHitForScene(hit, {
+      topic: 'Marc Cucurella',
+      subject: 'Marc Cucurella',
+      imageQuery: query,
+      jobQuery: query,
+    })
+    assert.ok(score > -100, `low-vision empty-title must stay claimable, got ${score}`)
+    const claimed = claimOxylabsPoolHit({
+      hits: [hit],
+      claimed: new Set(),
+      subject: 'Marc Cucurella',
+      topic: 'Marc Cucurella',
+      imageQuery: query,
+      jobQuery: query,
+      keyPrefix: 'serpapi',
+    })
+    assert.ok(claimed, 'must claim low-vision empty-title Cucurella hit')
   })
 
   it('surfaces Oxylabs auth failure (not only Wikimedia) in no-images errors', () => {
@@ -513,6 +546,39 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
       ]),
       true,
     )
+  })
+
+  it('explicit Build forceFresh clears avoidKeys even when prior Serp keys were real (Cucurella poison)', () => {
+    // After ~40 rebuilds the job holds 32 real Serp keys — NOT placeholders — so the old
+    // priorStillsWerePlaceholders gate left avoidKeys intact and the pool exhausted.
+    const poisoned = [
+      {
+        index: 0,
+        imageSource: 'serpapi',
+        imageKey: 'serpapi:https://cdn.example.com/cuc-1.jpg',
+        imageKeyHistory: Array.from(
+          { length: 32 },
+          (_, i) => `serpapi:https://cdn.example.com/cuc-${i}.jpg`,
+        ),
+        lineHash: 'keep-me-for-tts',
+      },
+    ]
+    assert.equal(priorStillsWerePlaceholders(poisoned), false)
+    assert.equal(
+      shouldForceFreshEofSceneImages({ forceFreshImages: true }, poisoned),
+      true,
+      'explicit Build must force fresh even when prior stills were real Serp claims',
+    )
+    assert.equal(
+      shouldForceFreshEofSceneImages({}, poisoned),
+      false,
+      'without explicit flag, real Serp history must not auto-wipe (Rebuild rotation still works)',
+    )
+
+    const cleared = clearEofImageAvoidHistoryFromManifest(poisoned)
+    assert.equal(cleared[0].lineHash, 'keep-me-for-tts', 'TTS line hash must survive the wipe')
+    assert.deepEqual(cleared[0].imageKeyHistory, [])
+    assert.equal(cleared[0].imageAttempt, 0)
   })
 
   it('marks rendering jobs stale when quiet (Hobby) or over max age', () => {

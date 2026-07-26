@@ -75,7 +75,7 @@ function estimateFullBuildSec(script) {
 /**
  * Full Short end-to-end: narration + images + captions + mux (Pro default path).
  * @param {string} jobId
- * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual', skipPlanPreflight?: boolean }} [opts]
+ * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual', skipPlanPreflight?: boolean, forceFreshImages?: boolean }} [opts]
  */
 export async function renderEofProductionFullBuild(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
@@ -100,6 +100,7 @@ export async function renderEofProductionFullBuild(jobId, opts = {}) {
       imageProvider: opts.imageProvider,
       qualityGateMode,
       skipPlanPreflight: true,
+      forceFreshImages: opts.forceFreshImages === true,
     })
   } catch (e) {
     if (e instanceof EofQualityGateBlockedError) throw e
@@ -204,6 +205,7 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
         qualityGateMode,
         skipPlanPreflight: true,
         reuseSceneImages: reuse,
+        forceFreshImages: opts.forceFreshImages === true,
       })
     }
 
@@ -255,7 +257,7 @@ export async function startEofProductionContinueBackground(jobId, opts = {}) {
 
 /**
  * @param {string} jobId
- * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual' }} [opts]
+ * @param {{ imageProvider?: string | null, qualityGateMode?: 'auto'|'manual', forceFreshImages?: boolean }} [opts]
  */
 export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
@@ -297,12 +299,14 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
           step: 'audio',
           imageProvider: opts.imageProvider,
           qualityGateMode,
+          forceFreshImages: opts.forceFreshImages === true,
         })
       }
       return renderEofProductionFullBuild(jobId, {
         ...opts,
         qualityGateMode,
         skipPlanPreflight: true,
+        forceFreshImages: opts.forceFreshImages === true,
       })
     })().catch((e) => {
       if (e instanceof EofQualityGateBlockedError) return
@@ -767,6 +771,7 @@ export async function startEofProductionVideoRenderBackground(jobId, opts = {}) 
         imageProvider: opts.imageProvider,
         qualityGateMode,
         skipPlanPreflight: true,
+        forceFreshImages: true,
       })
     })().catch((e) => {
       if (e instanceof EofQualityGateBlockedError) return

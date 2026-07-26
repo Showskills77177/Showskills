@@ -308,5 +308,11 @@ export function applyVisionScoresWithNameCueFallback(hits, subject, visionScores
       String(subject).slice(0, 40),
     )
   }
-  return fallback
+  // Strip low visionScore so claimOxylabsPoolHit does not hard-reject the same stills
+  // the fallback just rescued (empty-title Cucurella CDN thumbs score 2–3 on tiny thumbs).
+  return fallback.map((h) => {
+    if (!h || typeof h !== 'object' || h.visionScore == null) return h
+    const { visionScore: _drop, ...rest } = h
+    return rest
+  })
 }

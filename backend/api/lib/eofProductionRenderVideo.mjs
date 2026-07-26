@@ -231,6 +231,39 @@ export function appendEofImageKeyHistory(priorHistory, imageKey, limit = EOF_IMA
 }
 
 /**
+ * Strip per-scene Serp avoid history from a narrationManifest (keep TTS line hashes).
+ * After ~N Rebuilds a poisoned job can hold 32 avoided CDN keys and exhaust the pool
+ * even when Build Short resets ttsSynthCount — explicit human Build / Reset must wipe these.
+ * @param {unknown} manifest
+ */
+export function clearEofImageAvoidHistoryFromManifest(manifest) {
+  if (!Array.isArray(manifest)) return manifest ?? null
+  return manifest.map((row) => {
+    if (!row || typeof row !== 'object') return row
+    const next = { ...row, imageAttempt: 0, imageKeyHistory: [] }
+    if (String(row.imageSource || '').startsWith('placeholder')) {
+      next.imageKey = null
+      next.imageSource = null
+      next.imageUrl = null
+      next.imageTitle = null
+    }
+    return next
+  })
+}
+
+/**
+ * Explicit Build / Rebuild must clear avoidKeys — not only when prior stills were placeholders.
+ * Placeholder-only wipe left Cucurella poisoned after ~40 real Serp claims then encode/stale fails.
+ * @param {{ reuseSceneImages?: boolean, forceFreshImages?: boolean }} opts
+ * @param {unknown} priorManifest
+ */
+export function shouldForceFreshEofSceneImages(opts = {}, priorManifest) {
+  if (opts.reuseSceneImages === true) return false
+  if (opts.forceFreshImages === true) return true
+  return priorStillsWerePlaceholders(priorManifest)
+}
+
+/**
  * After encode: require durable video_base64 (or fail the job — never leave video_rendered empty).
  * @param {{ saved?: boolean, bytes?: number, recompressed?: boolean }} persisted
  */
@@ -255,6 +288,7 @@ export function assertEofVideoPersisted(persisted) {
  *   qualityGateMode?: 'auto' | 'manual',
  *   skipPlanPreflight?: boolean,
  *   skipStillsPreflight?: boolean,
+ *   forceFreshImages?: boolean,
  * }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
@@ -752,11 +786,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       }
     }
 
-    // Rebuild after a failed/placeholder job must re-search Serp — never stick to dead avoidKeys.
-    const forceFreshImages = !reuseSceneImages && priorStillsWerePlaceholders(priorManifest)
+    // Explicit Build / Rebuild (opts.forceFreshImages) OR prior placeholders → clear avoidKeys.
+    // Placeholder-only was not enough: Cucurella burned 32 real Serp keys then still failed encode.
+    const forceFreshImages = shouldForceFreshEofSceneImages(
+      { reuseSceneImages, forceFreshImages: opts.forceFreshImages === true },
+      priorManifest,
+    )
     if (forceFreshImages) {
       console.warn(
-        `[eof-video] prior stills were placeholders for job ${jobId} — forcing fresh Serp fetch (clearing avoid history)`,
+        `[eof-video] forcing fresh Serp fetch for job ${jobId} (clearing avoid history)`,
+        opts.forceFreshImages === true ? 'reason=explicit_build' : 'reason=prior_placeholders',
       )
     }
 

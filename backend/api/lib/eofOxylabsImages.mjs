@@ -724,7 +724,9 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
       return -500
     }
     // Vision already rejected this face — never claim.
-    if (Number.isFinite(vision) && vision < MIN_EOF_VISION_SCORE) {
+    // Exception: empty-title CDN thumbs kept by name-cue fallback often carry a low
+    // visionScore (Grok fails on tiny Serp thumbs). emptyTitleQueryOk must still claim.
+    if (Number.isFinite(vision) && vision < MIN_EOF_VISION_SCORE && !emptyTitleQueryOk) {
       return -500
     }
   }

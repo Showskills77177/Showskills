@@ -136,6 +136,31 @@ describe('vision name-cue fallback (Cucurella empty-title pool must not be wiped
     assert.equal(kept.length, 3)
   })
 
+  it('strips low visionScore on fallback so claim does not re-reject rescued stills', () => {
+    const hits = [
+      {
+        url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-scored',
+        title: '',
+        source: 'serpapi',
+        visionScore: 2,
+      },
+    ]
+    const scores = new Map([['https://encrypted-tbn0.gstatic.com/images?q=cuc-scored', 2]])
+    const kept = applyVisionScoresWithNameCueFallback(hits, subject, scores, { query })
+    assert.equal(kept.length, 1)
+    assert.equal(kept[0].visionScore, undefined)
+    const claimed = claimOxylabsPoolHit({
+      hits: kept,
+      claimed: new Set(),
+      subject,
+      topic: subject,
+      imageQuery: query,
+      jobQuery: query,
+      keyPrefix: 'serpapi',
+    })
+    assert.ok(claimed, 'rescued empty-title still must be claimable after score strip')
+  })
+
   it('still returns vision-approved stills unchanged when some pass', () => {
     const hits = [
       { url: 'https://cdn.example.com/good.jpg', title: 'Marc Cucurella', source: 'serpapi' },
