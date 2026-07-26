@@ -92,6 +92,7 @@ import {
   ensureEofMusicCatalogSeeded,
   listEofMusicTracks,
   listEofDefaultMusicBeds,
+  resolveEofMusicTrackIdForSelection,
 } from '../lib/eofMusicTracks.mjs'
 import { EOF_SCRIPT_FORMATS, EOF_DEFAULT_SCRIPT_FORMAT } from '../../../shared/eofScriptTemplates.mjs'
 import {
@@ -687,13 +688,12 @@ export default async function handler(req, res) {
         }
 
         try {
+          const resolvedMusicTrackId =
+            body.musicTrackId !== undefined
+              ? await resolveEofMusicTrackIdForSelection(existing.topic, body.musicTrackId)
+              : undefined
           await updateEofProductionJob(jobId, {
-            musicTrackId:
-              body.musicTrackId !== undefined
-                ? body.musicTrackId === null || body.musicTrackId === ''
-                  ? null
-                  : String(body.musicTrackId)
-                : undefined,
+            musicTrackId: resolvedMusicTrackId,
             musicVolume:
               body.musicVolume !== undefined ? Number(body.musicVolume) : undefined,
             musicStartSec:
@@ -1019,16 +1019,18 @@ export default async function handler(req, res) {
       const existing = await getEofProductionJob(jobId)
       if (!existing) return json(res, 404, { error: 'Job not found.' })
 
+      const resolvedMusicTrackId =
+        body.musicTrackId !== undefined
+          ? await resolveEofMusicTrackIdForSelection(
+              body.topic !== undefined ? body.topic : existing.topic,
+              body.musicTrackId,
+            )
+          : undefined
       const job = await updateEofProductionJob(jobId, {
         script: body.script,
         title: body.title,
         topic: body.topic,
-        musicTrackId:
-          body.musicTrackId !== undefined
-            ? body.musicTrackId === null || body.musicTrackId === ''
-              ? null
-              : String(body.musicTrackId)
-            : undefined,
+        musicTrackId: resolvedMusicTrackId,
         musicVolume: body.musicVolume,
         musicStartSec: body.musicStartSec !== undefined ? Number(body.musicStartSec) : undefined,
         musicEndSec:

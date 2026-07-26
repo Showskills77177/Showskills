@@ -2125,9 +2125,10 @@ export default function EofProductionPanel({
     const prevStart = musicStartSec
     const prevEnd = musicEndSec
     const jobSnap = jobs.find((j) => j.id === selectedId) || selected
+    const hadBuiltVideo =
+      jobSnap?.status === 'video_rendered' || Boolean(jobSnap?.renderOutputPath)
     const canRemuxAudio =
-      jobSnap?.status === 'video_rendered' ||
-      Boolean(jobSnap?.renderOutputPath) ||
+      hadBuiltVideo ||
       Boolean(jobSnap?.mixedAudioPath) ||
       Boolean(jobSnap?.narrationManifest?.length)
 
@@ -2210,7 +2211,11 @@ export default function EofProductionPanel({
         if (remixJson.job.renderProgress) setRenderProgress(remixJson.job.renderProgress)
       }
 
-      const finishedJob = await waitForJobComplete(selectedId, ['video_rendered', 'rendered'])
+      // Audio mixing briefly reports `rendered`; a built Short is not finished until
+      // the new durable MP4 has replaced the old one.
+      const finishedJob = hadBuiltVideo
+        ? await waitForVideoComplete(selectedId)
+        : await waitForJobComplete(selectedId, ['video_rendered', 'rendered'])
       if (finishedJob.status !== 'video_rendered' && finishedJob.status !== 'rendered') {
         throw new Error(finishedJob.errorMessage || 'Remove song did not finish remixing audio')
       }
@@ -2241,7 +2246,7 @@ export default function EofProductionPanel({
     }
   }
 
-  /** Post-build: swap default/safe music bed under existing VO, remux Short (no image refetch). */
+  /** Post-build: swap the selected/Auto bed under existing VO, remux Short (no image refetch). */
   async function remixMusicBed() {
     if (!selectedId) return
     setBusy(true)
@@ -4596,7 +4601,8 @@ export default function EofProductionPanel({
                   <p className={`mt-1 text-xs ${PX.muted}`}>
                     Pick a platform bed, drag the segment like YouTube (which part of the song), preview, then
                     Build or Remix. Remove song strips the bed from a built Short without rebuilding images/VO.
-                    Beds are auto-mastered for balanced Shorts volume — no Master button needed.
+                    No music is the safe default; Auto-pick by mood only runs when selected. Beds are
+                    auto-mastered for balanced Shorts volume — no Master button needed.
                   </p>
               <div className="mt-3 flex flex-wrap items-end gap-3">
                 <label className="block min-w-[220px] flex-1 text-xs text-[#aaa]">
@@ -4611,7 +4617,8 @@ export default function EofProductionPanel({
                     }}
                     disabled={busy || isRendering}
                   >
-                    <option value="">Auto (default / mood)</option>
+                    <option value="">No music (voiceover only)</option>
+                    <option value="auto">Auto-pick by mood</option>
                     {musicTracks
                       .filter((t) => t.active !== false)
                       .map((t) => (

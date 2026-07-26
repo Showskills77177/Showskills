@@ -86,6 +86,15 @@ export function shouldEofAllowNoMusic(opts = {}, job = {}) {
   return opts.allowNoMusic === true && !job?.musicTrackId
 }
 
+/**
+ * A music remix must rebuild the mix from cached scene VO, never restore the
+ * durable MP3 whose TTS hash matches but whose music choice may be stale.
+ */
+export function shouldEofReuseDurableMix(opts = {}, reuseState = {}) {
+  if (opts.reuseSceneAudio === true || opts.allowNoMusic === true) return false
+  return shouldReuseEofDurableMixedAudio(reuseState)
+}
+
 export async function renderEofProductionAudio(jobId, opts = {}) {
   const preserveSceneImages = opts.preserveSceneImages === true
   const voiceRegenerationMode = opts.voiceRegenerationMode === true
@@ -117,7 +126,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       voiceSettings: job.voiceSettings,
     })
     const flags = await getEofArtifactFlags(jobId)
-    const canReuseMixed = shouldReuseEofDurableMixedAudio({
+    const canReuseMixed = shouldEofReuseDurableMix(opts, {
       hasDurableAudio: flags.hasDurableAudio,
       storedFingerprint: job.ttsAudioHash,
       currentFingerprint: fingerprint,
@@ -403,7 +412,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
         errorMessage: null,
         ttsAudioHash: fingerprint,
         ttsSynthCount: nextSynthCount,
-        musicTrackId: wantNoMusic ? null : track?.id || job.musicTrackId || null,
+        musicTrackId: wantNoMusic ? null : track?.id || null,
         ...regenPatch,
         script: {
           ...job.script,

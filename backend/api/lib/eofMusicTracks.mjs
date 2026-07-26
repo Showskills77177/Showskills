@@ -392,10 +392,23 @@ export async function updateEofMusicTrack(id, patch) {
   return getEofMusicTrack(id)
 }
 
+export const EOF_AUTO_MUSIC_TRACK_ID = 'auto'
+
+/** Empty means VO-only; mood/default selection requires the explicit Auto sentinel. */
+export function eofMusicSelectionMode(trackId) {
+  const normalized = String(trackId || '').trim()
+  if (!normalized) return 'none'
+  if (normalized === EOF_AUTO_MUSIC_TRACK_ID) return 'auto'
+  return 'explicit'
+}
+
 export async function pickEofMusicTrackForTopic(topic, explicitTrackId = null) {
-  if (explicitTrackId) {
-    const track = await getEofMusicTrack(explicitTrackId)
-    if (track?.active) return track
+  const mode = eofMusicSelectionMode(explicitTrackId)
+  if (mode === 'none') return null
+
+  if (mode === 'explicit') {
+    const track = await getEofMusicTrack(String(explicitTrackId).trim())
+    return track?.active ? track : null
   }
 
   const tracks = await listEofMusicTracks()
@@ -408,4 +421,13 @@ export async function pickEofMusicTrackForTopic(topic, explicitTrackId = null) {
   const mood = inferMusicMoodFromTopic(topic)
   const moodMatch = tracks.find((t) => t.mood === mood)
   return moodMatch || tracks[0]
+}
+
+/**
+ * Resolve UI selection (including `auto`) to a real catalog id before storing
+ * it in eof_production_jobs, whose Postgres column has a track foreign key.
+ */
+export async function resolveEofMusicTrackIdForSelection(topic, trackId) {
+  const track = await pickEofMusicTrackForTopic(topic, trackId)
+  return track?.id || null
 }
