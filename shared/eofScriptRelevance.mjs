@@ -368,11 +368,11 @@ export function extractTopicAnchorTokens(topic) {
     out.push(...parts)
   }
   const raw = String(topic || '')
-  // Capitalized given name + optional particle + surname (often lowercased in typed topics)
-  const givenSurnameRe =
-    /\b([A-Z][\p{L}'’-]+)\s+(?:(di|de|da|del|della|van|von|der|la|le|du|dos|das)\s+)?([\p{L}'’-]{4,})\b/gu
+  // Given + particle + surname (surname often lowercased in typed topics): "Roberto di zebri"
+  const particleSurnameRe =
+    /\b([A-Z][\p{L}'’-]+)\s+(di|de|da|del|della|van|von|der|la|le|du|dos|das)\s+([\p{L}'’-]{4,})\b/gu
   let gm
-  while ((gm = givenSurnameRe.exec(raw))) {
+  while ((gm = particleSurnameRe.exec(raw))) {
     const given = cleanNameToken(gm[1])
     const surname = cleanNameToken(gm[3])
     if (given && !NAME_STOP_FIRST.has(given) && given.length >= 4) out.push(given)
@@ -425,10 +425,12 @@ const TOPIC_DISMISS_RE =
  * Uses TOPIC anchors only — desk headlines must not unlock a pivot.
  * @param {string} draft
  * @param {string} topic
+ * @param {{ mode?: string }} [opts] mode:'adapt' — allow same-story cast named in the draft unless hero is abandoned/dismissed
  */
-export function detectTopicDrift(draft, topic) {
+export function detectTopicDrift(draft, topic, opts = {}) {
   const text = String(draft || '').trim()
   const ordered = String(topic || '').trim()
+  const adaptMode = String(opts.mode || '').toLowerCase() === 'adapt'
   const anchors = extractTopicAnchorTokens(ordered)
   if (!text || anchors.length === 0) {
     return { drift: false, foreign: [], anchors, dismiss: false, anchorMentions: 0, foreignMentions: 0 }
@@ -457,11 +459,12 @@ export function detectTopicDrift(draft, topic) {
   const foreignMentions = countTokenMentions(text, foreignTokens)
 
   // Pivot: dismiss topic, or a foreign person dominates the VO vs topic anchors.
+  // Adapt: draft already approved the cast — only fail when hero is dismissed or nearly absent.
   const drift =
     foreign.length > 0 &&
     (dismiss ||
       (foreignMentions >= 2 && anchorMentions <= 1) ||
-      (foreignMentions > anchorMentions && foreignMentions >= 2))
+      (!adaptMode && foreignMentions > anchorMentions && foreignMentions >= 2))
 
   return { drift, foreign, anchors, dismiss, anchorMentions, foreignMentions }
 }
@@ -471,15 +474,18 @@ export function detectTopicDrift(draft, topic) {
  * Hard-fails cross-sport injections and viewer insults.
  * @param {string} draft
  * @param {{ topic?: string, deskBrief?: string, format?: string, context?: string, mode?: string }} [opts]
- *   mode: 'adapt' — draft is source of truth for same-story football cast; skip ungrounded_name hard-fail
- *   (still blocks cross-sport free-association and topic-drift pivots).
+ *   mode: 'adapt' — names in the draft/desk brief count as grounded for football cast
+ *   (still blocks cross-sport free-association and dismiss/abandon topic-drift pivots).
  */
 export function scoreDraftRelevance(draft, opts = {}) {
   const text = String(draft || '').trim()
   const topic = String(opts.orderedTopic || opts.topic || '')
   const deskBrief = String(opts.deskBrief || opts.context || '')
   const adaptMode = String(opts.mode || '').toLowerCase() === 'adapt'
-  const sourceText = `${topic}\n${deskBrief}`
+  // Cross-sport unlocks only from topic/desk — never from the draft alone.
+  const briefSource = `${topic}\n${deskBrief}`
+  // Adapt: approved draft (and desk brief) ground same-story football cast (Bergvall etc.).
+  const personGroundingSource = adaptMode ? `${topic}\n${deskBrief}\n${text}` : briefSource
   const reasons = []
   const rewriteHints = []
   const offTopic = []
@@ -498,7 +504,7 @@ export function scoreDraftRelevance(draft, opts = {}) {
 
   // A0) Topic drift — ordered topic only (desk RSS must not unlock a Keegan pivot)
   const topicAnchors = extractTopicAnchorTokens(topic)
-  const drift = detectTopicDrift(text, topic)
+  const drift = detectTopicDrift(text, topic, { mode: opts.mode })
   if (drift.drift) {
     score = Math.min(score, 1.5)
     const foreignLabel = drift.foreign[0] || 'another person'
@@ -519,7 +525,7 @@ export function scoreDraftRelevance(draft, opts = {}) {
   for (const fig of CROSS_SPORT_FIGURES) {
     const hit = fig.patterns.some((re) => re.test(text))
     if (!hit) continue
-    if (fig.patterns.some((re) => sourceHas(sourceText, re)) || sourceHas(sourceText, fig.label)) {
+    if (fig.patterns.some((re) => sourceHas(briefSource, re)) || sourceHas(briefSource, fig.label)) {
       continue
     }
     offTopic.push({ id: fig.id, label: fig.label, kind: 'cross_sport_person' })
@@ -528,38 +534,35 @@ export function scoreDraftRelevance(draft, opts = {}) {
   // A) Cross-sport lexemes
   for (const lex of CROSS_SPORT_LEXEMES) {
     if (!lex.pattern.test(text)) continue
-    if (sourceHas(sourceText, lex.pattern) || sourceHas(sourceText, lex.label)) continue
-    if (Array.isArray(lex.sourceAlso) && lex.sourceAlso.some((re) => sourceHas(sourceText, re))) {
+    if (sourceHas(briefSource, lex.pattern) || sourceHas(briefSource, lex.label)) continue
+    if (Array.isArray(lex.sourceAlso) && lex.sourceAlso.some((re) => sourceHas(briefSource, re))) {
       continue
     }
     offTopic.push({ id: lex.id, label: lex.label, kind: 'cross_sport' })
   }
 
-  // A) Ungrounded person-like names (soft→hard when several, or when also cross-sport)
-  // Adapt: draft is the cast source of truth — do not hard-fail football names already in the VO.
+  // A) Ungrounded person-like names — Adapt grounds names present in the draft/desk brief.
   const names = extractPersonLikeNames(text)
   const ungrounded = []
-  if (!adaptMode) {
-    for (const name of names) {
-      if (nameGroundedInSource(name, sourceText, topicAnchors)) continue
-      // Skip if already captured as a known cross-sport figure
-      if (
-        CROSS_SPORT_FIGURES.some((fig) =>
-          fig.patterns.some((re) => re.test(name)),
-        )
-      ) {
-        continue
-      }
-      ungrounded.push(name)
+  for (const name of names) {
+    if (nameGroundedInSource(name, personGroundingSource, topicAnchors)) continue
+    // Skip if already captured as a known cross-sport figure
+    if (
+      CROSS_SPORT_FIGURES.some((fig) =>
+        fig.patterns.some((re) => re.test(name)),
+      )
+    ) {
+      continue
     }
-    // Hard-fail ungrounded names that look like celebrity parallels (2+ tokens, none in source)
-    for (const name of ungrounded.slice(0, 4)) {
-      offTopic.push({
-        id: `ungrounded:${normalizeHay(name).replace(/\s+/g, '_')}`,
-        label: name,
-        kind: 'ungrounded_name',
-      })
-    }
+    ungrounded.push(name)
+  }
+  // Hard-fail ungrounded names that look like celebrity parallels (2+ tokens, none in source)
+  for (const name of ungrounded.slice(0, 4)) {
+    offTopic.push({
+      id: `ungrounded:${normalizeHay(name).replace(/\s+/g, '_')}`,
+      label: name,
+      kind: 'ungrounded_name',
+    })
   }
 
   if (offTopic.length) {
@@ -608,7 +611,7 @@ export function scoreDraftRelevance(draft, opts = {}) {
   if (
     /\b(autis(m|tic)|disabled|disability|special\s+needs)\b/i.test(text) &&
     !/\b(autis(m|tic)|disabled|disability|special\s+needs|son|daughter|child)\b/i.test(
-      normalizeHay(sourceText),
+      normalizeHay(briefSource),
     )
   ) {
     score -= 3

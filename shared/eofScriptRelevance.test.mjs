@@ -107,6 +107,19 @@ Live desk headlines:
     const topic = 'Roberto di zebri under pressure at Marseille'
     const draft = `Roberto De Zerbi is under pressure at Marseille after another sticky result. Lucas Bergvall has been linked in the chatter around the squad rebuild, but the stake is still De Zerbi's job. Does the board stick with De Zerbi, or blink first? Comment.`
 
+    // Generate-style (topic-only grounding) still flags Bergvall — Rooney+Ronaldo topics pass because both are in the topic string.
+    const generateStyle = scoreDraftRelevance(draft, {
+      topic,
+      orderedTopic: topic,
+      deskBrief: '',
+      format: 'news',
+    })
+    assert.equal(generateStyle.pass, false, JSON.stringify(generateStyle))
+    assert.ok(
+      generateStyle.reasons.some((r) => /Bergvall/i.test(r) && /not grounded/i.test(r)),
+      JSON.stringify(generateStyle.reasons),
+    )
+
     const v = scoreDraftRelevance(draft, {
       topic,
       orderedTopic: topic,
@@ -121,6 +134,31 @@ Live desk headlines:
       JSON.stringify(v.offTopic),
     )
     assert.ok(!v.reasons.some((r) => /not grounded|Topic drift/i.test(r)), JSON.stringify(v.reasons))
+  })
+
+  it('adapt grounds Bergvall-heavy De Zerbi draft when topic hero remains present', () => {
+    const topic = 'Roberto di zebri'
+    const draft = `Lucas Bergvall is in the frame for Marseille's midfield rebuild. Bergvall can carry the ball and progress play. Roberto De Zerbi still sets the system and owns the results. Is Bergvall the unlock under De Zerbi, or noise around a coach under pressure? Comment.`
+    const v = scoreDraftRelevance(draft, {
+      topic,
+      orderedTopic: topic,
+      deskBrief: '',
+      mode: 'adapt',
+    })
+    assert.ok(v.pass, JSON.stringify(v))
+    assert.equal(v.topicDrift, false, JSON.stringify(v))
+  })
+
+  it('Rooney+Ronaldo topic already grounds both names without adapt mode', () => {
+    const topic = "Wayne Rooney: Ronaldo isn't getting enough service"
+    const draft = `Wayne Rooney says Cristiano Ronaldo isn't getting enough service in the final third. That is the stake: supply for the star versus the system around him. Fair from Rooney, or overstated about Ronaldo? Comment.`
+    const v = scoreDraftRelevance(draft, {
+      topic,
+      orderedTopic: topic,
+      deskBrief: '',
+    })
+    assert.ok(v.pass, JSON.stringify(v))
+    assert.ok(!v.offTopic.some((o) => o.kind === 'ungrounded_name'), JSON.stringify(v.offTopic))
   })
 
   it('still blocks Fury when hair topic never mentions boxing', () => {
