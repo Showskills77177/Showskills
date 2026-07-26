@@ -158,11 +158,20 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
         console.info('[eof-production] continue audio already done → video', jobId)
       }
       // Hobby/slim only: fresh invocation for Serp + ffmpeg.
+      // If self-fetch cannot start (missing SITE_URL / CRON_SECRET), fall through
+      // and finish video in this same waitUntil — never leave the job stranded after TTS.
       if (await isEofSlimBuildEnabled()) {
-        await scheduleEofBuildContinue(jobId, 'video', {
+        const scheduled = await scheduleEofBuildContinue(jobId, 'video', {
           imageProvider: opts.imageProvider,
         })
-        return getEofProductionJob(jobId)
+        if (scheduled?.ok) {
+          return getEofProductionJob(jobId)
+        }
+        console.warn(
+          '[eof-production] continue-build schedule failed — running video in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
       }
       step = 'video'
     }
@@ -194,6 +203,38 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
     await markEofProductionJobFailed(jobId, message)
     throw e
   }
+}
+
+/**
+ * Hobby/slim continue-build entry — returns immediately; work runs under waitUntil.
+ * Never await Serp+ffmpeg in the HTTP request (that blocked the prior audio invocation's fetch).
+ * @param {string} jobId
+ * @param {{ step?: 'audio'|'video'|'auto', imageProvider?: string|null, qualityGateMode?: 'auto'|'manual', forceFreshImages?: boolean }} [opts]
+ */
+export async function startEofProductionContinueBackground(jobId, opts = {}) {
+  const job = await getEofProductionJob(jobId)
+  if (!job) throw new Error('Production job not found.')
+  if (
+    job.status !== EOF_PRODUCTION_JOB_STATUS.RENDERING &&
+    job.status !== EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO
+  ) {
+    return job
+  }
+
+  const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
+  const run = () =>
+    continueEofProductionBuild(jobId, {
+      step: opts.step,
+      imageProvider: opts.imageProvider,
+      qualityGateMode,
+      forceFreshImages: opts.forceFreshImages === true,
+    }).catch((e) => {
+      if (e instanceof EofQualityGateBlockedError) return
+      console.error('[eof-production] continue-build failed', jobId, e)
+    })
+
+  await runEofProductionWork(run)
+  return getEofProductionJob(jobId)
 }
 
 /**

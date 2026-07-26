@@ -394,14 +394,14 @@ export default async function handler(req, res) {
           body.step === 'audio' || body.step === 'video' ? body.step : 'auto'
         try {
           const runner = await loadEofRenderRunner()
-          // Slim/Hobby path: await this step only (TTS **or** Serp+encode); next step self-chains.
-          await runner.continueEofProductionBuild(jobId, {
+          // Return 202 immediately — Serp+ffmpeg must not block the prior audio invocation's fetch.
+          await runner.startEofProductionContinueBackground(jobId, {
             step,
             imageProvider,
             qualityGateMode: 'manual',
           })
           const job = await getEofProductionJob(jobId)
-          return json(res, 200, { ok: true, continued: true, step, job })
+          return json(res, 202, { ok: true, accepted: true, continued: true, step, job })
         } catch (e) {
           const EofQualityGateBlockedError = await loadEofQualityGateBlockedError()
           if (e instanceof EofQualityGateBlockedError) {

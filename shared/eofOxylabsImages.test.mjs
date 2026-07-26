@@ -54,6 +54,42 @@ describe('eofOxylabsImages', () => {
     assert.match(q1, /long hair|Chelsea/i)
   })
 
+  it('claims empty-title Serp CDN hits when job query names Cucurella', () => {
+    const query = '"Marc Cucurella" Chelsea hair'
+    const emptyTitle = {
+      url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-cdn-1',
+      title: '',
+      source: 'serpapi',
+      width: 800,
+      height: 1200,
+    }
+    const score = scoreOxylabsHitForScene(emptyTitle, {
+      topic: 'Marc Cucurella',
+      subject: 'Marc Cucurella',
+      imageQuery: query,
+      jobQuery: query,
+    })
+    assert.ok(score > -100, `empty-title + named query must be claimable, got ${score}`)
+    const claimed = claimOxylabsPoolHit({
+      hits: [
+        emptyTitle,
+        {
+          url: 'https://cdn.example.com/wrong.jpg',
+          title: 'Cristiano Ronaldo',
+          source: 'serpapi',
+        },
+      ],
+      claimed: new Set(),
+      subject: 'Marc Cucurella',
+      topic: 'Marc Cucurella',
+      imageQuery: query,
+      jobQuery: query,
+      keyPrefix: 'serpapi',
+    })
+    assert.ok(claimed, 'must claim the empty-title Cucurella Serp hit')
+    assert.match(claimed.imgUrl, /cuc-cdn-1/)
+  })
+
   it('surfaces Oxylabs auth failure (not only Wikimedia) in no-images errors', () => {
     const msg = formatEofNoSceneImagesError({
       topic: "Why Mark Cuccorea doesn't cut his hair",

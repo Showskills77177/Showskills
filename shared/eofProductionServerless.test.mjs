@@ -138,6 +138,7 @@ describe('eof production render import smoke', () => {
     assert.equal(typeof video.assertEofVideoPersisted, 'function')
     assert.equal(typeof runner.renderEofProductionFullBuild, 'function')
     assert.equal(typeof runner.continueEofProductionBuild, 'function')
+    assert.equal(typeof runner.startEofProductionContinueBackground, 'function')
     assert.equal(typeof runner.startEofProductionFullBuildBackground, 'function')
     assert.equal(typeof ffmpeg.runFfmpeg, 'function')
     assert.equal(typeof handler.default, 'function')

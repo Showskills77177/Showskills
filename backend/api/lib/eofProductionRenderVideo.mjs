@@ -82,15 +82,15 @@ const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 /** Cap whole scrape+vision+gen phase so builds fail fast instead of freezing the UI. */
 const IMAGE_POOL_DEADLINE_MS =
   Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) ||
-  (isEofForceSlim() ? 50_000 : 75_000)
+  (isEofForceSlim() ? 50_000 : 70_000)
 /** Cap per-scene download / slow fallback waterfall after the Serp pool. */
 const SCENE_ASSIGN_DEADLINE_MS =
   Number(process.env.EOF_SCENE_ASSIGN_DEADLINE_MS) ||
-  (isEofForceSlim() ? 60_000 : 90_000)
+  (isEofForceSlim() ? 60_000 : 75_000)
 /** Cap ffmpeg scene clips + mux so UI never sits forever. Pro gets a longer budget. */
 const VIDEO_ENCODE_DEADLINE_MS =
   Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) ||
-  (isEofForceSlim() ? 140_000 : 180_000)
+  (isEofForceSlim() ? 140_000 : 210_000)
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 

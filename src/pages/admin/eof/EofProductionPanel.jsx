@@ -1569,11 +1569,15 @@ export default function EofProductionPanel({
   const isRenderStuck =
     (selected?.status === 'rendering' || selected?.status === 'rendering_video') &&
     displayProgress &&
-    (displayProgress.elapsedSeconds > Math.max(120, (displayProgress.estimatedTotalSec || 60) * 1.5) ||
-      // Image search / scene assign / ffmpeg — fail-fast UI so Cancel appears within ~90s.
+    (displayProgress.elapsedSeconds >
+      Math.max(
+        buildMode === 'pro' ? 260 : 120,
+        (displayProgress.estimatedTotalSec || 60) * (buildMode === 'pro' ? 1.8 : 1.5),
+      ) ||
+      // Image search / scene assign / ffmpeg — Hobby fail-fast ~90s; Pro needs room for full encode.
       (displayProgress.pipeline === 'video' &&
         (displayProgress.stage === 'video' || displayProgress.stage === 'images') &&
-        displayProgress.elapsedSeconds > 90))
+        displayProgress.elapsedSeconds > (buildMode === 'pro' ? 240 : 90)))
 
   useEffect(() => {
     if (!active || !selectedId) return undefined

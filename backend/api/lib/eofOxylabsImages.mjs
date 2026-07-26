@@ -685,7 +685,7 @@ export async function fetchEofOxylabsSecondaryPool(opts = {}) {
  * Rank a SERP hit for a specific scene using title relevance + portrait preference.
  * Do NOT inject the job search query into the haystack — that hid weak titles.
  * @param {{ url?: string, title?: string|null, width?: number, height?: number }} hit
- * @param {{ topic?: string, imageQuery?: string, caption?: string, plainTextDraft?: string, intent?: string }} scene
+ * @param {{ topic?: string, subject?: string, imageQuery?: string, caption?: string, plainTextDraft?: string, intent?: string, jobQuery?: string, query?: string, poolQuery?: string }} scene
  */
 export function scoreOxylabsHitForScene(hit, scene = {}) {
   const title = String(hit?.title || '').trim()
@@ -707,11 +707,16 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
   const src = String(hit?.source || '')
   const isGen = src === 'grok-imagine' || src === 'free-gen'
   const vision = Number(hit?.visionScore)
+  const poolQuery = String(scene.jobQuery || scene.poolQuery || scene.query || '').trim()
+  // Google Images often returns CDN URLs with empty titles; if the Serp query already
+  // named the person (`"Marc Cucurella" Chelsea hair`), keep those hits claimable.
+  const queryNamesSubject = Boolean(poolQuery) && hitMentionsSubject(subject, poolQuery, '')
+  const emptyTitleQueryOk = queryNamesSubject && !title && Boolean(url)
 
   // Named subject (Rooney / Tuchel / …): title/URL must name them, OR vision already verified.
   if (isNamedFootballSubject(subject) && !isGen) {
     const visionOk = Number.isFinite(vision) && vision >= MIN_EOF_VISION_SCORE
-    if (!visionOk && !hitMentionsSubject(subject, title, url)) {
+    if (!visionOk && !hitMentionsSubject(subject, title, url) && !emptyTitleQueryOk) {
       return -500
     }
     // Vision already rejected this face — never claim.
@@ -774,6 +779,7 @@ export function claimOxylabsPoolHit(opts = {}) {
     else avoid.add(`${prefixTag}${k}`)
   }
 
+  const poolQuery = String(opts.jobQuery || opts.query || opts.poolQuery || '').trim()
   const scene = {
     topic: opts.topic,
     subject: opts.subject || resolveImageSubject(opts.topic) || opts.topic,
@@ -781,9 +787,11 @@ export function claimOxylabsPoolHit(opts = {}) {
     caption: opts.caption,
     plainTextDraft: opts.plainTextDraft,
     intent: opts.intent,
+    jobQuery: poolQuery,
   }
   const subject =
     resolveImageSubject(scene.subject || scene.topic) || String(scene.subject || '').trim()
+  const queryNamesSubject = Boolean(poolQuery) && hitMentionsSubject(subject, poolQuery, '')
   const ranked = hits
     .map((hit, i) => {
       const hitSource = String(hit?.source || '').trim()
@@ -791,10 +799,13 @@ export function claimOxylabsPoolHit(opts = {}) {
         hitSource === 'grok-imagine' || hitSource === 'free-gen' ? hitSource : prefix
       const identity = String(hit?.localPath || hit?.url || '').trim()
       const score = scoreOxylabsHitForScene(hit, scene)
+      const emptyTitleQueryOk =
+        queryNamesSubject && !String(hit?.title || '').trim() && Boolean(identity)
       if (
         score <= -400 &&
         isNamedFootballSubject(subject) &&
-        !hitMentionsSubject(subject, hit?.title || '', identity)
+        !hitMentionsSubject(subject, hit?.title || '', identity) &&
+        !emptyTitleQueryOk
       ) {
         console.info(
           '[eof-images] reject claim candidate',
@@ -821,17 +832,19 @@ export function claimOxylabsPoolHit(opts = {}) {
 
   // Never claim Getty/meme/quote-card / wrong-subject hits (score ≤ -100).
   const usable = ranked.filter((row) => row.score > -100)
+  const subjectCueOk = (title, url, hitSource) => {
+    if (hitSource === 'grok-imagine' || hitSource === 'free-gen') return true
+    if (!isNamedFootballSubject(subject)) return true
+    if (hitMentionsSubject(subject, title || '', url || '')) return true
+    // Empty-title Serp CDN row kept because the job query named the person.
+    return queryNamesSubject && !String(title || '').trim() && Boolean(url)
+  }
   let fallback = null
   for (const row of usable) {
     if (claimed.has(row.key)) continue
     if (avoid.has(row.url) || avoid.has(row.key) || (row.localPath && avoid.has(row.localPath))) {
       // Avoid-history reuse is OK only when the still still names the subject.
-      if (
-        isNamedFootballSubject(subject) &&
-        !hitMentionsSubject(subject, row.hit?.title || '', row.url) &&
-        row.hitSource !== 'grok-imagine' &&
-        row.hitSource !== 'free-gen'
-      ) {
+      if (!subjectCueOk(row.hit?.title || '', row.url, row.hitSource)) {
         continue
       }
       if (!fallback) fallback = { ...row, reused: true }
@@ -852,12 +865,7 @@ export function claimOxylabsPoolHit(opts = {}) {
   }
   if (!fallback) return null
   // Named-subject Shorts: never fall back to a still that does not name the person.
-  if (
-    isNamedFootballSubject(subject) &&
-    fallback.hitSource !== 'grok-imagine' &&
-    fallback.hitSource !== 'free-gen' &&
-    !hitMentionsSubject(subject, fallback.hit?.title || '', fallback.url)
-  ) {
+  if (!subjectCueOk(fallback.hit?.title || '', fallback.url, fallback.hitSource)) {
     console.info(
       '[eof-images] refuse fallback without subject cue',
       subject.slice(0, 40),

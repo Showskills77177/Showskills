@@ -353,6 +353,7 @@ async function fetchEofSceneImageInner({
     const poolSource = oxyPool.source === 'serpapi' ? 'serpapi' : 'oxylabs'
     const secondarySubject = String(oxyPool.secondarySubject || '').trim()
     const leadPoolSubject = String(oxyPool.subject || topic || '').trim()
+    const poolQuery = String(oxyPool.query || '').trim()
     const qLower = String(anchoredQuery || '').toLowerCase()
     const useSecondary =
       secondarySubject &&
@@ -364,6 +365,13 @@ async function fetchEofSceneImageInner({
       ? oxyPool.secondaryClaimed || (oxyPool.secondaryClaimed = new Set())
       : oxyPool.claimed || (oxyPool.claimed = new Set())
     const activeSubject = useSecondary ? secondarySubject : leadPoolSubject
+    const activePoolQuery = useSecondary
+      ? String(oxyPool.secondaryQuery || poolQuery).trim()
+      : poolQuery
+    const queryNamesSubject =
+      Boolean(activePoolQuery) &&
+      isNamedFootballSubject(activeSubject) &&
+      hitMentionsSubject(activeSubject, activePoolQuery, '')
     const maxDownloadTries = 5
     for (let t = 0; t < maxDownloadTries; t += 1) {
       const claimed = claimOxylabsPoolHit({
@@ -378,14 +386,20 @@ async function fetchEofSceneImageInner({
         plainTextDraft: draft,
         intent: useSecondary ? 'coach' : roleIntent,
         keyPrefix: useSecondary ? `${poolSource}-sec` : poolSource,
+        jobQuery: activePoolQuery,
       })
       if (!claimed) break
+      const titleBlank = !String(claimed.title || '').trim()
+      const subjectCue =
+        hitMentionsSubject(activeSubject, claimed.title || '', claimed.imgUrl || '') ||
+        (queryNamesSubject && titleBlank)
       // Named subject: refuse stills that never mention them (titles lie less often than pixels, but still a gate).
+      // Exception: empty-title Serp CDN URLs when the job query already named the person.
       if (
         isNamedFootballSubject(activeSubject) &&
         claimed.hitSource !== 'grok-imagine' &&
         claimed.hitSource !== 'free-gen' &&
-        !hitMentionsSubject(activeSubject, claimed.title || '', claimed.imgUrl || '')
+        !subjectCue
       ) {
         console.info(
           '[eof-scene-images] reject claimed still — no subject cue',
@@ -395,7 +409,7 @@ async function fetchEofSceneImageInner({
         activeClaimed.delete?.(claimed.key)
         continue
       }
-      // Score the TITLE for the scene — job query alone must not rubber-stamp weak stills.
+      // Score the TITLE for the scene — job query alone must not rubber-stamp weak titles.
       // Prefer topic (full headline) over bare subject so job-query clubs/attrs don't tank scores.
       const score = scoreImageRelevance(
         topic || activeSubject || anchoredQuery || '',
@@ -404,8 +418,7 @@ async function fetchEofSceneImageInner({
         { plainTextDraft: draft, captions: caption, intent: roleIntent },
       )
       const subjectNamed =
-        isNamedFootballSubject(activeSubject) &&
-        hitMentionsSubject(activeSubject, claimed.title || '', claimed.imgUrl || '')
+        isNamedFootballSubject(activeSubject) && subjectCue
       // Named-subject stills that already pass the name cue must not be discarded for a weak
       // token score (Cucurella: `"Marc Cucurella" Chelsea hair` used to score real titles at -2).
       if (
@@ -446,6 +459,10 @@ async function fetchEofSceneImageInner({
     }
     // Secondary pool empty/failed → fall back to lead pool once (still must match lead subject).
     if (useSecondary && Array.isArray(oxyPool.hits)) {
+      const leadQueryNames =
+        Boolean(poolQuery) &&
+        isNamedFootballSubject(leadPoolSubject) &&
+        hitMentionsSubject(leadPoolSubject, poolQuery, '')
       for (let t = 0; t < 3; t += 1) {
         const claimed = claimOxylabsPoolHit({
           hits: oxyPool.hits,
@@ -459,13 +476,18 @@ async function fetchEofSceneImageInner({
           plainTextDraft: draft,
           intent: roleIntent,
           keyPrefix: poolSource,
+          jobQuery: poolQuery,
         })
         if (!claimed) break
+        const titleBlank = !String(claimed.title || '').trim()
+        const leadCue =
+          hitMentionsSubject(leadPoolSubject, claimed.title || '', claimed.imgUrl || '') ||
+          (leadQueryNames && titleBlank)
         if (
           isNamedFootballSubject(leadPoolSubject) &&
           claimed.hitSource !== 'grok-imagine' &&
           claimed.hitSource !== 'free-gen' &&
-          !hitMentionsSubject(leadPoolSubject, claimed.title || '', claimed.imgUrl || '')
+          !leadCue
         ) {
           oxyPool.claimed.delete?.(claimed.key)
           continue
