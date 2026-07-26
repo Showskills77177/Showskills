@@ -228,6 +228,24 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
     )
   })
 
+  it('age 281s with heartbeat IS stale — do not raise the ceiling; finish the encode instead', () => {
+    // Exact Cucurella paste: poll killed at 281s. Raising maxAge forever is wrong —
+    // Vercel maxDuration is still 300s. Pipeline must finish under ~280s.
+    const now = Date.now()
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 281_000).toISOString() },
+        },
+        { now, ...resolveEofStaleWindows({ slim: false }) },
+      ),
+      true,
+      '281s means the build was too slow — Pro-reliable encode must finish earlier',
+    )
+  })
+
   it('Hobby slim may still early-fail on quiet', () => {
     const now = Date.now()
     assert.equal(

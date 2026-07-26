@@ -675,10 +675,8 @@ export async function failStaleEofProductionRenders(opts = {}) {
       ? Math.round((now - Date.parse(String(startedRaw))) / 1000)
       : staleOpts.maxAgeSec
     const message = slim
-      ? `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
-        `Cancel if stuck, then Rebuild once. Build mode is Hobby (slim) — or set EOF_FORCE_SLIM=1 on the server.`
-      : `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
-        `Cancel if stuck, then Rebuild once. Build mode is Pro — full encodes can take up to ~${staleOpts.maxAgeSec}s; do not Rebuild while a live encode is still running.`
+      ? `Build took too long (>${ageSec}s). Pipeline must finish under Vercel maxDuration — Rebuild once; if it keeps hitting this, use fewer scenes or Hobby slim.`
+      : `Build took too long (>${ageSec}s). Pipeline must finish under Vercel maxDuration — Rebuild once; if it keeps hitting this, use fewer scenes or Hobby slim.`
     console.warn(
       `[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s slim=${slim} maxAge=${staleOpts.maxAgeSec}s quiet=${staleOpts.maxQuietSec}s`,
     )

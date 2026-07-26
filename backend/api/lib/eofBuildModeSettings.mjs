@@ -28,7 +28,7 @@ export function listEofBuildModeOptions() {
       id: 'pro',
       label: 'Pro',
       detail:
-        'Full quality — all scenes, overlays, transitions, Ken Burns. Best on Vercel Pro (maxDuration 300).',
+        'Pro path under Vercel maxDuration 300 — reliable encode (hard cuts, no Ken Burns/overlays on Vercel). Local keeps full CapCut look.',
     },
     {
       id: 'hobby',

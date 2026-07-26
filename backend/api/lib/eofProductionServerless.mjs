@@ -1,9 +1,12 @@
 /**
  * EOF Production Shorts — Vercel Pro vs Hobby adaptation.
  *
- * Default (Pro / full quality):
- *   waitUntil + 202, full CapCut-style pipeline (overlays, transitions, more scenes)
- *   under vercel.json maxDuration 300.
+ * Default (Pro / full quality on local):
+ *   waitUntil + 202, CapCut-style pipeline under vercel.json maxDuration 300.
+ *
+ * Vercel Pro "reliable" encode (runtime VERCEL=1, not Hobby slim):
+ *   Hard cuts, no Ken Burns / logo blur / inset overlays. Full xfade+KB+blur
+ *   routinely blows the 300s isolate after Serp + vision + 4 scene encodes.
  *
  * Hobby / slim:
  *   Admin UI "Build mode: Hobby" (persisted) OR env EOF_FORCE_SLIM=1
@@ -20,6 +23,60 @@ export const EOF_SERVERLESS_MAX_DURATION_SEC =
 /** Cap scene count when slim/Hobby mode is forced. */
 export const EOF_SERVERLESS_MAX_SCENES =
   Number(process.env.EOF_SERVERLESS_MAX_SCENES) || 4
+
+/**
+ * Decide which expensive ffmpeg extras to drop so a Short finishes under maxDuration.
+ * Pure — safe for unit tests.
+ *
+ * Local/dev: full CapCut. Hobby slim: everything off.
+ * Vercel Pro: always drop logo blur + Ken Burns (biggest per-clip cost).
+ * Overlays + xfade stay unless sceneCount ≥ threshold (threatens 300s with Serp+TTS).
+ *
+ * @param {{ sceneCount?: number, vercel?: boolean, slim?: boolean }} [opts]
+ */
+export function resolveEofProEncodeCaps(opts = {}) {
+  const slim = opts.slim === true
+  const vercel = opts.vercel === true
+  const sceneCount = Math.max(0, Number(opts.sceneCount) || 0)
+  const sceneThreshold = Math.max(3, Number(process.env.EOF_PRO_ENCODE_BUDGET_SCENE_THRESHOLD) || 5)
+  if (slim) {
+    return {
+      skipLogoBlur: true,
+      skipKenBurns: true,
+      skipXfade: true,
+      skipOverlays: true,
+      threatenBudget: true,
+      profile: 'hobby-slim',
+      preserveOverlays: false,
+      preserveTransitions: false,
+    }
+  }
+  if (vercel) {
+    // 5+ full scenes with xfade+overlay after Serp routinely push past 280–300s.
+    const heavy = sceneCount >= sceneThreshold
+    return {
+      skipLogoBlur: true,
+      skipKenBurns: true,
+      // Preserve transitions/overlays when we can still fit under maxDuration.
+      skipXfade: heavy,
+      skipOverlays: heavy,
+      threatenBudget: true,
+      profile: heavy ? 'pro-budget' : 'pro-reliable',
+      preserveOverlays: !heavy,
+      preserveTransitions: !heavy,
+    }
+  }
+  return {
+    skipLogoBlur: false,
+    skipKenBurns: false,
+    skipXfade: false,
+    skipOverlays: false,
+    threatenBudget: false,
+    profile: 'full',
+    preserveOverlays: true,
+    preserveTransitions: true,
+  }
+}
 
 /** Running on Vercel (Pro or Hobby) — does NOT imply slim. */
 export function isEofVercelRuntime() {

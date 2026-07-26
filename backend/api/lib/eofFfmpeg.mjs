@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { promisify } from 'node:util'
+import { startProgressHeartbeat } from './eofAsyncPool.mjs'
 
 const execFileAsync = promisify(execFile)
 
@@ -92,12 +93,21 @@ async function resolveFfprobePath() {
 
 /**
  * @param {string[]} args
- * @param {import('node:child_process').ExecFileOptions & { timeoutMs?: number }} [opts]
+ * @param {import('node:child_process').ExecFileOptions & {
+ *   timeoutMs?: number,
+ *   onHeartbeat?: () => Promise<void> | void,
+ *   heartbeatMs?: number,
+ * }} [opts]
  */
 export async function runFfmpeg(args, opts = {}) {
   const bin = await resolveFfmpegPath()
-  const { timeoutMs, timeout, ...rest } = opts
+  const { timeoutMs, timeout, onHeartbeat, heartbeatMs, ...rest } = opts
   const ms = resolveExecTimeoutMs(timeoutMs ?? timeout, DEFAULT_FFMPEG_TIMEOUT_MS)
+  // Long libx264 encodes go mute for tens of seconds — tick so Pro quiet-stale stays accurate.
+  const stopHb =
+    typeof onHeartbeat === 'function'
+      ? startProgressHeartbeat(onHeartbeat, heartbeatMs || 3000)
+      : null
   try {
     return await execFileAsync(bin, args, {
       ...rest,
@@ -115,6 +125,8 @@ export async function runFfmpeg(args, opts = {}) {
       }
     }
     throw formatBinaryError('ffmpeg', err)
+  } finally {
+    stopHb?.()
   }
 }
 

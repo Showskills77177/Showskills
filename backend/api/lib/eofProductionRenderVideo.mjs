@@ -76,6 +76,7 @@ import {
   isEofForceSlim,
   capEofScriptScenesForServerless,
   eofServerlessSlimRenderOpts,
+  isEofVercelRuntime,
 } from './eofProductionServerless.mjs'
 import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
 
@@ -83,15 +84,15 @@ const IMAGE_CONCURRENCY = Number(process.env.EOF_IMAGE_CONCURRENCY) || 3
 /** Cap whole scrape+vision+gen phase so builds fail fast instead of freezing the UI. */
 const IMAGE_POOL_DEADLINE_MS =
   Number(process.env.EOF_IMAGE_POOL_DEADLINE_MS) ||
-  (isEofForceSlim() ? 50_000 : 70_000)
+  (isEofForceSlim() ? 50_000 : isEofVercelRuntime() ? 45_000 : 70_000)
 /** Cap per-scene download / slow fallback waterfall after the Serp pool. */
 const SCENE_ASSIGN_DEADLINE_MS =
   Number(process.env.EOF_SCENE_ASSIGN_DEADLINE_MS) ||
-  (isEofForceSlim() ? 60_000 : 75_000)
-/** Cap ffmpeg scene clips + mux so UI never sits forever. Pro gets a longer budget. */
+  (isEofForceSlim() ? 60_000 : isEofVercelRuntime() ? 50_000 : 75_000)
+/** Cap ffmpeg scene clips + mux. Vercel Pro-reliable must leave headroom under 280s. */
 const VIDEO_ENCODE_DEADLINE_MS =
   Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) ||
-  (isEofForceSlim() ? 140_000 : 210_000)
+  (isEofForceSlim() ? 140_000 : isEofVercelRuntime() ? 160_000 : 210_000)
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 
@@ -660,7 +661,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 subject: oxyPool.subject || leadSubject || job.topic,
                 intent: oxyPool.intent || leadIntent || 'neutral',
                 secondarySubjects: secondaryPeople,
-                maxImages: Math.min(8, oxyPool.hits.length),
+                // Vercel: score fewer stills so vision stays under ~10s of the 300s budget.
+                maxImages: Math.min(isEofVercelRuntime() ? 4 : 8, oxyPool.hits.length),
               })
               if (visionScores.size) {
                 // Fallback keeps query-named empty-title stills if vision rejects everything
@@ -691,7 +693,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
               } else {
                 oxyPool.hits = sortEofPoolHitsPreferScrape(oxyPool.hits)
               }
-              if (oxyPool.secondaryHits?.length) {
+              // Skip secondary vision on Vercel — a second Grok round easily burns another 10–25s.
+              if (oxyPool.secondaryHits?.length && !isEofVercelRuntime()) {
                 const secScores = await rankEofPoolHitsWithVision({
                   hits: oxyPool.secondaryHits,
                   subject: oxyPool.secondarySubject || secondaryPeople[0],
@@ -707,6 +710,15 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                     { query: oxyPool.secondaryQuery || '' },
                   )
                 }
+              } else if (
+                oxyPool.secondaryHits?.length &&
+                isNamedFootballSubject(oxyPool.secondarySubject || secondaryPeople[0])
+              ) {
+                oxyPool.secondaryHits = filterHitsRequiringSubjectNameCue(
+                  oxyPool.secondaryHits,
+                  oxyPool.secondarySubject || secondaryPeople[0],
+                  { query: oxyPool.secondaryQuery || '' },
+                )
               }
             } catch (e) {
               console.warn('[eof-video] vision re-rank skipped', e instanceof Error ? e.message : e)

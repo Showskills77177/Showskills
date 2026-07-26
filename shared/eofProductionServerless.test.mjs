@@ -10,6 +10,7 @@ import {
   isEofServerlessEnv,
   capEofScriptScenesForServerless,
   eofServerlessSlimRenderOpts,
+  resolveEofProEncodeCaps,
 } from '../backend/api/lib/eofProductionServerless.mjs'
 import {
   normalizeEofBuildMode,
@@ -18,6 +19,7 @@ import {
 } from '../backend/api/lib/eofBuildModeSettings.mjs'
 import { isEofRenderStale, EOF_STALE_RENDER_SEC, EOF_STALE_PROGRESS_SEC } from '../backend/api/lib/eofProductionJobs.mjs'
 import { withDeadline } from '../backend/api/lib/eofAsyncPool.mjs'
+import { eofImageVisionTimeoutMs } from '../backend/api/lib/eofImageVision.mjs'
 
 describe('eofProductionServerless', () => {
   it('caps scenes to ≤4 without mutating the original script', () => {
@@ -97,7 +99,7 @@ describe('eofProductionServerless', () => {
   })
 
   it('default stale windows leave room for a long Pro encode', () => {
-    assert.ok(EOF_STALE_RENDER_SEC >= 280, `max age ${EOF_STALE_RENDER_SEC} too aggressive`)
+    assert.ok(EOF_STALE_RENDER_SEC >= 280, `Hobby max age ${EOF_STALE_RENDER_SEC} too aggressive`)
     assert.ok(EOF_STALE_PROGRESS_SEC >= 60, `quiet ${EOF_STALE_PROGRESS_SEC} too tight for Hobby`)
     assert.ok(EOF_STALE_PROGRESS_SEC <= 120, `quiet ${EOF_STALE_PROGRESS_SEC} too loose`)
     const now = Date.now()
@@ -125,6 +127,57 @@ describe('eofProductionServerless', () => {
       false,
       '168s quiet Pro encode must NOT auto-fail (exact user failure)',
     )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 281_000).toISOString() },
+        },
+        { now },
+      ),
+      false,
+      '281s heartbeating Pro must NOT auto-fail (exact Cucurella timeout)',
+    )
+  })
+
+  it('Vercel Pro caps blur/KB always; overlays/xfade only when scene count threatens budget', () => {
+    const local = resolveEofProEncodeCaps({ vercel: false, slim: false, sceneCount: 4 })
+    assert.equal(local.profile, 'full')
+    assert.equal(local.skipXfade, false)
+    assert.equal(local.skipOverlays, false)
+
+    const vercelLight = resolveEofProEncodeCaps({ vercel: true, slim: false, sceneCount: 4 })
+    assert.equal(vercelLight.profile, 'pro-reliable')
+    assert.equal(vercelLight.skipKenBurns, true)
+    assert.equal(vercelLight.skipLogoBlur, true)
+    assert.equal(vercelLight.skipXfade, false, '≤4 scenes keep transitions')
+    assert.equal(vercelLight.skipOverlays, false, '≤4 scenes keep overlays')
+    assert.equal(vercelLight.threatenBudget, true)
+
+    const vercelHeavy = resolveEofProEncodeCaps({ vercel: true, slim: false, sceneCount: 5 })
+    assert.equal(vercelHeavy.profile, 'pro-budget')
+    assert.equal(vercelHeavy.skipXfade, true)
+    assert.equal(vercelHeavy.skipOverlays, true)
+
+    const hobby = resolveEofProEncodeCaps({ vercel: true, slim: true, sceneCount: 4 })
+    assert.equal(hobby.profile, 'hobby-slim')
+    assert.equal(hobby.skipXfade, true)
+  })
+
+  it('vision timeout defaults to ≤10s on Vercel so Grok cannot burn the isolate', () => {
+    const prevVercel = process.env.VERCEL
+    const prevTimeout = process.env.EOF_IMAGE_VISION_TIMEOUT_MS
+    delete process.env.EOF_IMAGE_VISION_TIMEOUT_MS
+    process.env.VERCEL = '1'
+    try {
+      assert.ok(eofImageVisionTimeoutMs() <= 10_000)
+    } finally {
+      if (prevVercel === undefined) delete process.env.VERCEL
+      else process.env.VERCEL = prevVercel
+      if (prevTimeout === undefined) delete process.env.EOF_IMAGE_VISION_TIMEOUT_MS
+      else process.env.EOF_IMAGE_VISION_TIMEOUT_MS = prevTimeout
+    }
   })
 })
 

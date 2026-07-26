@@ -51,7 +51,7 @@ import {
 import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 import { mixOverlaySfxIntoAudio, resolveEofWhooshSfxPath } from './eofAudioMix.mjs'
-import { isEofForceSlim, isEofVercelRuntime } from './eofProductionServerless.mjs'
+import { isEofForceSlim, isEofVercelRuntime, resolveEofProEncodeCaps } from './eofProductionServerless.mjs'
 
 const __eofLibDir = dirname(fileURLToPath(import.meta.url))
 
@@ -76,18 +76,19 @@ const CLIP_CONCURRENCY_DEFAULT = Number(process.env.EOF_VIDEO_CLIP_CONCURRENCY) 
 const VIDEO_THREADS =
   process.env.EOF_FFMPEG_THREADS ||
   (isEofVercelRuntime() ? '2' : '0')
+/** Per-scene clip: hard cap so one hung ffmpeg cannot burn the whole 280s budget. */
 const SCENE_CLIP_TIMEOUT_MS =
   Number(process.env.EOF_SCENE_CLIP_TIMEOUT_MS) ||
-  (isEofForceSlim() ? 45_000 : 60_000)
+  (isEofForceSlim() ? 45_000 : isEofVercelRuntime() ? 40_000 : 60_000)
 const MUX_TIMEOUT_MS =
   Number(process.env.EOF_MUX_TIMEOUT_MS) ||
-  (isEofForceSlim() ? 90_000 : 120_000)
+  (isEofForceSlim() ? 90_000 : isEofVercelRuntime() ? 60_000 : 120_000)
 
-function clipConcurrency() {
+function clipConcurrency(slim = false) {
   if (process.env.EOF_VIDEO_CLIP_CONCURRENCY) return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
   // Serial clips on Hobby slim — parallel ffmpeg fights for CPU and hangs more often.
-  if (isEofForceSlim()) return 1
-  // Pro serverless: allow modest parallelism with capped threads.
+  if (slim || isEofForceSlim()) return 1
+  // Pro serverless: concurrency 2 with capped threads — biggest wall-clock win under 300s.
   if (isEofVercelRuntime()) return Math.min(2, Math.max(1, CLIP_CONCURRENCY_DEFAULT))
   return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
 }
@@ -537,6 +538,8 @@ async function encodeSceneClip({
   encodeDurationSec,
   overlayMoment = null,
   stickers = null,
+  skipLogoBlur = false,
+  onHeartbeat = null,
 }) {
   const contentDur = Math.max(2, Number(scene.durationSec) || 3)
   const dur = Math.max(contentDur, Number(encodeDurationSec) || contentDur)
@@ -546,8 +549,9 @@ async function encodeSceneClip({
   const textDir = join(workDir, `caption-text-${scene.index + 1}`)
   mkdirSync(textDir, { recursive: true })
   const useStickers = eofStickersActive(stickers)
-  const logoBlur = stillNeedsNewsAgencyLogoBlur(sceneStillLogoBlurMeta(scene))
-  const overlayLogoBlur = Boolean(overlayMoment?.overlayLogoBlur)
+  const logoBlur =
+    !skipLogoBlur && stillNeedsNewsAgencyLogoBlur(sceneStillLogoBlurMeta(scene))
+  const overlayLogoBlur = !skipLogoBlur && Boolean(overlayMoment?.overlayLogoBlur)
   if (logoBlur || overlayLogoBlur) {
     console.info(
       '[eof-video] news-agency logo blur',
@@ -571,6 +575,7 @@ async function encodeSceneClip({
   }
 
   const framingOpts = { mildKenBurns, sourceWidth, sourceHeight }
+  const ffmpegHb = typeof onHeartbeat === 'function' ? { onHeartbeat } : {}
 
   const overlayPath = overlayMoment?.overlayImagePath
   const useOverlay =
@@ -629,7 +634,7 @@ async function encodeSceneClip({
           '-an',
           clipPath,
         ],
-        { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS },
+        { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
       )
       return clipPath
     } catch (e) {
@@ -683,7 +688,7 @@ async function encodeSceneClip({
         '-an',
         clipPath,
       ],
-      { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS },
+      { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
     )
     return clipPath
   }
@@ -728,13 +733,13 @@ async function encodeSceneClip({
       '-an',
       clipPath,
     ],
-    { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS },
+    { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
   )
 
   return clipPath
 }
 
-async function stitchWithConcat({ clipPaths, mixedAudioPath, out }) {
+async function stitchWithConcat({ clipPaths, mixedAudioPath, out, onHeartbeat = null }) {
   const listFile = join(dirname(out), 'video-concat.txt')
   const listBody = clipPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n')
   await writeFile(listFile, listBody, 'utf8')
@@ -776,14 +781,25 @@ async function stitchWithConcat({ clipPaths, mixedAudioPath, out }) {
         '+faststart',
         out,
       ]
-  await runFfmpeg(args, { maxBuffer: 16 * 1024 * 1024, timeoutMs: MUX_TIMEOUT_MS })
+  await runFfmpeg(args, {
+    maxBuffer: 16 * 1024 * 1024,
+    timeoutMs: MUX_TIMEOUT_MS,
+    ...(typeof onHeartbeat === 'function' ? { onHeartbeat } : {}),
+  })
   return hasAudio
 }
 
 /**
  * CapCut-style xfade stitch. Clips must already be padded (first n-1 longer by transitionSec).
  */
-async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDurationSec }) {
+async function stitchWithXfade({
+  clipPaths,
+  mixedAudioPath,
+  out,
+  graph,
+  targetDurationSec,
+  onHeartbeat = null,
+}) {
   const hasAudio = Boolean(mixedAudioPath && existsSync(mixedAudioPath))
   const inputs = ['-y']
   for (const p of clipPaths) {
@@ -818,7 +834,11 @@ async function stitchWithXfade({ clipPaths, mixedAudioPath, out, graph, targetDu
     '+faststart',
     out,
   )
-  await runFfmpeg(args, { maxBuffer: 32 * 1024 * 1024, timeoutMs: MUX_TIMEOUT_MS })
+  await runFfmpeg(args, {
+    maxBuffer: 32 * 1024 * 1024,
+    timeoutMs: MUX_TIMEOUT_MS,
+    ...(typeof onHeartbeat === 'function' ? { onHeartbeat } : {}),
+  })
   return hasAudio
 }
 
@@ -890,12 +910,25 @@ export async function renderEofProductionVideo({
   const effectFilters = videoEffectsFilterChain(videoEffects)
   const stickers = normalizeEofStickers(stickersRaw)
   const serverlessSlim = forceSlim === undefined ? isEofForceSlim() : Boolean(forceSlim)
-  // Hobby slim: hard cuts only — xfade filtergraphs + re-encode fallbacks blow the time budget.
+  const encodeCaps = resolveEofProEncodeCaps({
+    sceneCount: sorted.length,
+    vercel: isEofVercelRuntime(),
+    slim: serverlessSlim,
+  })
+  // Hobby slim OR Pro-reliable on Vercel: hard cuts — xfade filtergraphs blow the time budget.
   const useXfade =
-    !serverlessSlim && look.perCutTransitions.length > 0 && sorted.length > 1
+    !serverlessSlim &&
+    !encodeCaps.skipXfade &&
+    look.perCutTransitions.length > 0 &&
+    sorted.length > 1
   const kenBurns =
-    !serverlessSlim && (Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1')
-  const overlayMode = serverlessSlim ? 'off' : resolveEofOverlayMoments(overlayMomentsMode)
+    !serverlessSlim &&
+    !encodeCaps.skipKenBurns &&
+    (Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1')
+  const overlayMode =
+    serverlessSlim || encodeCaps.skipOverlays
+      ? 'off'
+      : resolveEofOverlayMoments(overlayMomentsMode)
   const overlayPlan = planEofOverlayMoments({
     mode: overlayMode,
     scenes: sorted,
@@ -909,8 +942,22 @@ export async function renderEofProductionVideo({
     overlayByScene.set(m.sceneIndex, {
       ...m,
       overlayImagePath: overlayScene.imagePath,
-      overlayLogoBlur: stillNeedsNewsAgencyLogoBlur(sceneStillLogoBlurMeta(overlayScene)),
+      overlayLogoBlur:
+        !encodeCaps.skipLogoBlur &&
+        stillNeedsNewsAgencyLogoBlur(sceneStillLogoBlurMeta(overlayScene)),
     })
+  }
+
+  if (encodeCaps.threatenBudget && !serverlessSlim) {
+    console.info(
+      '[eof-video] Pro reliable encode profile',
+      `scenes=${sorted.length}`,
+      encodeCaps.profile || 'pro-reliable',
+      encodeCaps.skipXfade ? 'hardCuts' : 'xfade',
+      encodeCaps.skipKenBurns ? 'skipKenBurns' : '',
+      encodeCaps.skipLogoBlur ? 'skipLogoBlur' : '',
+      encodeCaps.skipOverlays ? 'skipOverlays' : '',
+    )
   }
 
   console.info(
@@ -935,6 +982,7 @@ export async function renderEofProductionVideo({
     'stickers',
     eofStickerIds(stickers).join(',') || 'none',
     serverlessSlim ? 'serverlessSlim=1' : 'serverlessSlim=0',
+    `clipConcurrency=${clipConcurrency(serverlessSlim)}`,
   )
 
   const engine = plan.engine
@@ -972,7 +1020,11 @@ export async function renderEofProductionVideo({
   const encodeDurs = graph?.paddedDurations || contentDurs
 
   let clipsDone = 0
-  const clipPaths = await mapWithConcurrency(sorted, clipConcurrency(), async (scene) => {
+  const concurrency = clipConcurrency(serverlessSlim)
+  const clipHeartbeat = async () => {
+    if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
+  }
+  const clipPaths = await mapWithConcurrency(sorted, concurrency, async (scene) => {
     const i = sorted.findIndex((s) => s.index === scene.index)
     if (!scene.imagePath || !existsSync(scene.imagePath)) {
       throw new Error(`Scene ${scene.index + 1} image is missing.`)
@@ -991,6 +1043,8 @@ export async function renderEofProductionVideo({
       encodeDurationSec: encodeDurs[i] ?? contentDurs[i],
       overlayMoment: overlayByScene.get(scene.index) || null,
       stickers,
+      skipLogoBlur: encodeCaps.skipLogoBlur,
+      onHeartbeat: clipHeartbeat,
     })
     clipsDone += 1
     if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
@@ -1041,36 +1095,39 @@ export async function renderEofProductionVideo({
         out,
         graph,
         targetDurationSec,
+        onHeartbeat: clipHeartbeat,
       })
     } catch (e) {
       console.warn(
         '[eof-video] xfade failed, falling back to hard cuts',
         e instanceof Error ? e.message : e,
       )
-      // Re-encode without pad for clean concat lengths
-      const plainClips = []
-      for (let i = 0; i < sorted.length; i += 1) {
-        plainClips.push(
-          await encodeSceneClip({
-            scene: sorted[i],
-            workDir,
-            captionFont,
-            captionStyle: style,
-            captionLayout,
-            burnCaptions,
-            lookFilters,
-            effectFilters,
-            kenBurns,
-            encodeDurationSec: contentDurs[i],
-            overlayMoment: overlayByScene.get(sorted[i].index) || null,
-            stickers,
-          }),
-        )
-      }
+      // Re-encode without pad for clean concat lengths (parallel — serial doubled wall clock).
+      const plainClips = await mapWithConcurrency(sorted, concurrency, async (scene) => {
+        const i = sorted.findIndex((s) => s.index === scene.index)
+        return encodeSceneClip({
+          scene,
+          workDir,
+          captionFont,
+          captionStyle: style,
+          captionLayout,
+          burnCaptions,
+          lookFilters,
+          effectFilters,
+          kenBurns,
+          encodeDurationSec: contentDurs[i],
+          overlayMoment: overlayByScene.get(scene.index) || null,
+          stickers,
+          skipLogoBlur: encodeCaps.skipLogoBlur,
+          onHeartbeat: clipHeartbeat,
+        })
+      })
+      // mapWithConcurrency preserves input order
       hasAudio = await stitchWithConcat({
         clipPaths: plainClips,
         mixedAudioPath: audioForMux,
         out,
+        onHeartbeat: clipHeartbeat,
       })
     }
   } else {
@@ -1078,6 +1135,7 @@ export async function renderEofProductionVideo({
       clipPaths: orderedClips,
       mixedAudioPath: audioForMux,
       out,
+      onHeartbeat: clipHeartbeat,
     })
   }
 

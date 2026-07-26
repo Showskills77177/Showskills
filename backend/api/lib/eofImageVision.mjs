@@ -12,8 +12,16 @@ import {
   filterHitsRequiringSubjectNameCue,
   isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
+import { isEofVercelRuntime } from './eofProductionServerless.mjs'
 
 export { MIN_EOF_VISION_SCORE }
+
+/** Hard budget for Grok vision — on Vercel this must not burn 25s of the 300s isolate. */
+export function eofImageVisionTimeoutMs() {
+  const fromEnv = Number(process.env.EOF_IMAGE_VISION_TIMEOUT_MS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv
+  return isEofVercelRuntime() ? 10_000 : 25_000
+}
 
 function envKey(...names) {
   for (const name of names) {
@@ -115,7 +123,7 @@ export async function rankEofPoolHitsWithVision(opts = {}) {
 
   const hits = (Array.isArray(opts.hits) ? opts.hits : [])
     .filter((h) => h?.url && /^https?:\/\//i.test(h.url))
-    .slice(0, Math.max(4, Math.min(10, Number(opts.maxImages) || 8)))
+    .slice(0, Math.max(4, Math.min(isEofVercelRuntime() ? 4 : 10, Number(opts.maxImages) || 8)))
   if (hits.length < 2) return scores
 
   const subject = String(opts.subject || 'football person').trim()
@@ -176,7 +184,7 @@ Score every index 1–${hits.length}.`,
           { role: 'user', content: userContent },
         ],
       }),
-      signal: AbortSignal.timeout(Number(process.env.EOF_IMAGE_VISION_TIMEOUT_MS) || 25_000),
+      signal: AbortSignal.timeout(eofImageVisionTimeoutMs()),
     })
     if (!res.ok) {
       const err = await res.text().catch(() => '')
