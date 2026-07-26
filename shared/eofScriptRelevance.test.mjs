@@ -4,6 +4,7 @@ import {
   scoreDraftRelevance,
   mergeRelevanceIntoVerdict,
   extractPersonLikeNames,
+  extractTopicAnchorTokens,
   detectTopicDrift,
   tokensLooselyEqual,
   EOF_SHORTS_RELEVANCE_VOICE,
@@ -92,6 +93,7 @@ Live desk headlines:
       // Adapt path often has empty desk brief — topic anchors alone must ground the hero
       deskBrief: '',
       format: 'news',
+      mode: 'adapt',
     })
     assert.ok(v.pass, JSON.stringify(v))
     assert.ok(
@@ -101,16 +103,53 @@ Live desk headlines:
     assert.ok(!v.reasons.some((r) => /not grounded/i.test(r)), JSON.stringify(v.reasons))
   })
 
+  it('adapt grounds De Zerbi topic + Lucas Bergvall cast (secondary football name in draft)', () => {
+    const topic = 'Roberto di zebri under pressure at Marseille'
+    const draft = `Roberto De Zerbi is under pressure at Marseille after another sticky result. Lucas Bergvall has been linked in the chatter around the squad rebuild, but the stake is still De Zerbi's job. Does the board stick with De Zerbi, or blink first? Comment.`
+
+    const v = scoreDraftRelevance(draft, {
+      topic,
+      orderedTopic: topic,
+      deskBrief: '',
+      format: 'news',
+      mode: 'adapt',
+    })
+    assert.ok(v.pass, JSON.stringify(v))
+    assert.equal(v.topicDrift, false, JSON.stringify(v))
+    assert.ok(
+      !v.offTopic.some((o) => o.kind === 'ungrounded_name'),
+      JSON.stringify(v.offTopic),
+    )
+    assert.ok(!v.reasons.some((r) => /not grounded|Topic drift/i.test(r)), JSON.stringify(v.reasons))
+  })
+
   it('still blocks Fury when hair topic never mentions boxing', () => {
     const topic = "Why Mark Cuccorea doesn't cut his hair"
     const draft = `Marc Cucurella hit back on the hair row. Then Tyson Fury questioned Anthony Joshua's pride for no reason in this story. Fair from Cucurella? Comment.`
 
-    const v = scoreDraftRelevance(draft, { topic, orderedTopic: topic, deskBrief: '' })
+    const v = scoreDraftRelevance(draft, {
+      topic,
+      orderedTopic: topic,
+      deskBrief: '',
+      mode: 'adapt',
+    })
     assert.equal(v.pass, false, JSON.stringify(v))
     assert.ok(
       v.offTopic.some((o) => /fury|joshua/i.test(o.label) || /fury|joshua/i.test(o.id)),
       JSON.stringify(v.offTopic),
     )
+  })
+
+  it('adapt still fails Cucurella→Keegan topic drift', () => {
+    const draft = `Mark Cuccorea's hair is not the focus of any football story here. Kevin Keegan talks about his career highlights, including winning World Player of the Year twice. He also mentions his iconic "I would love it" remark. What's the most iconic moment of Keegan's career - his playing days or his managerial stint with England?`
+    const v = scoreDraftRelevance(draft, {
+      topic: CUCCURELLA_TOPIC,
+      orderedTopic: CUCCURELLA_TOPIC,
+      deskBrief: '',
+      mode: 'adapt',
+    })
+    assert.equal(v.pass, false, JSON.stringify(v))
+    assert.equal(v.topicDrift, true)
   })
 
   it('fails boxing lexeme free-association even without named boxers', () => {
@@ -162,8 +201,16 @@ Stakes: Cross-over pride debate (sourced)`
     assert.ok(tokensLooselyEqual('Cucurella', 'Cuccorella'))
     assert.ok(tokensLooselyEqual('Cucurella', 'Cuccurella'))
     assert.ok(tokensLooselyEqual('Marc', 'Mark'))
+    assert.ok(tokensLooselyEqual('zebri', 'zerbi'))
+    assert.ok(tokensLooselyEqual('Zerbi', 'zebri'))
     assert.ok(!tokensLooselyEqual('Cucurella', 'Keegan'))
     assert.ok(!tokensLooselyEqual('Fury', 'Cuccorea'))
+  })
+
+  it('extracts lowercase De Zerbi surname anchors from typed topics', () => {
+    const anchors = extractTopicAnchorTokens('Roberto di zebri under pressure at Marseille')
+    assert.ok(anchors.some((a) => /roberto/i.test(a)), JSON.stringify(anchors))
+    assert.ok(anchors.some((a) => tokensLooselyEqual(a, 'zerbi')), JSON.stringify(anchors))
   })
 
   it('merges relevance fail into a soft model pass', () => {

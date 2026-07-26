@@ -296,8 +296,18 @@ function editDistance(a, b) {
   return prev[m]
 }
 
+/** Adjacent-letter transposition (zebri ↔ zerbi). */
+function isSingleTransposition(a, b) {
+  if (!a || !b || a.length !== b.length || a.length < 4) return false
+  let i = 0
+  while (i < a.length && a[i] === b[i]) i += 1
+  if (i >= a.length - 1) return false
+  if (a[i] !== b[i + 1] || a[i + 1] !== b[i]) return false
+  return a.slice(i + 2) === b.slice(i + 2)
+}
+
 /**
- * Loose surname / given-name match (Cuccorea ≈ Cuccurella / Cucurella / Cuccorella; Marc ≈ Mark).
+ * Loose surname / given-name match (Cuccorea ≈ Cuccurella / Cucurella / Cuccorella; Marc ≈ Mark; zebri ≈ zerbi).
  * @param {string} a
  * @param {string} b
  */
@@ -311,14 +321,16 @@ export function tokensLooselyEqual(a, b) {
   const cx = collapseLetterRepeats(x)
   const cy = collapseLetterRepeats(y)
   if (cx && cy && (cx === cy || cx.includes(cy) || cy.includes(cx))) return true
+  if (isSingleTransposition(x, y) || (cx && cy && isSingleTransposition(cx, cy))) return true
 
   const maxLen = Math.max(x.length, y.length)
   const minLen = Math.min(x.length, y.length)
   if (minLen >= 4 && Math.abs(x.length - y.length) <= 3) {
     const dist = editDistance(x, y)
     const distCollapsed = cx && cy ? editDistance(cx, cy) : dist
-    // Marc↔Mark (1), Cucurella↔Cuccorea / Cuccurella (2–3 after collapse)
+    // Marc↔Mark (1), zebri↔zerbi (2), Cucurella↔Cuccorea / Cuccurella (2–3 after collapse)
     if (dist <= 1 || distCollapsed <= 1) return true
+    if (minLen >= 5 && (dist <= 2 || distCollapsed <= 2)) return true
     if (maxLen >= 7 && (dist <= 3 || distCollapsed <= 2)) return true
   }
 
@@ -337,9 +349,12 @@ export function tokensLooselyEqual(a, b) {
   return false
 }
 
+const NAME_PARTICLE = new Set(['di', 'de', 'da', 'del', 'della', 'van', 'von', 'der', 'la', 'le', 'du', 'dos', 'das'])
+
 /**
  * Distinctive person-anchor tokens from the ordered topic (surnames / full names).
  * Desk brief must NOT expand this — otherwise unrelated RSS unlocks a full pivot.
+ * Also catches user-typed lowercase surnames: "Roberto di zebri" → roberto + zebri.
  * @param {string} topic
  * @returns {string[]}
  */
@@ -352,11 +367,23 @@ export function extractTopicAnchorTokens(topic) {
       .filter((p) => p.length >= 4)
     out.push(...parts)
   }
+  const raw = String(topic || '')
+  // Capitalized given name + optional particle + surname (often lowercased in typed topics)
+  const givenSurnameRe =
+    /\b([A-Z][\p{L}'’-]+)\s+(?:(di|de|da|del|della|van|von|der|la|le|du|dos|das)\s+)?([\p{L}'’-]{4,})\b/gu
+  let gm
+  while ((gm = givenSurnameRe.exec(raw))) {
+    const given = cleanNameToken(gm[1])
+    const surname = cleanNameToken(gm[3])
+    if (given && !NAME_STOP_FIRST.has(given) && given.length >= 4) out.push(given)
+    if (surname && !NAME_STOP_FIRST.has(surname) && !NAME_PARTICLE.has(surname) && surname.length >= 4) {
+      if (!FOOTBALL_ORG.test(`${gm[1]} ${gm[3]}`)) out.push(surname)
+    }
+  }
   // Fallback: distinctive capitalized tokens in topic when extractPersonLikeNames misses
   if (!out.length) {
     const re = /\b([A-Z][\p{L}'’-]{3,})\b/gu
     let m
-    const raw = String(topic || '')
     while ((m = re.exec(raw))) {
       const tok = cleanNameToken(m[1])
       if (!tok || NAME_STOP_FIRST.has(tok)) continue
@@ -443,12 +470,15 @@ export function detectTopicDrift(draft, topic) {
  * Local relevance + voice score (0–10).
  * Hard-fails cross-sport injections and viewer insults.
  * @param {string} draft
- * @param {{ topic?: string, deskBrief?: string, format?: string, context?: string }} [opts]
+ * @param {{ topic?: string, deskBrief?: string, format?: string, context?: string, mode?: string }} [opts]
+ *   mode: 'adapt' — draft is source of truth for same-story football cast; skip ungrounded_name hard-fail
+ *   (still blocks cross-sport free-association and topic-drift pivots).
  */
 export function scoreDraftRelevance(draft, opts = {}) {
   const text = String(draft || '').trim()
   const topic = String(opts.orderedTopic || opts.topic || '')
   const deskBrief = String(opts.deskBrief || opts.context || '')
+  const adaptMode = String(opts.mode || '').toLowerCase() === 'adapt'
   const sourceText = `${topic}\n${deskBrief}`
   const reasons = []
   const rewriteHints = []
@@ -506,27 +536,30 @@ export function scoreDraftRelevance(draft, opts = {}) {
   }
 
   // A) Ungrounded person-like names (soft→hard when several, or when also cross-sport)
+  // Adapt: draft is the cast source of truth — do not hard-fail football names already in the VO.
   const names = extractPersonLikeNames(text)
   const ungrounded = []
-  for (const name of names) {
-    if (nameGroundedInSource(name, sourceText, topicAnchors)) continue
-    // Skip if already captured as a known cross-sport figure
-    if (
-      CROSS_SPORT_FIGURES.some((fig) =>
-        fig.patterns.some((re) => re.test(name)),
-      )
-    ) {
-      continue
+  if (!adaptMode) {
+    for (const name of names) {
+      if (nameGroundedInSource(name, sourceText, topicAnchors)) continue
+      // Skip if already captured as a known cross-sport figure
+      if (
+        CROSS_SPORT_FIGURES.some((fig) =>
+          fig.patterns.some((re) => re.test(name)),
+        )
+      ) {
+        continue
+      }
+      ungrounded.push(name)
     }
-    ungrounded.push(name)
-  }
-  // Hard-fail ungrounded names that look like celebrity parallels (2+ tokens, none in source)
-  for (const name of ungrounded.slice(0, 4)) {
-    offTopic.push({
-      id: `ungrounded:${normalizeHay(name).replace(/\s+/g, '_')}`,
-      label: name,
-      kind: 'ungrounded_name',
-    })
+    // Hard-fail ungrounded names that look like celebrity parallels (2+ tokens, none in source)
+    for (const name of ungrounded.slice(0, 4)) {
+      offTopic.push({
+        id: `ungrounded:${normalizeHay(name).replace(/\s+/g, '_')}`,
+        label: name,
+        kind: 'ungrounded_name',
+      })
+    }
   }
 
   if (offTopic.length) {

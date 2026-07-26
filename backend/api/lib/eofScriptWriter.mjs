@@ -458,13 +458,15 @@ const DRAFT_FLUFF_RE =
  * Local hard gates (hot-take + directness + factuality + relevance).
  * Used by softBest fallthrough, directed rewrites, and Adapt — never silent-pass bollox.
  * @param {string} draft
- * @param {{ topic?: string, format?: string, deskBrief?: string, context?: string }} [opts]
+ * @param {{ topic?: string, format?: string, deskBrief?: string, context?: string, mode?: string }} [opts]
+ *   mode: 'adapt' — trust football cast already named in the approved draft (still blocks Fury/Keegan pivots)
  */
 export function scoreLocalScriptGates(draft, opts = {}) {
   const format = opts.format || ''
   const topic = opts.topic || ''
   const orderedTopic = opts.orderedTopic || topic
   const deskBrief = String(opts.deskBrief || opts.context || '')
+  const mode = opts.mode || ''
   const hot = scoreDraftHotTake(draft, { format, topic: orderedTopic })
   const direct = scoreDraftDirectness(draft, { format, topic: orderedTopic })
   const fact = scoreDraftFactuality(draft, {
@@ -477,6 +479,7 @@ export function scoreLocalScriptGates(draft, opts = {}) {
     topic: orderedTopic,
     orderedTopic,
     deskBrief,
+    mode,
   })
   const pass = Boolean(hot.pass && direct.pass && fact.pass && rel.pass)
   const reasons = [
@@ -1340,7 +1343,13 @@ export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format,
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
 
-  const adaptGates = scoreLocalScriptGates(draft, { format: fmt, topic: t, orderedTopic: t })
+  // Adapt trusts the approved draft's football cast (Bergvall et al.) — still blocks Fury/Keegan pivots.
+  const adaptGates = scoreLocalScriptGates(draft, {
+    format: fmt,
+    topic: t,
+    orderedTopic: t,
+    mode: 'adapt',
+  })
   if (!adaptGates.pass) {
     throw new Error(
       `Cannot adapt this draft — ${adaptGates.reasons[0] || 'failed relevance/factuality gates'}. Fix or Regenerate the script first.`,
