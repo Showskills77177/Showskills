@@ -596,22 +596,23 @@ export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 
  */
 export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 90
 /**
- * Pro absolute safety ceiling (10–12 min). Must NOT sit at 280 — that killed live
- * heartbeating encodes while Vercel waitUntil (maxDuration 300) was still finishing,
- * and false-failed jobs that only needed a few more seconds of ffmpeg.
- * Real hard stop on Vercel remains maxDuration; this is poll/UI safety only.
+ * Pro absolute age ceiling — match Vercel Pro maxDuration (300s).
+ * Do NOT raise this forever: if encodes miss 300s that is a pipeline budget bug
+ * (see Pro reliable encode), not a reason to leave "Building…" zombies past isolate death.
+ * Heartbeats protect under this ceiling so age 281 + live HB is NOT stale.
  */
-export const EOF_STALE_PRO_MAX_AGE_SEC = Number(process.env.EOF_STALE_PRO_MAX_AGE_SEC) || 660
+export const EOF_STALE_PRO_MAX_AGE_SEC = Number(process.env.EOF_STALE_PRO_MAX_AGE_SEC) || 300
 /**
  * Pro quiet window: no progress/heartbeat for this long → isolate likely dead.
- * Longer than Hobby so a single slow ffmpeg/Serp beat does not false-fail.
+ * Wide enough that a slow ffmpeg/Serp beat does not false-fail; tight enough to
+ * unstick after a silent kill well under maxDuration.
  */
-export const EOF_STALE_PRO_QUIET_SEC = Number(process.env.EOF_STALE_PRO_QUIET_SEC) || 180
+export const EOF_STALE_PRO_QUIET_SEC = Number(process.env.EOF_STALE_PRO_QUIET_SEC) || 120
 
 /**
  * Resolve stale windows for the active Build mode.
- * Pro: recent heartbeat keeps the job alive under absolute max age (never age-kill at 280).
- * Hobby/slim: tighter age + quiet so the UI unsticks after a dead isolate.
+ * Pro: recent heartbeat keeps the job alive until maxAge (~300s); quiet kill only
+ * after ~90–120s without heartbeat. Hobby/slim: tighter age + quiet.
  * @param {{ slim?: boolean }} [opts]
  */
 export function resolveEofStaleWindows(opts = {}) {
@@ -632,7 +633,7 @@ export function resolveEofStaleWindows(opts = {}) {
     maxAgeSec,
     maxQuietSec,
     slim: false,
-    // Quiet kill only after Pro quiet window — live heartbeats never age-die at 280.
+    // Quiet kill after Pro quiet window — live heartbeats never age-die before maxAge.
     allowQuietKill: true,
   }
 }
@@ -663,9 +664,9 @@ export function isEofRenderStale(job, opts = {}) {
   const ageSec = Number.isFinite(startedMs) ? (now - startedMs) / 1000 : Infinity
   const quietSec = Number.isFinite(updatedMs) ? (now - updatedMs) / 1000 : ageSec
 
-  // Absolute safety only (Hobby ~280s, Pro ~11min) — never treat "age 281 + live HB" as dead.
+  // Absolute ceiling (Hobby ~280s, Pro ~300s = maxDuration) — age 281 + live HB is NOT dead.
   if (ageSec >= maxAgeSec) return true
-  // Recent progress / heartbeat → still running (waitUntil may still be encoding).
+  // Recent progress / heartbeat → still running under maxDuration.
   if (quietSec < maxQuietSec) return false
   if (!allowQuietKill) return false
   return true

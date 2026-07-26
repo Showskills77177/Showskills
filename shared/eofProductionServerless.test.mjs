@@ -98,7 +98,7 @@ describe('eofProductionServerless', () => {
     assert.equal(full.transitionStyle, 'dissolve')
   })
 
-  it('default stale windows leave room for a long Pro encode', () => {
+  it('default stale windows leave room for a long Pro encode under maxDuration', () => {
     assert.ok(EOF_STALE_RENDER_SEC >= 280, `Hobby max age ${EOF_STALE_RENDER_SEC} too aggressive`)
     assert.ok(EOF_STALE_PROGRESS_SEC >= 60, `quiet ${EOF_STALE_PROGRESS_SEC} too tight for Hobby`)
     assert.ok(EOF_STALE_PROGRESS_SEC <= 120, `quiet ${EOF_STALE_PROGRESS_SEC} too loose`)
@@ -125,7 +125,7 @@ describe('eofProductionServerless', () => {
         { now },
       ),
       false,
-      '168s quiet Pro encode must NOT auto-fail (exact user failure)',
+      '168s encode with quiet under Pro window must NOT auto-fail',
     )
     assert.equal(
       isEofRenderStale(
@@ -137,7 +137,7 @@ describe('eofProductionServerless', () => {
         { now },
       ),
       false,
-      '281s heartbeating Pro must NOT auto-fail (exact Cucurella timeout)',
+      '281s heartbeating Pro must NOT auto-fail under maxAge 300',
     )
   })
 

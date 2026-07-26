@@ -173,11 +173,13 @@ describe('eofTtsReuse fingerprint + decisions', () => {
 })
 
 describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
-  it('defaults Hobby max age ≥280s and Pro absolute ≥10min with quiet heartbeat', () => {
+  it('defaults Hobby ≥280s and Pro maxAge ≈300 matching Vercel maxDuration', () => {
     assert.ok(EOF_STALE_RENDER_SEC >= 280)
     const pro = resolveEofStaleWindows({ slim: false })
-    assert.ok(pro.maxAgeSec >= 600, `Pro maxAge ${pro.maxAgeSec} must be ≥10min safety`)
-    assert.ok(pro.maxQuietSec >= 120, `Pro quiet ${pro.maxQuietSec} too tight`)
+    assert.ok(pro.maxAgeSec >= 290, `Pro maxAge ${pro.maxAgeSec} too aggressive vs maxDuration`)
+    assert.ok(pro.maxAgeSec <= 300, `Pro maxAge ${pro.maxAgeSec} must not exceed maxDuration 300`)
+    assert.ok(pro.maxQuietSec >= 90, `Pro quiet ${pro.maxQuietSec} too tight`)
+    assert.ok(pro.maxQuietSec <= 120, `Pro quiet ${pro.maxQuietSec} too loose`)
     assert.ok(pro.maxQuietSec < pro.maxAgeSec)
     assert.equal(pro.allowQuietKill, true)
     const hobby = resolveEofStaleWindows({ slim: true })
@@ -186,8 +188,9 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
     assert.ok(hobby.maxQuietSec <= 120)
   })
 
-  it('does not auto-fail a 168s Pro encode that went quiet during ffmpeg', () => {
+  it('does not auto-fail a 168s Pro encode still within quiet window', () => {
     const now = Date.now()
+    // 100s quiet < Pro quiet 120 → still alive
     assert.equal(
       isEofRenderStale(
         {
@@ -198,7 +201,7 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
         { now, ...resolveEofStaleWindows({ slim: false }) },
       ),
       false,
-      'Pro mute encode at 168s must stay alive (quiet window is longer)',
+      'Pro mute encode at 168s with quiet <120s must stay alive',
     )
     assert.equal(
       isEofRenderStale(
@@ -210,12 +213,24 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
         { now },
       ),
       false,
-      'default (Pro) path must not quiet-kill at 168s',
+      'default (Pro) path must not quiet-kill at 100s quiet',
     )
   })
 
-  it('Pro job at age 281 with recent heartbeat does NOT fail (exact Cucurella timeout)', () => {
+  it('age 281 + recent heartbeat + maxAge 300 → not stale', () => {
     const now = Date.now()
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 281_000).toISOString() },
+        },
+        { now, maxAgeSec: 300, maxQuietSec: 120, allowQuietKill: true },
+      ),
+      false,
+      'live Pro encode at 281s under maxDuration must keep running',
+    )
     assert.equal(
       isEofRenderStale(
         {
@@ -226,7 +241,39 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
         { now, ...resolveEofStaleWindows({ slim: false }) },
       ),
       false,
-      'live Pro encode past old 280s ceiling must keep running under waitUntil',
+      'Pro defaults: age 281 + heartbeat must not fail',
+    )
+  })
+
+  it('age 301 → stale even with recent heartbeat', () => {
+    const now = Date.now()
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 301_000).toISOString() },
+        },
+        { now, maxAgeSec: 300, maxQuietSec: 120, allowQuietKill: true },
+      ),
+      true,
+      'past maxDuration the isolate is dead — poll must unstick',
+    )
+  })
+
+  it('quiet 120 without heartbeat → stale under maxAge', () => {
+    const now = Date.now()
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 120_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 200_000).toISOString() },
+        },
+        { now, maxAgeSec: 300, maxQuietSec: 120, allowQuietKill: true },
+      ),
+      true,
+      'no heartbeat for 120s → dead isolate under maxAge',
     )
   })
 
