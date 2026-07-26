@@ -635,12 +635,24 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
         {
           status: 'rendering_video',
           updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 281_000).toISOString() },
+        },
+        { now },
+      ),
+      false,
+      'Pro default: age 281 with heartbeat must NOT stale (exact Cucurella failure)',
+    )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
           renderProgress: { startedAt: new Date(now - 290_000).toISOString() },
         },
         { now, maxAgeSec: 280, maxQuietSec: 50, allowQuietKill: false },
       ),
       true,
-      'overall age > 280s must stale even with heartbeats (past maxDuration headroom)',
+      'explicit Hobby-style maxAge 280 still age-kills even with heartbeats',
     )
   })
 

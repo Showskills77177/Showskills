@@ -173,20 +173,21 @@ describe('eofTtsReuse fingerprint + decisions', () => {
 })
 
 describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
-  it('defaults max age to ≥280s and Pro quiet ≥ max age', () => {
+  it('defaults Hobby max age ≥280s and Pro absolute ≥10min with quiet heartbeat', () => {
     assert.ok(EOF_STALE_RENDER_SEC >= 280)
     const pro = resolveEofStaleWindows({ slim: false })
-    assert.ok(pro.maxAgeSec >= 280)
-    assert.ok(pro.maxQuietSec >= pro.maxAgeSec)
-    assert.equal(pro.allowQuietKill, false)
+    assert.ok(pro.maxAgeSec >= 600, `Pro maxAge ${pro.maxAgeSec} must be ≥10min safety`)
+    assert.ok(pro.maxQuietSec >= 120, `Pro quiet ${pro.maxQuietSec} too tight`)
+    assert.ok(pro.maxQuietSec < pro.maxAgeSec)
+    assert.equal(pro.allowQuietKill, true)
     const hobby = resolveEofStaleWindows({ slim: true })
     assert.equal(hobby.allowQuietKill, true)
+    assert.ok(hobby.maxAgeSec <= 300)
     assert.ok(hobby.maxQuietSec <= 120)
   })
 
   it('does not auto-fail a 168s Pro encode that went quiet during ffmpeg', () => {
     const now = Date.now()
-    // Exact user failure shape: age ~168s, last update ~90s+ ago, quiet kill under old 90s rule.
     assert.equal(
       isEofRenderStale(
         {
@@ -197,7 +198,7 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
         { now, ...resolveEofStaleWindows({ slim: false }) },
       ),
       false,
-      'Pro mute encode at 168s must stay alive',
+      'Pro mute encode at 168s must stay alive (quiet window is longer)',
     )
     assert.equal(
       isEofRenderStale(
@@ -213,24 +214,7 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
     )
   })
 
-  it('still fails Pro jobs past max age even with heartbeats', () => {
-    const now = Date.now()
-    assert.equal(
-      isEofRenderStale(
-        {
-          status: 'rendering_video',
-          updatedAt: new Date(now - 5_000).toISOString(),
-          renderProgress: { startedAt: new Date(now - 290_000).toISOString() },
-        },
-        { now, ...resolveEofStaleWindows({ slim: false }) },
-      ),
-      true,
-    )
-  })
-
-  it('age 281s with heartbeat IS stale — do not raise the ceiling; finish the encode instead', () => {
-    // Exact Cucurella paste: poll killed at 281s. Raising maxAge forever is wrong —
-    // Vercel maxDuration is still 300s. Pipeline must finish under ~280s.
+  it('Pro job at age 281 with recent heartbeat does NOT fail (exact Cucurella timeout)', () => {
     const now = Date.now()
     assert.equal(
       isEofRenderStale(
@@ -241,8 +225,41 @@ describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
         },
         { now, ...resolveEofStaleWindows({ slim: false }) },
       ),
+      false,
+      'live Pro encode past old 280s ceiling must keep running under waitUntil',
+    )
+  })
+
+  it('genuinely quiet Pro jobs fail past the Pro quiet window', () => {
+    const now = Date.now()
+    const pro = resolveEofStaleWindows({ slim: false })
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - (pro.maxQuietSec + 20) * 1000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 250_000).toISOString() },
+        },
+        { now, ...pro },
+      ),
       true,
-      '281s means the build was too slow — Pro-reliable encode must finish earlier',
+      'dead isolate with no heartbeat must stale',
+    )
+  })
+
+  it('still fails Pro jobs past absolute safety even with heartbeats', () => {
+    const now = Date.now()
+    const pro = resolveEofStaleWindows({ slim: false })
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 5_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - (pro.maxAgeSec + 30) * 1000).toISOString() },
+        },
+        { now, ...pro },
+      ),
+      true,
     )
   })
 

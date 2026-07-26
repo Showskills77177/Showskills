@@ -32,7 +32,7 @@ import {
 } from './eofSceneTts.mjs'
 import { mixEofNarrationWithMusic, isFfmpegAvailable } from './eofAudioMix.mjs'
 import { hasBundledFfmpeg } from './eofFfmpeg.mjs'
-import { mapWithConcurrency, createThrottledWriter } from './eofAsyncPool.mjs'
+import { mapWithConcurrency, createThrottledWriter, startProgressHeartbeat } from './eofAsyncPool.mjs'
 import {
   saveEofMixedAudioArtifact,
   clearEofVideoArtifact,
@@ -202,6 +202,10 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
     try {
       const workDir = eofProductionWorkDir(jobId)
       await reportProgress('tts', 0, { force: true })
+      // Keep Pro quiet-stale accurate during long ElevenLabs / Edge TTS calls.
+      const stopTtsHb = startProgressHeartbeat(async () => {
+        await reportProgress('tts', 0, { force: true })
+      }, 4000)
 
       const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
       const scenePlans = job.script.scenes.map((scene, i) => {
@@ -220,6 +224,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       const elevenLabsIds = new Map()
       let synthIncrements = 0
 
+      try {
       // Reuse existing scene files with matching line hashes before any synthesize.
       for (const plan of scenePlans) {
         const outPath = outPaths[plan.index]
@@ -327,6 +332,9 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
 
         await reportProgress(reuseSceneAudio ? 'mix' : 'tts', group.indexes[group.indexes.length - 1] + 1)
       })
+      } finally {
+        stopTtsHb()
+      }
 
       const sceneManifest = scenePlans.map((plan, i) => {
         const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]

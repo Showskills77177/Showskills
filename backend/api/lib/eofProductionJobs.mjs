@@ -587,34 +587,53 @@ export async function markEofProductionJobFailed(id, message) {
 }
 
 /**
- * Max age for a stuck rendering_* job before poll auto-fails it.
- * Must sit under vercel.json maxDuration (300s) but ABOVE a healthy Pro encode
- * (prior 120s ceiling + 90s quiet kill murdered live Pro builds ~168s in).
+ * Hobby max age for a stuck rendering_* job before poll auto-fails it.
+ * Kept aggressive so silent Hobby isolate deaths unstick the UI quickly.
  */
 export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 280
 /**
- * Hobby/slim only: no progress DB write for this long → treat isolate as dead.
- * Pro must NOT use a short quiet window — ffmpeg/Serp often go quiet for 90–180s.
+ * Hobby/slim: no progress DB write for this long → treat isolate as dead.
  */
 export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 90
+/**
+ * Pro absolute safety ceiling (10–12 min). Must NOT sit at 280 — that killed live
+ * heartbeating encodes while Vercel waitUntil (maxDuration 300) was still finishing,
+ * and false-failed jobs that only needed a few more seconds of ffmpeg.
+ * Real hard stop on Vercel remains maxDuration; this is poll/UI safety only.
+ */
+export const EOF_STALE_PRO_MAX_AGE_SEC = Number(process.env.EOF_STALE_PRO_MAX_AGE_SEC) || 660
+/**
+ * Pro quiet window: no progress/heartbeat for this long → isolate likely dead.
+ * Longer than Hobby so a single slow ffmpeg/Serp beat does not false-fail.
+ */
+export const EOF_STALE_PRO_QUIET_SEC = Number(process.env.EOF_STALE_PRO_QUIET_SEC) || 180
 
 /**
  * Resolve stale windows for the active Build mode.
- * Pro/non-slim: quiet threshold ≥ max age so mute encodes are only killed by overall age.
- * Hobby/slim: keep a tighter quiet window so the UI unsticks faster.
+ * Pro: recent heartbeat keeps the job alive under absolute max age (never age-kill at 280).
+ * Hobby/slim: tighter age + quiet so the UI unsticks after a dead isolate.
  * @param {{ slim?: boolean }} [opts]
  */
 export function resolveEofStaleWindows(opts = {}) {
-  const maxAgeSec = Math.max(60, EOF_STALE_RENDER_SEC)
   const slim = opts.slim === true
-  const quietDefault = Math.max(30, EOF_STALE_PROGRESS_SEC)
-  // Pro: quiet alone must never kill under maxAge (168s quiet-fail was the credit-burn loop).
-  const maxQuietSec = slim ? quietDefault : Math.max(quietDefault, maxAgeSec)
+  if (slim) {
+    const maxAgeSec = Math.max(60, EOF_STALE_RENDER_SEC)
+    const maxQuietSec = Math.max(30, EOF_STALE_PROGRESS_SEC)
+    return {
+      maxAgeSec,
+      maxQuietSec,
+      slim: true,
+      allowQuietKill: true,
+    }
+  }
+  const maxAgeSec = Math.max(EOF_STALE_RENDER_SEC, EOF_STALE_PRO_MAX_AGE_SEC)
+  const maxQuietSec = Math.max(60, EOF_STALE_PRO_QUIET_SEC)
   return {
     maxAgeSec,
     maxQuietSec,
-    slim,
-    allowQuietKill: slim,
+    slim: false,
+    // Quiet kill only after Pro quiet window — live heartbeats never age-die at 280.
+    allowQuietKill: true,
   }
 }
 
@@ -629,12 +648,14 @@ export function isEofRenderStale(job, opts = {}) {
     return false
   }
   const now = Number.isFinite(opts.now) ? opts.now : Date.now()
-  const maxAgeSec = Math.max(60, Number(opts.maxAgeSec) || EOF_STALE_RENDER_SEC)
-  const maxQuietSec = Math.max(30, Number(opts.maxQuietSec) || EOF_STALE_PROGRESS_SEC)
-  // Pro (default): quiet alone must never kill under maxAge — Serp/ffmpeg go mute for minutes.
-  // Hobby/slim: allowQuietKill so the UI unsticks after a dead isolate.
+  const slim = opts.slim === true
+  const defaults = resolveEofStaleWindows({ slim })
+  const maxAgeSec = Math.max(60, Number(opts.maxAgeSec) || defaults.maxAgeSec)
+  const maxQuietSec = Math.max(30, Number(opts.maxQuietSec) || defaults.maxQuietSec)
+  // Explicit false wins; otherwise use window default (Pro + Hobby both quiet-kill now).
   const allowQuietKill =
-    opts.allowQuietKill === true || (opts.allowQuietKill !== false && opts.slim === true)
+    opts.allowQuietKill === true ||
+    (opts.allowQuietKill !== false && defaults.allowQuietKill === true)
 
   const startedRaw = job?.renderProgress?.startedAt || job?.updatedAt
   const startedMs = startedRaw ? Date.parse(String(startedRaw)) : NaN
@@ -642,7 +663,9 @@ export function isEofRenderStale(job, opts = {}) {
   const ageSec = Number.isFinite(startedMs) ? (now - startedMs) / 1000 : Infinity
   const quietSec = Number.isFinite(updatedMs) ? (now - updatedMs) / 1000 : ageSec
 
+  // Absolute safety only (Hobby ~280s, Pro ~11min) — never treat "age 281 + live HB" as dead.
   if (ageSec >= maxAgeSec) return true
+  // Recent progress / heartbeat → still running (waitUntil may still be encoding).
   if (quietSec < maxQuietSec) return false
   if (!allowQuietKill) return false
   return true
@@ -674,9 +697,15 @@ export async function failStaleEofProductionRenders(opts = {}) {
     const ageSec = startedRaw
       ? Math.round((now - Date.parse(String(startedRaw))) / 1000)
       : staleOpts.maxAgeSec
+    const quietHint =
+      staleOpts.allowQuietKill !== false
+        ? ` quiet>${staleOpts.maxQuietSec}s or`
+        : ''
     const message = slim
-      ? `Build took too long (>${ageSec}s). Pipeline must finish under Vercel maxDuration — Rebuild once; if it keeps hitting this, use fewer scenes or Hobby slim.`
-      : `Build took too long (>${ageSec}s). Pipeline must finish under Vercel maxDuration — Rebuild once; if it keeps hitting this, use fewer scenes or Hobby slim.`
+      ? `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
+        `Cancel if stuck, then Rebuild once. Build mode is Hobby (slim) — or set EOF_FORCE_SLIM=1 on the server.`
+      : `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
+        `Cancel if stuck, then Rebuild once. Build mode is Pro — poll fails only after${quietHint} ~${staleOpts.maxAgeSec}s absolute; do not Rebuild while a live encode is still running.`
     console.warn(
       `[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s slim=${slim} maxAge=${staleOpts.maxAgeSec}s quiet=${staleOpts.maxQuietSec}s`,
     )
