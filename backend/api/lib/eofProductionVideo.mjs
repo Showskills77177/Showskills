@@ -2,9 +2,13 @@ import { existsSync, mkdirSync, readdirSync, rmSync, unlinkSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { runFfmpeg } from './eofFfmpeg.mjs'
+import { runFfmpeg, runFfprobe } from './eofFfmpeg.mjs'
 import { eofProductionJobDirPath } from './eofSceneTts.mjs'
 import { mapWithConcurrency } from './eofAsyncPool.mjs'
+import {
+  buildEofSceneScaleCropFilters,
+  buildEofSceneKenBurnsFragment,
+} from '../../../shared/eofSceneCrop.mjs'
 import { buildCaptionDrawtextFilters } from './eofTikTokCaptions.mjs'
 import {
   resolveEofCaptionStyle,
@@ -193,28 +197,66 @@ export function assertEofCleanPlateImagePath(imagePath) {
 }
 
 /**
- * Cover-scale + look (+ optional Ken Burns). Captions applied separately so overlays can sit under text.
+ * Probe still width×height (best-effort). Missing ffprobe → {0,0} → blind face-safe cover.
+ * @param {string} imagePath
+ * @returns {Promise<{ width: number, height: number }>}
+ */
+async function probeSceneStillSize(imagePath) {
+  if (!imagePath || !existsSync(imagePath)) return { width: 0, height: 0 }
+  try {
+    const { stdout } = await runFfprobe(
+      [
+        '-v',
+        'error',
+        '-select_streams',
+        'v:0',
+        '-show_entries',
+        'stream=width,height',
+        '-of',
+        'csv=p=0:s=x',
+        imagePath,
+      ],
+      { timeoutMs: 8_000, maxBuffer: 256 * 1024 },
+    )
+    const parts = String(stdout || '')
+      .trim()
+      .split(/[x,\s]+/)
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    if (parts.length >= 2) return { width: parts[0], height: parts[1] }
+  } catch {
+    /* ffprobe often absent on slim/serverless — fall through */
+  }
+  return { width: 0, height: 0 }
+}
+
+/**
+ * Cover-scale (or letterbox) + look (+ optional Ken Burns). Captions applied separately
+ * so overlays can sit under text.
  *
- * Face-safe crop (not dead-center):
- * - Landscape match stills → only X is cropped → keep horizontal center
- * - Tall / portrait stills → Y is cropped → bias toward the upper band so heads stay in frame
- *   (dead-center was chopping Tuchel/faces; glued-to-top was chopping pitch awkwardly)
+ * Framing (shared/eofSceneCrop.mjs — no face detection):
+ * - Tall / portrait → cover + upper face-safe Y bias (heads stay in frame)
+ * - Mild landscape → cover (mostly X after scale=increase)
+ * - Very wide / low-res → letterbox pad (don't thin-slice or mush-upscale)
  *
- * News/agency plates optionally get corner boxblur (Fox/Sky bugs, Getty watermarks) after crop.
+ * Ken Burns is skipped on letterbox plates and softened on the hook (scene 0).
+ * News/agency plates optionally get corner boxblur after crop.
  * Returns a filtergraph string (may include `;` when logo blur is active).
  */
 function buildSceneBaseFilters({
   frames,
   lookFilters = [],
   kenBurns = false,
+  mildKenBurns = false,
   logoBlur = false,
   logoBlurLabelPrefix = 'mlb',
+  sourceWidth = 0,
+  sourceHeight = 0,
 }) {
-  const head = [
-    'scale=1080:1920:force_original_aspect_ratio=increase',
-    'crop=1080:1920:(iw-ow)/2:max(0\\,min((ih-oh)*0.20\\,ih-oh))',
-    'setsar=1',
-  ]
+  const { framing, filters: head } = buildEofSceneScaleCropFilters({
+    width: sourceWidth,
+    height: sourceHeight,
+  })
   if (lookFilters?.length) head.push(...lookFilters)
 
   let chain = head.join(',')
@@ -227,9 +269,14 @@ function buildSceneBaseFilters({
     if (blur) chain = `${chain},${blur}`
   }
 
-  if (kenBurns) {
-    // Mild zoom, anchored upper-center so the push-in doesn't cut faces off the top.
-    chain += `,zoompan=z='min(zoom+0.0012\\,1.14)':x='iw/2-(iw/zoom/2)':y='max(0\\,min(ih-ih/zoom\\,(ih-ih/zoom)*0.22))':d=${frames}:s=1080x1920:fps=${VIDEO_FPS}`
+  // Zoompan on letterboxed pads zooms into empty bars — skip. Hook gets a milder push-in.
+  const allowKenBurns = kenBurns && framing.mode === 'cover'
+  if (allowKenBurns) {
+    chain += `,${buildEofSceneKenBurnsFragment({
+      frames,
+      fps: VIDEO_FPS,
+      mild: Boolean(mildKenBurns),
+    })}`
   } else {
     chain += `,fps=${VIDEO_FPS}`
   }
@@ -300,10 +347,21 @@ function buildSceneVideoFilter({
   lookFilters = [],
   effectFilters = [],
   kenBurns = false,
+  mildKenBurns = false,
   textDir,
   logoBlur = false,
+  sourceWidth = 0,
+  sourceHeight = 0,
 }) {
-  const base = buildSceneBaseFilters({ frames, lookFilters, kenBurns, logoBlur })
+  const base = buildSceneBaseFilters({
+    frames,
+    lookFilters,
+    kenBurns,
+    mildKenBurns,
+    logoBlur,
+    sourceWidth,
+    sourceHeight,
+  })
   const tail = [
     ...(effectFilters?.length ? effectFilters : []),
     ...buildSceneCaptionFilters({
@@ -333,18 +391,24 @@ function buildSceneOverlayFilterComplex({
   lookFilters = [],
   effectFilters = [],
   kenBurns = false,
+  mildKenBurns = false,
   textDir,
   overlayMoment,
   stickers = null,
   logoBlur = false,
   overlayLogoBlur = false,
+  sourceWidth = 0,
+  sourceHeight = 0,
 }) {
   const baseChain = buildSceneBaseFilters({
     frames,
     lookFilters,
     kenBurns,
+    mildKenBurns,
     logoBlur,
     logoBlurLabelPrefix: 'mlb',
+    sourceWidth,
+    sourceHeight,
   })
   const pop = buildOverlayPopFilterFragments({
     startSec: overlayMoment.startSec,
@@ -410,16 +474,22 @@ function buildSceneStickerFilterComplex({
   lookFilters = [],
   effectFilters = [],
   kenBurns = false,
+  mildKenBurns = false,
   textDir,
   stickers = null,
   logoBlur = false,
+  sourceWidth = 0,
+  sourceHeight = 0,
 }) {
   const baseChain = buildSceneBaseFilters({
     frames,
     lookFilters,
     kenBurns,
+    mildKenBurns,
     logoBlur,
     logoBlurLabelPrefix: 'mlb',
+    sourceWidth,
+    sourceHeight,
   })
   const fxChain = effectFilters?.length ? effectFilters.join(',') : ''
   const captionChain = buildSceneCaptionFilters({
@@ -487,6 +557,21 @@ async function encodeSceneClip({
     )
   }
 
+  // Hook (scene 0) gets milder Ken Burns; probe still size for aspect-aware crop.
+  const mildKenBurns = Number(scene.index) === 0
+  const probed = await probeSceneStillSize(scene.imagePath)
+  const sourceWidth = Number(scene.imageWidth) || probed.width || 0
+  const sourceHeight = Number(scene.imageHeight) || probed.height || 0
+  if (sourceWidth && sourceHeight) {
+    console.info(
+      '[eof-video] scene still size',
+      `scene=${scene.index + 1}`,
+      `${sourceWidth}x${sourceHeight}`,
+    )
+  }
+
+  const framingOpts = { mildKenBurns, sourceWidth, sourceHeight }
+
   const overlayPath = overlayMoment?.overlayImagePath
   const useOverlay =
     Boolean(overlayMoment) &&
@@ -511,6 +596,7 @@ async function encodeSceneClip({
       stickers,
       logoBlur,
       overlayLogoBlur,
+      ...framingOpts,
     })
     try {
       await runFfmpeg(
@@ -569,6 +655,7 @@ async function encodeSceneClip({
       textDir,
       stickers,
       logoBlur,
+      ...framingOpts,
     })
     await runFfmpeg(
       [
@@ -614,6 +701,7 @@ async function encodeSceneClip({
     kenBurns,
     textDir,
     logoBlur,
+    ...framingOpts,
   })
 
   await runFfmpeg(

@@ -9,6 +9,7 @@
 
 import { isCaptionContaminatedStill } from './eofStockImageFilter.mjs'
 import { buildNewsAgencyLogoBlurFilterFragment } from './eofNewsAgencyLogoBlur.mjs'
+import { EOF_CROP_Y_BIAS_FACE_SAFE, buildEofSceneCropYExpr } from './eofSceneCrop.mjs'
 
 /** @typedef {'off' | 'auto' | 'always'} EofOverlayMomentsMode */
 
@@ -394,7 +395,7 @@ export function buildOverlayPopFilterFragments({
   const head = [
     // Cover-crop into the card — face-safe Y (upper bias) so heads aren't chopped.
     `scale=${maxW}:${maxH}:force_original_aspect_ratio=increase`,
-    `crop=${maxW}:${maxH}:(iw-ow)/2:max(0\\,min((ih-oh)*0.18\\,ih-oh))`,
+    `crop=${maxW}:${maxH}:(iw-ow)/2:${buildEofSceneCropYExpr(EOF_CROP_Y_BIAS_FACE_SAFE)}`,
     'setsar=1',
   ].join(',')
   const logoBlur = agencyLogoBlur

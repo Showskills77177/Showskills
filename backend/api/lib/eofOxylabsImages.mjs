@@ -100,11 +100,15 @@ export function scoreImageCandidate(url, width = 0, height = 0) {
   else if (area >= 400 * 400) s += 10
   else if (area > 0 && area < 120 * 120) s -= 30
   // Vertical / square frames survive 9:16 cover-crop better than wide landscapes.
+  // Ultra-wide plates get letterboxed at encode time, but prefer not to pick them.
   if (w > 0 && h > 0) {
     if (h >= w * 1.15) s += 18
     else if (h >= w * 0.95) s += 8
-    else if (w >= h * 1.6) s -= 12
+    else if (w >= h * 2.2) s -= 28
+    else if (w >= h * 1.6) s -= 18
   }
+  // Tiny Serp gstatic thumbs upscale poorly into 9:16 — prefer originals.
+  if (area > 0 && area < 280 * 280) s -= 25
   return s
 }
 

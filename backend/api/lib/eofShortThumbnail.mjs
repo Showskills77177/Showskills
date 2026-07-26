@@ -14,6 +14,10 @@ import { ensureEofSceneImageOnDisk } from './eofProductionArtifacts.mjs'
 import { fetchEofSceneImage, eofSceneImageAbsPath } from './eofSceneImages.mjs'
 import { eofProductionWorkDir } from './eofSceneTts.mjs'
 import { composeEofStudioMeta } from './eofStudioMeta.mjs'
+import {
+  EOF_CROP_Y_BIAS_FACE_SAFE,
+  buildEofSceneCropYExpr,
+} from '../../../shared/eofSceneCrop.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -58,7 +62,7 @@ export async function adaptEofShortThumbnail({
   const vf = [
     `scale=${w}:${h}:force_original_aspect_ratio=increase`,
     // Face-safe when source is tall (portrait still → 16:9 thumb): keep heads.
-    `crop=${w}:${h}:(iw-ow)/2:max(0\\,min((ih-oh)*0.20\\,ih-oh))`,
+    `crop=${w}:${h}:(iw-ow)/2:${buildEofSceneCropYExpr(EOF_CROP_Y_BIAS_FACE_SAFE)}`,
     'setsar=1',
   ]
 
