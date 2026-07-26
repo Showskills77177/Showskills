@@ -4,6 +4,7 @@ import {
   MIN_EOF_VISION_SCORE,
   clampEofVisionRow,
   applyVisionScoresToHits,
+  applyVisionScoresWithNameCueFallback,
 } from '../backend/api/lib/eofImageVision.mjs'
 import {
   hitMentionsSubject,
@@ -108,6 +109,54 @@ describe('eofImageVision clamp + apply', () => {
     )
     assert.equal(ranked[0].source, 'serpapi')
     assert.equal(ranked[1].source, 'grok-imagine')
+  })
+})
+
+describe('vision name-cue fallback (Cucurella empty-title pool must not be wiped)', () => {
+  const query = '"Marc Cucurella" Chelsea hair'
+  const subject = 'Marc Cucurella'
+
+  it('keeps query-named empty-title CDN hits when vision rejects everything', () => {
+    // Exact Cucurella shape: Google Images CDN thumbs with blank titles from a person query.
+    const hits = [
+      { url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-1', title: '', source: 'serpapi' },
+      { url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-2', title: '', source: 'serpapi' },
+      { url: 'https://cdn.example.com/cucurella.jpg', title: 'Marc Cucurella Chelsea hair', source: 'serpapi' },
+    ]
+    // Vision scores the tiny thumbs below MIN and skips the third → applyVisionScoresToHits empties.
+    const scores = new Map([
+      ['https://encrypted-tbn0.gstatic.com/images?q=cuc-1', 3],
+      ['https://encrypted-tbn0.gstatic.com/images?q=cuc-2', 2],
+    ])
+    assert.equal(applyVisionScoresToHits(hits, scores).length, 0, 'precondition: strict vision empties pool')
+
+    const kept = applyVisionScoresWithNameCueFallback(hits, subject, scores, { query })
+    assert.ok(kept.length >= 1, `fallback must keep at least one Cucurella still, got ${kept.length}`)
+    // The named-title hit and the empty-title CDN hits (query names the person) all survive.
+    assert.equal(kept.length, 3)
+  })
+
+  it('still returns vision-approved stills unchanged when some pass', () => {
+    const hits = [
+      { url: 'https://cdn.example.com/good.jpg', title: 'Marc Cucurella', source: 'serpapi' },
+      { url: 'https://cdn.example.com/bad.jpg', title: 'Marc Cucurella', source: 'serpapi' },
+    ]
+    const scores = new Map([
+      ['https://cdn.example.com/good.jpg', 8],
+      ['https://cdn.example.com/bad.jpg', 2],
+    ])
+    const kept = applyVisionScoresWithNameCueFallback(hits, subject, scores, { query })
+    assert.equal(kept.length, 1)
+    assert.equal(kept[0].url, 'https://cdn.example.com/good.jpg')
+  })
+
+  it('does not resurrect wrong-subject hits via fallback (unnamed pool stays empty)', () => {
+    const hits = [
+      { url: 'https://cdn.example.com/ronaldo.jpg', title: 'Cristiano Ronaldo', source: 'serpapi' },
+    ]
+    const scores = new Map([['https://cdn.example.com/ronaldo.jpg', 2]])
+    const kept = applyVisionScoresWithNameCueFallback(hits, subject, scores, { query })
+    assert.equal(kept.length, 0, 'a wrong-subject still must not be kept just to avoid an empty pool')
   })
 })
 

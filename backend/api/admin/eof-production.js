@@ -579,6 +579,24 @@ export default async function handler(req, res) {
           return json(res, 202, { ok: true, accepted: true, job: existing })
         }
 
+        // Explicit human Build Short resets the ElevenLabs per-narration synth budget.
+        // The a23cad2 credit guard caps re-TTS at 3 per narration hash to stop the old
+        // stale-kill → auto-Rebuild → re-synth loop. But a job that already burned its 3
+        // synths during that loop (e.g. the ~40-attempt Cucurella job) could no longer be
+        // built at all — the guard threw "credit guard: already synthesized 3/3" on every
+        // Build. A deliberate click is not a silent retry, so give it a fresh budget; the
+        // guard still caps runaway synths WITHIN a single build (synthIncrements) and
+        // durable-audio reuse still short-circuits when a good mix already exists.
+        if (action === 'build-short' || action === 'render') {
+          await updateEofProductionJob(jobId, { ttsSynthCount: 0 }).catch((e) => {
+            console.warn(
+              '[eof-production] could not reset tts synth budget',
+              jobId,
+              e instanceof Error ? e.message : e,
+            )
+          })
+        }
+
         // Optional per-build override of Google Images provider (auto | serpapi | oxylabs).
         const imageProvider =
           body.imageProvider !== undefined && body.imageProvider !== null && String(body.imageProvider).trim()

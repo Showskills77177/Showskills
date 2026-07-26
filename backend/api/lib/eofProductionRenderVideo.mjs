@@ -29,6 +29,7 @@ import {
   isEofImageVisionConfigured,
   rankEofPoolHitsWithVision,
   applyVisionScoresToHits,
+  applyVisionScoresWithNameCueFallback,
 } from './eofImageVision.mjs'
 import {
   resolveImageSubject,
@@ -628,7 +629,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 maxImages: Math.min(8, oxyPool.hits.length),
               })
               if (visionScores.size) {
-                oxyPool.hits = applyVisionScoresToHits(oxyPool.hits, visionScores)
+                // Fallback keeps query-named empty-title stills if vision rejects everything
+                // (Cucurella empty-title CDN thumbs) so the pool is never wiped to a hard fail.
+                oxyPool.hits = applyVisionScoresWithNameCueFallback(
+                  oxyPool.hits,
+                  oxyPool.subject || leadSubject,
+                  visionScores,
+                  { query: oxyPool.query || '' },
+                )
                 console.info(
                   '[eof-video] vision kept',
                   oxyPool.hits.length,

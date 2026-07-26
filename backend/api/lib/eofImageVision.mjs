@@ -9,6 +9,8 @@ import {
   hitMentionsSubject,
   subjectNameCues,
   MIN_EOF_VISION_SCORE,
+  filterHitsRequiringSubjectNameCue,
+  isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
 
 export { MIN_EOF_VISION_SCORE }
@@ -269,4 +271,42 @@ export function applyVisionScoresToHits(hits, visionScores, opts = {}) {
       return (isGen(a) ? 1 : 0) - (isGen(b) ? 1 : 0)
     })
   return ranked
+}
+
+/**
+ * Vision re-rank with a subject-name-cue fallback so a named-subject pool is never wiped to
+ * empty (→ "No real scene images" fail) when vision rejects every still.
+ *
+ * Cucurella-specific failure: Google Images returns CDN thumbnails with EMPTY titles for
+ * `"Marc Cucurella" Chelsea hair`. Grok vision often can't confirm the face on tiny thumbs and
+ * scores them below MIN, so `applyVisionScoresToHits` drops all of them. Tuchel pools have real
+ * titles ("Thomas Tuchel …") that pass, which is why Tuchel rebuilt and Cucurella did not.
+ *
+ * When the ranked pool comes back empty for a named subject, fall back to the name-cue filter —
+ * it keeps empty-title hits when the Serp query already named the person. Better a query-named
+ * still than a hard build failure.
+ *
+ * @param {Array<{ url: string, title?: string|null, source?: string, localPath?: string }>} hits
+ * @param {string} subject
+ * @param {Map<string, number>} visionScores
+ * @param {{ query?: string }} [opts]
+ */
+export function applyVisionScoresWithNameCueFallback(hits, subject, visionScores, opts = {}) {
+  const ranked = applyVisionScoresToHits(hits, visionScores)
+  if (ranked.length) return ranked
+  if (!Array.isArray(hits) || !hits.length) return ranked
+  if (!isNamedFootballSubject(subject)) return ranked
+  const fallback = filterHitsRequiringSubjectNameCue(hits, subject, {
+    query: opts.query || '',
+    log: false,
+  })
+  if (fallback.length) {
+    console.warn(
+      '[eof-vision] pool emptied by vision — name-cue fallback kept',
+      fallback.length,
+      'still(s) for',
+      String(subject).slice(0, 40),
+    )
+  }
+  return fallback
 }

@@ -147,6 +147,29 @@ describe('eofTtsReuse fingerprint + decisions', () => {
     assert.equal(freshHash.blocked, false)
     assert.equal(freshHash.count, 0)
   })
+
+  it('explicit Build reset (ttsSynthCount → 0) unblocks a job that burned its budget', () => {
+    const fp = 'cucurella-narration-hash'
+    // The ~40-attempt Cucurella job: same narration hash, already at the 3/3 cap → blocked.
+    const blocked = eofTtsCreditGuardDecision({
+      engine: 'elevenlabs',
+      currentFingerprint: fp,
+      storedFingerprint: fp,
+      synthCount: EOF_TTS_MAX_SYNTHS_PER_HASH,
+    })
+    assert.equal(blocked.blocked, true, 'precondition: burned-budget job is blocked')
+
+    // build-short handler resets ttsSynthCount to 0 on an explicit human Build. Same hash,
+    // count now 0 → the deliberate build is allowed again (silent auto-retries never reset).
+    const afterReset = eofTtsCreditGuardDecision({
+      engine: 'elevenlabs',
+      currentFingerprint: fp,
+      storedFingerprint: fp,
+      synthCount: 0,
+    })
+    assert.equal(afterReset.blocked, false, 'explicit Build reset must unblock the job')
+    assert.equal(afterReset.count, 0)
+  })
 })
 
 describe('eof Pro stale windows (quiet must not kill live encodes)', () => {
