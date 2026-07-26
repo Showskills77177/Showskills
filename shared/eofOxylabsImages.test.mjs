@@ -515,7 +515,7 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
     )
   })
 
-  it('marks rendering jobs stale when quiet or over max age (waitUntil death)', () => {
+  it('marks rendering jobs stale when quiet (Hobby) or over max age', () => {
     const now = Date.now()
     assert.equal(
       isEofRenderStale(
@@ -524,7 +524,7 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
           updatedAt: new Date(now - 10_000).toISOString(),
           renderProgress: { startedAt: new Date(now - 10_000).toISOString() },
         },
-        { now, maxAgeSec: 280, maxQuietSec: 50 },
+        { now, maxAgeSec: 280, maxQuietSec: 50, allowQuietKill: true },
       ),
       false,
     )
@@ -535,10 +535,22 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
           updatedAt: new Date(now - 55_000).toISOString(),
           renderProgress: { startedAt: new Date(now - 55_000).toISOString() },
         },
-        { now, maxAgeSec: 280, maxQuietSec: 50 },
+        { now, maxAgeSec: 280, maxQuietSec: 50, allowQuietKill: true },
       ),
       true,
-      'quiet > 50s must stale (silent isolate kill)',
+      'Hobby quiet > 50s must stale (silent isolate kill)',
+    )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 55_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 55_000).toISOString() },
+        },
+        { now, maxAgeSec: 280, maxQuietSec: 50, allowQuietKill: false },
+      ),
+      false,
+      'Pro must not quiet-kill under max age',
     )
     assert.equal(
       isEofRenderStale(
@@ -547,7 +559,7 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
           updatedAt: new Date(now - 5_000).toISOString(),
           renderProgress: { startedAt: new Date(now - 150_000).toISOString() },
         },
-        { now, maxAgeSec: 280, maxQuietSec: 50 },
+        { now, maxAgeSec: 280, maxQuietSec: 50, allowQuietKill: false },
       ),
       false,
       'healthy heartbeats at 150s must NOT stale (encode can still finish under 280s)',
@@ -559,10 +571,10 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
           updatedAt: new Date(now - 5_000).toISOString(),
           renderProgress: { startedAt: new Date(now - 290_000).toISOString() },
         },
-        { now, maxAgeSec: 280, maxQuietSec: 50 },
+        { now, maxAgeSec: 280, maxQuietSec: 50, allowQuietKill: false },
       ),
       true,
-      'overall age > 280s must stale even with heartbeats (past Hobby maxDuration headroom)',
+      'overall age > 280s must stale even with heartbeats (past maxDuration headroom)',
     )
   })
 

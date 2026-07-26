@@ -99,6 +99,8 @@ async function addEofProductionJobColumns() {
     'voice_settings_json',
     'voice_regeneration_count',
     'voice_narration_hash',
+    'tts_audio_hash',
+    'tts_synth_count',
     'script_source',
     'caption_style',
     'caption_engine',

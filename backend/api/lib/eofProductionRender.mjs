@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { copyFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
 import {
@@ -7,6 +7,14 @@ import {
   buildEofRenderProgress,
   estimateEofRenderDurationSec,
 } from '../../../shared/eofProduction.mjs'
+import {
+  hashEofTtsFingerprint,
+  hashEofSceneTtsLine,
+  shouldReuseEofDurableMixedAudio,
+  shouldReuseEofSceneAudioFile,
+  planEofSceneTtsDedupe,
+  eofTtsCreditGuardDecision,
+} from '../../../shared/eofTtsReuse.mjs'
 import {
   getEofProductionJob,
   updateEofProductionJob,
@@ -29,7 +37,8 @@ import {
   saveEofMixedAudioArtifact,
   clearEofVideoArtifact,
   clearEofVideoOnlyArtifact,
-  clearEofMixedAudioArtifact,
+  ensureEofMixedAudioOnDisk,
+  getEofArtifactFlags,
 } from './eofProductionArtifacts.mjs'
 import { getElevenLabsMaxConcurrency } from './eofElevenLabsTts.mjs'
 
@@ -43,9 +52,11 @@ function resolveTtsConcurrency(voicePreset) {
 
 const MAX_INLINE_AUDIO_BYTES = 3_500_000
 
+/** Process-wide lock so continue-build / waitUntil cannot double-run TTS for one job. */
+const audioRenderLocks = new Set()
+
 export async function readEofMixedAudioInline(jobId) {
   try {
-    const { ensureEofMixedAudioOnDisk } = await import('./eofProductionArtifacts.mjs')
     const mixedPath = (await ensureEofMixedAudioOnDisk(jobId)) || join(eofProductionWorkDir(jobId), 'mixed.mp3')
     const info = await stat(mixedPath)
     if (!info.isFile() || info.size > MAX_INLINE_AUDIO_BYTES) return null
@@ -64,6 +75,7 @@ export async function readEofMixedAudioInline(jobId) {
  *   voiceRegenerationMode?: boolean,
  *   reuseSceneAudio?: boolean,
  *   allowNoMusic?: boolean,
+ *   forceFreshAudio?: boolean,
  * }} [opts]
  * When `allowNoMusic` is true and the job has no `musicTrackId`, mix VO-only
  * (do not auto-pick a default bed). Used by post-build music remix / Remove song.
@@ -78,179 +90,334 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
   const preserveSceneImages = opts.preserveSceneImages === true
   const voiceRegenerationMode = opts.voiceRegenerationMode === true
   const reuseSceneAudio = opts.reuseSceneAudio === true
+  const forceFreshAudio = opts.forceFreshAudio === true
   const allowNoMusic = opts.allowNoMusic === true
-  const job = await getEofProductionJob(jobId)
-  if (!job) throw new Error('Production job not found.')
-  if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
-  const ffmpegOk = (await hasBundledFfmpeg()) || (await isFfmpegAvailable())
-  if (!ffmpegOk) {
-    throw new Error(
-      'ffmpeg is not available for audio render. Ensure ffmpeg-static is installed or set FFMPEG_PATH.',
-    )
+  if (audioRenderLocks.has(jobId)) {
+    console.info('eof:tts skip reuse', jobId, 'reason=in_flight_lock')
+    return getEofProductionJob(jobId)
   }
-
-  await updateEofProductionJob(jobId, {
-    status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
-    errorMessage: null,
-  })
-
-  const sceneCount = job.script.scenes.length
-  const renderStartedAt = new Date().toISOString()
-  const estimatedTotalSec = estimateEofRenderDurationSec(job.script)
-
-  await updateEofProductionRenderProgress(
-    jobId,
-    buildEofRenderProgress({
-      stage: 'tts',
-      sceneIndex: 0,
-      sceneCount,
-      startedAt: renderStartedAt,
-      estimatedTotalSec,
-      pipeline: 'audio',
-    }),
-  )
-
-  async function reportProgress(stage, sceneIndex = 0, { force = false } = {}) {
-    const progress = buildEofRenderProgress({
-      stage,
-      sceneIndex,
-      sceneCount,
-      startedAt: renderStartedAt,
-      estimatedTotalSec,
-      pipeline: 'audio',
-    })
-    await throttledProgress(progress, { force })
-    return progress
-  }
-
-  const throttledProgress = createThrottledWriter(
-    (progress) => updateEofProductionRenderProgress(jobId, progress),
-    700,
-  )
+  audioRenderLocks.add(jobId)
 
   try {
-    const workDir = eofProductionWorkDir(jobId)
+    const job = await getEofProductionJob(jobId)
+    if (!job) throw new Error('Production job not found.')
+    if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
 
-    await reportProgress('tts', 0, { force: true })
+    const ffmpegOk = (await hasBundledFfmpeg()) || (await isFfmpegAvailable())
+    if (!ffmpegOk) {
+      throw new Error(
+        'ffmpeg is not available for audio render. Ensure ffmpeg-static is installed or set FFMPEG_PATH.',
+      )
+    }
 
-    const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
+    const fingerprint = hashEofTtsFingerprint({
+      script: job.script,
+      voicePreset: job.voicePreset,
+      voiceSettings: job.voiceSettings,
+    })
+    const flags = await getEofArtifactFlags(jobId)
+    const canReuseMixed = shouldReuseEofDurableMixedAudio({
+      hasDurableAudio: flags.hasDurableAudio,
+      storedFingerprint: job.ttsAudioHash,
+      currentFingerprint: fingerprint,
+      forceFreshAudio,
+      voiceRegenerationMode,
+    })
 
-    let scenesDone = 0
-    const ttsConcurrency = resolveTtsConcurrency(job.voicePreset)
-    const sceneManifest = await mapWithConcurrency(job.script.scenes, ttsConcurrency, async (scene, i) => {
-      const outPath = join(workDir, `scene-${i + 1}.mp3`)
-      const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]
-      let audioPath = outPath
-      let elevenLabsRequestId = prior?.elevenLabsRequestId || null
+    if (canReuseMixed) {
+      const restored = await ensureEofMixedAudioOnDisk(jobId)
+      if (restored && existsSync(restored)) {
+        console.info('eof:tts skip reuse', jobId, 'reason=durable_mixed', `hash=${fingerprint}`)
+        await updateEofProductionJob(jobId, {
+          status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
+          errorMessage: null,
+          mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
+        })
+        await updateEofProductionRenderProgress(jobId, null)
+        return getEofProductionJob(jobId)
+      }
+    }
 
-      if (reuseSceneAudio && existsSync(outPath)) {
-        // Music remix: keep existing VO takes — only re-bed under narration.
-        audioPath = outPath
-      } else {
-        const ttsResult = await synthesizeEofSceneNarration({
-          text: scene.narration,
+    const voicePresetMeta = EOF_VOICE_PRESETS[job.voicePreset] || {}
+    const credit = eofTtsCreditGuardDecision({
+      engine: voicePresetMeta.engine || 'edge',
+      currentFingerprint: fingerprint,
+      storedFingerprint: job.ttsAudioHash,
+      synthCount: job.ttsSynthCount,
+      voiceRegenerationMode,
+    })
+    if (credit.blocked) {
+      throw new Error(credit.reason)
+    }
+
+    await updateEofProductionJob(jobId, {
+      status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
+      errorMessage: null,
+    })
+
+    const sceneCount = job.script.scenes.length
+    const renderStartedAt = new Date().toISOString()
+    const estimatedTotalSec = estimateEofRenderDurationSec(job.script)
+
+    await updateEofProductionRenderProgress(
+      jobId,
+      buildEofRenderProgress({
+        stage: 'tts',
+        sceneIndex: 0,
+        sceneCount,
+        startedAt: renderStartedAt,
+        estimatedTotalSec,
+        pipeline: 'audio',
+      }),
+    )
+
+    const throttledProgress = createThrottledWriter(
+      (progress) => updateEofProductionRenderProgress(jobId, progress),
+      700,
+    )
+
+    async function reportProgress(stage, sceneIndex = 0, { force = false } = {}) {
+      const progress = buildEofRenderProgress({
+        stage,
+        sceneIndex,
+        sceneCount,
+        startedAt: renderStartedAt,
+        estimatedTotalSec,
+        pipeline: 'audio',
+      })
+      await throttledProgress(progress, { force })
+      return progress
+    }
+
+    try {
+      const workDir = eofProductionWorkDir(jobId)
+      await reportProgress('tts', 0, { force: true })
+
+      const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
+      const scenePlans = job.script.scenes.map((scene, i) => {
+        const text = String(scene.narration || '').trim()
+        const lineHash = hashEofSceneTtsLine({
+          text,
           voicePreset: job.voicePreset,
           voiceSettings: job.voiceSettings,
-          regenerateFromRequestId:
-            voiceRegenerationMode && prior?.elevenLabsRequestId ? prior.elevenLabsRequestId : null,
-          outPath,
         })
-        audioPath = typeof ttsResult === 'string' ? ttsResult : ttsResult.outPath
-        elevenLabsRequestId =
-          typeof ttsResult === 'object' && ttsResult.requestId
-            ? ttsResult.requestId
-            : prior?.elevenLabsRequestId || null
+        return { index: i, text, lineHash, scene }
+      })
+
+      const deduped = planEofSceneTtsDedupe(scenePlans)
+      const outPaths = scenePlans.map((_, i) => join(workDir, `scene-${i + 1}.mp3`))
+      const lineHashByIndex = new Map(scenePlans.map((s) => [s.index, s.lineHash]))
+      const elevenLabsIds = new Map()
+      let synthIncrements = 0
+
+      // Reuse existing scene files with matching line hashes before any synthesize.
+      for (const plan of scenePlans) {
+        const outPath = outPaths[plan.index]
+        const prior = priorManifest.find((row) => row.index === plan.index) || priorManifest[plan.index]
+        const reuseFile = shouldReuseEofSceneAudioFile({
+          fileExists: existsSync(outPath),
+          storedLineHash: prior?.lineHash || null,
+          currentLineHash: plan.lineHash,
+          reuseSceneAudio,
+          forceFreshAudio,
+          voiceRegenerationMode,
+        })
+        if (reuseFile) {
+          console.info(
+            'eof:tts skip reuse',
+            jobId,
+            `scene=${plan.index + 1}`,
+            'reason=scene_file',
+            `lineHash=${plan.lineHash}`,
+          )
+          if (prior?.elevenLabsRequestId) {
+            elevenLabsIds.set(plan.index, prior.elevenLabsRequestId)
+          }
+        }
       }
 
-      scenesDone += 1
-      await reportProgress(reuseSceneAudio ? 'mix' : 'tts', scenesDone)
-      return {
-        sceneId: scene.id,
-        index: i,
-        audioPath,
-        caption: scene.caption,
-        imageQuery: scene.imageQuery,
-        elevenLabsRequestId,
-        imageSource: prior?.imageSource || null,
-        imageQueryUsed: prior?.imageQueryUsed || scene.imageQuery,
-        // Keep rotation memory across voiceover remux / full builds so Rebuild still avoids recent stills.
-        imageKey: prior?.imageKey || null,
-        imageAttempt: Number(prior?.imageAttempt) || 0,
-        imageKeyHistory: Array.isArray(prior?.imageKeyHistory)
-          ? prior.imageKeyHistory.filter(Boolean)
-          : prior?.imageKey
-            ? [prior.imageKey]
-            : [],
-        imageTitle: prior?.imageTitle || null,
-        imageYear: prior?.imageYear || null,
+      const ttsConcurrency = resolveTtsConcurrency(job.voicePreset)
+      await mapWithConcurrency(deduped, ttsConcurrency, async (group) => {
+        const primaryIndex = group.indexes[0]
+        const primaryPath = outPaths[primaryIndex]
+        const prior =
+          priorManifest.find((row) => row.index === primaryIndex) || priorManifest[primaryIndex]
+        const primaryReuse = shouldReuseEofSceneAudioFile({
+          fileExists: existsSync(primaryPath),
+          storedLineHash: prior?.lineHash || null,
+          currentLineHash: group.lineHash,
+          reuseSceneAudio,
+          forceFreshAudio,
+          voiceRegenerationMode,
+        })
+
+        if (!primaryReuse) {
+          const engine = voicePresetMeta.engine || 'edge'
+          if (engine === 'elevenlabs') {
+            const nextCount =
+              (job.ttsAudioHash === fingerprint ? Number(job.ttsSynthCount) || 0 : 0) +
+              synthIncrements +
+              1
+            const guard = eofTtsCreditGuardDecision({
+              engine: 'elevenlabs',
+              currentFingerprint: fingerprint,
+              storedFingerprint: fingerprint,
+              synthCount: nextCount - 1,
+              voiceRegenerationMode,
+            })
+            if (guard.blocked) throw new Error(guard.reason)
+            console.info(
+              'eof:tts elevenlabs synthesize',
+              jobId,
+              `scene=${primaryIndex + 1}`,
+              `lineHash=${group.lineHash}`,
+              `synths=${nextCount}`,
+            )
+          } else {
+            console.info('eof:tts edge synthesize', jobId, `scene=${primaryIndex + 1}`)
+          }
+
+          const ttsResult = await synthesizeEofSceneNarration({
+            text: group.text,
+            voicePreset: job.voicePreset,
+            voiceSettings: job.voiceSettings,
+            regenerateFromRequestId:
+              voiceRegenerationMode && prior?.elevenLabsRequestId ? prior.elevenLabsRequestId : null,
+            outPath: primaryPath,
+          })
+          const requestId =
+            typeof ttsResult === 'object' && ttsResult.requestId ? ttsResult.requestId : null
+          if (requestId) elevenLabsIds.set(primaryIndex, requestId)
+          if (engine === 'elevenlabs') synthIncrements += 1
+        }
+
+        for (const idx of group.indexes.slice(1)) {
+          const dest = outPaths[idx]
+          const destPrior = priorManifest.find((row) => row.index === idx) || priorManifest[idx]
+          const destReuse = shouldReuseEofSceneAudioFile({
+            fileExists: existsSync(dest),
+            storedLineHash: destPrior?.lineHash || null,
+            currentLineHash: group.lineHash,
+            reuseSceneAudio,
+            forceFreshAudio,
+            voiceRegenerationMode,
+          })
+          if (destReuse) continue
+          copyFileSync(primaryPath, dest)
+          console.info(
+            'eof:tts skip reuse',
+            jobId,
+            `scene=${idx + 1}`,
+            'reason=dedupe_copy',
+            `from=${primaryIndex + 1}`,
+          )
+          const sharedId = elevenLabsIds.get(primaryIndex) || destPrior?.elevenLabsRequestId
+          if (sharedId) elevenLabsIds.set(idx, sharedId)
+        }
+
+        await reportProgress(reuseSceneAudio ? 'mix' : 'tts', group.indexes[group.indexes.length - 1] + 1)
+      })
+
+      const sceneManifest = scenePlans.map((plan, i) => {
+        const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]
+        return {
+          sceneId: plan.scene.id,
+          index: i,
+          audioPath: outPaths[i],
+          caption: plan.scene.caption,
+          imageQuery: plan.scene.imageQuery,
+          lineHash: lineHashByIndex.get(i) || plan.lineHash,
+          elevenLabsRequestId: elevenLabsIds.get(i) || prior?.elevenLabsRequestId || null,
+          imageSource: prior?.imageSource || null,
+          imageQueryUsed: prior?.imageQueryUsed || plan.scene.imageQuery,
+          imageKey: prior?.imageKey || null,
+          imageAttempt: Number(prior?.imageAttempt) || 0,
+          imageKeyHistory: Array.isArray(prior?.imageKeyHistory)
+            ? prior.imageKeyHistory.filter(Boolean)
+            : prior?.imageKey
+              ? [prior.imageKey]
+              : [],
+          imageTitle: prior?.imageTitle || null,
+          imageYear: prior?.imageYear || null,
+        }
+      })
+
+      const durations = await Promise.all(
+        sceneManifest.map((entry) => probeAudioDurationSec(entry.audioPath)),
+      )
+      const sceneManifestWithDur = sceneManifest.map((entry, i) => ({
+        ...entry,
+        durationSec: durations[i],
+      }))
+      sceneManifestWithDur.sort((a, b) => a.index - b.index)
+
+      await reportProgress('mix', sceneCount, { force: true })
+
+      const wantNoMusic = shouldEofAllowNoMusic({ allowNoMusic }, job)
+      const track = wantNoMusic ? null : await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
+      const musicPath = resolveEofMusicTrackFilePath(track)
+      const mixedPath = join(workDir, 'mixed.mp3')
+
+      await mixEofNarrationWithMusic({
+        sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
+        musicFilePath: musicPath,
+        musicVolume: job.musicVolume,
+        musicStartSec: job.musicStartSec,
+        musicEndSec: job.musicEndSec,
+        outputPath: mixedPath,
+      })
+
+      await reportProgress('done', sceneCount, { force: true })
+      await updateEofProductionRenderProgress(jobId, null)
+
+      if (preserveSceneImages) {
+        await clearEofVideoOnlyArtifact(jobId).catch(() => {})
+      } else {
+        await clearEofVideoArtifact(jobId).catch(() => {})
       }
-    })
 
-    const durations = await Promise.all(
-      sceneManifest.map((entry) => probeAudioDurationSec(entry.audioPath)),
-    )
-    const sceneManifestWithDur = sceneManifest.map((entry, i) => ({
-      ...entry,
-      durationSec: durations[i],
-    }))
+      // Write durable mix first (overwrites prior blob). Never clear-before-save —
+      // that left hasDurableAudio=false and continue-build re-ran TTS.
+      const saved = await saveEofMixedAudioArtifact(jobId, mixedPath)
+      if (!saved) {
+        console.warn('[eof-production] durable mixed audio save failed — keeping on-disk mix', jobId)
+      }
 
-    sceneManifestWithDur.sort((a, b) => a.index - b.index)
+      const sameHash = job.ttsAudioHash === fingerprint
+      const nextSynthCount = voiceRegenerationMode
+        ? job.ttsSynthCount
+        : (sameHash ? Number(job.ttsSynthCount) || 0 : 0) + synthIncrements
 
-    await reportProgress('mix', sceneCount, { force: true })
+      const regenPatch = voiceRegenerationMode
+        ? { voiceRegenerationCount: incrementEofVoiceRegenerationCount(job) }
+        : preserveSceneImages
+          ? {}
+          : resetEofVoiceRegenerationBaseline(job.script)
 
-    const wantNoMusic = shouldEofAllowNoMusic({ allowNoMusic }, job)
-    const track = wantNoMusic ? null : await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
-    const musicPath = resolveEofMusicTrackFilePath(track)
-    const mixedPath = join(workDir, 'mixed.mp3')
-
-    const mix = await mixEofNarrationWithMusic({
-      sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
-      musicFilePath: musicPath,
-      musicVolume: job.musicVolume,
-      musicStartSec: job.musicStartSec,
-      musicEndSec: job.musicEndSec,
-      outputPath: mixedPath,
-    })
-    void mix
-
-    await reportProgress('done', sceneCount, { force: true })
-    await updateEofProductionRenderProgress(jobId, null)
-
-    // Durable copy for Vercel: next request may land on a cold instance without /tmp files.
-    if (preserveSceneImages) {
-      await clearEofVideoOnlyArtifact(jobId).catch(() => {})
-    } else {
-      await clearEofVideoArtifact(jobId).catch(() => {})
+      return updateEofProductionJob(jobId, {
+        status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
+        narrationManifest: sceneManifestWithDur,
+        mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
+        renderOutputPath: null,
+        errorMessage: null,
+        ttsAudioHash: fingerprint,
+        ttsSynthCount: nextSynthCount,
+        musicTrackId: wantNoMusic ? null : track?.id || job.musicTrackId || null,
+        ...regenPatch,
+        script: {
+          ...job.script,
+          scenes: job.script.scenes.map((scene, i) => ({
+            ...scene,
+            durationSec: sceneManifestWithDur[i]?.durationSec ?? scene.durationSec,
+          })),
+        },
+      })
+    } catch (e) {
+      await markEofProductionJobFailed(jobId, e instanceof Error ? e.message : 'Render failed')
+      throw e
     }
-    await clearEofMixedAudioArtifact(jobId).catch(() => {})
-    await saveEofMixedAudioArtifact(jobId, mixedPath)
-
-    const regenPatch = voiceRegenerationMode
-      ? { voiceRegenerationCount: incrementEofVoiceRegenerationCount(job) }
-      : preserveSceneImages
-        ? {}
-        : resetEofVoiceRegenerationBaseline(job.script)
-
-    return updateEofProductionJob(jobId, {
-      status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
-      narrationManifest: sceneManifestWithDur,
-      mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
-      renderOutputPath: null,
-      errorMessage: null,
-      // Keep intentional VO-only (Remove song); otherwise persist auto-picked bed id.
-      musicTrackId: wantNoMusic ? null : track?.id || job.musicTrackId || null,
-      ...regenPatch,
-      script: {
-        ...job.script,
-        scenes: job.script.scenes.map((scene, i) => ({
-          ...scene,
-          durationSec: sceneManifestWithDur[i]?.durationSec ?? scene.durationSec,
-        })),
-      },
-    })
-  } catch (e) {
-    await markEofProductionJobFailed(jobId, e instanceof Error ? e.message : 'Render failed')
-    throw e
+  } finally {
+    audioRenderLocks.delete(jobId)
   }
 }

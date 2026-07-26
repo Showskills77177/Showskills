@@ -97,8 +97,8 @@ describe('eofProductionServerless', () => {
   })
 
   it('default stale windows leave room for a long Pro encode', () => {
-    assert.ok(EOF_STALE_RENDER_SEC >= 240, `max age ${EOF_STALE_RENDER_SEC} too aggressive`)
-    assert.ok(EOF_STALE_PROGRESS_SEC >= 60, `quiet ${EOF_STALE_PROGRESS_SEC} too tight for Pro mux`)
+    assert.ok(EOF_STALE_RENDER_SEC >= 280, `max age ${EOF_STALE_RENDER_SEC} too aggressive`)
+    assert.ok(EOF_STALE_PROGRESS_SEC >= 60, `quiet ${EOF_STALE_PROGRESS_SEC} too tight for Hobby`)
     assert.ok(EOF_STALE_PROGRESS_SEC <= 120, `quiet ${EOF_STALE_PROGRESS_SEC} too loose`)
     const now = Date.now()
     assert.equal(
@@ -112,6 +112,18 @@ describe('eofProductionServerless', () => {
       ),
       false,
       '160s heartbeating build must stay alive',
+    )
+    assert.equal(
+      isEofRenderStale(
+        {
+          status: 'rendering_video',
+          updatedAt: new Date(now - 100_000).toISOString(),
+          renderProgress: { startedAt: new Date(now - 168_000).toISOString() },
+        },
+        { now },
+      ),
+      false,
+      '168s quiet Pro encode must NOT auto-fail (exact user failure)',
     )
   })
 })

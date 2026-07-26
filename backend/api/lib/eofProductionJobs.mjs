@@ -41,6 +41,7 @@ import {
 } from '../../../shared/eofStickersElements.mjs'
 import { normalizeElevenLabsVoiceSettings, resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { hashEofNarrationLines } from '../../../shared/eofVoiceRegeneration.mjs'
+import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
 import { pickEofMusicTrackForTopic } from './eofMusicTracks.mjs'
 import { normalizeEofMusicTrim } from '../../../shared/eofMusicTrim.mjs'
 import { parseEofQualityGate, parseEofQualityGateHistory } from './eofShortQualityGate.mjs'
@@ -58,6 +59,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, music_track_id, music_volume,
   music_start_sec, music_end_sec,
   voice_preset, voice_settings_json, voice_regeneration_count, voice_narration_hash,
+  tts_audio_hash, tts_synth_count,
   caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
   overlay_moments, video_effects_json, stickers_json, quality_gate_json, quality_gate_history_json,
   narration_manifest_json, mixed_audio_path, render_output_path,
@@ -113,6 +115,8 @@ function rowToJob(row) {
     voiceSettings: parseVoiceSettingsJson(row.voice_settings_json),
     voiceRegenerationCount: Number(row.voice_regeneration_count) || 0,
     voiceNarrationHash: row.voice_narration_hash || null,
+    ttsAudioHash: row.tts_audio_hash || null,
+    ttsSynthCount: Math.max(0, Number(row.tts_synth_count) || 0),
     scriptSource: row.script_source || null,
     captionStyle: resolveEofCaptionStyle(row.caption_style || EOF_DEFAULT_CAPTION_STYLE),
     captionEngine: row.caption_engine || null,
@@ -329,6 +333,8 @@ export async function regenerateEofProductionDraft(
     mixedAudioPath: null,
     voiceRegenerationCount: 0,
     voiceNarrationHash: null,
+    ttsAudioHash: null,
+    ttsSynthCount: 0,
   })
   return {
     ...updated,
@@ -369,6 +375,8 @@ export async function adaptEofProductionDraftToScenes(id, { format, plainTextDra
     narrationManifest: null,
     voiceRegenerationCount: 0,
     voiceNarrationHash: null,
+    ttsAudioHash: null,
+    ttsSynthCount: 0,
   })
 }
 
@@ -393,6 +401,8 @@ export async function regenerateEofProductionScript(id, { format, scriptProvider
     narrationManifest: null,
     voiceRegenerationCount: 0,
     voiceNarrationHash: null,
+    ttsAudioHash: null,
+    ttsSynthCount: 0,
   })
 }
 
@@ -437,6 +447,11 @@ export async function updateEofProductionJob(id, patch) {
       : job.voiceRegenerationCount
   const voiceNarrationHash =
     patch.voiceNarrationHash !== undefined ? patch.voiceNarrationHash : job.voiceNarrationHash
+  const ttsAudioHash = patch.ttsAudioHash !== undefined ? patch.ttsAudioHash : job.ttsAudioHash
+  const ttsSynthCount =
+    patch.ttsSynthCount !== undefined
+      ? Math.max(0, Number(patch.ttsSynthCount) || 0)
+      : job.ttsSynthCount
   const youtubeProjectId =
     patch.youtubeProjectId !== undefined ? patch.youtubeProjectId : job.youtubeProjectId
   const captionStyle =
@@ -504,19 +519,21 @@ export async function updateEofProductionJob(id, patch) {
          render_output_path = $16,
          voice_regeneration_count = $17,
          voice_narration_hash = $18,
-         youtube_project_id = $19,
-         caption_style = $20,
-         caption_engine = $21,
-         zapcap_template_id = $22,
-         transition_style = $23,
-         color_grade = $24,
-         enhance_style = $25,
-         caption_layout_json = $26,
-         overlay_moments = $27,
-         video_effects_json = $28,
-         stickers_json = $29,
-         quality_gate_json = $30,
-         quality_gate_history_json = $31,
+         tts_audio_hash = $19,
+         tts_synth_count = $20,
+         youtube_project_id = $21,
+         caption_style = $22,
+         caption_engine = $23,
+         zapcap_template_id = $24,
+         transition_style = $25,
+         color_grade = $26,
+         enhance_style = $27,
+         caption_layout_json = $28,
+         overlay_moments = $29,
+         video_effects_json = $30,
+         stickers_json = $31,
+         quality_gate_json = $32,
+         quality_gate_history_json = $33,
          updated_at = ${nowSql()}
      WHERE id = $1`,
     [
@@ -538,6 +555,8 @@ export async function updateEofProductionJob(id, patch) {
       renderOutputPath,
       voiceRegenerationCount,
       voiceNarrationHash,
+      ttsAudioHash,
+      ttsSynthCount,
       youtubeProjectId,
       captionStyle,
       captionEngine || null,
@@ -570,19 +589,39 @@ export async function markEofProductionJobFailed(id, message) {
 /**
  * Max age for a stuck rendering_* job before poll auto-fails it.
  * Must sit under vercel.json maxDuration (300s) but ABOVE a healthy Pro encode
- * (prior 120s ceiling killed heartbeating builds before ffmpeg finished).
+ * (prior 120s ceiling + 90s quiet kill murdered live Pro builds ~168s in).
  */
 export const EOF_STALE_RENDER_SEC = Number(process.env.EOF_STALE_RENDER_SEC) || 280
 /**
- * No progress DB write (heartbeat) for this long → waitUntil/isolate died.
- * Keep loose enough that a long ffmpeg mux on Pro (~60–90s without a tick) isn't killed.
+ * Hobby/slim only: no progress DB write for this long → treat isolate as dead.
+ * Pro must NOT use a short quiet window — ffmpeg/Serp often go quiet for 90–180s.
  */
 export const EOF_STALE_PROGRESS_SEC = Number(process.env.EOF_STALE_PROGRESS_SEC) || 90
 
 /**
+ * Resolve stale windows for the active Build mode.
+ * Pro/non-slim: quiet threshold ≥ max age so mute encodes are only killed by overall age.
+ * Hobby/slim: keep a tighter quiet window so the UI unsticks faster.
+ * @param {{ slim?: boolean }} [opts]
+ */
+export function resolveEofStaleWindows(opts = {}) {
+  const maxAgeSec = Math.max(60, EOF_STALE_RENDER_SEC)
+  const slim = opts.slim === true
+  const quietDefault = Math.max(30, EOF_STALE_PROGRESS_SEC)
+  // Pro: quiet alone must never kill under maxAge (168s quiet-fail was the credit-burn loop).
+  const maxQuietSec = slim ? quietDefault : Math.max(quietDefault, maxAgeSec)
+  return {
+    maxAgeSec,
+    maxQuietSec,
+    slim,
+    allowQuietKill: slim,
+  }
+}
+
+/**
  * Pure helper — decide whether a rendering job should be force-failed.
  * @param {{ status?: string, updatedAt?: string|null, renderProgress?: { startedAt?: string|null }|null }} job
- * @param {{ now?: number, maxAgeSec?: number, maxQuietSec?: number }} [opts]
+ * @param {{ now?: number, maxAgeSec?: number, maxQuietSec?: number, allowQuietKill?: boolean, slim?: boolean }} [opts]
  */
 export function isEofRenderStale(job, opts = {}) {
   const status = String(job?.status || '')
@@ -592,34 +631,57 @@ export function isEofRenderStale(job, opts = {}) {
   const now = Number.isFinite(opts.now) ? opts.now : Date.now()
   const maxAgeSec = Math.max(60, Number(opts.maxAgeSec) || EOF_STALE_RENDER_SEC)
   const maxQuietSec = Math.max(30, Number(opts.maxQuietSec) || EOF_STALE_PROGRESS_SEC)
+  // Pro (default): quiet alone must never kill under maxAge — Serp/ffmpeg go mute for minutes.
+  // Hobby/slim: allowQuietKill so the UI unsticks after a dead isolate.
+  const allowQuietKill =
+    opts.allowQuietKill === true || (opts.allowQuietKill !== false && opts.slim === true)
+
   const startedRaw = job?.renderProgress?.startedAt || job?.updatedAt
   const startedMs = startedRaw ? Date.parse(String(startedRaw)) : NaN
   const updatedMs = job?.updatedAt ? Date.parse(String(job.updatedAt)) : NaN
   const ageSec = Number.isFinite(startedMs) ? (now - startedMs) / 1000 : Infinity
   const quietSec = Number.isFinite(updatedMs) ? (now - updatedMs) / 1000 : ageSec
-  return ageSec >= maxAgeSec || quietSec >= maxQuietSec
+
+  if (ageSec >= maxAgeSec) return true
+  if (quietSec < maxQuietSec) return false
+  if (!allowQuietKill) return false
+  return true
 }
 
 /**
  * Auto-fail jobs stuck in rendering / rendering_video (Vercel waitUntil killed mid-build).
  * Called from Production GET poll so the UI unblocks without a manual cancel.
- * @param {{ maxAgeSec?: number, maxQuietSec?: number }} [opts]
+ * @param {{ maxAgeSec?: number, maxQuietSec?: number, allowQuietKill?: boolean, slim?: boolean }} [opts]
  * @returns {Promise<string[]>} failed job ids
  */
 export async function failStaleEofProductionRenders(opts = {}) {
   const jobs = await listEofProductionJobs(80)
   const failed = []
   const now = Date.now()
+  const slim =
+    opts.slim != null ? opts.slim === true : await isEofSlimBuildEnabled().catch(() => false)
+  const windows = resolveEofStaleWindows({ slim })
+  const staleOpts = {
+    now,
+    maxAgeSec: opts.maxAgeSec != null ? opts.maxAgeSec : windows.maxAgeSec,
+    maxQuietSec: opts.maxQuietSec != null ? opts.maxQuietSec : windows.maxQuietSec,
+    allowQuietKill: opts.allowQuietKill != null ? opts.allowQuietKill : windows.allowQuietKill,
+    slim,
+  }
   for (const job of jobs) {
-    if (!isEofRenderStale(job, { ...opts, now })) continue
+    if (!isEofRenderStale(job, staleOpts)) continue
     const startedRaw = job?.renderProgress?.startedAt || job?.updatedAt
     const ageSec = startedRaw
       ? Math.round((now - Date.parse(String(startedRaw))) / 1000)
-      : EOF_STALE_RENDER_SEC
-    const message =
-      `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
-      `Cancel if the job is stuck, then Rebuild — Serp stills re-fetch. On Hobby set EOF_FORCE_SLIM=1.`
-    console.warn(`[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s`)
+      : staleOpts.maxAgeSec
+    const message = slim
+      ? `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
+        `Cancel if stuck, then Rebuild once. Build mode is Hobby (slim) — or set EOF_FORCE_SLIM=1 on the server.`
+      : `Render stuck / timed out after ${ageSec}s (serverless isolate stopped mid-build). ` +
+        `Cancel if stuck, then Rebuild once. Build mode is Pro — full encodes can take up to ~${staleOpts.maxAgeSec}s; do not Rebuild while a live encode is still running.`
+    console.warn(
+      `[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s slim=${slim} maxAge=${staleOpts.maxAgeSec}s quiet=${staleOpts.maxQuietSec}s`,
+    )
     await markEofProductionJobFailed(job.id, message)
     failed.push(job.id)
   }

@@ -382,7 +382,8 @@ export default async function handler(req, res) {
         if (!existing) return json(res, 404, { error: 'Job not found.' })
         if (
           existing.status !== 'rendering' &&
-          existing.status !== 'rendering_video'
+          existing.status !== 'rendering_video' &&
+          existing.status !== 'rendered'
         ) {
           return json(res, 200, { ok: true, skipped: true, job: existing })
         }

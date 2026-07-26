@@ -128,9 +128,11 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
   ) {
     return job
   }
+  // After audio, status is `rendered` — allow video step to proceed (do not early-return).
   if (
     status !== EOF_PRODUCTION_JOB_STATUS.RENDERING &&
-    status !== EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO
+    status !== EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO &&
+    status !== EOF_PRODUCTION_JOB_STATUS.RENDERED
   ) {
     return job
   }
@@ -139,15 +141,24 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
   const flags = await getEofArtifactFlags(jobId)
   const stage = String(job.renderProgress?.stage || 'tts')
   let step = opts.step === 'audio' || opts.step === 'video' ? opts.step : 'auto'
+
+  // Audio is done when durable mix exists OR job already has mixedAudioPath / RENDERED
+  // after TTS (durable save may have failed — do NOT re-burn ElevenLabs).
+  const audioAlreadyDone =
+    flags.hasDurableAudio ||
+    Boolean(job.mixedAudioPath) ||
+    (Array.isArray(job.narrationManifest) && job.narrationManifest.length > 0) ||
+    status === EOF_PRODUCTION_JOB_STATUS.RENDERED
+
   if (step === 'auto') {
-    step = flags.hasDurableAudio ? 'video' : 'audio'
+    step = audioAlreadyDone ? 'video' : 'audio'
   }
 
   try {
     await maybeCapScenesForServerlessBuild(jobId)
 
     if (step === 'audio') {
-      if (!flags.hasDurableAudio) {
+      if (!audioAlreadyDone) {
         console.info('[eof-production] continue step=audio', jobId)
         await updateEofProductionJob(jobId, {
           status: EOF_PRODUCTION_JOB_STATUS.RENDERING,
@@ -214,10 +225,15 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
 export async function startEofProductionContinueBackground(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
-  if (
-    job.status !== EOF_PRODUCTION_JOB_STATUS.RENDERING &&
-    job.status !== EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO
-  ) {
+  const status = String(job.status || '')
+  const step = opts.step === 'audio' || opts.step === 'video' ? opts.step : 'auto'
+  // After TTS, status is `rendered` — still allow the video continue hop.
+  const okStatus =
+    status === EOF_PRODUCTION_JOB_STATUS.RENDERING ||
+    status === EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO ||
+    (step === 'video' && status === EOF_PRODUCTION_JOB_STATUS.RENDERED) ||
+    (step === 'auto' && status === EOF_PRODUCTION_JOB_STATUS.RENDERED)
+  if (!okStatus) {
     return job
   }
 
