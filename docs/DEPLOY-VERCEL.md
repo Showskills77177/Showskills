@@ -2,6 +2,8 @@
 
 For a **Cloudflare Pages staging SPA** alongside this Vercel API (preview only, not `showskills.co.uk`), see [DEPLOY-CLOUDFLARE.md](./DEPLOY-CLOUDFLARE.md).
 
+For **Railway EOF ffmpeg worker** (staging Short encodes off Vercel), see [DEPLOY-RAILWAY-EOF.md](./DEPLOY-RAILWAY-EOF.md).
+
 ## Serverless function limit (12 max)
 
 API routing uses **five** serverless functions (under the Hobby 12-function limit), all dispatching via `lib/vercelApiDispatch.mjs`:

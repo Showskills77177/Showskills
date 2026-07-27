@@ -1,0 +1,14 @@
+# Railway EOF video worker (staging Shorts encode — not showskills.co.uk).
+# Service start: node scripts/eof-railway-worker.mjs
+# Set branch to `staging` (or the worker PR branch). Do NOT attach a custom domain.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci --include=dev"
+
+[deploy]
+startCommand = "node scripts/eof-railway-worker.mjs"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

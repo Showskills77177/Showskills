@@ -1,0 +1,9 @@
+# Install system ffmpeg for the EOF Railway worker (prefer PATH over ffmpeg-static).
+[phases.setup]
+nixPkgs = ["ffmpeg", "nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+[start]
+cmd = "node scripts/eof-railway-worker.mjs"

@@ -639,7 +639,9 @@ export const EOF_STALE_PRO_QUIET_SEC = Number(process.env.EOF_STALE_PRO_QUIET_SE
 /**
  * Resolve stale windows for the active Build mode.
  * Pro: recent heartbeat keeps the job alive until maxAge (~300s); quiet kill only
- * after ~90–120s without heartbeat. Hobby/slim: tighter age + quiet.
+ * after quiet window without heartbeat. Hobby/slim: tighter age + quiet.
+ * When EOF_WORKER_URL is set, use a longer absolute ceiling so Railway encodes
+ * are not auto-failed at Vercel's 300s maxDuration.
  * @param {{ slim?: boolean }} [opts]
  */
 export function resolveEofStaleWindows(opts = {}) {
@@ -654,13 +656,24 @@ export function resolveEofStaleWindows(opts = {}) {
       allowQuietKill: true,
     }
   }
-  const maxAgeSec = Math.max(EOF_STALE_RENDER_SEC, EOF_STALE_PRO_MAX_AGE_SEC)
-  const maxQuietSec = Math.max(60, EOF_STALE_PRO_QUIET_SEC)
+  const workerConfigured = Boolean(
+    String(process.env.EOF_WORKER_URL || '').trim() &&
+      String(process.env.EOF_WORKER_SECRET || '').trim(),
+  )
+  const workerMaxAge = Number(process.env.EOF_STALE_WORKER_MAX_AGE_SEC) || 900
+  const workerQuiet = Number(process.env.EOF_STALE_WORKER_QUIET_SEC) || 240
+  const maxAgeSec = workerConfigured
+    ? Math.max(EOF_STALE_PRO_MAX_AGE_SEC, workerMaxAge)
+    : Math.max(EOF_STALE_RENDER_SEC, EOF_STALE_PRO_MAX_AGE_SEC)
+  const maxQuietSec = workerConfigured
+    ? Math.max(EOF_STALE_PRO_QUIET_SEC, workerQuiet)
+    : Math.max(60, EOF_STALE_PRO_QUIET_SEC)
   return {
     maxAgeSec,
     maxQuietSec,
     slim: false,
-    // Quiet kill after Pro quiet window — live heartbeats never age-die before maxAge.
+    worker: workerConfigured,
+    // Quiet kill after quiet window — live heartbeats never age-die before maxAge.
     allowQuietKill: true,
   }
 }

@@ -29,7 +29,32 @@ import {
   isEofVercelRuntime,
   scheduleEofBuildContinue,
 } from './eofProductionServerless.mjs'
+import {
+  isEofExternalWorkerConfigured,
+  scheduleEofVideoOnWorker,
+} from './eofProductionWorkerDispatch.mjs'
 import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
+
+/**
+ * Prefer Railway (or other) worker for video when configured; else Vercel continue-build.
+ * @param {string} jobId
+ * @param {{ imageProvider?: string|null, forceFreshImages?: boolean, qualityGateMode?: 'auto'|'manual' }} [opts]
+ */
+async function scheduleEofVideoHop(jobId, opts = {}) {
+  if (isEofExternalWorkerConfigured()) {
+    const scheduled = await scheduleEofVideoOnWorker(jobId, opts)
+    if (scheduled?.ok) return scheduled
+    console.warn(
+      '[eof-production] external worker hop failed — falling back to Vercel continue-build',
+      jobId,
+      scheduled?.reason || scheduled?.status || 'unknown',
+    )
+  }
+  return scheduleEofBuildContinue(jobId, 'video', {
+    imageProvider: opts.imageProvider,
+    forceFreshImages: opts.forceFreshImages === true,
+  })
+}
 
 /**
  * Start background work and return immediately (202).
@@ -170,27 +195,31 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
       } else {
         console.info('[eof-production] continue audio already done → video', jobId)
       }
-      // Vercel (Pro or Hobby): fresh invocation for Serp + ffmpeg — one isolate cannot
-      // fit TTS + Serp + 4-scene encode under maxDuration 300 (Cucurella hair Shorts).
-      // If self-fetch cannot start (missing SITE_URL / CRON_SECRET), fall through
-      // and finish video in this same waitUntil — never leave the job stranded after TTS.
-      if ((await isEofSlimBuildEnabled()) || isEofVercelRuntime()) {
+      // Prefer Railway worker when configured. Else Vercel continue-build hop
+      // (one isolate cannot fit TTS + Serp + 4-scene encode under maxDuration 300).
+      // If neither hop starts, fall through and finish video in this waitUntil.
+      if (
+        isEofExternalWorkerConfigured() ||
+        (await isEofSlimBuildEnabled()) ||
+        isEofVercelRuntime()
+      ) {
         // Claim the job before the hop: while it sat on `rendered` a second Build Short
         // passed the API guard and ran a parallel encode over the same work dir.
         await updateEofProductionJob(jobId, {
           status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
           errorMessage: null,
         })
-        const scheduled = await scheduleEofBuildContinue(jobId, 'video', {
+        const scheduled = await scheduleEofVideoHop(jobId, {
           imageProvider: opts.imageProvider,
           forceFreshImages: opts.forceFreshImages === true,
+          qualityGateMode,
         })
         if (scheduled?.ok) {
           return getEofProductionJob(jobId)
         }
         console.warn('[eof-production] continue hop not scheduled — keeping build in this isolate', jobId)
         console.warn(
-          '[eof-production] continue-build schedule failed — running video in-process',
+          '[eof-production] video hop schedule failed — running video in-process',
           jobId,
           scheduled?.reason || scheduled?.status || 'unknown',
         )
@@ -774,6 +803,20 @@ export async function startEofProductionVideoRenderBackground(jobId, opts = {}) 
   const run = () =>
     (async () => {
       await maybeCapScenesForServerlessBuild(jobId)
+      // Rebuild Video: hand Serp+ffmpeg to Railway when configured (same as full Build).
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, {
+          imageProvider: opts.imageProvider,
+          forceFreshImages: true,
+          qualityGateMode,
+        })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on rebuild-video — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
       if (await isEofSlimBuildEnabled()) {
         return continueEofProductionBuild(jobId, {
           step: 'video',
