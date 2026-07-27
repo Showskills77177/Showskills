@@ -1096,7 +1096,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     )
     let persisted
     try {
-      await saveEofSceneImagesArtifact(jobId, workDir)
+      const stillsSaved = await saveEofSceneImagesArtifact(jobId, workDir)
+      if (!stillsSaved) {
+        // Not fatal for this Short, but Replace Captions / effects remux read these back
+        // from the DB and would fail on a cold isolate with no obvious cause.
+        console.warn(
+          `[eof-production] scene stills not stored for job ${jobId} — remux paths will need a full Rebuild`,
+        )
+      }
       persisted = assertEofVideoPersisted(
         await persistEofVideoArtifact(jobId, videoAbs, {
           onHeartbeat: () => report('mux', sceneCount, { force: true, message: 'Compressing Short…' }),

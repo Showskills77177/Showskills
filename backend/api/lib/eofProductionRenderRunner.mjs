@@ -318,9 +318,16 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
         skipPlanPreflight: true,
         forceFreshImages: opts.forceFreshImages === true,
       })
-    })().catch((e) => {
+    })().catch(async (e) => {
       if (e instanceof EofQualityGateBlockedError) return
       console.error('[eof-production] full Short build failed', jobId, e)
+      // Backstop: anything thrown outside the inner handlers would otherwise leave the job
+      // stuck on rendering_* until the watchdog reports a vague "isolate stopped mid-build".
+      await markEofProductionJobFailed(
+        jobId,
+        e instanceof Error ? e.message : 'Short build failed',
+        { onlyWhenRendering: true },
+      ).catch(() => {})
     })
 
   // Always return quickly → API 202; work continues via waitUntil (Pro) or continue-build (slim).

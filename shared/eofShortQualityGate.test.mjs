@@ -506,6 +506,36 @@ describe('eofShortQualityGate helpers', () => {
     assert.equal(auto.blocked, true)
   })
 
+  it('lets a manual Build through with some placeholder stills, but not auto-publish', () => {
+    const job = {
+      topic: 'Jurgen Klopp',
+      captionStyle: 'off',
+      musicTrackId: 'bed-1',
+      musicVolume: 0.22,
+      overlayMoments: 'off',
+      script: {
+        scenes: [
+          { narration: 'Klopp speaks.', caption: 'Klopp speaks.', durationSec: 4 },
+          { narration: 'The touchline row.', caption: 'The touchline row.', durationSec: 4 },
+          { narration: 'Your call?', caption: 'Your call?', durationSec: 4 },
+        ],
+      },
+      // 2/3 placeholders is over the 0.34 fraction that blocks unattended publishing.
+      narrationManifest: [
+        { index: 0, durationSec: 4, imageSource: 'serpapi', imageKey: 'a', imageTitle: 'Jurgen Klopp' },
+        { index: 1, durationSec: 4, imageSource: 'placeholder', imageKey: 'p1' },
+        { index: 2, durationSec: 4, imageSource: 'placeholder', imageKey: 'p2' },
+      ],
+    }
+
+    const manual = runEofShortQualityStillsPreflight(job, { mode: 'manual' })
+    assert.equal(manual.blocked, false, 'the operator watching the build decides, not the gate')
+    assert.ok(manual.checks.some((c) => c.id === 'stills_placeholder' && c.severity === 'warn'))
+
+    const auto = runEofShortQualityStillsPreflight(job, { mode: 'auto' })
+    assert.equal(auto.blocked, true, 'auto-publish must not ship placeholder-heavy Shorts')
+  })
+
   it('plan checks are included in the full heuristic suite', () => {
     const plan = collectEofShortQualityPlanChecks({
       topic: 'x',

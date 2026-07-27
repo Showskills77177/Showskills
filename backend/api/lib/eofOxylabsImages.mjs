@@ -391,11 +391,16 @@ export async function searchOxylabsGoogleImagesWithStatus(query, opts = {}) {
         }
       }
       console.warn('[eof-oxylabs] SEARCH DOWN (http)', res.status, body.slice(0, 180), '— soft-fallback')
+      // Same split as SerpAPI: only 429 / an explicit message means the plan is spent.
+      const outOfRequests =
+        res.status === 429 || /quota|out of requests|limit reached/i.test(body)
       return {
         hits: [],
         health: {
-          status: 'http_error',
-          detail: `API error HTTP ${res.status}`,
+          status: outOfRequests ? 'quota_exceeded' : 'http_error',
+          detail: outOfRequests
+            ? `Oxylabs plan requests exhausted (HTTP ${res.status})`
+            : `API error HTTP ${res.status}`,
           httpStatus: res.status,
           softFallback: true,
         },
