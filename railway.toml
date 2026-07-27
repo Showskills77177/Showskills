@@ -2,11 +2,6 @@
 # Service start: node scripts/eof-railway-worker.mjs
 # Set branch to `staging` (or the worker PR branch). Do NOT attach a custom domain.
 
-[build]
-builder = "DOCKER"
-# Dockerfile in repo will be used to build the worker image
-# buildCommand is not needed for Docker builder
-
 [deploy]
 startCommand = "node scripts/eof-railway-worker.mjs"
 healthcheckPath = "/health"
