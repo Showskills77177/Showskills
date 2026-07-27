@@ -634,7 +634,7 @@ export const EOF_STALE_PRO_MAX_AGE_SEC = Number(process.env.EOF_STALE_PRO_MAX_AG
  * Wide enough that a slow ffmpeg/Serp beat does not false-fail; tight enough to
  * unstick after a silent kill well under maxDuration.
  */
-export const EOF_STALE_PRO_QUIET_SEC = Number(process.env.EOF_STALE_PRO_QUIET_SEC) || 120
+export const EOF_STALE_PRO_QUIET_SEC = Number(process.env.EOF_STALE_PRO_QUIET_SEC) || 160
 
 /**
  * Resolve stale windows for the active Build mode.
