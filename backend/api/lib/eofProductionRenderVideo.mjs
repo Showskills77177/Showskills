@@ -120,6 +120,36 @@ export function budgetedPhaseDeadlineMs(cap, startedAtMs, opts = {}) {
   return Math.max(min, Math.min(cap, remaining))
 }
 
+/** How many stills to put back when the subject/vision filter empties a working pool. */
+export const EOF_POOL_RESCUE_LIMIT = 6
+
+/**
+ * Best-effort stills for a pool that a filter wiped to zero.
+ *
+ * Only stock/meme rejects stay dropped — those are never usable. Everything else comes
+ * back ranked, because a search that returned real photos must not end in a failed build.
+ *
+ * @param {Array<{ url?: string, localPath?: string, title?: string, source?: string, visionScore?: number, visionRejected?: boolean }>} hits
+ * @param {number} [limit]
+ */
+export function rescueEofFilteredPoolHits(hits, limit = EOF_POOL_RESCUE_LIMIT) {
+  const rows = (Array.isArray(hits) ? hits : []).filter((h) => h && (h.url || h.localPath))
+  if (!rows.length) return []
+  const scored = rows.map((hit, i) => {
+    const vision = Number(hit.visionScore)
+    return {
+      hit,
+      // Keep any vision opinion we have, then prefer real scrapes over generated stills.
+      rank:
+        (Number.isFinite(vision) ? vision : 4) +
+        (hit.source === 'grok-imagine' || hit.source === 'free-gen' ? -1 : 0),
+      tie: i,
+    }
+  })
+  scored.sort((a, b) => b.rank - a.rank || a.tie - b.tie)
+  return scored.slice(0, Math.max(1, Number(limit) || EOF_POOL_RESCUE_LIMIT)).map((r) => r.hit)
+}
+
 /** True when prior stills were placeholders — Rebuild must not treat them as reusable history. */
 export function priorStillsWerePlaceholders(manifest) {
   const rows = Array.isArray(manifest) ? manifest : []
@@ -332,6 +362,8 @@ export function assertEofVideoPersisted(persisted) {
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
   const buildStartedMs = Date.now()
+  /** Set when a manual Build renders with placeholder stills instead of failing. */
+  let placeholderOnlyWarning = ''
   const includeAudioIfPresent = opts.includeAudioIfPresent === true
   const reuseSceneImages = opts.reuseSceneImages === true
   // Remux / remix / effects reuse cached stills — skip stills gate (stale clickbait pop
@@ -688,6 +720,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             }
           }
 
+          // Keep the unfiltered pool: a filter that rejects everything must degrade the
+          // stills, never fail the Short (see rescue below).
+          const hitsBeforeSubjectFilter = Array.isArray(oxyPool?.hits) ? [...oxyPool.hits] : []
+
           // Grok vision: look at the stills (not just titles) — drop watermark / wrong era / wrong face.
           // Prefer real scrape photos when vision scores tie (applyVisionScoresToHits).
           // When vision is off/failed: NEVER take the first Google hit for a celebrity — require name cues.
@@ -810,6 +846,19 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             console.warn(
               `eof:serp pool emptied after subject/vision filter subject=${String(leadSubject || '').slice(0, 40)} before=${imageFetchDiag.scrapeHitsBeforeFilter}`,
             )
+            // Rescue: the search worked, so put the best-ranked stills back rather than
+            // marching on to placeholders and a hard "no scene images" failure. A slightly
+            // off still beats a Short that refuses to build.
+            const rescued = rescueEofFilteredPoolHits(hitsBeforeSubjectFilter)
+            if (rescued.length) {
+              oxyPool.hits = rescued
+              oxyPool.rescuedFromFilter = true
+              imageFetchDiag.scrapeHitsAfterFilter = rescued.length
+              imageFetchDiag.rescuedFromFilter = rescued.length
+              console.warn(
+                `eof:serp pool rescued ${rescued.length} still(s) after the filter emptied it — build continues with lower-confidence stills`,
+              )
+            }
           }
           if (!oxyPool?.hits?.length) {
             imagePhaseNote = 'Searching Wikimedia Commons…'
@@ -952,17 +1001,23 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       )
     }
     if (placeholderCount === scenesForVideo.length && scenesForVideo.length > 0) {
-      throw new Error(
-        formatEofNoSceneImagesError({
-          topic: job.topic,
-          providerOrder: imageFetchDiag.providerOrder,
-          providerAttempts: imageFetchDiag.providerAttempts,
-          scrapeHitsBeforeFilter: imageFetchDiag.scrapeHitsBeforeFilter,
-          scrapeHitsAfterFilter: imageFetchDiag.scrapeHitsAfterFilter,
-          wikiHits: imageFetchDiag.wikiHits,
-          genHits: imageFetchDiag.genHits,
-          subject: imageFetchDiag.subject,
-        }),
+      const imageFailure = formatEofNoSceneImagesError({
+        topic: job.topic,
+        providerOrder: imageFetchDiag.providerOrder,
+        providerAttempts: imageFetchDiag.providerAttempts,
+        scrapeHitsBeforeFilter: imageFetchDiag.scrapeHitsBeforeFilter,
+        scrapeHitsAfterFilter: imageFetchDiag.scrapeHitsAfterFilter,
+        wikiHits: imageFetchDiag.wikiHits,
+        genHits: imageFetchDiag.genHits,
+        subject: imageFetchDiag.subject,
+      })
+      // Unattended publishing must not ship an imageless Short. A manual Build renders it
+      // anyway — the operator gets a watchable Short plus a warning, and can swap stills
+      // per scene, instead of a dead job with nothing to work from.
+      if (qualityGateMode === 'auto') throw new Error(imageFailure)
+      placeholderOnlyWarning = imageFailure
+      console.warn(
+        `[eof-video] rendering job ${jobId} with placeholder stills only — ${imageFailure}`,
       )
     }
 
@@ -1135,7 +1190,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         rendered.zapcapTemplateId !== undefined
           ? rendered.zapcapTemplateId
           : job.zapcapTemplateId || null,
-      errorMessage: null,
+      // A placeholder-only render still succeeds, but say so on the job so the degraded
+      // stills are obvious in the panel rather than a silent surprise.
+      errorMessage: placeholderOnlyWarning
+        ? `Short built with placeholder stills. ${placeholderOnlyWarning}`
+        : null,
       qualityGate: null,
     })
 

@@ -71,7 +71,7 @@ export async function persistEofVideoArtifact(jobId, absPath, opts = {}) {
  * Re-encode MP4 until under maxBytes (or CRF ladder exhausted).
  * @param {string} absPath
  * @param {number} maxBytes
- * @param {{ onHeartbeat?: () => Promise<void>|void }} [opts]
+ * @param {{ onHeartbeat?: () => Promise<void>|void, budgetMs?: number }} [opts]
  */
 export async function recompressEofVideoUnderLimit(absPath, maxBytes, opts = {}) {
   if (!absPath || !existsSync(absPath)) return false
@@ -84,19 +84,25 @@ export async function recompressEofVideoUnderLimit(absPath, maxBytes, opts = {})
   const startedMs = Date.now()
   const hb = typeof opts.onHeartbeat === 'function' ? { onHeartbeat: opts.onHeartbeat } : {}
   const tmp = absPath.replace(/\.mp4$/i, '.compact.mp4')
-  // Jump straight to a hard CRF when there is only time for one pass.
-  const ladder = budgetMs < passTimeoutMs * 2 ? [38] : [32, 35, 38, 42]
-  for (const crf of ladder) {
+  // Jump straight to a hard CRF when there is only time for one pass. The last rung drops
+  // to 720x1280 — a Short that renders must never be lost just because it would not fit.
+  const ladder =
+    budgetMs < passTimeoutMs * 2
+      ? [{ crf: 38 }, { crf: 42, height: 1280 }]
+      : [{ crf: 32 }, { crf: 35 }, { crf: 38 }, { crf: 42 }, { crf: 42, height: 1280 }]
+  for (const rung of ladder) {
     if (Date.now() - startedMs >= budgetMs) {
       console.warn('[eof-production] recompress out of build budget — stopping ladder')
       break
     }
+    const { crf, height } = rung
     try {
       await runFfmpeg(
         [
           '-y',
           '-i',
           absPath,
+          ...(height ? ['-vf', `scale=-2:${height}:flags=fast_bilinear`] : []),
           '-c:v',
           'libx264',
           '-preset',
@@ -118,7 +124,12 @@ export async function recompressEofVideoUnderLimit(absPath, maxBytes, opts = {})
         { maxBuffer: 16 * 1024 * 1024, timeoutMs: passTimeoutMs, ...hb },
       )
     } catch (e) {
-      console.warn('[eof-production] recompress failed crf', crf, e instanceof Error ? e.message : e)
+      console.warn(
+        '[eof-production] recompress failed crf',
+        crf,
+        height ? `${height}p` : '',
+        e instanceof Error ? e.message : e,
+      )
       continue
     }
     if (!existsSync(tmp)) continue
