@@ -118,7 +118,7 @@ export function eofProductionPublicOrigin() {
  * Uses CRON_SECRET bearer (continue-build allows it).
  * @param {string} jobId
  * @param {'audio'|'video'} step
- * @param {{ imageProvider?: string|null }} [opts]
+ * @param {{ imageProvider?: string|null, forceFreshImages?: boolean }} [opts]
  */
 export async function scheduleEofBuildContinue(jobId, step, opts = {}) {
   const origin = eofProductionPublicOrigin()
@@ -137,6 +137,9 @@ export async function scheduleEofBuildContinue(jobId, step, opts = {}) {
     step: step === 'video' ? 'video' : 'audio',
   }
   if (opts.imageProvider) body.imageProvider = opts.imageProvider
+  // Build Short asks for fresh stills; without forwarding it the video isolate falls
+  // back to reusing the previous scene images and Serp never re-runs.
+  if (opts.forceFreshImages === true) body.forceFreshImages = true
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -145,6 +148,8 @@ export async function scheduleEofBuildContinue(jobId, step, opts = {}) {
         Authorization: `Bearer ${secret}`,
       },
       body: JSON.stringify(body),
+      // The handler answers 202 straight away; never let a hung hop hold the audio isolate.
+      signal: AbortSignal.timeout(Number(process.env.EOF_CONTINUE_FETCH_TIMEOUT_MS) || 15_000),
     })
     console.info('[eof-production] scheduled continue', step, jobId, res.status)
     return { ok: res.ok || res.status === 202, status: res.status }
