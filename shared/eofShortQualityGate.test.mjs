@@ -472,6 +472,40 @@ describe('eofShortQualityGate helpers', () => {
     assert.ok(gate.checks.some((c) => c.id === 'stills_placeholder'))
   })
 
+  it('stills preflight does not block a manual Build over a missing pop inset', () => {
+    const job = {
+      topic: 'Marc Cucurella',
+      captionStyle: 'off',
+      musicTrackId: 'bed-1',
+      musicVolume: 0.22,
+      overlayMoments: 'always',
+      script: {
+        scenes: [
+          { narration: 'Cucurella hits back.', caption: 'Cucurella hits back.', durationSec: 4 },
+          { narration: 'The hair stays.', caption: 'The hair stays.', durationSec: 4 },
+          { narration: 'Your take?', caption: 'Your take?', durationSec: 4 },
+        ],
+      },
+      narrationManifest: [
+        { index: 0, durationSec: 4, imageSource: 'serpapi', imageKey: 'a', imageTitle: 'Marc Cucurella' },
+        { index: 1, durationSec: 4, imageSource: 'serpapi', imageKey: 'b', imageTitle: 'Cucurella Chelsea' },
+        { index: 2, durationSec: 4, imageSource: 'serpapi', imageKey: 'c', imageTitle: 'Cucurella close up' },
+      ],
+    }
+
+    const manual = runEofShortQualityStillsPreflight(job, { mode: 'manual', renderMeta: { overlayCount: 0 } })
+    assert.equal(manual.pass, true, 'a missing decorative inset must not fail a manual Build')
+    assert.equal(manual.blocked, false)
+    assert.ok(
+      manual.checks.some((c) => c.id === 'overlay_missing_always' && c.severity === 'warn'),
+      'still reported as a warning',
+    )
+
+    const auto = runEofShortQualityStillsPreflight(job, { mode: 'auto', renderMeta: { overlayCount: 0 } })
+    assert.equal(auto.pass, false, 'unattended auto-publish keeps the stricter bar')
+    assert.equal(auto.blocked, true)
+  })
+
   it('plan checks are included in the full heuristic suite', () => {
     const plan = collectEofShortQualityPlanChecks({
       topic: 'x',

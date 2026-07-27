@@ -177,6 +177,7 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
       if ((await isEofSlimBuildEnabled()) || isEofVercelRuntime()) {
         const scheduled = await scheduleEofBuildContinue(jobId, 'video', {
           imageProvider: opts.imageProvider,
+          forceFreshImages: opts.forceFreshImages === true,
         })
         if (scheduled?.ok) {
           return getEofProductionJob(jobId)

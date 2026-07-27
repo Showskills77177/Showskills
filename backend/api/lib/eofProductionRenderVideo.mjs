@@ -1013,7 +1013,6 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
 
     await report('mux', sceneCount, { force: true })
-    await updateEofProductionRenderProgress(jobId, null)
 
     const updatedManifest = rows.map((entry, i) => {
       const videoScene = scenesForVideo.find((s) => s.index === entry.index) || scenesForVideo[i]
@@ -1046,13 +1045,29 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
 
     const videoAbs = eofProductionVideoAbsPath(jobId)
-    await saveEofSceneImagesArtifact(jobId, workDir)
-    const persisted = assertEofVideoPersisted(await persistEofVideoArtifact(jobId, videoAbs))
+    // Storing stills + base64 video (and any recompress pass) can outlast the Pro quiet
+    // window. Without a beat here the stale watchdog fails Shorts that encoded fine.
+    const stopPersistHb = startProgressHeartbeat(
+      () => report('mux', sceneCount, { force: true, message: 'Saving Short…' }),
+      4000,
+    )
+    let persisted
+    try {
+      await saveEofSceneImagesArtifact(jobId, workDir)
+      persisted = assertEofVideoPersisted(
+        await persistEofVideoArtifact(jobId, videoAbs, {
+          onHeartbeat: () => report('mux', sceneCount, { force: true, message: 'Compressing Short…' }),
+        }),
+      )
+    } finally {
+      stopPersistHb()
+    }
     if (persisted.recompressed) {
       console.info(
         `[eof-production] stored compressed Short for job ${jobId} (${persisted.bytes} bytes)`,
       )
     }
+    await updateEofProductionRenderProgress(jobId, null)
 
     // Only mark video_rendered after durable base64 is stored (assert above throws otherwise).
     const saved = await updateEofProductionJob(jobId, {

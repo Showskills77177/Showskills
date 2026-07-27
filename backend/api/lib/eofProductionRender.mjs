@@ -376,30 +376,40 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       const musicPath = resolveEofMusicTrackFilePath(track)
       const mixedPath = join(workDir, 'mixed.mp3')
 
-      await mixEofNarrationWithMusic({
-        sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
-        musicFilePath: musicPath,
-        musicVolume: job.musicVolume,
-        musicStartSec: job.musicStartSec,
-        musicEndSec: job.musicEndSec,
-        outputPath: mixedPath,
-      })
+      // ffmpeg concat/amix plus the durable base64 write are silent — beat through them
+      // or the stale watchdog fails a job whose audio is actually fine.
+      const stopMixHb = startProgressHeartbeat(async () => {
+        await reportProgress('mix', sceneCount, { force: true })
+      }, 4000)
+      let saved
+      try {
+        await mixEofNarrationWithMusic({
+          sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
+          musicFilePath: musicPath,
+          musicVolume: job.musicVolume,
+          musicStartSec: job.musicStartSec,
+          musicEndSec: job.musicEndSec,
+          outputPath: mixedPath,
+        })
 
-      await reportProgress('done', sceneCount, { force: true })
-      await updateEofProductionRenderProgress(jobId, null)
+        if (preserveSceneImages) {
+          await clearEofVideoOnlyArtifact(jobId).catch(() => {})
+        } else {
+          await clearEofVideoArtifact(jobId).catch(() => {})
+        }
 
-      if (preserveSceneImages) {
-        await clearEofVideoOnlyArtifact(jobId).catch(() => {})
-      } else {
-        await clearEofVideoArtifact(jobId).catch(() => {})
+        // Write durable mix first (overwrites prior blob). Never clear-before-save —
+        // that left hasDurableAudio=false and continue-build re-ran TTS.
+        saved = await saveEofMixedAudioArtifact(jobId, mixedPath)
+      } finally {
+        stopMixHb()
       }
-
-      // Write durable mix first (overwrites prior blob). Never clear-before-save —
-      // that left hasDurableAudio=false and continue-build re-ran TTS.
-      const saved = await saveEofMixedAudioArtifact(jobId, mixedPath)
       if (!saved) {
         console.warn('[eof-production] durable mixed audio save failed — keeping on-disk mix', jobId)
       }
+
+      await reportProgress('done', sceneCount, { force: true })
+      await updateEofProductionRenderProgress(jobId, null)
 
       const sameHash = job.ttsAudioHash === fingerprint
       const nextSynthCount = voiceRegenerationMode
