@@ -1566,18 +1566,12 @@ export default function EofProductionPanel({
     draftScript,
   ])
 
+  // Never offer Reset before the server would give up (Pro maxAge ~300s / Hobby ~280s),
+  // or the operator cancels a live encode and the next Build starts from scratch.
   const isRenderStuck =
     (selected?.status === 'rendering' || selected?.status === 'rendering_video') &&
     displayProgress &&
-    (displayProgress.elapsedSeconds >
-      Math.max(
-        buildMode === 'pro' ? 260 : 120,
-        (displayProgress.estimatedTotalSec || 60) * (buildMode === 'pro' ? 1.8 : 1.5),
-      ) ||
-      // Image search / scene assign / ffmpeg — Hobby fail-fast ~90s; Pro needs room for full encode.
-      (displayProgress.pipeline === 'video' &&
-        (displayProgress.stage === 'video' || displayProgress.stage === 'images') &&
-        displayProgress.elapsedSeconds > (buildMode === 'pro' ? 240 : 90)))
+    displayProgress.elapsedSeconds > (buildMode === 'pro' ? 300 : 120)
 
   useEffect(() => {
     if (!active || !selectedId) return undefined
@@ -5220,7 +5214,8 @@ export default function EofProductionPanel({
                     Reset build state
                   </button>
                   <span className="text-[11px] text-[#8a8a8a]">
-                    Unsticks poisoned jobs (burned TTS budget / exhausted Serp avoid history). Then Build Short once.
+                    Clears this job&apos;s TTS budget and its used-stills list so Build Short can pick
+                    fresh images again. Nothing to do with your SerpAPI plan. Then Build Short once.
                   </span>
                 </div>
               </div>

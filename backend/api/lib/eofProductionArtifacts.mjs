@@ -37,7 +37,7 @@ export async function saveEofVideoArtifact(jobId, absPath) {
  * Persist Short MP4; if over the DB cap, recompress in place (higher CRF) then retry.
  * @param {string} jobId
  * @param {string} absPath
- * @param {{ onHeartbeat?: () => Promise<void>|void }} [opts]
+ * @param {{ onHeartbeat?: () => Promise<void>|void, budgetMs?: number }} [opts]
  * @returns {Promise<{ saved: boolean, bytes: number, recompressed: boolean }>}
  */
 export async function persistEofVideoArtifact(jobId, absPath, opts = {}) {
@@ -56,6 +56,7 @@ export async function persistEofVideoArtifact(jobId, absPath, opts = {}) {
   )
   const ok = await recompressEofVideoUnderLimit(absPath, maxBytes, {
     onHeartbeat: opts.onHeartbeat,
+    budgetMs: opts.budgetMs,
   })
   recompressed = ok
   if (!ok) {
@@ -78,10 +79,18 @@ export async function recompressEofVideoUnderLimit(absPath, maxBytes, opts = {})
 
   // The whole ladder runs after the encode finished, so cap each pass: four unbounded
   // re-encodes can outlast the isolate and lose a Short that was already rendered.
-  const passTimeoutMs = Number(process.env.EOF_RECOMPRESS_TIMEOUT_MS) || 60_000
+  const passTimeoutMs = Number(process.env.EOF_RECOMPRESS_TIMEOUT_MS) || 45_000
+  const budgetMs = Number.isFinite(opts.budgetMs) ? Number(opts.budgetMs) : Infinity
+  const startedMs = Date.now()
   const hb = typeof opts.onHeartbeat === 'function' ? { onHeartbeat: opts.onHeartbeat } : {}
   const tmp = absPath.replace(/\.mp4$/i, '.compact.mp4')
-  for (const crf of [32, 35, 38, 42]) {
+  // Jump straight to a hard CRF when there is only time for one pass.
+  const ladder = budgetMs < passTimeoutMs * 2 ? [38] : [32, 35, 38, 42]
+  for (const crf of ladder) {
+    if (Date.now() - startedMs >= budgetMs) {
+      console.warn('[eof-production] recompress out of build budget — stopping ladder')
+      break
+    }
     try {
       await runFfmpeg(
         [

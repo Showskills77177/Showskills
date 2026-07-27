@@ -14,6 +14,7 @@ import {
   shouldReuseEofSceneAudioFile,
   planEofSceneTtsDedupe,
   eofTtsCreditGuardDecision,
+  nextEofTtsSynthCount,
 } from '../../../shared/eofTtsReuse.mjs'
 import {
   getEofProductionJob,
@@ -223,6 +224,8 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       const lineHashByIndex = new Map(scenePlans.map((s) => [s.index, s.lineHash]))
       const elevenLabsIds = new Map()
       let synthIncrements = 0
+      const priorSynthCount =
+        job.ttsAudioHash === fingerprint ? Number(job.ttsSynthCount) || 0 : 0
 
       try {
       // Reuse existing scene files with matching line hashes before any synthesize.
@@ -269,15 +272,13 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
         if (!primaryReuse) {
           const engine = voicePresetMeta.engine || 'edge'
           if (engine === 'elevenlabs') {
-            const nextCount =
-              (job.ttsAudioHash === fingerprint ? Number(job.ttsSynthCount) || 0 : 0) +
-              synthIncrements +
-              1
+            // Budget counts whole TTS passes, not scenes — charging per scene blocked
+            // every Short past 3 lines halfway through its own first build.
             const guard = eofTtsCreditGuardDecision({
               engine: 'elevenlabs',
               currentFingerprint: fingerprint,
               storedFingerprint: fingerprint,
-              synthCount: nextCount - 1,
+              synthCount: priorSynthCount,
               voiceRegenerationMode,
             })
             if (guard.blocked) throw new Error(guard.reason)
@@ -286,7 +287,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
               jobId,
               `scene=${primaryIndex + 1}`,
               `lineHash=${group.lineHash}`,
-              `synths=${nextCount}`,
+              `pass=${priorSynthCount + 1}/${guard.limit}`,
             )
           } else {
             console.info('eof:tts edge synthesize', jobId, `scene=${primaryIndex + 1}`)
@@ -411,10 +412,9 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       await reportProgress('done', sceneCount, { force: true })
       await updateEofProductionRenderProgress(jobId, null)
 
-      const sameHash = job.ttsAudioHash === fingerprint
       const nextSynthCount = voiceRegenerationMode
         ? job.ttsSynthCount
-        : (sameHash ? Number(job.ttsSynthCount) || 0 : 0) + synthIncrements
+        : nextEofTtsSynthCount({ priorCount: priorSynthCount, scenesSynthesized: synthIncrements })
 
       const regenPatch = voiceRegenerationMode
         ? { voiceRegenerationCount: incrementEofVoiceRegenerationCount(job) }

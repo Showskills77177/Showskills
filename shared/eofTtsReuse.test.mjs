@@ -8,6 +8,7 @@ import {
   shouldReuseEofSceneAudioFile,
   planEofSceneTtsDedupe,
   eofTtsCreditGuardDecision,
+  nextEofTtsSynthCount,
 } from './eofTtsReuse.mjs'
 import {
   isEofRenderStale,
@@ -169,6 +170,45 @@ describe('eofTtsReuse fingerprint + decisions', () => {
     })
     assert.equal(afterReset.blocked, false, 'explicit Build reset must unblock the job')
     assert.equal(afterReset.count, 0)
+  })
+
+  it('charges the ElevenLabs budget once per pass, not once per scene', () => {
+    // A 5-scene Brian Short used to bill 5 and trip the 3/3 cap inside its own build.
+    assert.equal(nextEofTtsSynthCount({ priorCount: 0, scenesSynthesized: 5 }), 1)
+    assert.equal(nextEofTtsSynthCount({ priorCount: 1, scenesSynthesized: 5 }), 2)
+    assert.equal(nextEofTtsSynthCount({ priorCount: 2, scenesSynthesized: 1 }), 3)
+    // Fully reused audio costs nothing, and Regenerate voiceover keeps its own budget.
+    assert.equal(nextEofTtsSynthCount({ priorCount: 2, scenesSynthesized: 0 }), 2)
+    assert.equal(
+      nextEofTtsSynthCount({ priorCount: 2, scenesSynthesized: 5, voiceRegenerationMode: true }),
+      2,
+    )
+
+    // Three real passes still exhaust the budget — the guard keeps its purpose.
+    let count = 0
+    for (let pass = 0; pass < EOF_TTS_MAX_SYNTHS_PER_HASH; pass += 1) {
+      assert.equal(
+        eofTtsCreditGuardDecision({
+          engine: 'elevenlabs',
+          currentFingerprint: 'fp',
+          storedFingerprint: 'fp',
+          synthCount: count,
+        }).blocked,
+        false,
+        `pass ${pass + 1} of a 5-scene Short must run`,
+      )
+      count = nextEofTtsSynthCount({ priorCount: count, scenesSynthesized: 5 })
+    }
+    assert.equal(
+      eofTtsCreditGuardDecision({
+        engine: 'elevenlabs',
+        currentFingerprint: 'fp',
+        storedFingerprint: 'fp',
+        synthCount: count,
+      }).blocked,
+      true,
+      'a fourth pass over the same narration is still refused',
+    )
   })
 })
 

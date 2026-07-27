@@ -95,6 +95,30 @@ const VIDEO_ENCODE_DEADLINE_MS =
   (isEofForceSlim() ? 140_000 : isEofVercelRuntime() ? 160_000 : 210_000)
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
+/**
+ * Whole-isolate budget for the video hop. Phase caps above are per-phase, so back to
+ * back worst cases (45 + 50 + 160 + persist) can run past Vercel's 300s maxDuration and
+ * lose a Short that already encoded. Every phase is clamped to what is left of this.
+ */
+const VIDEO_BUILD_BUDGET_MS =
+  Number(process.env.EOF_VIDEO_BUILD_BUDGET_MS) ||
+  (isEofVercelRuntime() ? 270_000 : 600_000)
+/** Held back from the phase caps for stills + base64 persist after the encode. */
+const PERSIST_RESERVE_MS = Number(process.env.EOF_PERSIST_RESERVE_MS) || 35_000
+
+/**
+ * Phase deadline that also respects the remaining isolate budget.
+ * @param {number} cap phase cap in ms
+ * @param {number} startedAtMs build hop start
+ * @param {{ reserveMs?: number, minMs?: number }} [opts]
+ */
+export function budgetedPhaseDeadlineMs(cap, startedAtMs, opts = {}) {
+  const reserve = Number.isFinite(opts.reserveMs) ? opts.reserveMs : PERSIST_RESERVE_MS
+  const min = Number.isFinite(opts.minMs) ? opts.minMs : 10_000
+  const elapsed = Math.max(0, Date.now() - startedAtMs)
+  const remaining = VIDEO_BUILD_BUDGET_MS - elapsed - reserve
+  return Math.max(min, Math.min(cap, remaining))
+}
 
 /** True when prior stills were placeholders — Rebuild must not treat them as reusable history. */
 export function priorStillsWerePlaceholders(manifest) {
@@ -166,8 +190,16 @@ export function formatEofNoSceneImagesError(info = {}) {
             ? 'Oxylabs not configured (need OXYLABS_ENABLED=1 + OXYLABS_USERNAME / OXYLABS_PASSWORD)'
             : 'SerpAPI not configured (SERPAPI_API_KEY)',
         )
+      } else if (status === 'quota_exceeded') {
+        parts.push(
+          provider === 'oxylabs'
+            ? 'Oxylabs plan requests exhausted'
+            : 'SerpAPI plan searches exhausted (serpapi.com/dashboard)',
+        )
       } else if (status === 'ok' && Number(a.hits) > 0) {
-        parts.push(`${provider}: returned ${a.hits} hit(s) then post-filter emptied the pool`)
+        parts.push(
+          `${provider}: search worked (${a.hits} hit(s), no quota problem) but the subject/vision filter rejected them all`,
+        )
       } else if (status === 'empty' || Number(a.hits) === 0) {
         parts.push(`${provider}: ${a.detail || '0 usable image URLs'}`)
       } else {
@@ -201,7 +233,13 @@ export function formatEofNoSceneImagesError(info = {}) {
   }
 
   const tried = parts.length ? parts.join('; ') : 'no image sources produced usable stills'
-  return `No real scene images could be downloaded for “${topic}”. Tried: ${tried}. Check server logs / Vercel env, then Rebuild video again.`
+  // When the search itself succeeded, say so — otherwise this reads as a spent SerpAPI plan.
+  const searchWorked =
+    Number.isFinite(before) && before > 0 && Number.isFinite(after) && after === 0
+  const next = searchWorked
+    ? 'Image search is fine — the stills were filtered out. Try a simpler scene image query (or a different Images provider), then Rebuild video.'
+    : 'Check server logs / Vercel env, then Rebuild video again.'
+  return `No real scene images could be downloaded for “${topic}”. Tried: ${tried}. ${next}`
 }
 
 /**
@@ -293,6 +331,7 @@ export function assertEofVideoPersisted(persisted) {
  * }} [opts]
  */
 export async function renderEofProductionVideoJob(jobId, opts = {}) {
+  const buildStartedMs = Date.now()
   const includeAudioIfPresent = opts.includeAudioIfPresent === true
   const reuseSceneImages = opts.reuseSceneImages === true
   // Remux / remix / effects reuse cached stills — skip stills gate (stale clickbait pop
@@ -792,7 +831,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           }
         })()
 
-        await withDeadline(poolWork, IMAGE_POOL_DEADLINE_MS, 'Image search')
+        await withDeadline(
+          poolWork,
+          budgetedPhaseDeadlineMs(IMAGE_POOL_DEADLINE_MS, buildStartedMs),
+          'Image search',
+        )
       } finally {
         stopImageHb()
       }
@@ -895,7 +938,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           imageYear: imageMeta.imageYear || null,
         }
       }),
-      SCENE_ASSIGN_DEADLINE_MS,
+      budgetedPhaseDeadlineMs(SCENE_ASSIGN_DEADLINE_MS, buildStartedMs),
       'Scene image assign',
     )
 
@@ -1004,7 +1047,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             await report('video', done)
           },
         }),
-        VIDEO_ENCODE_DEADLINE_MS,
+        budgetedPhaseDeadlineMs(VIDEO_ENCODE_DEADLINE_MS, buildStartedMs, { minMs: 45_000 }),
         'Video encode (ffmpeg)',
       )
       relPath = rendered.relPath
@@ -1057,6 +1100,10 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       persisted = assertEofVideoPersisted(
         await persistEofVideoArtifact(jobId, videoAbs, {
           onHeartbeat: () => report('mux', sceneCount, { force: true, message: 'Compressing Short…' }),
+          budgetMs: budgetedPhaseDeadlineMs(PERSIST_RESERVE_MS, buildStartedMs, {
+            reserveMs: 0,
+            minMs: 8_000,
+          }),
         }),
       )
     } finally {

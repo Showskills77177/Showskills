@@ -175,6 +175,12 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
       // If self-fetch cannot start (missing SITE_URL / CRON_SECRET), fall through
       // and finish video in this same waitUntil — never leave the job stranded after TTS.
       if ((await isEofSlimBuildEnabled()) || isEofVercelRuntime()) {
+        // Claim the job before the hop: while it sat on `rendered` a second Build Short
+        // passed the API guard and ran a parallel encode over the same work dir.
+        await updateEofProductionJob(jobId, {
+          status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+          errorMessage: null,
+        })
         const scheduled = await scheduleEofBuildContinue(jobId, 'video', {
           imageProvider: opts.imageProvider,
           forceFreshImages: opts.forceFreshImages === true,
@@ -182,6 +188,7 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
         if (scheduled?.ok) {
           return getEofProductionJob(jobId)
         }
+        console.warn('[eof-production] continue hop not scheduled — keeping build in this isolate', jobId)
         console.warn(
           '[eof-production] continue-build schedule failed — running video in-process',
           jobId,

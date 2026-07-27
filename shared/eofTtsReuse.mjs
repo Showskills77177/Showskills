@@ -167,3 +167,26 @@ export function eofTtsCreditGuardDecision({
   }
   return { allow: true, blocked: false, reason: null, count, limit }
 }
+
+/**
+ * Next stored ElevenLabs budget after a TTS pass.
+ *
+ * The budget counts passes over one narration+voice, never scenes: charging per scene
+ * blocked any Short past `EOF_TTS_MAX_SYNTHS_PER_HASH` lines during its own first build.
+ *
+ * @param {{
+ *   priorCount?: number,
+ *   scenesSynthesized?: number,
+ *   voiceRegenerationMode?: boolean,
+ * }} [input]
+ * @returns {number}
+ */
+export function nextEofTtsSynthCount({
+  priorCount = 0,
+  scenesSynthesized = 0,
+  voiceRegenerationMode = false,
+} = {}) {
+  const prior = Math.max(0, Number(priorCount) || 0)
+  if (voiceRegenerationMode) return prior
+  return prior + (Number(scenesSynthesized) > 0 ? 1 : 0)
+}
