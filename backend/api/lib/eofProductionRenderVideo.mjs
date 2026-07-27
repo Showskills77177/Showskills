@@ -92,19 +92,19 @@ const SCENE_ASSIGN_DEADLINE_MS =
 /** Cap ffmpeg scene clips + mux. Vercel Pro-reliable must leave headroom under 280s. */
 const VIDEO_ENCODE_DEADLINE_MS =
   Number(process.env.EOF_VIDEO_ENCODE_DEADLINE_MS) ||
-  (isEofForceSlim() ? 140_000 : isEofVercelRuntime() ? 160_000 : 210_000)
+  (isEofForceSlim() ? 140_000 : isEofVercelRuntime() ? 170_000 : 210_000)
 /** Per-scene history length — keep ≥20 rebuilds of avoidKeys before oldest URLs can repeat. */
 export const EOF_IMAGE_KEY_HISTORY_LIMIT = 32
 /**
  * Whole-isolate budget for the video hop. Phase caps above are per-phase, so back to
- * back worst cases (45 + 50 + 160 + persist) can run past Vercel's 300s maxDuration and
+ * back worst cases (45 + 50 + 170 + persist) can run past Vercel's 300s maxDuration and
  * lose a Short that already encoded. Every phase is clamped to what is left of this.
  */
 const VIDEO_BUILD_BUDGET_MS =
   Number(process.env.EOF_VIDEO_BUILD_BUDGET_MS) ||
-  (isEofVercelRuntime() ? 270_000 : 600_000)
+  (isEofVercelRuntime() ? 275_000 : 600_000)
 /** Held back from the phase caps for stills + base64 persist after the encode. */
-const PERSIST_RESERVE_MS = Number(process.env.EOF_PERSIST_RESERVE_MS) || 35_000
+const PERSIST_RESERVE_MS = Number(process.env.EOF_PERSIST_RESERVE_MS) || 30_000
 
 /**
  * Phase deadline that also respects the remaining isolate budget.
@@ -1034,7 +1034,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         force: true,
         message: `Encoding scene clip ${n} of ${sceneCount} (ffmpeg)…`,
       })
-    }, 4000)
+    }, 2000)
 
     const draftBlob = String(job.script?.plainTextDraft || '').trim()
     const secondaryPeople = listSecondaryImageSubjects(job.topic, draftBlob)
@@ -1147,7 +1147,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     // window. Without a beat here the stale watchdog fails Shorts that encoded fine.
     const stopPersistHb = startProgressHeartbeat(
       () => report('mux', sceneCount, { force: true, message: 'Saving Short…' }),
-      4000,
+      2000,
     )
     let persisted
     try {
