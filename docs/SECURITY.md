@@ -55,6 +55,8 @@ No website can be guaranteed “unhackable.” This project uses **defense in de
 | `OXYLABS_USERNAME` / `OXYLABS_PASSWORD` | EOF Google Images (opt-in); aliases `OXYLABS_USER` / `OXYLABS_PASS` |
 | `OXYLABS_GEO_LOCATION` | Optional Oxylabs geo (default United States) |
 | `EOF_QUALITY_GATE_SLACK_WEBHOOK` | Optional Slack Incoming Webhook when quality gate blocks auto-publish |
+| `EOF_WORKER_URL` | Staging only — Railway (or VPS) origin for EOF ffmpeg encode (`https://….up.railway.app`) |
+| `EOF_WORKER_SECRET` | Shared bearer for Vercel → worker `POST /eof-worker/render` (also set on Railway) |
 
 ### EOF Oxylabs (opt-in / staging)
 
