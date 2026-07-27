@@ -35,12 +35,9 @@ export async function saveEofVideoArtifact(jobId, absPath) {
 
 /**
  * Persist Short MP4; if over the DB cap, recompress in place (higher CRF) then retry.
- * @param {string} jobId
- * @param {string} absPath
- * @param {{ onHeartbeat?: () => Promise<void>|void, budgetMs?: number }} [opts]
  * @returns {Promise<{ saved: boolean, bytes: number, recompressed: boolean }>}
  */
-export async function persistEofVideoArtifact(jobId, absPath, opts = {}) {
+export async function persistEofVideoArtifact(jobId, absPath) {
   if (!jobId || !absPath || !existsSync(absPath)) {
     return { saved: false, bytes: 0, recompressed: false }
   }
@@ -54,10 +51,7 @@ export async function persistEofVideoArtifact(jobId, absPath, opts = {}) {
   console.warn(
     `[eof-production] video too large to store (${bytes} bytes) for job ${jobId} — recompressing under ${maxBytes}`,
   )
-  const ok = await recompressEofVideoUnderLimit(absPath, maxBytes, {
-    onHeartbeat: opts.onHeartbeat,
-    budgetMs: opts.budgetMs,
-  })
+  const ok = await recompressEofVideoUnderLimit(absPath, maxBytes)
   recompressed = ok
   if (!ok) {
     return { saved: false, bytes: existsSync(absPath) ? statSync(absPath).size : bytes, recompressed }
@@ -71,38 +65,19 @@ export async function persistEofVideoArtifact(jobId, absPath, opts = {}) {
  * Re-encode MP4 until under maxBytes (or CRF ladder exhausted).
  * @param {string} absPath
  * @param {number} maxBytes
- * @param {{ onHeartbeat?: () => Promise<void>|void, budgetMs?: number }} [opts]
  */
-export async function recompressEofVideoUnderLimit(absPath, maxBytes, opts = {}) {
+export async function recompressEofVideoUnderLimit(absPath, maxBytes) {
   if (!absPath || !existsSync(absPath)) return false
   if (statSync(absPath).size <= maxBytes) return true
 
-  // The whole ladder runs after the encode finished, so cap each pass: four unbounded
-  // re-encodes can outlast the isolate and lose a Short that was already rendered.
-  const passTimeoutMs = Number(process.env.EOF_RECOMPRESS_TIMEOUT_MS) || 45_000
-  const budgetMs = Number.isFinite(opts.budgetMs) ? Number(opts.budgetMs) : Infinity
-  const startedMs = Date.now()
-  const hb = typeof opts.onHeartbeat === 'function' ? { onHeartbeat: opts.onHeartbeat } : {}
   const tmp = absPath.replace(/\.mp4$/i, '.compact.mp4')
-  // Jump straight to a hard CRF when there is only time for one pass. The last rung drops
-  // to 720x1280 — a Short that renders must never be lost just because it would not fit.
-  const ladder =
-    budgetMs < passTimeoutMs * 2
-      ? [{ crf: 38 }, { crf: 42, height: 1280 }]
-      : [{ crf: 32 }, { crf: 35 }, { crf: 38 }, { crf: 42 }, { crf: 42, height: 1280 }]
-  for (const rung of ladder) {
-    if (Date.now() - startedMs >= budgetMs) {
-      console.warn('[eof-production] recompress out of build budget — stopping ladder')
-      break
-    }
-    const { crf, height } = rung
+  for (const crf of [32, 35, 38, 42]) {
     try {
       await runFfmpeg(
         [
           '-y',
           '-i',
           absPath,
-          ...(height ? ['-vf', `scale=-2:${height}:flags=fast_bilinear`] : []),
           '-c:v',
           'libx264',
           '-preset',
@@ -121,15 +96,10 @@ export async function recompressEofVideoUnderLimit(absPath, maxBytes, opts = {})
           'yuv420p',
           tmp,
         ],
-        { maxBuffer: 16 * 1024 * 1024, timeoutMs: passTimeoutMs, ...hb },
+        { maxBuffer: 16 * 1024 * 1024 },
       )
     } catch (e) {
-      console.warn(
-        '[eof-production] recompress failed crf',
-        crf,
-        height ? `${height}p` : '',
-        e instanceof Error ? e.message : e,
-      )
+      console.warn('[eof-production] recompress failed crf', crf, e instanceof Error ? e.message : e)
       continue
     }
     if (!existsSync(tmp)) continue

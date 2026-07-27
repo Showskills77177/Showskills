@@ -24,9 +24,7 @@ import {
   priorStillsWerePlaceholders,
   clearEofImageAvoidHistoryFromManifest,
   shouldForceFreshEofSceneImages,
-  rescueEofFilteredPoolHits,
   EOF_IMAGE_KEY_HISTORY_LIMIT,
-  EOF_POOL_RESCUE_LIMIT,
 } from '../backend/api/lib/eofProductionRenderVideo.mjs'
 import { withDeadline } from '../backend/api/lib/eofAsyncPool.mjs'
 import { isEofRenderStale } from '../backend/api/lib/eofProductionJobs.mjs'
@@ -656,36 +654,6 @@ describe('eof hang fail-fast + placeholder rebuild', () => {
       true,
       'explicit Hobby-style maxAge 280 still age-kills even with heartbeats',
     )
-  })
-
-  it('rescues a pool the subject/vision filter wiped instead of failing the Short', () => {
-    // The recurring Cucurella case: SerpAPI returns real photos, the name/vision filter
-    // rejects every one, and the build used to die with "no scene images".
-    const hits = [
-      { url: 'https://cdn/gen.jpg', title: '', source: 'free-gen', visionScore: 7 },
-      { url: 'https://cdn/scrape.jpg', title: '', source: 'serpapi', visionScore: 7 },
-      { url: 'https://cdn/best.jpg', title: 'Cucurella', source: 'serpapi', visionScore: 9 },
-      { url: 'https://cdn/unscored.jpg', title: '', source: 'serpapi' },
-    ]
-
-    const rescued = rescueEofFilteredPoolHits(hits)
-    assert.ok(rescued.length > 0, 'a search that returned photos must never end in zero stills')
-    assert.equal(rescued[0].url, 'https://cdn/best.jpg', 'best vision score leads')
-    assert.equal(
-      rescued[1].url,
-      'https://cdn/scrape.jpg',
-      'on an equal vision score a real scrape beats a generated still',
-    )
-    assert.ok(rescued.length <= EOF_POOL_RESCUE_LIMIT)
-
-    assert.deepEqual(rescueEofFilteredPoolHits([]), [], 'nothing to rescue stays empty')
-    assert.deepEqual(rescueEofFilteredPoolHits(null), [])
-    assert.deepEqual(
-      rescueEofFilteredPoolHits([{ title: 'no url at all' }]),
-      [],
-      'rows without a url or local path are not usable',
-    )
-    assert.equal(rescueEofFilteredPoolHits(hits, 2).length, 2, 'limit is honoured')
   })
 
   it('withDeadline rejects hung work instead of freezing forever', async () => {

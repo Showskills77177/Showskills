@@ -168,7 +168,7 @@ export function extractSerpApiImageRows(payload) {
 }
 
 /**
- * @typedef {'ok'|'empty'|'auth_failed'|'not_configured'|'quota_exceeded'|'http_error'|'timeout'|'error'|'api_error'} EofSerpApiSearchStatus
+ * @typedef {'ok'|'empty'|'auth_failed'|'not_configured'|'http_error'|'timeout'|'error'|'api_error'} EofSerpApiSearchStatus
  * @typedef {{
  *   status: EofSerpApiSearchStatus,
  *   detail: string,
@@ -287,21 +287,18 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
           },
         }
       }
-      // Only 429 (or an explicit run-out message) means the plan is actually spent —
-      // every other HTTP code is a transient error and must not read as "out of searches".
-      const outOfSearches =
-        res.status === 429 || /run out of searches|exceeded.*(quota|searches)/i.test(body)
-      const status = outOfSearches ? 'quota_exceeded' : 'http_error'
-      const detail = outOfSearches
-        ? `SerpAPI plan searches exhausted (HTTP ${res.status}) — check https://serpapi.com/dashboard`
-        : `API error HTTP ${res.status}`
       console.warn('[eof-serpapi] search failed', res.status, body.slice(0, 180))
-      recordSerpApiAttempt({ query: q, status, hits: 0, detail })
+      recordSerpApiAttempt({
+        query: q,
+        status: 'http_error',
+        hits: 0,
+        detail: `API error HTTP ${res.status}`,
+      })
       return {
         hits: [],
         health: {
-          status,
-          detail,
+          status: 'http_error',
+          detail: `API error HTTP ${res.status}`,
           httpStatus: res.status,
           softFallback: true,
         },

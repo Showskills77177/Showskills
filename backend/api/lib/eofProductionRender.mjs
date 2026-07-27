@@ -14,7 +14,6 @@ import {
   shouldReuseEofSceneAudioFile,
   planEofSceneTtsDedupe,
   eofTtsCreditGuardDecision,
-  nextEofTtsSynthCount,
 } from '../../../shared/eofTtsReuse.mjs'
 import {
   getEofProductionJob,
@@ -224,8 +223,6 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       const lineHashByIndex = new Map(scenePlans.map((s) => [s.index, s.lineHash]))
       const elevenLabsIds = new Map()
       let synthIncrements = 0
-      const priorSynthCount =
-        job.ttsAudioHash === fingerprint ? Number(job.ttsSynthCount) || 0 : 0
 
       try {
       // Reuse existing scene files with matching line hashes before any synthesize.
@@ -272,13 +269,15 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
         if (!primaryReuse) {
           const engine = voicePresetMeta.engine || 'edge'
           if (engine === 'elevenlabs') {
-            // Budget counts whole TTS passes, not scenes — charging per scene blocked
-            // every Short past 3 lines halfway through its own first build.
+            const nextCount =
+              (job.ttsAudioHash === fingerprint ? Number(job.ttsSynthCount) || 0 : 0) +
+              synthIncrements +
+              1
             const guard = eofTtsCreditGuardDecision({
               engine: 'elevenlabs',
               currentFingerprint: fingerprint,
               storedFingerprint: fingerprint,
-              synthCount: priorSynthCount,
+              synthCount: nextCount - 1,
               voiceRegenerationMode,
             })
             if (guard.blocked) throw new Error(guard.reason)
@@ -287,7 +286,7 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
               jobId,
               `scene=${primaryIndex + 1}`,
               `lineHash=${group.lineHash}`,
-              `pass=${priorSynthCount + 1}/${guard.limit}`,
+              `synths=${nextCount}`,
             )
           } else {
             console.info('eof:tts edge synthesize', jobId, `scene=${primaryIndex + 1}`)
@@ -377,44 +376,35 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
       const musicPath = resolveEofMusicTrackFilePath(track)
       const mixedPath = join(workDir, 'mixed.mp3')
 
-      // ffmpeg concat/amix plus the durable base64 write are silent — beat through them
-      // or the stale watchdog fails a job whose audio is actually fine.
-      const stopMixHb = startProgressHeartbeat(async () => {
-        await reportProgress('mix', sceneCount, { force: true })
-      }, 4000)
-      let saved
-      try {
-        await mixEofNarrationWithMusic({
-          sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
-          musicFilePath: musicPath,
-          musicVolume: job.musicVolume,
-          musicStartSec: job.musicStartSec,
-          musicEndSec: job.musicEndSec,
-          outputPath: mixedPath,
-        })
-
-        if (preserveSceneImages) {
-          await clearEofVideoOnlyArtifact(jobId).catch(() => {})
-        } else {
-          await clearEofVideoArtifact(jobId).catch(() => {})
-        }
-
-        // Write durable mix first (overwrites prior blob). Never clear-before-save —
-        // that left hasDurableAudio=false and continue-build re-ran TTS.
-        saved = await saveEofMixedAudioArtifact(jobId, mixedPath)
-      } finally {
-        stopMixHb()
-      }
-      if (!saved) {
-        console.warn('[eof-production] durable mixed audio save failed — keeping on-disk mix', jobId)
-      }
+      await mixEofNarrationWithMusic({
+        sceneAudioPaths: sceneManifestWithDur.map((s) => s.audioPath),
+        musicFilePath: musicPath,
+        musicVolume: job.musicVolume,
+        musicStartSec: job.musicStartSec,
+        musicEndSec: job.musicEndSec,
+        outputPath: mixedPath,
+      })
 
       await reportProgress('done', sceneCount, { force: true })
       await updateEofProductionRenderProgress(jobId, null)
 
+      if (preserveSceneImages) {
+        await clearEofVideoOnlyArtifact(jobId).catch(() => {})
+      } else {
+        await clearEofVideoArtifact(jobId).catch(() => {})
+      }
+
+      // Write durable mix first (overwrites prior blob). Never clear-before-save —
+      // that left hasDurableAudio=false and continue-build re-ran TTS.
+      const saved = await saveEofMixedAudioArtifact(jobId, mixedPath)
+      if (!saved) {
+        console.warn('[eof-production] durable mixed audio save failed — keeping on-disk mix', jobId)
+      }
+
+      const sameHash = job.ttsAudioHash === fingerprint
       const nextSynthCount = voiceRegenerationMode
         ? job.ttsSynthCount
-        : nextEofTtsSynthCount({ priorCount: priorSynthCount, scenesSynthesized: synthIncrements })
+        : (sameHash ? Number(job.ttsSynthCount) || 0 : 0) + synthIncrements
 
       const regenPatch = voiceRegenerationMode
         ? { voiceRegenerationCount: incrementEofVoiceRegenerationCount(job) }

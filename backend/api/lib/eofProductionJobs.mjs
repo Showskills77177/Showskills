@@ -578,38 +578,11 @@ export async function updateEofProductionJob(id, patch) {
   return getEofProductionJob(id)
 }
 
-/**
- * @param {string} id
- * @param {string} message
- * @param {{ onlyWhenRendering?: boolean }} [opts] onlyWhenRendering — skip when the job
- *   already left rendering_*, so a stale poll cannot overwrite a Short that just finished.
- */
-export async function markEofProductionJobFailed(id, message, opts = {}) {
-  const errorMessage = String(message || 'Failed').slice(0, 500)
-  if (opts.onlyWhenRendering) {
-    await ensureEofProductionSchema()
-    const res = await query(
-      `UPDATE eof_production_jobs
-       SET status = $2, error_message = $3, render_progress_json = NULL, updated_at = ${nowSql()}
-       WHERE id = $1 AND status IN ($4, $5)`,
-      [
-        id,
-        EOF_PRODUCTION_JOB_STATUS.FAILED,
-        errorMessage,
-        EOF_PRODUCTION_JOB_STATUS.RENDERING,
-        EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
-      ],
-    )
-    if (!res.rowCount) {
-      console.info(`[eof-production] skipped stale fail for job=${id} — it already left rendering`)
-      return getEofProductionJob(id)
-    }
-    return getEofProductionJob(id)
-  }
+export async function markEofProductionJobFailed(id, message) {
   await updateEofProductionRenderProgress(id, null)
   return updateEofProductionJob(id, {
     status: EOF_PRODUCTION_JOB_STATUS.FAILED,
-    errorMessage,
+    errorMessage: String(message || 'Failed').slice(0, 500),
   })
 }
 
@@ -737,8 +710,7 @@ export async function failStaleEofProductionRenders(opts = {}) {
     console.warn(
       `[eof-production] auto-fail stale render job=${job.id} age=${ageSec}s slim=${slim} maxAge=${staleOpts.maxAgeSec}s quiet=${staleOpts.maxQuietSec}s`,
     )
-    const after = await markEofProductionJobFailed(job.id, message, { onlyWhenRendering: true })
-    if (after?.status !== EOF_PRODUCTION_JOB_STATUS.FAILED) continue
+    await markEofProductionJobFailed(job.id, message)
     failed.push(job.id)
   }
   return failed

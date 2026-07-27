@@ -401,7 +401,6 @@ export default async function handler(req, res) {
             step,
             imageProvider,
             qualityGateMode: 'manual',
-            forceFreshImages: body.forceFreshImages === true,
           })
           const job = await getEofProductionJob(jobId)
           return json(res, 202, { ok: true, accepted: true, continued: true, step, job })

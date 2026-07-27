@@ -11,7 +11,6 @@ import {
   capEofScriptScenesForServerless,
   eofServerlessSlimRenderOpts,
   resolveEofProEncodeCaps,
-  scheduleEofBuildContinue,
 } from '../backend/api/lib/eofProductionServerless.mjs'
 import {
   normalizeEofBuildMode,
@@ -169,66 +168,6 @@ describe('eofProductionServerless', () => {
     const hobby = resolveEofProEncodeCaps({ vercel: true, slim: true, sceneCount: 4 })
     assert.equal(hobby.profile, 'hobby-slim')
     assert.equal(hobby.skipXfade, true)
-  })
-
-  it('clamps video phase deadlines to what is left of the isolate budget', async () => {
-    const prevVercel = process.env.VERCEL
-    process.env.VERCEL = '1'
-    try {
-      const { budgetedPhaseDeadlineMs } = await import(
-        `../backend/api/lib/eofProductionRenderVideo.mjs?budget=${Date.now()}`
-      )
-      const now = Date.now()
-
-      assert.equal(
-        budgetedPhaseDeadlineMs(45_000, now),
-        45_000,
-        'a fresh hop gets the full phase cap',
-      )
-
-      // 200s into a 270s budget: the 160s encode cap must shrink, not run to 360s total.
-      const late = budgetedPhaseDeadlineMs(160_000, now - 200_000, { minMs: 1_000 })
-      assert.ok(late < 160_000, 'late phases must not blow past maxDuration')
-      assert.ok(late <= 35_000, `expected ≤35s of budget left, got ${late}ms`)
-
-      // Past the budget entirely — still return the floor so we fail fast, never negative.
-      assert.equal(budgetedPhaseDeadlineMs(160_000, now - 400_000, { minMs: 5_000 }), 5_000)
-    } finally {
-      if (prevVercel === undefined) delete process.env.VERCEL
-      else process.env.VERCEL = prevVercel
-    }
-  })
-
-  it('forwards forceFreshImages across the continue-build hop', async () => {
-    const prevSite = process.env.SITE_URL
-    const prevSecret = process.env.CRON_SECRET
-    const prevFetch = globalThis.fetch
-    process.env.SITE_URL = 'https://staging.example.com'
-    process.env.CRON_SECRET = 'test-secret'
-    /** @type {any} */
-    let sent = null
-    globalThis.fetch = async (_url, init) => {
-      sent = JSON.parse(init.body)
-      return { ok: true, status: 202 }
-    }
-    try {
-      await scheduleEofBuildContinue('job-1', 'video', { forceFreshImages: true })
-      assert.equal(sent.step, 'video')
-      assert.equal(
-        sent.forceFreshImages,
-        true,
-        'video isolate must know Build Short asked for fresh stills',
-      )
-
-      await scheduleEofBuildContinue('job-1', 'video', {})
-      assert.equal(sent.forceFreshImages, undefined, 'plain continue keeps reuse allowed')
-    } finally {
-      globalThis.fetch = prevFetch
-      if (prevSite === undefined) delete process.env.SITE_URL
-      else process.env.SITE_URL = prevSite
-      if (prevSecret === undefined) delete process.env.CRON_SECRET
-      else process.env.CRON_SECRET = prevSecret
-    }
   })
 
   it('vision timeout defaults to ≤10s on Vercel so Grok cannot burn the isolate', () => {
