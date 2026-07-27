@@ -26,6 +26,7 @@ import {
 } from './eofShortQualityGateApply.mjs'
 import {
   capEofScriptScenesForServerless,
+  isEofVercelRuntime,
   scheduleEofBuildContinue,
 } from './eofProductionServerless.mjs'
 import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
@@ -169,10 +170,11 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
       } else {
         console.info('[eof-production] continue audio already done → video', jobId)
       }
-      // Hobby/slim only: fresh invocation for Serp + ffmpeg.
+      // Vercel (Pro or Hobby): fresh invocation for Serp + ffmpeg — one isolate cannot
+      // fit TTS + Serp + 4-scene encode under maxDuration 300 (Cucurella hair Shorts).
       // If self-fetch cannot start (missing SITE_URL / CRON_SECRET), fall through
       // and finish video in this same waitUntil — never leave the job stranded after TTS.
-      if (await isEofSlimBuildEnabled()) {
+      if ((await isEofSlimBuildEnabled()) || isEofVercelRuntime()) {
         const scheduled = await scheduleEofBuildContinue(jobId, 'video', {
           imageProvider: opts.imageProvider,
         })
@@ -290,11 +292,11 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
     }),
   )
 
-  // Pro default: whole Short in one waitUntil. Slim/Hobby: chunked continue-build.
+  // Vercel: chunked continue-build (audio isolate → video isolate). Local Pro: one shot.
   const run = () =>
     (async () => {
       const slim = await isEofSlimBuildEnabled()
-      if (slim) {
+      if (slim || isEofVercelRuntime()) {
         return continueEofProductionBuild(jobId, {
           step: 'audio',
           imageProvider: opts.imageProvider,

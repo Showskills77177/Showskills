@@ -147,13 +147,18 @@ describe('eofProductionServerless', () => {
     assert.equal(local.skipXfade, false)
     assert.equal(local.skipOverlays, false)
 
-    const vercelLight = resolveEofProEncodeCaps({ vercel: true, slim: false, sceneCount: 4 })
+    const vercelLight = resolveEofProEncodeCaps({ vercel: true, slim: false, sceneCount: 3 })
     assert.equal(vercelLight.profile, 'pro-reliable')
     assert.equal(vercelLight.skipKenBurns, true)
     assert.equal(vercelLight.skipLogoBlur, true)
-    assert.equal(vercelLight.skipXfade, false, '≤4 scenes keep transitions')
-    assert.equal(vercelLight.skipOverlays, false, '≤4 scenes keep overlays')
+    assert.equal(vercelLight.skipXfade, false, '≤3 scenes keep transitions')
+    assert.equal(vercelLight.skipOverlays, false, '≤3 scenes keep overlays')
     assert.equal(vercelLight.threatenBudget, true)
+
+    const vercelFour = resolveEofProEncodeCaps({ vercel: true, slim: false, sceneCount: 4 })
+    assert.equal(vercelFour.profile, 'pro-budget')
+    assert.equal(vercelFour.skipXfade, true, '4-scene Shorts use hard cuts on Vercel')
+    assert.equal(vercelFour.skipOverlays, true)
 
     const vercelHeavy = resolveEofProEncodeCaps({ vercel: true, slim: false, sceneCount: 5 })
     assert.equal(vercelHeavy.profile, 'pro-budget')

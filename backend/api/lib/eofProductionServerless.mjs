@@ -2,9 +2,11 @@
  * EOF Production Shorts — Vercel Pro vs Hobby adaptation.
  *
  * Default (Pro / full quality on local):
- *   waitUntil + 202, CapCut-style pipeline under vercel.json maxDuration 300.
+ *   Single-process CapCut-style pipeline.
  *
- * Vercel Pro "reliable" encode (runtime VERCEL=1, not Hobby slim):
+ * Vercel Pro (runtime VERCEL=1, not Hobby slim):
+ *   Chunked continue-build: TTS in one maxDuration window, Serp+ffmpeg in the next.
+ *   "Reliable" encode profile on each video step:
  *   Hard cuts, no Ken Burns / logo blur / inset overlays. Full xfade+KB+blur
  *   routinely blows the 300s isolate after Serp + vision + 4 scene encodes.
  *
@@ -38,7 +40,7 @@ export function resolveEofProEncodeCaps(opts = {}) {
   const slim = opts.slim === true
   const vercel = opts.vercel === true
   const sceneCount = Math.max(0, Number(opts.sceneCount) || 0)
-  const sceneThreshold = Math.max(3, Number(process.env.EOF_PRO_ENCODE_BUDGET_SCENE_THRESHOLD) || 5)
+  const sceneThreshold = Math.max(3, Number(process.env.EOF_PRO_ENCODE_BUDGET_SCENE_THRESHOLD) || 4)
   if (slim) {
     return {
       skipLogoBlur: true,
@@ -112,7 +114,7 @@ export function eofProductionPublicOrigin() {
 }
 
 /**
- * Fire-and-forget the next build step as a NEW serverless invocation (Hobby/slim only).
+ * Fire-and-forget the next build step as a NEW serverless invocation (Vercel Pro + Hobby/slim).
  * Uses CRON_SECRET bearer (continue-build allows it).
  * @param {string} jobId
  * @param {'audio'|'video'} step

@@ -28,7 +28,7 @@ export function listEofBuildModeOptions() {
       id: 'pro',
       label: 'Pro',
       detail:
-        'Pro path under Vercel maxDuration 300 — reliable encode (hard cuts, no Ken Burns/overlays on Vercel). Local keeps full CapCut look.',
+        'On Vercel: TTS then a fresh invoke for Serp + ffmpeg (fits maxDuration 300). Local: full CapCut pipeline.',
     },
     {
       id: 'hobby',
