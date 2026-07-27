@@ -175,12 +175,20 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
       // If self-fetch cannot start (missing SITE_URL / CRON_SECRET), fall through
       // and finish video in this same waitUntil — never leave the job stranded after TTS.
       if ((await isEofSlimBuildEnabled()) || isEofVercelRuntime()) {
+        // Claim the job before the hop: while it sat on `rendered` a second Build Short
+        // passed the API guard and ran a parallel encode over the same work dir.
+        await updateEofProductionJob(jobId, {
+          status: EOF_PRODUCTION_JOB_STATUS.RENDERING_VIDEO,
+          errorMessage: null,
+        })
         const scheduled = await scheduleEofBuildContinue(jobId, 'video', {
           imageProvider: opts.imageProvider,
+          forceFreshImages: opts.forceFreshImages === true,
         })
         if (scheduled?.ok) {
           return getEofProductionJob(jobId)
         }
+        console.warn('[eof-production] continue hop not scheduled — keeping build in this isolate', jobId)
         console.warn(
           '[eof-production] continue-build schedule failed — running video in-process',
           jobId,
@@ -310,9 +318,16 @@ export async function startEofProductionFullBuildBackground(jobId, opts = {}) {
         skipPlanPreflight: true,
         forceFreshImages: opts.forceFreshImages === true,
       })
-    })().catch((e) => {
+    })().catch(async (e) => {
       if (e instanceof EofQualityGateBlockedError) return
       console.error('[eof-production] full Short build failed', jobId, e)
+      // Backstop: anything thrown outside the inner handlers would otherwise leave the job
+      // stuck on rendering_* until the watchdog reports a vague "isolate stopped mid-build".
+      await markEofProductionJobFailed(
+        jobId,
+        e instanceof Error ? e.message : 'Short build failed',
+        { onlyWhenRendering: true },
+      ).catch(() => {})
     })
 
   // Always return quickly → API 202; work continues via waitUntil (Pro) or continue-build (slim).

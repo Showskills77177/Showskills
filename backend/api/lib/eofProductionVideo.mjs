@@ -80,6 +80,13 @@ const VIDEO_THREADS =
 const SCENE_CLIP_TIMEOUT_MS =
   Number(process.env.EOF_SCENE_CLIP_TIMEOUT_MS) ||
   (isEofForceSlim() ? 45_000 : isEofVercelRuntime() ? 40_000 : 60_000)
+/**
+ * Flat retry after a slow/hung scene clip. The retry drops zoompan + look/effect
+ * filters, so it encodes far faster than the first attempt and still fits the budget.
+ */
+const SCENE_CLIP_FALLBACK_TIMEOUT_MS =
+  Number(process.env.EOF_SCENE_CLIP_FALLBACK_TIMEOUT_MS) ||
+  Math.round(SCENE_CLIP_TIMEOUT_MS * 0.75)
 const MUX_TIMEOUT_MS =
   Number(process.env.EOF_MUX_TIMEOUT_MS) ||
   (isEofForceSlim() ? 90_000 : isEofVercelRuntime() ? 60_000 : 120_000)
@@ -662,6 +669,61 @@ async function encodeSceneClip({
       logoBlur,
       ...framingOpts,
     })
+    try {
+      await runFfmpeg(
+        [
+          '-y',
+          '-loop',
+          '1',
+          '-i',
+          scene.imagePath,
+          '-filter_complex',
+          filterComplex,
+          '-map',
+          '[vout]',
+          '-t',
+          String(dur),
+          '-c:v',
+          'libx264',
+          '-preset',
+          VIDEO_PRESET,
+          '-crf',
+          VIDEO_CRF,
+          '-threads',
+          VIDEO_THREADS,
+          '-pix_fmt',
+          'yuv420p',
+          '-an',
+          clipPath,
+        ],
+        { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
+      )
+      return clipPath
+    } catch (e) {
+      console.warn(
+        '[eof-video] sticker clip failed, falling back to plain scene',
+        `scene=${scene.index + 1}`,
+        e instanceof Error ? e.message : e,
+      )
+    }
+  }
+
+  const runSceneEncode = async (opts) => {
+    const vf = buildSceneVideoFilter({
+      frames,
+      caption,
+      durationSec: contentDur,
+      captionFont,
+      captionStyle,
+      captionLayout,
+      burnCaptions,
+      lookFilters: opts.lookFilters,
+      effectFilters: opts.effectFilters,
+      kenBurns: opts.kenBurns,
+      textDir,
+      logoBlur,
+      ...framingOpts,
+    })
     await runFfmpeg(
       [
         '-y',
@@ -669,10 +731,8 @@ async function encodeSceneClip({
         '1',
         '-i',
         scene.imagePath,
-        '-filter_complex',
-        filterComplex,
-        '-map',
-        '[vout]',
+        '-vf',
+        vf,
         '-t',
         String(dur),
         '-c:v',
@@ -688,53 +748,32 @@ async function encodeSceneClip({
         '-an',
         clipPath,
       ],
-      { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
+      { maxBuffer: 16 * 1024 * 1024, timeoutMs: opts.timeoutMs, ...ffmpegHb },
     )
-    return clipPath
   }
 
-  const vf = buildSceneVideoFilter({
-    frames,
-    caption,
-    durationSec: contentDur,
-    captionFont,
-    captionStyle,
-    captionLayout,
-    burnCaptions,
-    lookFilters,
-    effectFilters,
-    kenBurns,
-    textDir,
-    logoBlur,
-    ...framingOpts,
-  })
-
-  await runFfmpeg(
-    [
-      '-y',
-      '-loop',
-      '1',
-      '-i',
-      scene.imagePath,
-      '-vf',
-      vf,
-      '-t',
-      String(dur),
-      '-c:v',
-      'libx264',
-      '-preset',
-      VIDEO_PRESET,
-      '-crf',
-      VIDEO_CRF,
-      '-threads',
-      VIDEO_THREADS,
-      '-pix_fmt',
-      'yuv420p',
-      '-an',
-      clipPath,
-    ],
-    { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
-  )
+  try {
+    await runSceneEncode({
+      lookFilters,
+      effectFilters,
+      kenBurns,
+      timeoutMs: SCENE_CLIP_TIMEOUT_MS,
+    })
+  } catch (e) {
+    // One slow scene must not fail the whole Short: zoompan + look/effect filters are
+    // what blow the per-clip cap on shared serverless vCPU, so retry flat before giving up.
+    console.warn(
+      '[eof-video] scene clip encode failed, retrying flat (no Ken Burns / looks / effects)',
+      `scene=${scene.index + 1}`,
+      e instanceof Error ? e.message : e,
+    )
+    await runSceneEncode({
+      lookFilters: [],
+      effectFilters: [],
+      kenBurns: false,
+      timeoutMs: SCENE_CLIP_FALLBACK_TIMEOUT_MS,
+    })
+  }
 
   return clipPath
 }

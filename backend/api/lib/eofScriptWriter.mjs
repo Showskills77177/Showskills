@@ -785,6 +785,16 @@ export async function writeEofPlainTextDraft({
   const prev = String(previousDraft || '').trim()
   const note = String(directorNote || '').trim().slice(0, 1200)
   const autoMode = isAutoScriptMode(scriptProvider)
+
+  // Fail fast with an actionable message instead of the generic "failed local quality
+  // gates" error — that message is misleading when the real cause is zero configured
+  // writers (the template fallback then also gets hard-rejected by the same gates).
+  if (!resolveScriptProviderAttemptOrder(scriptProvider).length) {
+    throw new Error(
+      `No AI script provider is configured for "${rawTopic}". Set ANTHROPIC_API_KEY (Claude), ` +
+        'GROQ_API_KEY (free), OPENAI_API_KEY, or an xAI key on Vercel, redeploy, then Regenerate.',
+    )
+  }
   const tuned = autoTuneDraftSettings({
     format: fmt,
     regenerate,

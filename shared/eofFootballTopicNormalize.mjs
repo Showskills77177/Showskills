@@ -7,6 +7,8 @@ export function normalizeFootballTopicQuery(topic) {
   let t = String(topic || '').trim()
   if (!t) return t
   t = t.replace(/\bcuccorea\b/gi, 'Cucurella')
+  t = t.replace(/\bcuccurea\b/gi, 'Cucurella')
+  t = t.replace(/\bcucurea\b/gi, 'Cucurella')
   t = t.replace(/\bcuccorella\b/gi, 'Cucurella')
   t = t.replace(/\bcuccurella\b/gi, 'Cucurella')
   t = t.replace(/\bcucurela\b/gi, 'Cucurella')

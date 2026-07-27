@@ -740,9 +740,16 @@ export function collectEofShortQualityPlanChecks(job, renderMeta = {}) {
  * Stills-assignment checks — after image fetch/assignment, before ffmpeg.
  * @param {EofQualityJobSnapshot} job
  * @param {EofQualityRenderMeta} [renderMeta]
+ * @param {{ overlayMissingBlocks?: boolean, placeholdersBlock?: boolean }} [opts] set either
+ *   to false to downgrade that check to a warning. The stills preflight aborts a manual
+ *   Build before ffmpeg, so only unattended auto-publish blocks on a missing decorative
+ *   inset or a partly-placeholder Short — an operator watching the build decides for
+ *   themselves. An all-placeholder render still fails in the pipeline either way.
  * @returns {EofQualityCheck[]}
  */
-export function collectEofShortQualityStillsChecks(job, renderMeta = {}) {
+export function collectEofShortQualityStillsChecks(job, renderMeta = {}, opts = {}) {
+  const overlayMissingSeverity = opts.overlayMissingBlocks === false ? 'warn' : 'fail'
+  const placeholderFailSeverity = opts.placeholdersBlock === false ? 'warn' : 'fail'
   /** @type {EofQualityCheck[]} */
   const checks = []
   const scenes = Array.isArray(job?.script?.scenes) ? job.script.scenes : []
@@ -759,7 +766,7 @@ export function collectEofShortQualityStillsChecks(job, renderMeta = {}) {
       const msg = `Placeholder still(s) on scene${placeholderIdx.length === 1 ? '' : 's'} ${placeholderIdx.join(', ')}`
       checks.push({
         id: 'stills_placeholder',
-        severity: frac > maxPlaceholderFraction() ? 'fail' : 'warn',
+        severity: frac > maxPlaceholderFraction() ? placeholderFailSeverity : 'warn',
         message: msg,
         detail: `${placeholderIdx.length}/${sources.length} scenes used placeholders`,
       })
@@ -819,7 +826,7 @@ export function collectEofShortQualityStillsChecks(job, renderMeta = {}) {
   if (overlayMode === 'always' && count === 0 && (manifest.length >= 2 || scenes.length >= 2)) {
     checks.push({
       id: 'overlay_missing_always',
-      severity: 'fail',
+      severity: overlayMissingSeverity,
       message: 'Pop inset set to Always but no inset moment was rendered',
       detail: 'Distinct stills missing or overlay plan empty',
     })
@@ -832,7 +839,7 @@ export function collectEofShortQualityStillsChecks(job, renderMeta = {}) {
   ) {
     checks.push({
       id: 'overlay_missing_auto_secondary',
-      severity: 'fail',
+      severity: overlayMissingSeverity,
       message: 'Pop inset expected for secondary subject but none was shown',
       detail: null,
     })
@@ -1107,9 +1114,13 @@ export function runEofShortQualityStillsPreflight(job, opts = {}) {
   if (!isEofShortQualityGateEnabled()) {
     return { ...disabledGateResult(), phase: 'stills' }
   }
-  const checks = collectEofShortQualityStillsChecks(job, opts.renderMeta || {})
+  const mode = opts.mode === 'auto' ? 'auto' : 'manual'
+  const checks = collectEofShortQualityStillsChecks(job, opts.renderMeta || {}, {
+    overlayMissingBlocks: mode === 'auto',
+    placeholdersBlock: mode === 'auto',
+  })
   return finalizeEofQualityGate(checks, {
-    mode: opts.mode === 'auto' ? 'auto' : 'manual',
+    mode,
     blockOnFail: opts.blockOnFail !== false,
     phase: 'stills',
   })
