@@ -702,8 +702,28 @@ export async function renderEofProductionCaptionReplace(jobId) {
     `style=${job.captionStyle || 'default'}`,
   )
 
+  // Replace Captions must NEVER touch narration/TTS — it only reuses the durable
+  // mixed-audio blob (ensureEofMixedAudioOnDisk). Capture the voice fingerprint
+  // before/after so a future regression that accidentally re-synthesizes ElevenLabs
+  // audio on every caption edit is caught loudly instead of silently re-billing.
+  const ttsHashBefore = job.ttsAudioHash
+  const ttsSynthCountBefore = job.ttsSynthCount
+
   try {
-    return await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
+    const result = await renderEofProductionVideoJob(jobId, eofRemuxVideoJobOpts())
+    const after = await getEofProductionJob(jobId)
+    if (
+      after &&
+      (after.ttsAudioHash !== ttsHashBefore || after.ttsSynthCount !== ttsSynthCountBefore)
+    ) {
+      console.error(
+        '[eof-production] REGRESSION: caption replace changed the TTS fingerprint/synth count',
+        jobId,
+        `before hash=${ttsHashBefore} count=${ttsSynthCountBefore}`,
+        `after hash=${after.ttsAudioHash} count=${after.ttsSynthCount}`,
+      )
+    }
+    return result
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Caption replace failed'
     await markEofProductionJobFailed(jobId, message)
