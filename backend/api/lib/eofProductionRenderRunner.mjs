@@ -34,6 +34,7 @@ import {
   scheduleEofVideoOnWorker,
 } from './eofProductionWorkerDispatch.mjs'
 import { isEofSlimBuildEnabled } from './eofBuildModeSettings.mjs'
+import { hashEofTtsFingerprint } from '../../../shared/eofTtsReuse.mjs'
 
 /**
  * Prefer Railway (or other) worker for video when configured; else Vercel continue-build.
@@ -170,12 +171,23 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
   let step = opts.step === 'audio' || opts.step === 'video' ? opts.step : 'auto'
 
   // Audio is done when durable mix exists OR job already has mixedAudioPath / RENDERED
-  // after TTS (durable save may have failed — do NOT re-burn ElevenLabs).
+  // after TTS (durable save may have failed — do NOT re-burn ElevenLabs). But a stored
+  // mix only counts as "done" if it matches the CURRENT voice/narration fingerprint —
+  // otherwise a voice-preset switch (e.g. British → Brian) silently reuses the old
+  // audio because durable audio already existed from a prior render.
+  const currentFingerprint = hashEofTtsFingerprint({
+    script: job.script,
+    voicePreset: job.voicePreset,
+    voiceSettings: job.voiceSettings,
+  })
+  const durableAudioMatchesVoice = job.ttsAudioHash === currentFingerprint
   const audioAlreadyDone =
-    flags.hasDurableAudio ||
-    Boolean(job.mixedAudioPath) ||
-    (Array.isArray(job.narrationManifest) && job.narrationManifest.length > 0) ||
-    status === EOF_PRODUCTION_JOB_STATUS.RENDERED
+    (flags.hasDurableAudio && durableAudioMatchesVoice) ||
+    (Boolean(job.mixedAudioPath) && durableAudioMatchesVoice) ||
+    (Array.isArray(job.narrationManifest) &&
+      job.narrationManifest.length > 0 &&
+      durableAudioMatchesVoice) ||
+    (status === EOF_PRODUCTION_JOB_STATUS.RENDERED && durableAudioMatchesVoice)
 
   if (step === 'auto') {
     step = audioAlreadyDone ? 'video' : 'audio'
