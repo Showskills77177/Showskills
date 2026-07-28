@@ -120,7 +120,10 @@ export function tidyCaption(sentence) {
  * @param {string[]} sentences
  * @param {{ min?: number, max?: number, capWords?: number }} [opts]
  */
-export function balanceSceneUnits(sentences, { min = 4, max = EOF_MAX_SCENES, capWords = 16 } = {}) {
+export function balanceSceneUnits(
+  sentences,
+  { min = 4, max = EOF_MAX_SCENES, capWords = 16, capChars = 130 } = {},
+) {
   let units = sentences.map((s) => s.trim()).filter(Boolean)
   if (!units.length) return []
 
@@ -144,17 +147,25 @@ export function balanceSceneUnits(sentences, { min = 4, max = EOF_MAX_SCENES, ca
     units.splice(idx, 1, ...pieces)
   }
 
-  // Too many scenes → merge the shortest adjacent pair until within budget
+  // Too many scenes → merge the shortest adjacent pair until within budget.
+  // Never merge a pair whose combined length would blow the caption cap —
+  // tidyCaption/normalizeEofScript truncate (and silently drop) anything past
+  // that length, which was cutting whole sentences (including CTAs) out of the
+  // narration. If no pair fits, stop merging rather than lose narration text —
+  // a few extra scenes is far better than a truncated Short.
   while (units.length > max) {
-    let idx = 0
+    let idx = -1
     let smallest = Infinity
     for (let i = 0; i < units.length - 1; i += 1) {
+      const merged = `${units[i]} ${units[i + 1]}`.replace(/\s+/g, ' ').trim()
+      if (merged.length > capChars) continue
       const combined = wordCount(units[i]) + wordCount(units[i + 1])
       if (combined < smallest) {
         smallest = combined
         idx = i
       }
     }
+    if (idx < 0) break
     units[idx] = `${units[idx]} ${units[idx + 1]}`.replace(/\s+/g, ' ').trim()
     units.splice(idx + 1, 1)
   }
