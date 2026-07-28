@@ -597,7 +597,20 @@ export async function startEofProductionStickersApplyBackground(jobId) {
   )
 
   const run = () =>
-    renderEofProductionStickersApply(jobId).catch((e) => {
+    (async () => {
+      // Apply Stickers is remux-only but still real ffmpeg work — hand it to Railway
+      // when configured so it doesn't hit Vercel's isolate limits, same as Build/Rebuild.
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, { mode: 'stickers-apply' })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on stickers apply — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
+      return renderEofProductionStickersApply(jobId)
+    })().catch((e) => {
       console.error('[eof-production] apply stickers failed', jobId, e)
     })
 
@@ -630,7 +643,20 @@ export async function startEofProductionEffectsApplyBackground(jobId) {
   )
 
   const run = () =>
-    renderEofProductionEffectsApply(jobId).catch((e) => {
+    (async () => {
+      // Apply Effects is remux-only but still real ffmpeg work — hand it to Railway
+      // when configured so it doesn't hit Vercel's isolate limits, same as Build/Rebuild.
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, { mode: 'effects-apply' })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on effects apply — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
+      return renderEofProductionEffectsApply(jobId)
+    })().catch((e) => {
       console.error('[eof-production] apply effects failed', jobId, e)
     })
 
@@ -697,7 +723,23 @@ export async function startEofProductionCaptionReplaceBackground(jobId) {
   )
 
   const run = () =>
-    renderEofProductionCaptionReplace(jobId).catch((e) => {
+    (async () => {
+      // Replace Captions is remux-only but still real ffmpeg work — hand it to Railway
+      // when configured so it doesn't hit Vercel's isolate limits, same as Build/Rebuild.
+      // This was the actual cause of "ffmpeg failed: timed out after 30s" here — the
+      // caption-replace path never hopped to the worker at all, unlike Build/Rebuild
+      // Video, so it always ran on Vercel's constrained isolate.
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, { mode: 'caption-replace' })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on caption replace — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
+      return renderEofProductionCaptionReplace(jobId)
+    })().catch((e) => {
       console.error('[eof-production] caption replace failed', jobId, e)
     })
 
@@ -769,7 +811,21 @@ export async function startEofProductionMusicRemixBackground(jobId) {
   )
 
   const run = () =>
-    renderEofProductionMusicRemix(jobId).catch((e) => {
+    (async () => {
+      // Music Remix re-mixes audio then remuxes video — both are cheap on Vercel's
+      // memory budget individually, but the remux step is still real ffmpeg. Hand the
+      // whole thing to Railway when configured, same as the other quick-edit actions.
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, { mode: 'music-remix' })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on music remix — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
+      return renderEofProductionMusicRemix(jobId)
+    })().catch((e) => {
       console.error('[eof-production] music remix failed', jobId, e)
     })
 

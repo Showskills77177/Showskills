@@ -29,7 +29,7 @@ export function isEofExternalWorkerConfigured() {
 /**
  * POST /eof-worker/render on the worker — expects 202 quickly.
  * @param {string} jobId
- * @param {{ imageProvider?: string|null, forceFreshImages?: boolean, qualityGateMode?: 'auto'|'manual' }} [opts]
+ * @param {{ imageProvider?: string|null, forceFreshImages?: boolean, qualityGateMode?: 'auto'|'manual', mode?: 'build'|'caption-replace'|'effects-apply'|'stickers-apply'|'music-remix' }} [opts]
  */
 export async function scheduleEofVideoOnWorker(jobId, opts = {}) {
   const origin = eofWorkerBaseUrl()
@@ -52,6 +52,16 @@ export async function scheduleEofVideoOnWorker(jobId, opts = {}) {
   if (opts.forceFreshImages === true) body.forceFreshImages = true
   if (opts.qualityGateMode === 'auto' || opts.qualityGateMode === 'manual') {
     body.qualityGateMode = opts.qualityGateMode
+  }
+  // Lightweight "keep images + voiceover" edits (Replace Captions / Apply Effects /
+  // Apply Stickers / Remix Music) — else the worker defaults to a full build hop.
+  if (
+    opts.mode === 'caption-replace' ||
+    opts.mode === 'effects-apply' ||
+    opts.mode === 'stickers-apply' ||
+    opts.mode === 'music-remix'
+  ) {
+    body.mode = opts.mode
   }
 
   try {

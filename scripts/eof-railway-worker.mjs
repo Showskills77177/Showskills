@@ -16,7 +16,13 @@
  * Do NOT set VERCEL / VERCEL_ENV here — full encode profile must stay on.
  */
 import express from 'express'
-import { continueEofProductionBuild } from '../backend/api/lib/eofProductionRenderRunner.mjs'
+import {
+  continueEofProductionBuild,
+  renderEofProductionCaptionReplace,
+  renderEofProductionEffectsApply,
+  renderEofProductionStickersApply,
+  renderEofProductionMusicRemix,
+} from '../backend/api/lib/eofProductionRenderRunner.mjs'
 import {
   getEofProductionJob,
   markEofProductionJobFailed,
@@ -108,16 +114,27 @@ app.post('/eof-worker/render', async (req, res) => {
   const imageProvider = req.body?.imageProvider || null
   const forceFreshImages = req.body?.forceFreshImages === true
   const qualityGateMode = req.body?.qualityGateMode === 'auto' ? 'auto' : 'manual'
+  const mode = String(req.body?.mode || '').trim()
 
   void (async () => {
     try {
-      console.info('[eof-worker] starting video encode', jobId)
-      await continueEofProductionBuild(jobId, {
-        step: 'video',
-        imageProvider,
-        forceFreshImages,
-        qualityGateMode,
-      })
+      console.info('[eof-worker] starting video encode', jobId, mode ? `mode=${mode}` : '')
+      if (mode === 'caption-replace') {
+        await renderEofProductionCaptionReplace(jobId)
+      } else if (mode === 'effects-apply') {
+        await renderEofProductionEffectsApply(jobId)
+      } else if (mode === 'stickers-apply') {
+        await renderEofProductionStickersApply(jobId)
+      } else if (mode === 'music-remix') {
+        await renderEofProductionMusicRemix(jobId)
+      } else {
+        await continueEofProductionBuild(jobId, {
+          step: 'video',
+          imageProvider,
+          forceFreshImages,
+          qualityGateMode,
+        })
+      }
       console.info('[eof-worker] finished', jobId)
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Worker encode failed'
