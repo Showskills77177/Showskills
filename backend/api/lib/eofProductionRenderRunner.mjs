@@ -500,7 +500,21 @@ export async function startApplyEofProductionZapcapBackground(jobId) {
   )
 
   const run = () =>
-    applyEofProductionZapcapCaptions(jobId).catch((e) => {
+    (async () => {
+      // ZapCap upload + poll + local remux is heavy and slow (paid API round-trip on
+      // top of ffmpeg) — hand it to Railway when configured, same as the other
+      // quick-edit actions, instead of running it on Vercel's constrained isolate.
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, { mode: 'zapcap-apply' })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on ZapCap apply — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
+      return applyEofProductionZapcapCaptions(jobId)
+    })().catch((e) => {
       console.error('[eof-production] ZapCap apply failed', jobId, e)
     })
 
