@@ -100,7 +100,7 @@ function clipConcurrency(slim = false) {
   return Math.max(1, CLIP_CONCURRENCY_DEFAULT)
 }
 
-function resolveCaptionFont() {
+export function resolveCaptionFont() {
   for (const path of CAPTION_FONT_CANDIDATES) {
     if (path && existsSync(path)) return path
   }
@@ -294,7 +294,7 @@ function buildSceneBaseFilters({
 /**
  * Local caption burn: live = bottom bar; CapCut styles = mid vignette (escape hatch only).
  */
-function buildSceneCaptionFilters({
+export function buildSceneCaptionFilters({
   caption,
   durationSec,
   captionFont,
@@ -969,10 +969,15 @@ export async function renderEofProductionVideo({
     vercel: isEofVercelRuntime(),
     slim: serverlessSlim,
   })
+  // Pre-finished real-footage clips (search->gate->process pipeline) already have
+  // exact-duration, non-padded output — force hard cuts for the whole Short when any
+  // scene uses one so xfade's padded-duration filtergraph never sees a mismatched clip.
+  const hasVideoFootageScene = sorted.some((s) => s.videoClipPath && existsSync(s.videoClipPath))
   // Hobby slim OR Pro-reliable on Vercel: hard cuts — xfade filtergraphs blow the time budget.
   const useXfade =
     !serverlessSlim &&
     !encodeCaps.skipXfade &&
+    !hasVideoFootageScene &&
     look.perCutTransitions.length > 0 &&
     sorted.length > 1
   const kenBurns =
@@ -1080,6 +1085,13 @@ export async function renderEofProductionVideo({
   }
   const clipPaths = await mapWithConcurrency(sorted, concurrency, async (scene) => {
     const i = sorted.findIndex((s) => s.index === scene.index)
+    if (scene.videoClipPath && existsSync(scene.videoClipPath)) {
+      // Real-footage scenes arrive pre-finished (cropped/cut/captioned) from the
+      // video-footage orchestrator — bypass encodeSceneClip entirely.
+      clipsDone += 1
+      if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
+      return { index: scene.index, clipPath: scene.videoClipPath }
+    }
     if (!scene.imagePath || !existsSync(scene.imagePath)) {
       throw new Error(`Scene ${scene.index + 1} image is missing.`)
     }

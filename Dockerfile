@@ -1,8 +1,11 @@
 FROM node:20-bullseye-slim
 
-# Install ffmpeg and ca-certificates
+# Install ffmpeg, ca-certificates, and the yt-dlp standalone binary (video-footage pipeline).
+# yt-dlp only ever runs here (Railway worker) — never on Vercel.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+  && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl \
+  && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+  && chmod a+rx /usr/local/bin/yt-dlp \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

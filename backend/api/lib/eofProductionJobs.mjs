@@ -62,6 +62,7 @@ const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, mu
   tts_audio_hash, tts_synth_count,
   caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
   overlay_moments, video_effects_json, stickers_json, quality_gate_json, quality_gate_history_json,
+  video_footage_mode,
   narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
@@ -138,6 +139,7 @@ function rowToJob(row) {
     stickers: normalizeEofStickers(row.stickers_json || EOF_DEFAULT_STICKERS),
     qualityGate: parseEofQualityGate(row.quality_gate_json),
     qualityGateHistory: parseEofQualityGateHistory(row.quality_gate_history_json),
+    videoFootageMode: row.video_footage_mode === 'auto' ? 'auto' : 'off',
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -499,6 +501,10 @@ export async function updateEofProductionJob(id, patch) {
     patch.qualityGateHistory !== undefined
       ? patch.qualityGateHistory
       : job.qualityGateHistory
+  const videoFootageMode =
+    (patch.videoFootageMode !== undefined ? patch.videoFootageMode : job.videoFootageMode) === 'auto'
+      ? 'auto'
+      : 'off'
 
   await query(
     `UPDATE eof_production_jobs
@@ -534,44 +540,46 @@ export async function updateEofProductionJob(id, patch) {
          stickers_json = $31,
          quality_gate_json = $32,
          quality_gate_history_json = $33,
-         updated_at = ${nowSql()}
-     WHERE id = $1`,
+        video_footage_mode = $34,
+        updated_at = ${nowSql()}
+    WHERE id = $1`,
     [
-      id,
-      patch.topic !== undefined ? patch.topic : job.topic,
-      title,
-      status,
-      script ? JSON.stringify(script) : null,
-      scriptSource,
-      musicTrackId,
-      musicVolume,
-      musicStartSec,
-      musicEndSec,
-      voicePreset,
-      voiceSettings ? JSON.stringify(voiceSettings) : null,
-      errorMessage,
-      mixedAudioPath,
-      narrationManifest ? JSON.stringify(narrationManifest) : null,
-      renderOutputPath,
-      voiceRegenerationCount,
-      voiceNarrationHash,
-      ttsAudioHash,
-      ttsSynthCount,
-      youtubeProjectId,
-      captionStyle,
-      captionEngine || null,
-      zapcapTemplateId || null,
-      transitionStyle,
-      colorGrade,
-      enhanceStyle,
-      JSON.stringify(captionLayout),
-      overlayMoments,
-      JSON.stringify(videoEffects),
-      JSON.stringify(stickers),
-      qualityGate ? JSON.stringify(qualityGate) : null,
-      Array.isArray(qualityGateHistory) && qualityGateHistory.length
-        ? JSON.stringify(qualityGateHistory)
-        : null,
+     id,
+     patch.topic !== undefined ? patch.topic : job.topic,
+     title,
+     status,
+     script ? JSON.stringify(script) : null,
+     scriptSource,
+     musicTrackId,
+     musicVolume,
+     musicStartSec,
+     musicEndSec,
+     voicePreset,
+     voiceSettings ? JSON.stringify(voiceSettings) : null,
+     errorMessage,
+     mixedAudioPath,
+     narrationManifest ? JSON.stringify(narrationManifest) : null,
+     renderOutputPath,
+     voiceRegenerationCount,
+     voiceNarrationHash,
+     ttsAudioHash,
+     ttsSynthCount,
+     youtubeProjectId,
+     captionStyle,
+     captionEngine || null,
+     zapcapTemplateId || null,
+     transitionStyle,
+     colorGrade,
+     enhanceStyle,
+     JSON.stringify(captionLayout),
+     overlayMoments,
+     JSON.stringify(videoEffects),
+     JSON.stringify(stickers),
+     qualityGate ? JSON.stringify(qualityGate) : null,
+     Array.isArray(qualityGateHistory) && qualityGateHistory.length
+       ? JSON.stringify(qualityGateHistory)
+       : null,
+     videoFootageMode,
     ],
   )
 

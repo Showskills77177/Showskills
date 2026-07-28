@@ -1022,6 +1022,37 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     }
 
     scenesForVideo.sort((a, b) => a.index - b.index)
+
+    // Opt-in real-footage pipeline (job.videoFootageMode === 'auto'): try to attach a
+    // finished video clip per scene; any scene that doesn't get one keeps its still image.
+    // Never blocks the build — getEofSceneVideoClip() swallows all its own errors.
+    if (job.videoFootageMode === 'auto') {
+      const { getEofSceneVideoClip } = await import('./eofSceneVideoFootage.mjs')
+      const footageSubject = resolveImageSubject(job.topic) || String(job.topic || '').trim()
+      const workDirForFootage = eofProductionWorkDir(jobId)
+      for (const scene of scenesForVideo) {
+        try {
+          const videoClipPath = await getEofSceneVideoClip({
+            jobId,
+            workDir: workDirForFootage,
+            sceneIndex: scene.index,
+            subject: footageSubject,
+            topic: job.topic,
+            sceneCaption: scene.caption,
+            targetDurationSec: scene.durationSec,
+            captionStyle: job.captionStyle,
+            captionLayout: job.captionLayout || job.script?.captionLayout || null,
+          })
+          if (videoClipPath) scene.videoClipPath = videoClipPath
+        } catch (err) {
+          console.warn(
+            `[eof-video-footage] scene ${scene.index} failed — using image`,
+            err instanceof Error ? err.message : err,
+          )
+        }
+      }
+    }
+
     // 5-scene Shorts land at 42% here ("Building scene clip 1 of 5…") — heartbeat so UI isn't frozen.
     let videoProgressIndex = 0
     await report('video', 0, {
