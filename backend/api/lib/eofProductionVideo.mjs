@@ -988,6 +988,21 @@ export async function renderEofProductionVideo({
     serverlessSlim || encodeCaps.skipOverlays
       ? 'off'
       : resolveEofOverlayMoments(overlayMomentsMode)
+  // Probe still dimensions up front (best-effort) so the overlay planner can refuse a
+  // tiny/blurry still as a pop-card source — Cucurella bug: a low-res CDN thumbnail
+  // popped in oversized-and-blurry with nothing to gate it on before this.
+  if (overlayMode !== 'off') {
+    await Promise.all(
+      sorted.map(async (s) => {
+        if (Number(s.imageWidth) > 0 && Number(s.imageHeight) > 0) return
+        const dims = await probeSceneStillSize(s.imagePath)
+        if (dims.width && dims.height) {
+          s.imageWidth = dims.width
+          s.imageHeight = dims.height
+        }
+      }),
+    )
+  }
   const overlayPlan = planEofOverlayMoments({
     mode: overlayMode,
     scenes: sorted,

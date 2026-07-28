@@ -38,7 +38,10 @@ import {
   filterHitsRequiringSubjectNameCue,
   isNamedFootballSubject,
 } from '../../../shared/eofSceneImageQueries.mjs'
-import { resolveEofOverlayMoments } from '../../../shared/eofOverlayMoments.mjs'
+import {
+  resolveEofOverlayMoments,
+  findEofOverlaySourceSceneIndex,
+} from '../../../shared/eofOverlayMoments.mjs'
 import {
   applyEofShortQualityGateToJob,
   applyEofShortQualityPreflightToJob,
@@ -1070,10 +1073,17 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     const draftBlob = String(job.script?.plainTextDraft || '').trim()
     const secondaryPeople = listSecondaryImageSubjects(job.topic, draftBlob)
     const sceneCountForOverlay = scenesForVideo.length
+    // Prefer the scene whose OWN caption actually names the secondary person or a
+    // personal-life beat ("his son", "off the pitch") — never guess a fixed index.
+    // Falls back to the old blind heuristic only when no scene text gives a real signal.
+    const contentOverlaySceneIndex = findEofOverlaySourceSceneIndex(scenesForVideo, secondaryPeople)
     const secondarySceneIndex =
-      secondaryPeople.length && sceneCountForOverlay >= 3
-        ? Math.min(1, Math.max(0, sceneCountForOverlay - 2))
-        : null
+      contentOverlaySceneIndex != null
+        ? contentOverlaySceneIndex
+        : secondaryPeople.length && sceneCountForOverlay >= 3
+          ? Math.min(1, Math.max(0, sceneCountForOverlay - 2))
+          : null
+    const hasSecondarySubject = secondaryPeople.length > 0 || contentOverlaySceneIndex != null
 
     let relPath
     let rendered
@@ -1098,7 +1108,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           blockOnFail: true,
           jobSnapshot: { narrationManifest: stillsManifest },
           renderMeta: {
-            hasSecondarySubject: secondaryPeople.length > 0,
+            hasSecondarySubject,
             secondarySceneIndex,
           },
         })
@@ -1126,7 +1136,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           captionMode,
           videoEffects: job.videoEffects,
           stickers: job.stickers,
-          hasSecondarySubject: secondaryPeople.length > 0,
+          hasSecondarySubject,
           secondarySceneIndex,
           onSceneProgress: async (done) => {
             videoProgressIndex = done
@@ -1236,7 +1246,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         renderMeta: {
           overlayCount: rendered.videoLook?.overlayCount ?? rendered.overlayMoments?.length ?? 0,
           overlayMoments: rendered.overlayMoments || [],
-          hasSecondarySubject: secondaryPeople.length > 0,
+          hasSecondarySubject,
           secondarySceneIndex,
           captionEngine: rendered.captionEngine || null,
         },

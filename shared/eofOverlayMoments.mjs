@@ -161,9 +161,14 @@ export function eofOverlayLayoutIsFaceSafe(layout = EOF_OVERLAY_LAYOUT) {
   return true
 }
 
+const MIN_EOF_OVERLAY_PIXELS = { width: 300, height: 300 }
+
 /**
- * Reject meme / clickbait / baked-caption plates as pop inset sources.
- * @param {{ imagePath?: string, imageKey?: string | null, imageSource?: string, imageTitle?: string | null, imageQuery?: string | null }} scene
+ * Reject meme / clickbait / baked-caption plates as pop inset sources, and reject
+ * stills we know are too small/low-res to look good scaled up into the card (Cucurella
+ * bug: a tiny CDN thumbnail popped in blurry and undersized). Only rejects on KNOWN
+ * dimensions — missing width/height never blind-fails a still.
+ * @param {{ imagePath?: string, imageKey?: string | null, imageSource?: string, imageTitle?: string | null, imageQuery?: string | null, imageWidth?: number, imageHeight?: number }} scene
  */
 export function isBadEofOverlayStill(scene) {
   if (!scene) return true
@@ -174,6 +179,11 @@ export function isBadEofOverlayStill(scene) {
   if (isCaptionContaminatedStill(url, title)) return true
   // Extra clickbait / dark thumbnail cues beyond the stock filter.
   if (/\b(going\s+bananas|thumbnail|clickbait|with\s+text|text\s+box)\b/i.test(title)) return true
+  const w = Number(scene.imageWidth) || 0
+  const h = Number(scene.imageHeight) || 0
+  if (w > 0 && h > 0 && (w < MIN_EOF_OVERLAY_PIXELS.width || h < MIN_EOF_OVERLAY_PIXELS.height)) {
+    return true
+  }
   return false
 }
 
@@ -226,6 +236,48 @@ export function sceneTimelineOffsetSec(contentDurations, sceneIndex) {
     t += Math.max(2, Number(contentDurations[i]) || 3)
   }
   return t
+}
+
+/**
+ * Generic "different life beat" cues — family/personal-life content that isn't a
+ * named football person but still means the still shown there should NOT be swapped
+ * for a random other scene's plate (e.g. "his son", "off the pitch", "at home").
+ */
+const EOF_OVERLAY_PERSONAL_CUE_RE =
+  /\b(his|her|their)\s+(son|daughter|wife|husband|girlfriend|boyfriend|family|kids?|children)\b|\bpersonal\s+life\b|\boff[\s-]the[\s-]pitch\b|\baway\s+from\s+football\b|\bat\s+home\s+with\b/i
+
+/**
+ * Find the scene whose OWN caption actually talks about a secondary subject (a named
+ * teammate/rival, e.g. Tuchel, OR a personal-life beat like "his son") so the overlay
+ * only ever pops in a still that matches what that specific scene is about.
+ *
+ * This replaces blind "always scene index 1" guessing — the prior heuristic could pop
+ * an unrelated still (e.g. an old Chelsea action shot) onto a scene that had nothing to
+ * do with it, or skip a real personal-life beat entirely because it only recognised
+ * named footballers, never generic family mentions like "his son".
+ *
+ * @param {Array<{ index: number, caption?: string }>} scenes
+ * @param {string[]} [secondarySubjects] known named people (Tuchel, Rooney, …)
+ * @returns {number|null} scene index whose caption is the content match, or null if none found
+ */
+export function findEofOverlaySourceSceneIndex(scenes, secondarySubjects = []) {
+  const list = Array.isArray(scenes) ? scenes : []
+  const subs = (secondarySubjects || []).filter(Boolean)
+  for (const scene of list) {
+    const caption = String(scene?.caption || '').trim()
+    if (!caption) continue
+    if (EOF_OVERLAY_PERSONAL_CUE_RE.test(caption)) return scene.index
+    for (const sub of subs) {
+      const surname = String(sub || '')
+        .trim()
+        .split(/\s+/)
+        .pop()
+      if (surname && surname.length >= 3 && new RegExp(`\\b${surname}\\b`, 'i').test(caption)) {
+        return scene.index
+      }
+    }
+  }
+  return null
 }
 
 /**

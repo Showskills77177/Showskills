@@ -52,7 +52,22 @@ function personLabelMatchesSubject(personLabel, subject) {
 }
 
 /**
- * Apply hard-fail clamps from a vision row (wrong face, watermark, meme text).
+ * True when the model's detected era clearly conflicts with the requested intent —
+ * e.g. a Short about a pundit/coach TODAY should not accept an old "playing days" action
+ * shot (and vice versa). "unknown"/"other" never conflicts (model wasn't sure — don't punish).
+ * @param {string} intent
+ * @param {string} era
+ */
+function eraConflictsWithIntent(intent, era) {
+  const i = String(intent || '').toLowerCase()
+  const e = String(era || '').toLowerCase()
+  if (!e || e === 'unknown' || e === 'other') return false
+  if (i === 'neutral' || !i) return false
+  return i !== e
+}
+
+/**
+ * Apply hard-fail clamps from a vision row (wrong face, watermark, meme text, wrong era).
  * Exported for unit tests.
  * @param {{
  *   score?: number,
@@ -60,12 +75,14 @@ function personLabelMatchesSubject(personLabel, subject) {
  *   watermark?: boolean,
  *   burned_captions?: boolean,
  *   subject_visible?: boolean,
+ *   era?: string,
  * }} row
  * @param {string} subject
  * @param {string[]} [secondarySubjects]
+ * @param {{ intent?: string }} [opts]
  * @returns {{ score: number, rejected: boolean, reason: string }}
  */
-export function clampEofVisionRow(row, subject, secondarySubjects = []) {
+export function clampEofVisionRow(row, subject, secondarySubjects = [], opts = {}) {
   let s = Number(row?.score)
   if (!Number.isFinite(s)) {
     return { score: 0, rejected: true, reason: 'non-numeric score' }
@@ -95,6 +112,15 @@ export function clampEofVisionRow(row, subject, secondarySubjects = []) {
       s = Math.min(s, 1)
       reasons.push(`wrong_person:${String(row?.person || '').slice(0, 40)}`)
     }
+  }
+
+  // Era/context mismatch — Cucurella-class bug: a "playing days" Chelsea action shot
+  // passed a pundit-era Short because era wasn't checked at all. Don't hard-fail (era
+  // detection is fuzzy on thumbnails) but cap well below the keep bar so it loses to
+  // any correctly-era-matched candidate in the same pool.
+  if (eraConflictsWithIntent(opts.intent, row?.era)) {
+    s = Math.min(s, 3)
+    reasons.push(`era_mismatch:${row.era}_vs_${opts.intent}`)
   }
 
   s = Math.max(0, Math.min(10, s))
@@ -199,7 +225,7 @@ Score every index 1–${hits.length}.`,
     for (const row of list) {
       const idx = Number(row?.index) - 1
       if (idx < 0 || idx >= hits.length) continue
-      const clamped = clampEofVisionRow(row, subject, secondary)
+      const clamped = clampEofVisionRow(row, subject, secondary, { intent })
       scores.set(hits[idx].url, clamped.score)
       if (clamped.rejected) {
         rejected += 1

@@ -9,6 +9,7 @@ import {
   eofOverlayCoversFaceZone,
   eofOverlayLayoutIsFaceSafe,
   isBadEofOverlayStill,
+  findEofOverlaySourceSceneIndex,
   EOF_DEFAULT_OVERLAY_MOMENTS,
   EOF_OVERLAY_LAYOUT,
 } from './eofOverlayMoments.mjs'
@@ -149,6 +150,66 @@ describe('eofOverlayMoments', () => {
       }),
       false,
     )
+  })
+
+  it('rejects known-tiny stills as pop inset sources (Cucurella blurry-thumbnail bug)', () => {
+    assert.equal(
+      isBadEofOverlayStill({
+        imagePath: '/tiny.jpg',
+        imageSource: 'serpapi',
+        imageTitle: 'Marc Cucurella',
+        imageWidth: 120,
+        imageHeight: 120,
+      }),
+      true,
+    )
+    assert.equal(
+      isBadEofOverlayStill({
+        imagePath: '/full-res.jpg',
+        imageSource: 'serpapi',
+        imageTitle: 'Marc Cucurella',
+        imageWidth: 900,
+        imageHeight: 1200,
+      }),
+      false,
+    )
+    // Unknown dimensions never blind-reject.
+    assert.equal(
+      isBadEofOverlayStill({
+        imagePath: '/unknown-dims.jpg',
+        imageSource: 'serpapi',
+        imageTitle: 'Marc Cucurella',
+      }),
+      false,
+    )
+  })
+
+  it('findEofOverlaySourceSceneIndex finds the caption that names a secondary person', () => {
+    const scenes = [
+      { index: 0, caption: 'Cucurella made a stunning tackle in the box.' },
+      { index: 1, caption: 'Tuchel praised his defensive discipline after the match.' },
+      { index: 2, caption: 'The crowd erupted as the final whistle blew.' },
+    ]
+    assert.equal(findEofOverlaySourceSceneIndex(scenes, ['Thomas Tuchel']), 1)
+  })
+
+  it('findEofOverlaySourceSceneIndex finds generic family/personal-life beats without a named subject', () => {
+    const scenes = [
+      { index: 0, caption: 'Cucurella broke through as a rising star at Getafe.' },
+      { index: 1, caption: 'Off the pitch, his son is his biggest fan.' },
+      { index: 2, caption: 'He signed for Chelsea in a big-money move.' },
+    ]
+    // No named secondary football subject at all — must still find scene 1 via the
+    // personal-life cue ("his son … off the pitch").
+    assert.equal(findEofOverlaySourceSceneIndex(scenes, []), 1)
+  })
+
+  it('findEofOverlaySourceSceneIndex returns null when nothing matches (keeps old fallback)', () => {
+    const scenes = [
+      { index: 0, caption: 'Cucurella made a stunning tackle in the box.' },
+      { index: 1, caption: 'The crowd went wild after the goal.' },
+    ]
+    assert.equal(findEofOverlaySourceSceneIndex(scenes, []), null)
   })
 
   it('auto skips contaminated secondary stills for the pop', () => {

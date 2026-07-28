@@ -75,6 +75,48 @@ describe('eofImageVision clamp + apply', () => {
     assert.equal(ok.rejected, false)
   })
 
+  it('caps era-mismatched stills below the keep bar (Cucurella Chelsea-days bug)', () => {
+    // Pundit-era Short must not accept an old "playing days" action shot even
+    // when the face/person match is otherwise clean.
+    const mismatched = clampEofVisionRow(
+      { score: 9, subject_visible: true, person: 'Marc Cucurella', era: 'playing' },
+      'Marc Cucurella',
+      [],
+      { intent: 'pundit' },
+    )
+    assert.ok(mismatched.score <= 3, `era mismatch should cap score, got ${mismatched.score}`)
+    assert.equal(mismatched.rejected, true)
+    assert.match(mismatched.reason, /era_mismatch/)
+
+    // Matching era passes through untouched.
+    const matched = clampEofVisionRow(
+      { score: 9, subject_visible: true, person: 'Marc Cucurella', era: 'pundit' },
+      'Marc Cucurella',
+      [],
+      { intent: 'pundit' },
+    )
+    assert.equal(matched.score, 9)
+    assert.equal(matched.rejected, false)
+
+    // Unknown/other era never punished (model unsure — don't reject on a guess).
+    const unknown = clampEofVisionRow(
+      { score: 8, subject_visible: true, person: 'Marc Cucurella', era: 'unknown' },
+      'Marc Cucurella',
+      [],
+      { intent: 'pundit' },
+    )
+    assert.equal(unknown.score, 8)
+
+    // Neutral intent never triggers an era check.
+    const neutral = clampEofVisionRow(
+      { score: 8, subject_visible: true, person: 'Marc Cucurella', era: 'playing' },
+      'Marc Cucurella',
+      [],
+      { intent: 'neutral' },
+    )
+    assert.equal(neutral.score, 8)
+  })
+
   it('applyVisionScoresToHits drops scores below 6 and unscored URLs', () => {
     const scores = new Map([
       ['https://ok.test/rooney.jpg', 7],
