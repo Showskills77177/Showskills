@@ -614,6 +614,9 @@ async function encodeSceneClip({
       await runFfmpeg(
         [
           '-y',
+          '-hide_banner',
+          '-loglevel',
+          'error',
           '-loop',
           '1',
           '-i',
@@ -641,7 +644,7 @@ async function encodeSceneClip({
           '-an',
           clipPath,
         ],
-        { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
+        { maxBuffer: 64 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
       )
       return clipPath
     } catch (e) {
@@ -673,6 +676,9 @@ async function encodeSceneClip({
       await runFfmpeg(
         [
           '-y',
+          '-hide_banner',
+          '-loglevel',
+          'error',
           '-loop',
           '1',
           '-i',
@@ -696,7 +702,7 @@ async function encodeSceneClip({
           '-an',
           clipPath,
         ],
-        { maxBuffer: 16 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
+        { maxBuffer: 64 * 1024 * 1024, timeoutMs: SCENE_CLIP_TIMEOUT_MS, ...ffmpegHb },
       )
       return clipPath
     } catch (e) {
@@ -727,6 +733,9 @@ async function encodeSceneClip({
     await runFfmpeg(
       [
         '-y',
+        '-hide_banner',
+        '-loglevel',
+        'error',
         '-loop',
         '1',
         '-i',
@@ -748,7 +757,7 @@ async function encodeSceneClip({
         '-an',
         clipPath,
       ],
-      { maxBuffer: 16 * 1024 * 1024, timeoutMs: opts.timeoutMs, ...ffmpegHb },
+      { maxBuffer: 64 * 1024 * 1024, timeoutMs: opts.timeoutMs, ...ffmpegHb },
     )
   }
 
@@ -786,6 +795,9 @@ async function stitchWithConcat({ clipPaths, mixedAudioPath, out, onHeartbeat = 
   const args = hasAudio
     ? [
         '-y',
+        '-hide_banner',
+        '-loglevel',
+        'error',
         '-f',
         'concat',
         '-safe',
@@ -807,6 +819,9 @@ async function stitchWithConcat({ clipPaths, mixedAudioPath, out, onHeartbeat = 
       ]
     : [
         '-y',
+        '-hide_banner',
+        '-loglevel',
+        'error',
         '-f',
         'concat',
         '-safe',
@@ -840,7 +855,7 @@ async function stitchWithXfade({
   onHeartbeat = null,
 }) {
   const hasAudio = Boolean(mixedAudioPath && existsSync(mixedAudioPath))
-  const inputs = ['-y']
+  const inputs = ['-y', '-hide_banner', '-loglevel', 'error']
   for (const p of clipPaths) {
     inputs.push('-i', p)
   }
