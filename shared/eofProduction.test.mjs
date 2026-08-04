@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   EOF_DEFAULT_VOICE_PRESET,
+  EOF_FALLBACK_FREE_VOICE_PRESET,
   EOF_VOICE_PRESETS,
   buildEofRenderProgress,
   buildFallbackRenderProgress,
@@ -16,6 +17,11 @@ describe('eofProduction voice presets', () => {
     assert.equal(EOF_DEFAULT_VOICE_PRESET, 'british')
     assert.equal(EOF_VOICE_PRESETS.british.engine, 'edge')
     assert.ok(isEofFreeVoicePreset(EOF_DEFAULT_VOICE_PRESET))
+  })
+
+  it('exposes a free-voice auto-fallback for when ElevenLabs is not configured', () => {
+    assert.ok(isEofFreeVoicePreset(EOF_FALLBACK_FREE_VOICE_PRESET))
+    assert.equal(EOF_VOICE_PRESETS[EOF_FALLBACK_FREE_VOICE_PRESET].engine, 'edge')
   })
 
   it('exposes one to three free Edge voices plus optional ElevenLabs Brian', () => {

@@ -1,7 +1,11 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { EdgeTTS } from 'node-edge-tts'
-import { EOF_VOICE_PRESETS, EOF_DEFAULT_VOICE_PRESET } from '../../../shared/eofProduction.mjs'
+import {
+  EOF_VOICE_PRESETS,
+  EOF_DEFAULT_VOICE_PRESET,
+  EOF_FALLBACK_FREE_VOICE_PRESET,
+} from '../../../shared/eofProduction.mjs'
 import { resolveElevenLabsVoiceSettings } from '../../../shared/eofElevenLabsVoice.mjs'
 import { runFfmpeg, runFfprobe } from './eofFfmpeg.mjs'
 import { isEofElevenLabsConfigured, synthesizeElevenLabsSpeech } from './eofElevenLabsTts.mjs'
@@ -42,9 +46,16 @@ export async function synthesizeEofSceneNarration({
 
   if (preset.engine === 'elevenlabs') {
     if (!isEofElevenLabsConfigured()) {
-      throw new Error(
-        'Brian (ElevenLabs) needs ELEVENLABS_API_KEY on the server. Add it in Vercel env, or pick a free Edge voice (British / British calm / American).',
+      // Never hard-fail a build over a missing ElevenLabs key — fall back to a free
+      // Edge voice so the Short still renders (user can add ELEVENLABS_API_KEY later
+      // and re-run "Regenerate Voiceover" to switch back to Brian).
+      const fallback = EOF_VOICE_PRESETS[EOF_FALLBACK_FREE_VOICE_PRESET] || EOF_VOICE_PRESETS.british
+      console.warn(
+        '[eof-tts] ELEVENLABS_API_KEY not set — falling back from Brian to',
+        fallback.id,
+        '(free Edge voice). Add ELEVENLABS_API_KEY in Vercel env to use Brian.',
       )
+      return synthesizeWithEdgeTts({ text: line, preset: fallback, outPath })
     }
     const resolved = resolveElevenLabsVoiceSettings(preset, voiceSettings)
     const result = await synthesizeElevenLabsSpeech({

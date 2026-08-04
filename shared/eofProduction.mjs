@@ -54,6 +54,9 @@ export const EOF_VOICE_PRESETS = {
 /** Default narrator for new production jobs — free Edge TTS (no ElevenLabs credits). */
 export const EOF_DEFAULT_VOICE_PRESET = 'british'
 
+/** Auto-fallback when Brian/ElevenLabs is selected but ELEVENLABS_API_KEY is missing. */
+export const EOF_FALLBACK_FREE_VOICE_PRESET = 'british'
+
 /** Free Microsoft Edge neural voices (no ELEVENLABS_API_KEY). */
 export function listEofFreeVoicePresets() {
   return Object.values(EOF_VOICE_PRESETS).filter((p) => p.engine === 'edge')
