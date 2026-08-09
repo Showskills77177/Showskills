@@ -892,6 +892,22 @@ export default async function handler(req, res) {
         }
       }
 
+      if (action === 'update-video-footage-mode') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        const videoFootageMode = body.videoFootageMode === 'auto' ? 'auto' : 'off'
+        try {
+          const job = await updateEofProductionJob(jobId, { videoFootageMode })
+          return json(res, 200, { ok: true, job })
+        } catch (e) {
+          return json(res, 500, {
+            error: e instanceof Error ? e.message : 'Could not update video footage mode',
+          })
+        }
+      }
+
       if (action === 'delete') {
         try {
           await requireEofOwner(req)
@@ -1095,6 +1111,7 @@ export default async function handler(req, res) {
           videoEffects,
           stickers,
           manualDraft,
+          videoFootageMode: body.videoFootageMode === 'auto' ? 'auto' : 'off',
         })
         return json(res, 201, {
           ok: true,

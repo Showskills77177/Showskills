@@ -201,6 +201,11 @@ export async function createEofProductionJob({
    * AI call ever happens.
    */
   manualDraft = null,
+  /**
+   * 'off' (default) = stills only · 'auto' = try to attach real yt-dlp footage
+   * (old highlights / training clips) per scene before falling back to stills.
+   */
+  videoFootageMode = 'off',
 }) {
   await ensureEofProductionSchema()
   let t = String(topic || '').trim()
@@ -300,6 +305,9 @@ export async function createEofProductionJob({
   )
 
   const created = await getEofProductionJob(id)
+  if (videoFootageMode === 'auto') {
+    return updateEofProductionJob(id, { videoFootageMode: 'auto' })
+  }
   return failureDetail ? { ...created, scriptFailureDetail: failureDetail } : created
 }
 

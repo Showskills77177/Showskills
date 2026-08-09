@@ -1017,6 +1017,7 @@ export default function EofProductionPanel({
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
   const [useOwnScript, setUseOwnScript] = useState(false)
+  const [useVideoFootage, setUseVideoFootage] = useState(false)
   const [manualDraft, setManualDraft] = useState('')
   const [selectedId, setSelectedId] = useState(readStoredSelectedId)
   const [draftScript, setDraftScript] = useState(null)
@@ -2615,6 +2616,36 @@ export default function EofProductionPanel({
     }
   }
 
+  /** Toggles real yt-dlp video footage on/off for an already-created job. */
+  async function toggleVideoFootageMode(nextEnabled) {
+    if (!selectedId) return
+    setBusy(true)
+    setErr('')
+    try {
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update-video-footage-mode',
+          jobId: selectedId,
+          videoFootageMode: nextEnabled ? 'auto' : 'off',
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Could not update video footage setting')
+      if (j.job) upsertJob(j.job)
+      setSuccess(
+        nextEnabled
+          ? 'Video footage sourcing turned on — next Build/Continue will try real clips before falling back to stills.'
+          : 'Video footage sourcing turned off — this Short will use stills only.',
+      )
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not update video footage setting')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function upsertJob(job) {
     if (!job?.id) return
     setJobs((prev) => {
@@ -2653,6 +2684,7 @@ export default function EofProductionPanel({
           videoEffects: normalizeEofVideoEffects(videoEffects),
           stickers: normalizeEofStickers(stickers),
           plainTextDraft: useOwnScript ? manualDraft.trim() : '',
+          videoFootageMode: useVideoFootage ? 'auto' : 'off',
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -3371,6 +3403,15 @@ export default function EofProductionPanel({
               onChange={(e) => setUseOwnScript(e.target.checked)}
             />
             Post my own script (skip the AI writer)
+          </label>
+
+          <label className="flex items-center gap-2 text-sm text-[#aaa]">
+            <input
+              type="checkbox"
+              checked={useVideoFootage}
+              onChange={(e) => setUseVideoFootage(e.target.checked)}
+            />
+            Use real video footage (yt-dlp) when available, not just stills
           </label>
 
           {useOwnScript ? (
@@ -5043,6 +5084,28 @@ export default function EofProductionPanel({
                 ) : null}
               </details>
             ) : null}
+
+            {/* Video footage sourcing toggle */}
+            <details className={`${PX.surface} p-4`}>
+              <summary className="cursor-pointer text-xs font-semibold text-[#aaa]">
+                Video footage sourcing
+              </summary>
+              <p className={`mt-2 text-xs ${PX.muted}`}>
+                When on, the pipeline tries yt-dlp to source real clips (old highlights, training,
+                speed footage) for scenes before falling back to stills. Runs the Quality Gate and
+                copyright/size checks automatically — a bad or risky clip is dropped and that scene
+                just uses images instead.
+              </p>
+              <label className="mt-3 flex items-center gap-2 text-sm text-[#aaa]">
+                <input
+                  type="checkbox"
+                  disabled={busy || isRendering}
+                  checked={selected.videoFootageMode === 'auto'}
+                  onChange={(e) => toggleVideoFootageMode(e.target.checked)}
+                />
+                Use real video footage (yt-dlp) for this Short
+              </label>
+            </details>
 
             {/* Step 2 — Scenes */}
             <section className={`${PX.surface} p-5 sm:p-6 xl:p-7`}>
