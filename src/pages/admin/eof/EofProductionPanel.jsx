@@ -998,6 +998,8 @@ export default function EofProductionPanel({
     normalizeElevenLabsVoiceSettings(null),
   )
   const [voiceSettings, setVoiceSettings] = useState(() => normalizeElevenLabsVoiceSettings(null))
+  const [manualVoiceoverUploading, setManualVoiceoverUploading] = useState(false)
+  const [manualVoiceoverStatus, setManualVoiceoverStatus] = useState('')
   const [openAiScriptEnabled, setOpenAiScriptEnabled] = useState(false)
   const [scriptProviders, setScriptProviders] = useState({
     xai: false,
@@ -2500,7 +2502,11 @@ export default function EofProductionPanel({
     if (!selectedId || !draftScript) return
     setBusy(true)
     setErr('')
-    setSuccess('Regenerating voiceover with your Brian settings — reusing scene photos…')
+    setSuccess(
+      voicePreset === 'manual'
+        ? 'Remixing with your uploaded voiceover — reusing scene photos…'
+        : 'Regenerating voiceover with your Brian settings — reusing scene photos…',
+    )
     setRenderPhase('rendering')
     setVideoPreviewUrl('')
 
@@ -2554,7 +2560,7 @@ export default function EofProductionPanel({
       setRenderProgress({ percent: 100, message: 'Voiceover updated', etaLabel: '0:00 left', pipeline: 'video' })
       setSuccess(
         finishedJob.status === 'video_rendered'
-          ? 'Voiceover regenerated — same photos, new Brian mix, Short remuxed.'
+          ? `Voiceover regenerated — same photos, new ${voicePreset === 'manual' ? 'uploaded' : 'Brian'} mix, Short remuxed.`
           : 'Voiceover regenerated — run Build Short once to create the video.',
       )
       upsertJob(finishedJob)
@@ -2569,6 +2575,43 @@ export default function EofProductionPanel({
       stopRenderPolling()
       setBusy(false)
       setRenderPhase('')
+    }
+  }
+
+  /** Reads a File as base64 and uploads it as the job's voiceover — skips TTS entirely. */
+  async function uploadManualVoiceover(file) {
+    if (!selectedId || !file) return
+    setManualVoiceoverUploading(true)
+    setManualVoiceoverStatus('')
+    setErr('')
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(reader.error || new Error('Could not read file'))
+        reader.readAsDataURL(file)
+      })
+
+      const res = await apiFetch('/api/admin/eof-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upload-voiceover',
+          jobId: selectedId,
+          audioBase64: dataUrl,
+          mimeType: file.type || '',
+        }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || 'Voiceover upload failed')
+
+      setVoicePreset('manual')
+      if (j.job) upsertJob(j.job)
+      setManualVoiceoverStatus(`Uploaded “${file.name}” — click Regenerate voiceover (or Build Short) to use it.`)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Voiceover upload failed')
+    } finally {
+      setManualVoiceoverUploading(false)
     }
   }
 
@@ -3456,6 +3499,11 @@ export default function EofProductionPanel({
                   </option>
                 ))}
               </select>
+              {voicePreset === 'manual' ? (
+                <span className="mt-1 block text-[10px] text-[#fbbf24]">
+                  Upload your audio file on the job panel after creating it (below the Voice picker there).
+                </span>
+              ) : null}
             </label>
           </div>
           {imageProvider === 'serpapi' && !imageSources.serpapi ? (
@@ -4941,6 +4989,56 @@ export default function EofProductionPanel({
                         ) : null}
                       </span>
                     )}
+                  </div>
+                ) : null}
+              </details>
+            ) : null}
+
+            {/* Manual voiceover upload */}
+            {voicePreset === 'manual' ? (
+              <details className={`${PX.surface} p-4`} open>
+                <summary className="cursor-pointer text-xs font-semibold text-[#aaa]">
+                  Your own voiceover
+                </summary>
+                <p className={`mt-2 text-xs ${PX.muted}`}>
+                  Upload an MP3/WAV/M4A of your narration. No TTS or AI voice runs — it&apos;s used as-is, and
+                  scene timing is auto-split by how long each line of narration is.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    disabled={manualVoiceoverUploading || busy || isRendering}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) uploadManualVoiceover(file)
+                      e.target.value = ''
+                    }}
+                    className="text-xs text-[#aaa] file:mr-3 file:rounded-md file:border-0 file:bg-[#272727] file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-[#333]"
+                  />
+                  {manualVoiceoverUploading ? (
+                    <span className="text-[10px] text-[#717171]">Uploading…</span>
+                  ) : null}
+                </div>
+                {manualVoiceoverStatus ? (
+                  <p className="mt-2 text-[10px] text-[#4ade80]">{manualVoiceoverStatus}</p>
+                ) : null}
+                {(selected.status === 'video_rendered' ||
+                  selected.status === 'rendered' ||
+                  selected.mixedAudioPath) &&
+                sceneCount ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#303030] pt-3">
+                    <button
+                      type="button"
+                      disabled={busy || isRendering}
+                      onClick={regenerateVoiceover}
+                      className={PX.btnGhost}
+                    >
+                      {busy || isRendering ? 'Regenerating…' : 'Regenerate voiceover'}
+                    </button>
+                    <span className="text-[10px] text-[#717171]">
+                      Same captions &amp; photos — remixes with your uploaded audio.
+                    </span>
                   </div>
                 ) : null}
               </details>

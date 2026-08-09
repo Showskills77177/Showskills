@@ -115,6 +115,8 @@ async function addEofProductionJobColumns() {
     'quality_gate_json',
     'quality_gate_history_json',
     'video_footage_mode',
+    'manual_voiceover_base64',
+    'manual_voiceover_mime',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {

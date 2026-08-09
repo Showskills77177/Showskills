@@ -49,6 +49,12 @@ export const EOF_VOICE_PRESETS = {
     similarityBoost: 0.75,
     style: 0.35,
   },
+  manual: {
+    id: 'manual',
+    label: 'Your own voiceover (uploaded)',
+    detail: 'Skips all TTS — uses the audio file you uploaded as-is, no AI voice or credits',
+    engine: 'manual',
+  },
 }
 
 /** Default narrator for new production jobs — free Edge TTS (no ElevenLabs credits). */

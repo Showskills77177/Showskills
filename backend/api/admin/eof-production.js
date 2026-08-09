@@ -654,6 +654,45 @@ export default async function handler(req, res) {
         }
       }
 
+      if (action === 'upload-voiceover') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+
+        const raw = typeof body.audioBase64 === 'string' ? body.audioBase64 : ''
+        const b64 = raw.replace(/^data:[^;]+;base64,/, '').trim()
+        if (!b64) return json(res, 400, { error: 'audioBase64 is required.' })
+
+        const mimeType = typeof body.mimeType === 'string' ? body.mimeType.trim() : ''
+
+        try {
+          const { eofProductionWorkDir } = await import('../lib/eofSceneTts.mjs')
+          const { saveEofManualVoiceoverArtifact } = await import('../lib/eofProductionArtifacts.mjs')
+          const { mkdirSync, writeFileSync } = await import('node:fs')
+          const { join } = await import('node:path')
+
+          const buf = Buffer.from(b64, 'base64')
+          if (buf.length > 15_000_000) {
+            return json(res, 413, { error: 'Voiceover file is too large (max ~15MB).' })
+          }
+          const workDir = eofProductionWorkDir(jobId)
+          mkdirSync(workDir, { recursive: true })
+          const absPath = join(workDir, 'manual-voiceover.audio')
+          writeFileSync(absPath, buf)
+
+          const saved = await saveEofManualVoiceoverArtifact(jobId, absPath, mimeType)
+          if (!saved) {
+            return json(res, 413, { error: 'Voiceover file is too large to store — try a shorter clip.' })
+          }
+
+          const job = await updateEofProductionJob(jobId, { voicePreset: 'manual' })
+          return json(res, 200, { ok: true, job })
+        } catch (e) {
+          return json(res, 500, { error: e instanceof Error ? e.message : 'Voiceover upload failed' })
+        }
+      }
+
       if (action === 'regenerate-voiceover' || action === 'render-audio') {
         const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
         if (!jobId) return json(res, 400, { error: 'jobId is required.' })
@@ -675,7 +714,10 @@ export default async function handler(req, res) {
           }
 
           const refreshed = await getEofProductionJob(jobId)
-          const regen = eofVoiceRegenerationStatus(refreshed)
+          const regen =
+            refreshed.voicePreset === 'manual'
+              ? { canRegenerate: true, blockedReason: null }
+              : eofVoiceRegenerationStatus(refreshed)
           if (!regen.canRegenerate) {
             return json(res, 400, { error: regen.blockedReason || 'Voice regeneration is not available.' })
           }

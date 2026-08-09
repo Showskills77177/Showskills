@@ -13,7 +13,8 @@ export async function getEofArtifactFlags(jobId) {
     `SELECT
        CASE WHEN mixed_audio_base64 IS NOT NULL AND length(mixed_audio_base64) > 0 THEN 1 ELSE 0 END AS has_audio,
        CASE WHEN video_base64 IS NOT NULL AND length(video_base64) > 0 THEN 1 ELSE 0 END AS has_video,
-       CASE WHEN scene_images_base64_json IS NOT NULL AND length(scene_images_base64_json) > 0 THEN 1 ELSE 0 END AS has_scenes
+       CASE WHEN scene_images_base64_json IS NOT NULL AND length(scene_images_base64_json) > 0 THEN 1 ELSE 0 END AS has_scenes,
+       CASE WHEN manual_voiceover_base64 IS NOT NULL AND length(manual_voiceover_base64) > 0 THEN 1 ELSE 0 END AS has_manual_voiceover
      FROM eof_production_jobs WHERE id = $1`,
     [jobId],
   )
@@ -22,6 +23,7 @@ export async function getEofArtifactFlags(jobId) {
     hasDurableAudio: Boolean(row?.has_audio),
     hasDurableVideo: Boolean(row?.has_video),
     hasDurableSceneImages: Boolean(row?.has_scenes),
+    hasManualVoiceover: Boolean(row?.has_manual_voiceover),
   }
 }
 
@@ -40,7 +42,8 @@ export async function withEofArtifactFlags(jobs) {
        id,
        CASE WHEN mixed_audio_base64 IS NOT NULL AND length(mixed_audio_base64) > 0 THEN 1 ELSE 0 END AS has_audio,
        CASE WHEN video_base64 IS NOT NULL AND length(video_base64) > 0 THEN 1 ELSE 0 END AS has_video,
-       CASE WHEN scene_images_base64_json IS NOT NULL AND length(scene_images_base64_json) > 0 THEN 1 ELSE 0 END AS has_scenes
+       CASE WHEN scene_images_base64_json IS NOT NULL AND length(scene_images_base64_json) > 0 THEN 1 ELSE 0 END AS has_scenes,
+       CASE WHEN manual_voiceover_base64 IS NOT NULL AND length(manual_voiceover_base64) > 0 THEN 1 ELSE 0 END AS has_manual_voiceover
      FROM eof_production_jobs WHERE id IN (${placeholders})`,
     ids,
   )
@@ -51,6 +54,7 @@ export async function withEofArtifactFlags(jobs) {
         hasDurableAudio: Boolean(row.has_audio),
         hasDurableVideo: Boolean(row.has_video),
         hasDurableSceneImages: Boolean(row.has_scenes),
+        hasManualVoiceover: Boolean(row.has_manual_voiceover),
       },
     ]),
   )
@@ -59,6 +63,7 @@ export async function withEofArtifactFlags(jobs) {
       hasDurableAudio: false,
       hasDurableVideo: false,
       hasDurableSceneImages: false,
+      hasManualVoiceover: false,
     }
     return { ...job, ...flags }
   })

@@ -29,6 +29,19 @@ export async function saveEofMixedAudioArtifact(jobId, absPath) {
   return saveArtifactColumn(jobId, 'mixed_audio_base64', absPath)
 }
 
+/** Store the user's uploaded voiceover file as-is (source audio, not the final mix). */
+export async function saveEofManualVoiceoverArtifact(jobId, absPath, mimeType = '') {
+  const ok = await saveArtifactColumn(jobId, 'manual_voiceover_base64', absPath)
+  if (ok && mimeType) {
+    await ensureEofProductionSchema()
+    await query(
+      `UPDATE eof_production_jobs SET manual_voiceover_mime = $2, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE id = $1`,
+      [jobId, String(mimeType).slice(0, 120)],
+    )
+  }
+  return ok
+}
+
 export async function saveEofVideoArtifact(jobId, absPath) {
   return saveArtifactColumn(jobId, 'video_base64', absPath)
 }
@@ -217,6 +230,53 @@ export async function ensureEofMixedAudioOnDisk(jobId) {
   mkdirSync(dirname(abs), { recursive: true })
   writeFileSync(abs, Buffer.from(b64, 'base64'))
   return existsSync(abs) ? abs : null
+}
+
+/**
+ * Restore the user's uploaded voiceover source file to disk (if not already there).
+ * @param {string} jobId
+ * @returns {Promise<string|null>} absolute path, or null when nothing was ever uploaded
+ */
+export async function ensureEofManualVoiceoverOnDisk(jobId) {
+  const workDir = eofProductionWorkDir(jobId)
+  const abs = join(workDir, 'manual-voiceover.audio')
+  if (existsSync(abs)) return abs
+
+  await ensureEofProductionSchema()
+  const { rows } = await query(
+    `SELECT manual_voiceover_base64 FROM eof_production_jobs WHERE id = $1`,
+    [jobId],
+  )
+  const b64 = rows[0]?.manual_voiceover_base64
+  if (!b64 || typeof b64 !== 'string') return null
+
+  mkdirSync(dirname(abs), { recursive: true })
+  writeFileSync(abs, Buffer.from(b64, 'base64'))
+  return existsSync(abs) ? abs : null
+}
+
+export async function hasEofManualVoiceover(jobId) {
+  await ensureEofProductionSchema()
+  const { rows } = await query(
+    `SELECT CASE WHEN manual_voiceover_base64 IS NOT NULL AND length(manual_voiceover_base64) > 0 THEN 1 ELSE 0 END AS has_it
+     FROM eof_production_jobs WHERE id = $1`,
+    [jobId],
+  )
+  return Boolean(rows[0]?.has_it)
+}
+
+export async function clearEofManualVoiceoverArtifact(jobId) {
+  await ensureEofProductionSchema()
+  await query(
+    `UPDATE eof_production_jobs SET manual_voiceover_base64 = NULL, manual_voiceover_mime = NULL, updated_at = ${dbIsPostgres() ? 'now()' : `datetime('now')`} WHERE id = $1`,
+    [jobId],
+  )
+  try {
+    const abs = join(eofProductionWorkDir(jobId), 'manual-voiceover.audio')
+    if (existsSync(abs)) unlinkSync(abs)
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

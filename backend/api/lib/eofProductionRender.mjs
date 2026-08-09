@@ -32,13 +32,14 @@ import {
   probeAudioDurationSec,
 } from './eofSceneTts.mjs'
 import { mixEofNarrationWithMusic, isFfmpegAvailable } from './eofAudioMix.mjs'
-import { hasBundledFfmpeg } from './eofFfmpeg.mjs'
+import { hasBundledFfmpeg, runFfmpeg } from './eofFfmpeg.mjs'
 import { mapWithConcurrency, createThrottledWriter, startProgressHeartbeat } from './eofAsyncPool.mjs'
 import {
   saveEofMixedAudioArtifact,
   clearEofVideoArtifact,
   clearEofVideoOnlyArtifact,
   ensureEofMixedAudioOnDisk,
+  ensureEofManualVoiceoverOnDisk,
   getEofArtifactFlags,
 } from './eofProductionArtifacts.mjs'
 import { getElevenLabsMaxConcurrency } from './eofElevenLabsTts.mjs'
@@ -150,6 +151,14 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
     }
 
     const voicePresetMeta = EOF_VOICE_PRESETS[job.voicePreset] || {}
+
+    if (voicePresetMeta.engine === 'manual') {
+      return renderEofProductionAudioFromManualVoiceover(jobId, job, {
+        fingerprint,
+        allowNoMusic,
+      })
+    }
+
     const credit = eofTtsCreditGuardDecision({
       engine: voicePresetMeta.engine || 'edge',
       currentFingerprint: fingerprint,
@@ -446,5 +455,145 @@ export async function renderEofProductionAudio(jobId, opts = {}) {
     }
   } finally {
     audioRenderLocks.delete(jobId)
+  }
+}
+
+/**
+ * Skip TTS entirely — mix the user's uploaded voiceover file straight into the Short.
+ * Per-scene durationSec is estimated by splitting the uploaded audio's total length
+ * proportionally across each scene's narration character count (best-effort auto-timing;
+ * there is no line-by-line audio to measure directly since it is a single uploaded track).
+ */
+async function renderEofProductionAudioFromManualVoiceover(jobId, job, { fingerprint, allowNoMusic }) {
+  try {
+    const workDir = eofProductionWorkDir(jobId)
+    const sceneCount = job.script.scenes.length
+    const renderStartedAt = new Date().toISOString()
+
+    await updateEofProductionRenderProgress(
+      jobId,
+      buildEofRenderProgress({
+        stage: 'mix',
+        sceneIndex: 0,
+        sceneCount,
+        startedAt: renderStartedAt,
+        estimatedTotalSec: 20,
+        pipeline: 'audio',
+      }),
+    )
+
+    const uploadedPath = await ensureEofManualVoiceoverOnDisk(jobId)
+    if (!uploadedPath) {
+      throw new Error(
+        'No voiceover uploaded yet. Choose "Your own voiceover (uploaded)" and upload an audio file first, then Build/Regenerate.',
+      )
+    }
+
+    const totalDurationSec = await probeAudioDurationSec(uploadedPath)
+    if (!totalDurationSec || totalDurationSec <= 0) {
+      throw new Error('Could not read your uploaded voiceover file — try re-uploading it as MP3 or WAV.')
+    }
+
+    // The uploaded file can be any container/codec (WAV, M4A, etc.) — normalize to MP3 first.
+    // The downstream mixer concatenates narration parts with `-c copy`, which requires a
+    // single consistent codec; feeding it the raw upload as-is can produce a broken output.
+    const normalizedPath = join(workDir, 'manual-voiceover.mp3')
+    await runFfmpeg(['-y', '-i', uploadedPath, '-c:a', 'libmp3lame', '-q:a', '2', normalizedPath], {
+      maxBuffer: 16 * 1024 * 1024,
+    })
+
+    const charCounts = job.script.scenes.map((scene) =>
+      Math.max(1, String(scene.narration || '').trim().length),
+    )
+    const totalChars = charCounts.reduce((a, b) => a + b, 0)
+    const sceneDurations = charCounts.map((chars) =>
+      Math.max(1, (chars / totalChars) * totalDurationSec),
+    )
+
+    const wantNoMusic = shouldEofAllowNoMusic({ allowNoMusic }, job)
+    const track = wantNoMusic ? null : await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
+    const musicPath = resolveEofMusicTrackFilePath(track)
+    const mixedPath = join(workDir, 'mixed.mp3')
+
+    const stopMixHb = startProgressHeartbeat(async () => {
+      await updateEofProductionRenderProgress(
+        jobId,
+        buildEofRenderProgress({
+          stage: 'mix',
+          sceneIndex: sceneCount,
+          sceneCount,
+          startedAt: renderStartedAt,
+          estimatedTotalSec: 20,
+          pipeline: 'audio',
+        }),
+      )
+    }, 4000)
+    let saved
+    try {
+      await mixEofNarrationWithMusic({
+        sceneAudioPaths: [normalizedPath],
+        musicFilePath: musicPath,
+        musicVolume: job.musicVolume,
+        musicStartSec: job.musicStartSec,
+        musicEndSec: job.musicEndSec,
+        outputPath: mixedPath,
+      })
+      await clearEofVideoArtifact(jobId).catch(() => {})
+      saved = await saveEofMixedAudioArtifact(jobId, mixedPath)
+    } finally {
+      stopMixHb()
+    }
+    if (!saved) {
+      console.warn('[eof-production] durable mixed audio save failed — keeping on-disk mix', jobId)
+    }
+
+    await updateEofProductionRenderProgress(jobId, null)
+
+    // Preserve prior per-scene image bookkeeping (source/key/history) — losing it here
+    // would make the next video render re-fetch every still from scratch.
+    const priorManifest = Array.isArray(job.narrationManifest) ? job.narrationManifest : []
+    const narrationManifest = job.script.scenes.map((scene, i) => {
+      const prior = priorManifest.find((row) => row.index === i) || priorManifest[i]
+      return {
+        sceneId: scene.id,
+        index: i,
+        audioPath: normalizedPath,
+        caption: scene.caption,
+        imageQuery: scene.imageQuery,
+        durationSec: sceneDurations[i],
+        manualVoiceover: true,
+        imageSource: prior?.imageSource || null,
+        imageQueryUsed: prior?.imageQueryUsed || scene.imageQuery,
+        imageKey: prior?.imageKey || null,
+        imageAttempt: Number(prior?.imageAttempt) || 0,
+        imageKeyHistory: Array.isArray(prior?.imageKeyHistory)
+          ? prior.imageKeyHistory.filter(Boolean)
+          : prior?.imageKey
+            ? [prior.imageKey]
+            : [],
+        imageTitle: prior?.imageTitle || null,
+        imageYear: prior?.imageYear || null,
+      }
+    })
+
+    return updateEofProductionJob(jobId, {
+      status: EOF_PRODUCTION_JOB_STATUS.RENDERED,
+      narrationManifest,
+      mixedAudioPath: eofProductionMixedAudioRelPath(jobId),
+      renderOutputPath: null,
+      errorMessage: null,
+      ttsAudioHash: fingerprint,
+      musicTrackId: wantNoMusic ? null : track?.id || null,
+      script: {
+        ...job.script,
+        scenes: job.script.scenes.map((scene, i) => ({
+          ...scene,
+          durationSec: sceneDurations[i],
+        })),
+      },
+    })
+  } catch (e) {
+    await markEofProductionJobFailed(jobId, e instanceof Error ? e.message : 'Voiceover mix failed')
+    throw e
   }
 }
