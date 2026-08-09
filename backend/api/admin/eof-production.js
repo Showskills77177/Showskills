@@ -999,6 +999,10 @@ export default async function handler(req, res) {
 
       const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
       const format = typeof body.format === 'string' ? body.format.trim() : EOF_DEFAULT_SCRIPT_FORMAT
+      // Post-your-own-script path: when provided, the AI writer is skipped entirely —
+      // this text becomes the plain-text draft as-is (still needs "Adapt to scenes" next).
+      const manualDraft =
+        typeof body.plainTextDraft === 'string' ? body.plainTextDraft.trim() : ''
       const voicePreset =
         typeof body.voicePreset === 'string' && body.voicePreset.trim()
           ? body.voicePreset.trim()
@@ -1028,6 +1032,11 @@ export default async function handler(req, res) {
       const stickers = normalizeEofStickers(
         body.stickers !== undefined ? body.stickers : EOF_DEFAULT_STICKERS,
       )
+      if (manualDraft && manualDraft.length < 20) {
+        return json(res, 422, {
+          error: 'Pasted script is too short — paste the full narration (at least a sentence or two).',
+        })
+      }
       try {
         const job = await createEofProductionJob({
           topic,
@@ -1043,6 +1052,7 @@ export default async function handler(req, res) {
           overlayMoments,
           videoEffects,
           stickers,
+          manualDraft,
         })
         return json(res, 201, {
           ok: true,

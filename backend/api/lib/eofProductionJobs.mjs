@@ -194,6 +194,13 @@ export async function createEofProductionJob({
   context = null,
   /** 'standard' | 'production' — Production UI + Script Maker use production (hard gates, no bollox softBest) */
   qualityBar = 'production',
+  /**
+   * Post a script straight away — skips the AI writer entirely. When set (non-empty),
+   * this becomes the job's plain-text draft as-is; the user still runs "Adapt to scenes"
+   * next (that step needs AI to break narration into timed scenes), but no script-writing
+   * AI call ever happens.
+   */
+  manualDraft = null,
 }) {
   await ensureEofProductionSchema()
   let t = String(topic || '').trim()
@@ -220,7 +227,20 @@ export async function createEofProductionJob({
   let status
   let failureDetail = ''
 
-  if (mode === 'full') {
+  const pastedDraft = String(manualDraft || '').trim()
+  if (pastedDraft) {
+    // User already wrote the script — never call the AI writer for it.
+    script = buildEofDraftShell({
+      topic: t,
+      format,
+      plainTextDraft: pastedDraft,
+      title: t,
+      source: 'manual',
+      qualityBar,
+    })
+    scriptSource = 'manual'
+    status = EOF_PRODUCTION_JOB_STATUS.DRAFT
+  } else if (mode === 'full') {
     const written = await writeEofProductionScript({ topic: t, format, context, scriptProvider })
     script = written.script
     scriptSource = written.source || 'template'

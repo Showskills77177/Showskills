@@ -249,6 +249,7 @@ export function preferredEofScriptProvider() {
 
 export function eofScriptProviderLabel(provider) {
   const id = normalizeScriptProviderId(provider)
+  if (id === 'manual') return 'your own script'
   if (id === 'xai') return 'xAI Grok 4.5'
   if (id === 'openai') return 'OpenAI'
   if (id === 'anthropic') {

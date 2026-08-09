@@ -1014,6 +1014,8 @@ export default function EofProductionPanel({
   const [preferredScriptProvider, setPreferredScriptProvider] = useState('template')
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
   const [topic, setTopic] = useState('')
+  const [useOwnScript, setUseOwnScript] = useState(false)
+  const [manualDraft, setManualDraft] = useState('')
   const [selectedId, setSelectedId] = useState(readStoredSelectedId)
   const [draftScript, setDraftScript] = useState(null)
   const [draftDirty, setDraftDirty] = useState(false)
@@ -2583,6 +2585,10 @@ export default function EofProductionPanel({
 
   async function createJob(e) {
     e.preventDefault()
+    if (useOwnScript && manualDraft.trim().length < 20) {
+      setErr('Paste the full narration (at least a sentence or two) before creating the job.')
+      return
+    }
     setBusy(true)
     setErr('')
     setSuccess('')
@@ -2603,15 +2609,19 @@ export default function EofProductionPanel({
           overlayMoments,
           videoEffects: normalizeEofVideoEffects(videoEffects),
           stickers: normalizeEofStickers(stickers),
+          plainTextDraft: useOwnScript ? manualDraft.trim() : '',
         }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || 'Could not create script')
       setTopic('')
+      setManualDraft('')
       selectJob(j.job.id)
       if (j.job?.script) hydrateDraftFromJob(j.job)
       hydratedJobIdRef.current = j.job.id
-      if (j.scriptWarning) {
+      if (j.job?.scriptSource === 'manual') {
+        setSuccess(`Your script for “${j.job.topic}” is in — no AI writing used. Click Adapt to scenes next.`)
+      } else if (j.scriptWarning) {
         setErr(j.scriptWarning)
         setSuccess(
           `Fallback draft ready for “${j.job.topic}”. Edit it, then Adapt to scenes — or fix AI billing and click Regenerate script.`,
@@ -3310,6 +3320,29 @@ export default function EofProductionPanel({
               autoComplete="off"
             />
           </label>
+
+          <label className="flex items-center gap-2 text-sm text-[#aaa]">
+            <input
+              type="checkbox"
+              checked={useOwnScript}
+              onChange={(e) => setUseOwnScript(e.target.checked)}
+            />
+            Post my own script (skip the AI writer)
+          </label>
+
+          {useOwnScript ? (
+            <label className={`block ${PX.label}`}>
+              Your script
+              <textarea
+                value={manualDraft}
+                onChange={(e) => setManualDraft(e.target.value)}
+                className={`${inputCls} min-h-[160px] text-base`}
+                placeholder="Paste your already-written narration here. It's used as-is — no AI writing. Click Adapt to scenes afterward to build the timed shot list."
+                minLength={20}
+                required={useOwnScript}
+              />
+            </label>
+          ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <label className={PX.label}>
