@@ -22,6 +22,7 @@ import {
   renderEofProductionEffectsApply,
   renderEofProductionStickersApply,
   renderEofProductionMusicRemix,
+  renderEofProductionVoiceoverOnly,
   applyEofProductionZapcapCaptions,
 } from '../backend/api/lib/eofProductionRenderRunner.mjs'
 import {
@@ -128,6 +129,8 @@ app.post('/eof-worker/render', async (req, res) => {
         await renderEofProductionStickersApply(jobId)
       } else if (mode === 'music-remix') {
         await renderEofProductionMusicRemix(jobId)
+      } else if (mode === 'voiceover-regen') {
+        await renderEofProductionVoiceoverOnly(jobId)
       } else if (mode === 'zapcap-apply') {
         await applyEofProductionZapcapCaptions(jobId)
       } else {

@@ -76,6 +76,31 @@ describe('eofProductionWorkerDispatch', () => {
     }
   })
 
+  it('forwards mode: voiceover-regen so voiceover regeneration remuxes on the worker (has yt-dlp), not Vercel', async () => {
+    const prevUrl = process.env.EOF_WORKER_URL
+    const prevSecret = process.env.EOF_WORKER_SECRET
+    const prevFetch = globalThis.fetch
+    try {
+      process.env.EOF_WORKER_URL = 'https://eof-worker.example'
+      process.env.EOF_WORKER_SECRET = 'shared-secret'
+      let seen
+      globalThis.fetch = async (url, init) => {
+        seen = { url: String(url), init }
+        return { ok: false, status: 202 }
+      }
+      const result = await scheduleEofVideoOnWorker('job-2', { mode: 'voiceover-regen' })
+      assert.equal(result.ok, true)
+      const body = JSON.parse(seen.init.body)
+      assert.equal(body.mode, 'voiceover-regen')
+    } finally {
+      globalThis.fetch = prevFetch
+      if (prevUrl === undefined) delete process.env.EOF_WORKER_URL
+      else process.env.EOF_WORKER_URL = prevUrl
+      if (prevSecret === undefined) delete process.env.EOF_WORKER_SECRET
+      else process.env.EOF_WORKER_SECRET = prevSecret
+    }
+  })
+
   it('widens Pro stale windows when the worker is configured', () => {
     const prevUrl = process.env.EOF_WORKER_URL
     const prevSecret = process.env.EOF_WORKER_SECRET

@@ -453,7 +453,22 @@ export async function startEofProductionVoiceoverRegenerationBackground(jobId) {
   )
 
   const run = () =>
-    renderEofProductionVoiceoverOnly(jobId).catch((e) => {
+    (async () => {
+      // Voiceover regen re-synths audio then remuxes video via ffmpeg — the remux (and any
+      // opted-in yt-dlp video-footage sourcing) must happen on Railway, not Vercel, exactly
+      // like Music Remix/Captions/Effects/Stickers. Without this hop, video-footage-mode
+      // silently no-ops on Vercel (no yt-dlp there) and always falls back to stills.
+      if (isEofExternalWorkerConfigured()) {
+        const scheduled = await scheduleEofVideoOnWorker(jobId, { mode: 'voiceover-regen' })
+        if (scheduled?.ok) return getEofProductionJob(jobId)
+        console.warn(
+          '[eof-production] worker hop failed on voiceover regen — falling back in-process',
+          jobId,
+          scheduled?.reason || scheduled?.status || 'unknown',
+        )
+      }
+      return renderEofProductionVoiceoverOnly(jobId)
+    })().catch((e) => {
       console.error('[eof-production] voiceover regeneration failed', jobId, e)
     })
 
