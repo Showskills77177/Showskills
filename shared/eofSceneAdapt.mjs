@@ -186,21 +186,29 @@ function titleFromDraft(topic, draft) {
  * Deterministic, faithful split of an approved plain-text draft into Short scenes.
  * Keeps the writer's words (no paraphrase, no dropped tail) and ties every image
  * query to the topic's player/club (Bellingham, Messi, …).
- * @param {{ plainTextDraft: string, topic: string, format?: string }} input
+ * @param {{ plainTextDraft: string, topic: string, format?: string, forceMinScenes?: number }} input
+ * `forceMinScenes` overrides the normal 3-scene floor — pass 1 for a guaranteed,
+ * credit-free last-resort split of a manual/own script (even a single short
+ * sentence becomes a valid one-scene Short instead of falling back to AI or a
+ * generic template).
  */
-export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, format = 'news' }) {
+export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, format = 'news', forceMinScenes } = {}) {
   const draft = String(plainTextDraft || '').trim()
   const t = String(topic || '').trim() || 'Football'
+  const allowSingleSentence = Number.isFinite(forceMinScenes) && forceMinScenes <= 1
   const sentences = splitDraftIntoSentences(draft)
-  if (sentences.length < 2) return null
+  if (!sentences.length) return null
+  if (sentences.length < 2 && !allowSingleSentence) return null
 
-  const { min, max } = targetSceneCountForDraft(draft)
+  const target = targetSceneCountForDraft(draft)
+  const min = Number.isFinite(forceMinScenes) && forceMinScenes > 0 ? Math.max(1, Math.floor(forceMinScenes)) : target.min
   const units = balanceSceneUnits(sentences, {
     min,
-    max: Math.min(max, EOF_MAX_SCENES),
+    max: Math.min(target.max, EOF_MAX_SCENES),
     capWords: 16,
   })
-  if (units.length < 3) return null
+  const requiredMin = Number.isFinite(forceMinScenes) && forceMinScenes > 0 ? Math.max(1, Math.floor(forceMinScenes)) : 3
+  if (units.length < requiredMin) return null
 
   const sceneCount = units.length
   const scenes = units.map((unit, i) => {

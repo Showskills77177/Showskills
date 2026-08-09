@@ -95,4 +95,28 @@ describe('post-your-own-script (skip the AI writer) — createEofProductionJob',
     assert.ok(adapted.script.scenes.length >= 1)
     assert.equal(adapted.script.plainTextDraft, pasted)
   })
+
+  it('adapts a very short manual/own script into a single scene without any AI credits or a generic template', async () => {
+    const { createEofProductionJob, adaptEofProductionDraftToScenes } = await import(
+      '../backend/api/lib/eofProductionJobs.mjs'
+    )
+    // Too short to reach the normal 3-scene floor (one short sentence, no LLM keys
+    // configured in this test env) — must never fall back to a paid AI adapt call
+    // or discard the writer's words for buildFactsShortScript's generic template.
+    const pasted = 'Marcus Rashford is back to his best for Manchester United this season.'
+
+    const job = await createEofProductionJob({
+      topic: 'Marcus Rashford',
+      createdBy: 'tester',
+      manualDraft: pasted,
+    })
+    assert.equal(job.scriptSource, 'manual')
+
+    const adapted = await adaptEofProductionDraftToScenes(job.id, { plainTextDraft: pasted })
+    assert.equal(adapted.scriptSource, 'local-split-minimal')
+    assert.ok(adapted.script.scenes.length >= 1)
+    assert.equal(adapted.script.plainTextDraft, pasted)
+    // Not the generic template — keeps the writer's actual sentence in the scenes.
+    assert.ok(adapted.script.scenes.some((s) => /Rashford/i.test(s.caption)))
+  })
 })

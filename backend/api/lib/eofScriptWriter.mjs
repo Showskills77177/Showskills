@@ -1385,6 +1385,25 @@ export async function adaptEofPlainTextToScenes({
     return { script: local, source: 'local-split' }
   }
 
+  // Manual/own scripts never spend AI credits to adapt — the writer owns the words.
+  // Guarantee a local split down to a single scene rather than calling a paid
+  // provider or discarding the draft for a generic template. Only an explicit
+  // chat request should trigger AI rewriting/adapting of a manual script.
+  if (isManualScript) {
+    const guaranteed = adaptPlainTextDraftToScenesLocally({
+      plainTextDraft: draft,
+      topic: t,
+      format: fmt,
+      forceMinScenes: 1,
+    })
+    if (guaranteed?.scenes?.length >= 1) {
+      return { script: guaranteed, source: 'local-split-minimal' }
+    }
+    // Draft passed the length check above (>=40 chars) so this should be unreachable,
+    // but never silently fall through to AI/template for a manual script.
+    throw new Error('Could not split this draft into scenes — add a bit more text or another sentence.')
+  }
+
   const order = resolveScriptProviderAttemptOrder(scriptProvider)
   const attempts = []
   for (const id of order) {
