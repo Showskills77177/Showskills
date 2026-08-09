@@ -391,6 +391,7 @@ export async function adaptEofProductionDraftToScenes(id, { format, plainTextDra
     topic: job.topic,
     format: fmt,
     scriptProvider,
+    isManualScript: job.scriptSource === 'manual',
   })
   script.plainTextDraft = draft
   const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)

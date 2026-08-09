@@ -68,4 +68,31 @@ describe('post-your-own-script (skip the AI writer) — createEofProductionJob',
       /No AI script provider is configured/,
     )
   })
+
+  it('adapts a manual/own script to scenes even when it would trip the AI topic-drift gate', async () => {
+    const { createEofProductionJob, adaptEofProductionDraftToScenes } = await import(
+      '../backend/api/lib/eofProductionJobs.mjs'
+    )
+    // Deliberately contrasts Antonio's story against David Moyes — a legitimate editorial
+    // contrast in a user-written script, which the AI topic-drift gate would otherwise flag
+    // as "narrative shifts to David Moyes instead of the ordered topic".
+    const pasted =
+      'Michail Antonio was refused compassionate leave for his own father\'s burial by his club. ' +
+      'Contrast that with David Moyes, who has always let players go home for family funerals no questions asked. ' +
+      'Antonio deserved better than this from the people who are supposed to have his back. ' +
+      'This is about how a football club should treat its players in the worst moments of their lives.'
+
+    const job = await createEofProductionJob({
+      topic: 'Michail Antonio',
+      createdBy: 'tester',
+      manualDraft: pasted,
+    })
+    assert.equal(job.scriptSource, 'manual')
+
+    // Would throw "Cannot adapt this draft — Topic drift..." for an AI-written script;
+    // must succeed here because the writer owns the content and topic themselves.
+    const adapted = await adaptEofProductionDraftToScenes(job.id, { plainTextDraft: pasted })
+    assert.ok(adapted.script.scenes.length >= 1)
+    assert.equal(adapted.script.plainTextDraft, pasted)
+  })
 })

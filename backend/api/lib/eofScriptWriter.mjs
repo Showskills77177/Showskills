@@ -1348,23 +1348,33 @@ export async function writeEofPlainTextDraft({
  * Step 2 — split approved plain text into Short scenes.
  * @param {{ plainTextDraft: string, topic: string, format?: string }} input
  */
-export async function adaptEofPlainTextToScenes({ plainTextDraft, topic, format, scriptProvider }) {
+export async function adaptEofPlainTextToScenes({
+  plainTextDraft,
+  topic,
+  format,
+  scriptProvider,
+  /** Skip AI relevance/factuality/drift gates entirely for a user-authored ("post your own script") draft — the writer owns the content and topic themselves. */
+  isManualScript = false,
+}) {
   const draft = String(plainTextDraft || '').trim()
   if (draft.length < 40) throw new Error('Plain-text draft is too short — write or generate a fuller script first.')
   const t = String(topic || '').trim() || 'Football'
   const fmt = resolveFormat(format)
 
   // Adapt trusts the approved draft's football cast (Bergvall et al.) — still blocks Fury/Keegan pivots.
-  const adaptGates = scoreLocalScriptGates(draft, {
-    format: fmt,
-    topic: t,
-    orderedTopic: t,
-    mode: 'adapt',
-  })
-  if (!adaptGates.pass) {
-    throw new Error(
-      `Cannot adapt this draft — ${adaptGates.reasons[0] || 'failed relevance/factuality gates'}. Fix or Regenerate the script first.`,
-    )
+  // Manual/own scripts skip this gate entirely — same as script creation, which never runs it either.
+  if (!isManualScript) {
+    const adaptGates = scoreLocalScriptGates(draft, {
+      format: fmt,
+      topic: t,
+      orderedTopic: t,
+      mode: 'adapt',
+    })
+    if (!adaptGates.pass) {
+      throw new Error(
+        `Cannot adapt this draft — ${adaptGates.reasons[0] || 'failed relevance/factuality gates'}. Fix or Regenerate the script first.`,
+      )
+    }
   }
 
   // Faithful, deterministic split FIRST — keeps the approved script's exact words and
