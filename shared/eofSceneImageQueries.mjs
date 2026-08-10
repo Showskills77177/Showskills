@@ -1008,6 +1008,29 @@ export function imageAngleFromCaption(caption, subject, coachOrIntent = false) {
 }
 
 /**
+ * True when a caption's own wording already signals a distinct photo beat —
+ * tactics, training, celebration, sideline, press/interview, matchday, pundit
+ * desk — the same cues `imageAngleFromCaption` matches. Used so a scene's
+ * default image query can follow its own caption instead of whichever angle
+ * the scene-index round-robin happens to land on (e.g. a "trains every day"
+ * caption must not get a "celebrating" still just because it is scene 3 of 5).
+ * @param {string} caption
+ */
+export function captionNamesSpecificImageBeat(caption) {
+  const c = String(caption || '').toLowerCase()
+  if (!c) return false
+  return (
+    /\b(pundit|studio|sky|tnt|presenter|analysis|desk)\b/.test(c) ||
+    /\btactic|formation|system|shape|press(ing)?\b/.test(c) ||
+    /\bpress|interview|says|said|quotes?\b/.test(c) ||
+    /\btrain|session|drill\b/.test(c) ||
+    /\bcelebrat|goal|scores?|winner\b/.test(c) ||
+    /\bsideline|touchline|bench\b/.test(c) ||
+    /\bmatch|game|derby|final\b/.test(c)
+  )
+}
+
+/**
  * Per-scene image search line for auto-generated scripts.
  * @param {string} topic
  * @param {number} sceneIndex
@@ -1046,6 +1069,12 @@ export function defaultSceneImageQuery(topic, sceneIndex, opts = {}) {
       intent: opts.intent === 'coach' ? undefined : opts.intent,
     })
     if (resolvedIntent === 'coach') resolvedIntent = 'neutral'
+  }
+  // A caption that names its own beat deserves that specific angle — this is the
+  // same correction anchorSceneImageQuery applies to AI-written queries, so a
+  // manual/local-split script's images track its own captions just as closely.
+  if (caption && captionNamesSpecificImageBeat(caption)) {
+    return imageAngleFromCaption(caption, core, resolvedIntent)
   }
   const angles = anglesForIntent(resolvedIntent)
   return angles[sceneIndex % angles.length](core)

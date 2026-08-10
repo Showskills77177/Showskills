@@ -65,6 +65,31 @@ describe('eofSceneImageQueries', () => {
     assert.match(q, /football|match|celebrating|press|training/i)
   })
 
+  it('follows the caption beat instead of the scene-index round-robin (manual/local-split path)', () => {
+    // Regression: local-split (manual script) scenes only ever set imageQuery via
+    // defaultSceneImageQuery's angle-rotation-by-scene-index — a "trains every day"
+    // caption at scene index 2 got the "celebrating" angle just because that is
+    // where the rotation landed, and a goal-celebration caption got "press
+    // conference". Both must now follow their own caption's beat.
+    const trainingBeat = defaultSceneImageQuery('Marc Cucurella hair', 2, {
+      caption: 'Cucurella trains every single day with the same routine.',
+    })
+    assert.match(trainingBeat, /Cucurella/i)
+    assert.match(trainingBeat, /train/i)
+    assert.doesNotMatch(trainingBeat, /celebrat/i)
+
+    const goalBeat = defaultSceneImageQuery('Marc Cucurella hair', 3, {
+      caption: 'He scored a stunning goal and celebrated wildly in front of the fans.',
+    })
+    assert.match(goalBeat, /Cucurella/i)
+    assert.match(goalBeat, /celebrat/i)
+
+    // A caption with no distinct beat still gets the round-robin angle (unchanged).
+    const generic = defaultSceneImageQuery('Erling Haaland', 0, { caption: 'Fans cannot stop talking about it.' })
+    assert.match(generic, /Haaland/i)
+    assert.match(generic, /football|match|celebrating|press|training/i)
+  })
+
   it('does not glue the year onto the name entity (Tuchel 2026)', () => {
     // Regression: "2026" was glued into the proper-noun run → required entity became
     // "Thomas Tuchel 2026", hard-rejecting real current photos titled "Thomas Tuchel England v Ghana 2026".
