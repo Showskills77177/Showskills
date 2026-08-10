@@ -30,6 +30,7 @@ import {
   markEofProductionJobFailed,
 } from '../backend/api/lib/eofProductionJobs.mjs'
 import { EOF_PRODUCTION_JOB_STATUS } from '../shared/eofProduction.mjs'
+import { isYtDlpAvailable } from '../backend/api/lib/eofYtDlp.mjs'
 
 const PORT = Number(process.env.PORT) || 8080
 const SECRET = String(process.env.EOF_WORKER_SECRET || '').trim()
@@ -161,4 +162,24 @@ app.listen(PORT, '0.0.0.0', () => {
   if (process.env.VERCEL || process.env.VERCEL_ENV) {
     console.warn('[eof-worker] VERCEL env is set — unset it so encodes use the full (non-Pro-cap) profile')
   }
+  // Check once at boot, not just lazily per-scene — a wrong Railway Builder
+  // setting (Nixpacks/Railpack instead of the Dockerfile) silently ships a
+  // worker with ffmpeg but no yt-dlp, and every real-footage attempt fails
+  // with only a per-scene console.warn buried deep in a render log. Surface
+  // it loudly here so a bad deploy is visible immediately in the boot logs.
+  isYtDlpAvailable()
+    .then((ok) => {
+      if (ok) {
+        console.info('[eof-worker] yt-dlp available — real-footage pipeline enabled')
+      } else {
+        console.warn(
+          '[eof-worker] yt-dlp NOT FOUND — real-footage pipeline will fall back to images for every scene. ' +
+            'Check the Railway service is actually building from the Dockerfile (Settings → Builder, or ' +
+            'railway.toml [build] builder = "DOCKERFILE") — a Nixpacks/Railpack build does not install yt-dlp.',
+        )
+      }
+    })
+    .catch(() => {
+      console.warn('[eof-worker] yt-dlp availability check failed to run')
+    })
 })
