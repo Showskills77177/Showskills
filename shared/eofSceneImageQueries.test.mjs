@@ -266,6 +266,30 @@ describe('eofSceneImageQueries', () => {
     assert.deepEqual(kept.map((k) => k.title), ['Michail Antonio celebrates for West Ham'])
   })
 
+  it('does not turn a player subject into a "football manager" search over a contrast mention', () => {
+    // Regression (from a real Railway worker log): topic/subject "Antonio" with a
+    // draft that contrasts the player against "a manager like David Moyes" made
+    // the whole job's image search become "Antonio football manager" — Moyes
+    // being named (correctly recognized) leaked coach intent onto Antonio, and a
+    // second, unguarded topicLooksLikeCoach(blob) fallback re-introduced the same
+    // leak even after the first guard was added. Neither the bare "manager" word
+    // nor a different, named secondary coach may hijack an unrecognized subject's
+    // own search intent — only the subject's own name/topic can.
+    const draft =
+      "Michail Antonio was refused compassionate leave for his own father's burial by his club. " +
+      'Contrast that with a manager like David Moyes, who has always let players go home for family funerals no questions asked. ' +
+      'Antonio deserved better than this.'
+    // detectImageRoleIntent itself trusts a genuinely NAMED coach anywhere in the
+    // blob (correct for e.g. a Tuchel-topic Short) — callers that resolve a
+    // DIFFERENT primary subject are responsible for stripping secondary named
+    // coaches first, which buildSceneImageSearchQueries/defaultSceneImageQuery do.
+    const qs = buildSceneImageSearchQueries({ topic: 'Antonio', plainTextDraft: draft, sceneIndex: 0 })
+    assert.ok(!qs.some((q) => /manager/i.test(q)), `must not search for a manager: ${JSON.stringify(qs)}`)
+
+    const angle = defaultSceneImageQuery('Antonio', 0, { plainTextDraft: draft })
+    assert.doesNotMatch(angle, /manager/i)
+  })
+
   it('resolves Ferguson to Sir Alex Ferguson instead of losing to a named club', () => {
     // Regression: "ferguson" was not a recognized coach, so resolveImageSubject's
     // named-entity ranking skipped him entirely and picked the multi-word club
