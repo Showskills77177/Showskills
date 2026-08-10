@@ -15,6 +15,8 @@ import {
   primaryImageEntities,
   splitGluedPersonClubEntity,
   entityMentionsInHaystack,
+  topicLooksLikeCoach,
+  expandPlayerFullName,
 } from './eofSceneImageQueries.mjs'
 import { normalizeFootballTopicQuery } from './eofFootballTopicNormalize.mjs'
 
@@ -235,6 +237,45 @@ describe('eofSceneImageQueries', () => {
     })
     assert.ok(qs.some((q) => /pundit|studio|Sky Sports/i.test(q)), `expected pundit queries, got ${qs}`)
     assert.ok(!qs.some((q) => /celebrating football/i.test(q)))
+  })
+
+  it('never credits Antonio Conte photos to Michail Antonio (shared "Antonio" token)', () => {
+    // Regression: Michail Antonio's surname "Antonio" is also Antonio Conte's
+    // first name — the surname-alone fallback in hitMentionsSubject/
+    // entityMentionsInHaystack was accepting any "Antonio Conte" press-conference
+    // photo as a Michail Antonio still just because it contained the word "Antonio".
+    const subject = 'Michail Antonio'
+    assert.equal(
+      hitMentionsSubject(subject, 'Antonio Conte press conference Napoli', ''),
+      false,
+      'must not credit a different Antonio to Michail Antonio',
+    )
+    assert.equal(
+      hitMentionsSubject(subject, 'Michail Antonio celebrates for West Ham', ''),
+      true,
+      'the real Michail Antonio photo must still pass',
+    )
+    const kept = filterHitsRequiringSubjectNameCue(
+      [
+        { url: 'https://cdn.example.com/1.jpg', title: 'Antonio Conte speaks to reporters', source: 'serpapi' },
+        { url: 'https://cdn.example.com/2.jpg', title: 'Michail Antonio celebrates for West Ham', source: 'serpapi' },
+      ],
+      subject,
+      { log: false },
+    )
+    assert.deepEqual(kept.map((k) => k.title), ['Michail Antonio celebrates for West Ham'])
+  })
+
+  it('resolves Ferguson to Sir Alex Ferguson instead of losing to a named club', () => {
+    // Regression: "ferguson" was not a recognized coach, so resolveImageSubject's
+    // named-entity ranking skipped him entirely and picked the multi-word club
+    // "Man United" as the primary subject instead — Ferguson never got his own
+    // images sourced because the image search targeted the club, not him.
+    assert.equal(resolveImageSubject('Ferguson breaks silence on Man United'), 'Sir Alex Ferguson')
+    assert.equal(resolveImageSubject('Sir Alex Ferguson turns 82'), 'Sir Alex Ferguson')
+    assert.equal(topicLooksLikeCoach('Sir Alex Ferguson'), true)
+    assert.equal(expandPlayerFullName('ferguson'), 'Sir Alex Ferguson')
+    assert.equal(expandPlayerFullName('conte'), 'Antonio Conte')
   })
 
   it('normalizes Cuccorea typo to Marc Cucurella for image search + subject cues', () => {
