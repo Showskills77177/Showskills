@@ -125,7 +125,8 @@ export function scoreImageCandidate(url, width = 0, height = 0) {
 const HAIR_TOPIC_RE = /\b(hair|hairstyle|locks?|dreadlocks?|beard|mullet|cut\s+his\s+hair|cut\s+her\s+hair|doesn'?t\s+cut)\b/i
 
 export function buildOxylabsJobQuery(topic, attempt = 0, context = {}) {
-  const subject = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const subject =
+    resolveImageSubject(topic || '', context.plainTextDraft || '') || String(topic || 'football').trim()
   const year = new Date().getFullYear()
   const blob = [topic, context.plainTextDraft, context.captions]
     .flat()
@@ -635,7 +636,7 @@ export async function fetchEofOxylabsJobPool(opts = {}) {
   return {
     query,
     intent,
-    subject: resolveImageSubject(opts.topic || '') || null,
+    subject: resolveImageSubject(opts.topic || '', opts.plainTextDraft || '') || null,
     health,
     healthNote,
     hits: kept.map((h) => ({
@@ -703,7 +704,7 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
   const caption = String(scene.caption || '').trim()
   // Always resolve mononyms / "Rooney on Ronaldo" → Wayne Rooney (never surname=Ronaldo).
   const subject =
-    resolveImageSubject(scene.subject || topic) ||
+    resolveImageSubject(scene.subject || topic, scene.plainTextDraft || '') ||
     String(scene.subject || topic || '').trim()
   const intent = detectImageRoleIntent({
     topic,
@@ -793,7 +794,7 @@ export function claimOxylabsPoolHit(opts = {}) {
   const poolQuery = String(opts.jobQuery || opts.query || opts.poolQuery || '').trim()
   const scene = {
     topic: opts.topic,
-    subject: opts.subject || resolveImageSubject(opts.topic) || opts.topic,
+    subject: opts.subject || resolveImageSubject(opts.topic, opts.plainTextDraft || '') || opts.topic,
     imageQuery: opts.imageQuery,
     caption: opts.caption,
     plainTextDraft: opts.plainTextDraft,
@@ -801,7 +802,8 @@ export function claimOxylabsPoolHit(opts = {}) {
     jobQuery: poolQuery,
   }
   const subject =
-    resolveImageSubject(scene.subject || scene.topic) || String(scene.subject || '').trim()
+    resolveImageSubject(scene.subject || scene.topic, scene.plainTextDraft || '') ||
+    String(scene.subject || '').trim()
   const queryNamesSubject = Boolean(poolQuery) && hitMentionsSubject(subject, poolQuery, '')
   const ranked = hits
     .map((hit, i) => {

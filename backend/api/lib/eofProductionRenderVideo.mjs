@@ -516,6 +516,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         oxylabs: isEofOxylabsConfigured(),
       })
       imageFetchDiag.providerOrder = [...providerOrder]
+      // A bare/unrecognized topic (e.g. "Antonio") is ambiguous between several
+      // real football people — resolve it against the draft (which usually
+      // spells out the fuller name, e.g. "Michail Antonio was refused...")
+      // BEFORE logging or using it, not after.
+      const draftForSubject = String(job.script?.plainTextDraft || '').trim()
       console.info(
         '[eof-video] image provider',
         preferredProvider,
@@ -524,13 +529,13 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         providerOrder.join(' → ') || '(none keyed)',
         `| gen=${imageGenMode}/${imageGenProvider}`,
         `| topic=${String(job.topic || '').slice(0, 80)}`,
-        `| subject=${String(resolveImageSubject(job.topic) || '').slice(0, 40)}`,
+        `| subject=${String(resolveImageSubject(job.topic, draftForSubject) || '').slice(0, 40)}`,
       )
       const imageContext = {
-        plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
+        plainTextDraft: draftForSubject,
         captions: rows.map((r) => r.caption).filter(Boolean),
       }
-      const leadSubject = resolveImageSubject(job.topic) || String(job.topic || '').trim()
+      const leadSubject = resolveImageSubject(job.topic, draftForSubject) || String(job.topic || '').trim()
       imageFetchDiag.subject = leadSubject || null
       const leadIntent = detectImageRoleIntent({
         topic: job.topic,
@@ -1031,7 +1036,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     // Never blocks the build — getEofSceneVideoClip() swallows all its own errors.
     if (job.videoFootageMode === 'auto') {
       const { getEofSceneVideoClip } = await import('./eofSceneVideoFootage.mjs')
-      const footageSubject = resolveImageSubject(job.topic) || String(job.topic || '').trim()
+      const footageSubject =
+        resolveImageSubject(job.topic, String(job.script?.plainTextDraft || '').trim()) ||
+        String(job.topic || '').trim()
       const workDirForFootage = eofProductionWorkDir(jobId)
       for (const scene of scenesForVideo) {
         try {

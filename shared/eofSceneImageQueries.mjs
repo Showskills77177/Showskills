@@ -238,7 +238,7 @@ export function listImageSubjects(topic, plainTextDraft = '') {
     out.push(full)
   }
   // Ensure topic lead is first
-  const lead = resolveImageSubject(topic)
+  const lead = resolveImageSubject(topic, plainTextDraft)
   if (lead) {
     const li = out.findIndex((x) => x.toLowerCase() === lead.toLowerCase())
     if (li > 0) {
@@ -256,7 +256,7 @@ export function listImageSubjects(topic, plainTextDraft = '') {
  */
 export function listSecondaryImageSubjects(topic, plainTextDraft = '') {
   const all = listImageSubjects(topic, plainTextDraft)
-  const lead = resolveImageSubject(topic)
+  const lead = resolveImageSubject(topic, plainTextDraft)
   return all.filter((s) => {
     if (lead && s.toLowerCase() === lead.toLowerCase()) return false
     const full = expandEntityFullName(s) || s
@@ -462,7 +462,7 @@ export function resolveSceneImageSubject(input = {}) {
   const topic = String(input.topic || '').trim()
   const caption = String(input.caption || '')
   const draft = String(input.plainTextDraft || '')
-  const lead = resolveImageSubject(topic) || topic || 'football'
+  const lead = resolveImageSubject(topic, draft) || topic || 'football'
   const secondary = listSecondaryImageSubjects(topic, draft)
   if (!secondary.length) return lead
 
@@ -477,7 +477,39 @@ export function resolveSceneImageSubject(input = {}) {
   return lead
 }
 
-export function resolveImageSubject(topic) {
+/**
+ * When a topic resolves to a bare, unrecognized single word (e.g. "Antonio"),
+ * a plain first name shared by several unrelated football people — Michail
+ * Antonio (a West Ham player), Antonio Conte (a manager), Antonio Brown (an
+ * NFL player) — every downstream entity/subject check is working with the
+ * same ambiguous word and cannot tell them apart, and image search for a bare
+ * first name alone is a coin flip on which "Antonio" it returns. If the draft
+ * spells out a fuller name that the bare word is the tail of ("Michail
+ * Antonio was refused...") use that instead — it is almost always the
+ * writer's actual subject, and every existing multi-word name guard (surname
+ * collisions, coach detection, entity gates) handles it far better than a
+ * bare mononym.
+ * @param {string} bareLead
+ * @param {string} draft
+ * @returns {string}
+ */
+function expandBareLeadFromDraft(bareLead, draft) {
+  const lead = String(bareLead || '').trim()
+  if (!lead || /\s/.test(lead)) return lead
+  const text = String(draft || '').trim()
+  if (!text) return lead
+  const re = new RegExp(`\\b((?:[A-Z][a-zA-Z'-]+\\s+){1,2}${escapeRe(lead)})\\b`)
+  const m = text.match(re)
+  return m?.[1] ? m[1].replace(/\s+/g, ' ').trim() : lead
+}
+
+/**
+ * @param {string} topic
+ * @param {string} [plainTextDraft] optional — expands a bare unrecognized
+ *   mononym topic ("Antonio") to a fuller name found in the draft ("Michail
+ *   Antonio") when one exists. Omit to keep the old topic-only behavior.
+ */
+export function resolveImageSubject(topic, plainTextDraft = '') {
   const cleaned = sanitizeTopicForImageSearch(topic)
   const entities = primaryImageEntities(cleaned)
   const hay = cleaned.toLowerCase()
@@ -506,7 +538,8 @@ export function resolveImageSubject(topic) {
     .filter((w) => !COMP_WORD_RE.test(w) && !NAME_BREAK_RE.test(w))
     .join(' ')
     .trim()
-  return cleanedEnt || first || 'football'
+  const bareLead = cleanedEnt || first || 'football'
+  return plainTextDraft ? expandBareLeadFromDraft(bareLead, plainTextDraft) : bareLead
 }
 
 /**
@@ -1178,7 +1211,7 @@ export function anchorSceneImageQuery({
   intent: intentOpt,
   sceneCount,
 } = {}) {
-  const lead = resolveImageSubject(topic || '') || String(topic || 'football').trim()
+  const lead = resolveImageSubject(topic || '', plainTextDraft || '') || String(topic || 'football').trim()
   const secondary = listSecondaryImageSubjects(topic || '', plainTextDraft || '')
   const raw = String(imageQuery || '').trim()
 

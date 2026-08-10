@@ -9,6 +9,7 @@ import {
   searchSerpApiGoogleImages,
   searchSerpApiGoogleImagesWithStatus,
   formatSerpApiSearchHealthNote,
+  withoutAmericanSportsAmbiguity,
   EOF_SERPAPI_MAX_QUERIES_PER_JOB,
   serpApiEngine,
 } from '../backend/api/lib/eofSerpApiImages.mjs'
@@ -46,6 +47,41 @@ describe('eofSerpApiImages', () => {
     else process.env.SERPAPI_KEY = prevShort
     if (prevEof == null) delete process.env.EOF_SERPAPI_API_KEY
     else process.env.EOF_SERPAPI_API_KEY = prevEof
+  })
+
+  it('excludes American-football terms from ambiguous "football" queries', () => {
+    // Regression: a bare "<subject> football" query returned NFL results (no
+    // gl/hl locale hint means Google's default lean is American-football-
+    // heavy for the word "football"). Exclude it at the search level.
+    assert.match(withoutAmericanSportsAmbiguity('"Antonio" football'), /-nfl/)
+    assert.match(withoutAmericanSportsAmbiguity('"Antonio" football manager'), /-"american football"/i)
+    assert.doesNotMatch(withoutAmericanSportsAmbiguity(''), /-nfl/)
+    // Queries that never say "football" at all have nothing to disambiguate.
+    assert.equal(withoutAmericanSportsAmbiguity('"Marc Cucurella" Chelsea hair'), '"Marc Cucurella" Chelsea hair')
+    // A caller that explicitly wants NFL content must not have it excluded.
+    assert.doesNotMatch(withoutAmericanSportsAmbiguity('Tom Brady nfl highlights'), /-nfl/)
+  })
+
+  it('sends the American-sports exclusion in the actual outgoing SerpAPI request', async () => {
+    const prevKey = process.env.SERPAPI_API_KEY
+    process.env.SERPAPI_API_KEY = 'mock-key'
+    const originalFetch = globalThis.fetch
+    const fetchMock = mock.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ images_results: [] }),
+      text: async () => '',
+    }))
+    globalThis.fetch = fetchMock
+    try {
+      await searchSerpApiGoogleImagesWithStatus('"Antonio" football', { limit: 5 })
+      const calledUrl = new URL(String(fetchMock.mock.calls[0].arguments[0]))
+      assert.match(calledUrl.searchParams.get('q') || '', /-nfl/, 'the real request must exclude nfl')
+    } finally {
+      globalThis.fetch = originalFetch
+      if (prevKey == null) delete process.env.SERPAPI_API_KEY
+      else process.env.SERPAPI_API_KEY = prevKey
+    }
   })
 
   it('builds google_images URL with optional gl/hl and never logs the key in path alone', () => {
