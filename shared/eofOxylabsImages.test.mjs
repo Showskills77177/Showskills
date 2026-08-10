@@ -177,6 +177,30 @@ describe('eofOxylabsImages', () => {
     assert.doesNotMatch(q0, /pundit/i)
   })
 
+  it('does not turn an unrecognized subject into a "football manager" search over a contrast mention', () => {
+    // Regression from a real production Railway log: subject "Antonio" (a
+    // player) produced the live SerpAPI query `"Antonio" football manager`.
+    // buildOxylabsJobQuery calls detectImageRoleIntent directly with the raw,
+    // unstripped draft — a prior fix guarded two OTHER callers
+    // (buildSceneImageSearchQueries / defaultSceneImageQuery in
+    // eofSceneImageQueries.mjs) but not this one, the actual live
+    // fetchEofSerpApiJobPool → buildOxylabsJobQuery path, so the bug shipped
+    // anyway. The guard now lives inside detectImageRoleIntent itself so every
+    // caller — this one included — is protected without opting in.
+    const draft =
+      "Michail Antonio was refused compassionate leave for his own father's burial by his club. " +
+      'Contrast that with a manager like David Moyes, who has always let players go home for family funerals no questions asked. ' +
+      'Antonio deserved better than this.'
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const q = buildOxylabsJobQuery('Antonio', attempt, { plainTextDraft: draft })
+      assert.doesNotMatch(q, /manager/i, `attempt=${attempt} must not search for a manager, got "${q}"`)
+      assert.match(q, /Antonio/i)
+    }
+    // A genuinely named coach subject must still get coach-biased queries.
+    const tuchelDraft = "Thomas Tuchel's tactics left England exposed again."
+    assert.match(buildOxylabsJobQuery('Thomas Tuchel', 0, { plainTextDraft: tuchelDraft }), /manager/i)
+  })
+
   it('ranks pundit studio titles above playing kit titles for Rooney TV scripts', () => {
     const year = new Date().getFullYear()
     const hits = [
