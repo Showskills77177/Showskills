@@ -270,19 +270,15 @@ describe('eofSceneImageQueries', () => {
     // Regression (from a real Railway worker log): topic/subject "Antonio" with a
     // draft that contrasts the player against "a manager like David Moyes" made
     // the whole job's image search become "Antonio football manager" — Moyes
-    // being named (correctly recognized) leaked coach intent onto Antonio, and a
-    // second, unguarded topicLooksLikeCoach(blob) fallback re-introduced the same
-    // leak even after the first guard was added. Neither the bare "manager" word
-    // nor a different, named secondary coach may hijack an unrecognized subject's
-    // own search intent — only the subject's own name/topic can.
+    // being named (correctly recognized) leaked coach intent onto Antonio. The
+    // strip-before-detect guard now lives inside detectImageRoleIntent itself
+    // (see eofOxylabsImages.test.mjs for the regression on the actual live
+    // production path, buildOxylabsJobQuery, which a caller-side-only version
+    // of this fix had missed).
     const draft =
       "Michail Antonio was refused compassionate leave for his own father's burial by his club. " +
       'Contrast that with a manager like David Moyes, who has always let players go home for family funerals no questions asked. ' +
       'Antonio deserved better than this.'
-    // detectImageRoleIntent itself trusts a genuinely NAMED coach anywhere in the
-    // blob (correct for e.g. a Tuchel-topic Short) — callers that resolve a
-    // DIFFERENT primary subject are responsible for stripping secondary named
-    // coaches first, which buildSceneImageSearchQueries/defaultSceneImageQuery do.
     const qs = buildSceneImageSearchQueries({ topic: 'Antonio', plainTextDraft: draft, sceneIndex: 0 })
     assert.ok(!qs.some((q) => /manager/i.test(q)), `must not search for a manager: ${JSON.stringify(qs)}`)
 

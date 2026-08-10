@@ -544,27 +544,45 @@ export function detectImageRoleIntent(input = {}) {
   if (input?.intent && ['pundit', 'playing', 'coach', 'neutral'].includes(input.intent)) {
     return input.intent
   }
-  const captions = Array.isArray(input.captions)
-    ? input.captions.join(' ')
-    : String(input.captions || '')
-  const blob = [input.topic, input.plainTextDraft, captions, input.imageQuery]
+  const topicText = String(input.topic || '').trim()
+  const captionsRaw = Array.isArray(input.captions) ? input.captions.join(' ') : String(input.captions || '')
+
+  // A coach signal (a named manager, or a bare role word like "manager") is
+  // only trustworthy when it is actually about the SUBJECT. A long draft
+  // almost always mentions someone else's manager, a rival manager, or a
+  // contrast ("his club vs a manager like David Moyes who would have...")
+  // that has nothing to do with the subject themselves being a coach. Strip
+  // every OTHER named coach out of the draft/captions/imageQuery before
+  // building the blob — unless the subject's own topic string already looks
+  // like a coach, in which case that signal is genuine and must stay. This
+  // guard lives HERE (not in each caller) so every current and future caller
+  // of detectImageRoleIntent gets it automatically — a per-caller version of
+  // this same fix was previously added only to two of three real call sites
+  // and the third (fetchEofSerpApiJobPool → buildOxylabsJobQuery, the actual
+  // live production path) kept shipping "<subject> football manager".
+  const subjectIsCoach = topicLooksLikeCoach(topicText)
+  const draftText = subjectIsCoach
+    ? String(input.plainTextDraft || '')
+    : stripOtherNamedCoachMentions(input.plainTextDraft)
+  const captionsText = subjectIsCoach ? captionsRaw : stripOtherNamedCoachMentions(captionsRaw)
+  const imageQueryText = subjectIsCoach
+    ? String(input.imageQuery || '')
+    : stripOtherNamedCoachMentions(input.imageQuery)
+
+  const blob = [topicText, draftText, captionsText, imageQueryText]
     .map((s) => String(s || '').trim())
     .filter(Boolean)
     .join(' \n ')
   if (!blob) return 'neutral'
 
-  // Active coaches / manager headlines win over weak “said” noise. A NAMED coach
-  // is trusted anywhere in the blob. But a bare role word ("manager"/"coach"/
-  // "boss"/"gaffer") with no name attached is weak on its own — a long draft
-  // almost always mentions someone's manager, a rival manager, or a contrast
-  // ("his club vs a manager like Moyes who would have...") that has nothing to
-  // do with the subject being a manager themselves. An unrecognized subject
-  // (e.g. topic "Antonio", no surname context) must not get bounced onto
-  // "<subject> football manager" queries just because "manager" appears
-  // somewhere else in the draft — only trust the bare role word when it is
-  // part of the subject's own topic/name string.
+  // An unrecognized subject (e.g. topic "Antonio", no surname context) must
+  // not get bounced onto "<subject> football manager" just because a bare
+  // role word appears somewhere in the (already-stripped) draft — only trust
+  // it when it is part of the subject's own topic/name string. A genuinely
+  // named coach that survived the strip above (i.e. IS the subject) is
+  // trusted anywhere in the blob.
   const namedCoachInBlob = KNOWN_COACH_RE.test(blob)
-  const roleWordNamesTheSubject = COACH_ROLE_RE.test(String(input.topic || ''))
+  const roleWordNamesTheSubject = COACH_ROLE_RE.test(topicText)
   if ((namedCoachInBlob || roleWordNamesTheSubject) && !PLAYING_STRONG_RE.test(blob)) {
     return 'coach'
   }
