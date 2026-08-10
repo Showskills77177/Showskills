@@ -286,6 +286,35 @@ describe('eofSceneImageQueries', () => {
     assert.doesNotMatch(angle, /manager/i)
   })
 
+  it('expands a bare unrecognized topic to the fuller name spelled out in the draft', () => {
+    // Regression (from a real Antonio job): topic "Antonio" alone is a bare
+    // first name shared by Michail Antonio (a West Ham player), Antonio Conte
+    // (a manager), and Antonio Brown (an NFL player) — every substring-based
+    // entity/subject check treats all three as the same match. The draft
+    // itself spells out "Michail Antonio" in its first sentence; the subject
+    // resolver must use that instead of staying on the bare, three-way-
+    // ambiguous "Antonio".
+    const draft =
+      "Michail Antonio was refused compassionate leave for his own father's burial by his club. " +
+      'Antonio deserved better than this.'
+    assert.equal(resolveImageSubject('Antonio'), 'Antonio', 'topic-only call must be unchanged (no draft passed)')
+    assert.equal(resolveImageSubject('Antonio', draft), 'Michail Antonio')
+
+    // Must not perturb an already-recognized name with an unrelated draft.
+    assert.equal(
+      resolveImageSubject('Marc Cucurella', 'Some unrelated draft about a different story entirely.'),
+      'Marc Cucurella',
+    )
+
+    // Must not invent an expansion when the draft has no fuller name for the
+    // bare lead (e.g. the capitalized word before it is just a sentence start,
+    // not part of a proper name).
+    assert.equal(
+      resolveImageSubject('Antonio', 'Reports linked Antonio to a move. His manager backed him.'),
+      'Antonio',
+    )
+  })
+
   it('resolves Ferguson to Sir Alex Ferguson instead of losing to a named club', () => {
     // Regression: "ferguson" was not a recognized coach, so resolveImageSubject's
     // named-entity ranking skipped him entirely and picked the multi-word club

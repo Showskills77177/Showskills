@@ -99,6 +99,28 @@ export function serpApiHl() {
   return envTrim('SERPAPI_HL') || ''
 }
 
+/**
+ * Google Images (and SerpAPI, which proxies raw Google query syntax) treats a
+ * bare "football" query as ambiguous without an explicit locale/gl hint, and
+ * in practice leans American-football-heavy by default — a Short about
+ * "Antonio" (a West Ham player) surfaced NFL results because nothing in the
+ * query told Google which "football". Exclude the American-sports reading at
+ * the SEARCH level (Google's documented `-word` operator, which works on
+ * Images too) rather than only scoring it down after the fact: a real
+ * association-football photo title never needs "NFL"/"touchdown"/etc, so this
+ * can only help a genuine hit, never cost one. Applied here — the one place
+ * every SerpAPI Google Images call passes through — so every current and
+ * future caller (job pool, secondary pool, rebuilds, …) is covered without
+ * needing to opt in per call site.
+ * @param {string} query
+ */
+export function withoutAmericanSportsAmbiguity(query) {
+  const q = String(query || '').trim()
+  if (!q || !/\bfootball\b/i.test(q)) return q
+  if (/\bnfl\b/i.test(q)) return q // caller explicitly wants NFL-adjacent content
+  return `${q} -nfl -"american football" -touchdown -quarterback -"super bowl"`
+}
+
 function isHttpUrl(value) {
   return typeof value === 'string' && /^https?:\/\//i.test(value.trim())
 }
@@ -231,7 +253,7 @@ export async function searchSerpApiGoogleImagesWithStatus(query, opts = {}) {
     }
   }
 
-  const q = String(query || '').trim()
+  const q = withoutAmericanSportsAmbiguity(String(query || '').trim())
   if (!q) {
     recordSerpApiAttempt({ query: '', status: 'empty', hits: 0, detail: 'empty query' })
     return {
@@ -460,7 +482,7 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
     query,
     intent,
     source: 'serpapi',
-    subject: resolveImageSubject(opts.topic || '') || null,
+    subject: resolveImageSubject(opts.topic || '', opts.plainTextDraft || '') || null,
     health,
     healthNote,
     hits: kept.map((h) => ({
