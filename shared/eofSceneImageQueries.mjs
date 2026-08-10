@@ -75,7 +75,7 @@ const COMP_NOISE_RE =
 
 /** Well-known managers/coaches — avoid “football player” image queries. */
 const KNOWN_COACH_RE =
-  /\b(tuchel|guardiola|klopp|mourinho|ancelotti|arteta|slot|postecoglou|ten\s*hag|conte|sarri|flick|nagelsmann|spalletti|deschamps|scaloni|southgate|xabi\s*alonso|alonso|de\s*zerbi|emery|roger[s]?|kompany|inzaghi|pirez|pirlo|lampard|gerrard|neville)\b/i
+  /\b(tuchel|guardiola|klopp|mourinho|ancelotti|arteta|slot|postecoglou|ten\s*hag|conte|sarri|flick|nagelsmann|spalletti|deschamps|scaloni|southgate|xabi\s*alonso|alonso|de\s*zerbi|emery|roger[s]?|kompany|inzaghi|pirez|pirlo|lampard|gerrard|neville|ferguson|wenger|moyes|benitez|redknapp|ranieri|allardyce|hodgson|dyche|maresca|amorim|iraola)\b/i
 
 const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
 
@@ -159,6 +159,18 @@ const PLAYER_FULL_NAMES = [
   [/^ancelotti$/i, 'Carlo Ancelotti'],
   [/^nagelsmann$/i, 'Julian Nagelsmann'],
   [/^southgate$/i, 'Gareth Southgate'],
+  [/^ferguson$/i, 'Sir Alex Ferguson'],
+  [/^conte$/i, 'Antonio Conte'],
+  [/^wenger$/i, 'Arsene Wenger'],
+  [/^moyes$/i, 'David Moyes'],
+  [/^benitez$/i, 'Rafael Benitez'],
+  [/^redknapp$/i, 'Harry Redknapp'],
+  [/^ranieri$/i, 'Claudio Ranieri'],
+  [/^allardyce$/i, 'Sam Allardyce'],
+  [/^hodgson$/i, 'Roy Hodgson'],
+  [/^dyche$/i, 'Sean Dyche'],
+  [/^maresca$/i, 'Enzo Maresca'],
+  [/^amorim$/i, 'Ruben Amorim'],
 ]
 
 /**
@@ -269,6 +281,15 @@ function escapeRe(token) {
 }
 
 /**
+ * Surnames that are ALSO a different well-known football person's given/full
+ * name — matching on the surname alone would credit the wrong person's photo.
+ * Michail Antonio's surname "Antonio" is Antonio Conte's first name, so a
+ * title like "Antonio Conte press conference" must not pass as a Michail
+ * Antonio still just because it contains the word "Antonio".
+ */
+const AMBIGUOUS_SURNAME_RE = /^(antonio)$/i
+
+/**
  * Surname / full-name cues for a subject (Wayne Rooney → { full, surname, tokens }).
  * Used to gate SERP stills so “two random guys” never pass on a Rooney Short.
  * @param {string} subject
@@ -299,9 +320,15 @@ export function hitMentionsSubject(subject, title = '', url = '') {
   const hay = `${title || ''} ${url || ''}`.toLowerCase()
   if (!hay.trim()) return false
   if (full && hay.includes(full.toLowerCase())) return true
-  if (surname.length >= 4 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(hay)) return true
+  // Surname-alone matching must never fire for a surname that is itself another
+  // known person's first name (Michail Antonio ↔ Antonio Conte) — fall through
+  // to the two-token checks below, which require BOTH names to be present.
+  const ambiguousSurname = tokens.length >= 2 && AMBIGUOUS_SURNAME_RE.test(surname)
+  if (!ambiguousSurname && surname.length >= 4 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(hay)) {
+    return true
+  }
   // Fuzzy surname: Cuccorea (topic typo) ≈ Cucurella (real photo titles).
-  if (surname.length >= 5) {
+  if (!ambiguousSurname && surname.length >= 5) {
     const hayToks = hay.split(/[^a-z0-9à-ÿ]+/i).filter((t) => t.length >= 4)
     if (hayToks.some((t) => tokensLooselyEqual(surname, t))) return true
   }
@@ -526,8 +553,19 @@ export function detectImageRoleIntent(input = {}) {
     .join(' \n ')
   if (!blob) return 'neutral'
 
-  // Active coaches / manager headlines win over weak “said” noise.
-  if (topicLooksLikeCoach(blob) && !PLAYING_STRONG_RE.test(blob)) {
+  // Active coaches / manager headlines win over weak “said” noise. A NAMED coach
+  // is trusted anywhere in the blob. But a bare role word ("manager"/"coach"/
+  // "boss"/"gaffer") with no name attached is weak on its own — a long draft
+  // almost always mentions someone's manager, a rival manager, or a contrast
+  // ("his club vs a manager like Moyes who would have...") that has nothing to
+  // do with the subject being a manager themselves. An unrecognized subject
+  // (e.g. topic "Antonio", no surname context) must not get bounced onto
+  // "<subject> football manager" queries just because "manager" appears
+  // somewhere else in the draft — only trust the bare role word when it is
+  // part of the subject's own topic/name string.
+  const namedCoachInBlob = KNOWN_COACH_RE.test(blob)
+  const roleWordNamesTheSubject = COACH_ROLE_RE.test(String(input.topic || ''))
+  if ((namedCoachInBlob || roleWordNamesTheSubject) && !PLAYING_STRONG_RE.test(blob)) {
     return 'coach'
   }
 
@@ -545,7 +583,9 @@ export function detectImageRoleIntent(input = {}) {
   if (playingScore >= 3 && punditScore === 0) return 'playing'
   if (punditScore > playingScore && punditScore >= 2) return 'pundit'
   if (playingScore > punditScore && playingScore >= 2) return 'playing'
-  if (topicLooksLikeCoach(blob)) return 'coach'
+  // Same rule as the early return above: only a named coach, or a role word
+  // that names the subject itself, may resolve this as 'coach'.
+  if (namedCoachInBlob || roleWordNamesTheSubject) return 'coach'
   return 'neutral'
 }
 
@@ -721,9 +761,17 @@ export function entityMentionsInHaystack(entity, hay) {
   const strong = parts.filter((p) => p.length >= 4)
   if (strong.length >= 2 && strong.every((p) => h.includes(p))) return true
 
-  // Surname-only fallback for 2+ word names.
+  // Surname-only fallback for 2+ word names — never for a surname that is itself
+  // another known person's first name (Michail Antonio ↔ Antonio Conte); the
+  // `strong.every` check above already requires every given name too in that case.
   const surname = parts[parts.length - 1]
-  if (surname.length >= 5 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(h)) return true
+  if (
+    !(parts.length >= 2 && AMBIGUOUS_SURNAME_RE.test(surname)) &&
+    surname.length >= 5 &&
+    new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(h)
+  ) {
+    return true
+  }
 
   return false
 }
@@ -802,6 +850,20 @@ const COACH_ANGLES = [
 ]
 
 /**
+ * Strip OTHER named coaches (and the bare "Thomas") out of text before role-
+ * intent detection, so a secondary manager mentioned only as a contrast —
+ * "Antonio deserved better than a manager like David Moyes" — never hijacks
+ * the PRIMARY subject's own pundit/playing/coach intent. Only call this when
+ * the primary subject itself is not already a known coach.
+ * @param {string} text
+ */
+function stripOtherNamedCoachMentions(text) {
+  return String(text || '')
+    .replace(new RegExp(KNOWN_COACH_RE.source, 'gi'), ' ')
+    .replace(/\bthomas\b/gi, ' ')
+}
+
+/**
  * @param {'pundit'|'playing'|'coach'|'neutral'} intent
  */
 function anglesForIntent(intent) {
@@ -827,11 +889,20 @@ export function buildSceneImageSearchQueries({
   const entities = primaryImageEntities(name, custom)
   const core = entities.slice(0, 2).join(' ') || extractTopicImageTokens(name).slice(0, 2).join(' ') || name || 'football'
   const year = new Date().getFullYear()
+  // A secondary manager named only as a contrast ("Antonio vs a manager like
+  // Moyes") must not hijack an unrecognized/player subject's own search intent
+  // and turn it into "<subject> football manager". Only the subject's own name
+  // is trusted to carry a coach signal here — matches defaultSceneImageQuery.
+  const subjectIsCoach = topicLooksLikeCoach(name) || topicLooksLikeCoach(core)
   const intent = detectImageRoleIntent({
     topic: name,
     imageQuery: custom,
-    plainTextDraft,
-    captions,
+    plainTextDraft: subjectIsCoach ? plainTextDraft : stripOtherNamedCoachMentions(plainTextDraft),
+    captions: subjectIsCoach
+      ? captions
+      : Array.isArray(captions)
+        ? captions.map(stripOtherNamedCoachMentions)
+        : stripOtherNamedCoachMentions(captions),
     intent: intentOpt,
   })
   const coach = intent === 'coach'
@@ -1008,6 +1079,29 @@ export function imageAngleFromCaption(caption, subject, coachOrIntent = false) {
 }
 
 /**
+ * True when a caption's own wording already signals a distinct photo beat —
+ * tactics, training, celebration, sideline, press/interview, matchday, pundit
+ * desk — the same cues `imageAngleFromCaption` matches. Used so a scene's
+ * default image query can follow its own caption instead of whichever angle
+ * the scene-index round-robin happens to land on (e.g. a "trains every day"
+ * caption must not get a "celebrating" still just because it is scene 3 of 5).
+ * @param {string} caption
+ */
+export function captionNamesSpecificImageBeat(caption) {
+  const c = String(caption || '').toLowerCase()
+  if (!c) return false
+  return (
+    /\b(pundit|studio|sky|tnt|presenter|analysis|desk)\b/.test(c) ||
+    /\btactic|formation|system|shape|press(ing)?\b/.test(c) ||
+    /\bpress|interview|says|said|quotes?\b/.test(c) ||
+    /\btrain|session|drill\b/.test(c) ||
+    /\bcelebrat|goal|scores?|winner\b/.test(c) ||
+    /\bsideline|touchline|bench\b/.test(c) ||
+    /\bmatch|game|derby|final\b/.test(c)
+  )
+}
+
+/**
  * Per-scene image search line for auto-generated scripts.
  * @param {string} topic
  * @param {number} sceneIndex
@@ -1035,17 +1129,19 @@ export function defaultSceneImageQuery(topic, sceneIndex, opts = {}) {
     resolvedIntent = blobIntent === 'playing' ? 'playing' : 'coach'
   } else {
     // Strip other named coaches from the draft so “Rooney on Tuchel” stays pundit/playing for Rooney.
-    const stripCoaches = (text) =>
-      String(text || '')
-        .replace(new RegExp(KNOWN_COACH_RE.source, 'gi'), ' ')
-        .replace(/\bthomas\b/gi, ' ')
     resolvedIntent = detectImageRoleIntent({
       topic: core,
-      caption: stripCoaches(caption),
-      plainTextDraft: stripCoaches(opts.plainTextDraft),
+      caption: stripOtherNamedCoachMentions(caption),
+      plainTextDraft: stripOtherNamedCoachMentions(opts.plainTextDraft),
       intent: opts.intent === 'coach' ? undefined : opts.intent,
     })
     if (resolvedIntent === 'coach') resolvedIntent = 'neutral'
+  }
+  // A caption that names its own beat deserves that specific angle — this is the
+  // same correction anchorSceneImageQuery applies to AI-written queries, so a
+  // manual/local-split script's images track its own captions just as closely.
+  if (caption && captionNamesSpecificImageBeat(caption)) {
+    return imageAngleFromCaption(caption, core, resolvedIntent)
   }
   const angles = anglesForIntent(resolvedIntent)
   return angles[sceneIndex % angles.length](core)

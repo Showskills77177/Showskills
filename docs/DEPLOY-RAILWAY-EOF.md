@@ -18,6 +18,17 @@ If `EOF_WORKER_URL` is unset, behaviour is unchanged (Vercel encode).
 2. Branch: **`staging`** (not `main`)
 3. No custom domain — use **Generate Domain** (`*.up.railway.app`)
 4. Start command (also in `railway.toml`): `node scripts/eof-railway-worker.mjs`
+5. **Builder must be Dockerfile**, not Nixpacks/Railpack. `railway.toml` sets
+   `[build] builder = "DOCKERFILE"` explicitly, which overrides the
+   dashboard's Builder setting — but only a service created (or previously
+   configured) with Nixpacks and then switched later can silently drift back
+   if that line is ever removed. **Only the Dockerfile installs yt-dlp**
+   (`nixpacks.toml` was removed for exactly this reason — it only had
+   ffmpeg). If yt-dlp goes missing on a live worker with no error, this is
+   the first thing to check: open the service's **Deployments** tab and
+   confirm the active deployment actually built from the Dockerfile, and
+   check the boot log for `[eof-worker] yt-dlp available` vs
+   `[eof-worker] yt-dlp NOT FOUND`.
 
 ## Variables on Railway
 
@@ -54,3 +65,16 @@ curl -sS -X POST https://YOUR.up.railway.app/eof-worker/render \
 ```
 
 Expect `202` then watch the job reach `video_rendered` in EOF Production.
+
+Also check the deploy's boot logs for one of:
+
+```
+[eof-worker] yt-dlp available — real-footage pipeline enabled
+[eof-worker] yt-dlp NOT FOUND — ...
+```
+
+If it says `NOT FOUND`, the service built with the wrong Builder (see above)
+— redeploy after confirming `railway.toml`'s `builder = "DOCKERFILE"` is
+actually in effect (Deployments tab → active deployment → build logs should
+show the `docker build` / `apt-get install` steps from the Dockerfile, not a
+Nixpacks/Railpack build plan).

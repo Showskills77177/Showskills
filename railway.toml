@@ -1,6 +1,19 @@
 # Railway EOF video worker (staging Shorts encode — not showskills.co.uk).
 # Service start: node scripts/eof-railway-worker.mjs
 # Set branch to `staging` (or the worker PR branch). Do NOT attach a custom domain.
+#
+# builder MUST stay DOCKERFILE — the Dockerfile installs the yt-dlp standalone
+# binary (real-footage pipeline) alongside ffmpeg; nixpacks.toml does NOT and
+# must never be revived. Railway config-as-code overrides the dashboard's
+# Builder setting, so this line is what actually decides the builder even if
+# the dashboard still has an old Nixpacks/Railpack service setting from before
+# the Dockerfile existed. Do NOT remove this section "to let Railway
+# auto-detect" — a prior commit did exactly that (after setting the earlier
+# invalid value "DOCKER" instead of "DOCKERFILE") and it silently fell back to
+# whatever builder the dashboard remembered, which is how yt-dlp went missing
+# on a live worker with no visible error.
+[build]
+builder = "DOCKERFILE"
 
 [deploy]
 startCommand = "node scripts/eof-railway-worker.mjs"
