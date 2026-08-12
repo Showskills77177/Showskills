@@ -875,6 +875,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             try {
               wikiPool = await listWikimediaPersonImages(job.topic, {
                 limit: Math.max(8, rows.length + 3),
+                plainTextDraft: draftForSubject,
               })
             } catch (e) {
               console.warn(

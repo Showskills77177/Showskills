@@ -265,7 +265,7 @@ export function listSecondaryImageSubjects(topic, plainTextDraft = '') {
   })
 }
 
-function personMentionedInText(person, text) {
+export function personMentionedInText(person, text) {
   const parts = String(person || '')
     .toLowerCase()
     .split(/\s+/)

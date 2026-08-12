@@ -306,12 +306,16 @@ function subjectSearchQueries(subject, topic) {
  * Use this on Rebuild so we don't hammer Wikidata once per scene (Vercel timeouts).
  *
  * @param {string} topic
- * @param {{ limit?: number }} [opts]
+ * @param {{ limit?: number, plainTextDraft?: string }} [opts] `plainTextDraft` expands a
+ *   bare, ambiguous mononym topic ("Antonio") to the fuller name the draft actually spells
+ *   out ("Michail Antonio") — without it Wikidata/Commons resolves the bare word to
+ *   whichever unrelated person of that name it ranks first (a real production bug: a bare
+ *   "Antonio" topic once returned an unrelated Indian public figure's photo).
  * @returns {Promise<Array<{ imgUrl: string, title: string, queryUsed: string, relevance: number, year: number, sourceDetail: string }>>}
  */
 export async function listWikimediaPersonImages(topic, opts = {}) {
   const limit = Math.max(1, Math.min(20, Number(opts.limit) || 8))
-  const subject = resolveImageSubject(topic) || String(topic || '').trim()
+  const subject = resolveImageSubject(topic, opts.plainTextDraft || '') || String(topic || '').trim()
   if (!subject || subject === 'football' || subject.length < 2) return []
 
   const byKey = new Map()
@@ -397,7 +401,10 @@ export async function searchWikimediaCommonsImages(query, index = 0, opts = {}) 
     return { ...pick }
   }
 
-  const listed = await listWikimediaPersonImages(topic || query, { limit: 12 })
+  const listed = await listWikimediaPersonImages(topic || query, {
+    limit: 12,
+    plainTextDraft: opts.plainTextDraft || '',
+  })
   if (!listed.length) {
     console.warn('[eof-wikimedia] no on-topic recent hits for', topic || query)
     return null

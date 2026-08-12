@@ -10,6 +10,8 @@ import {
   anchorSceneImageQuery,
   hitMentionsSubject,
   isNamedFootballSubject,
+  listSecondaryImageSubjects,
+  personMentionedInText,
 } from '../../../shared/eofSceneImageQueries.mjs'
 import {
   isPinterestPinUrl,
@@ -619,7 +621,16 @@ async function fetchEofSceneImageInner({
 
   // Last resort only: Wikidata/Commons (pre-built pool when available)
   {
-    const subject = resolveImageSubject(topic || custom)
+    // A scene's own caption sometimes names a secondary person (e.g. "Ferguson") distinct
+    // from the job's lead subject — the pre-built wikiPool/blanket draft-expansion only ever
+    // resolves the lead subject, so that secondary person's photo never got sourced even in
+    // this last-resort fallback. Prefer a caption-named secondary subject for this scene only.
+    const secondarySubjects = listSecondaryImageSubjects(topic, draft)
+    const captionSecondary = secondarySubjects.find((s) => personMentionedInText(s, caption))
+    const subject = captionSecondary || resolveImageSubject(topic || custom, draft)
+    // The pre-built wikiPool is single-subject (lead only) — do not reuse it for a
+    // different, secondary-subject scene, or it would hand back the wrong person's photo.
+    const usablePool = captionSecondary ? undefined : wikiPool
     let fallbackDup = null
     for (let t = 0; t < tries; t += 1) {
       let cand = null
@@ -627,7 +638,8 @@ async function fetchEofSceneImageInner({
         const hit = await searchWikimediaCommonsImages(subject || queries[0] || topic || 'football', index, {
           topic: topic || subject,
           rotate: rot + t,
-          pool: Array.isArray(wikiPool) && wikiPool.length ? wikiPool : undefined,
+          pool: Array.isArray(usablePool) && usablePool.length ? usablePool : undefined,
+          plainTextDraft: draft,
         })
         if (hit && (hit.relevance ?? 0) >= 6) {
           cand = {

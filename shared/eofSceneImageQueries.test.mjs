@@ -17,6 +17,8 @@ import {
   entityMentionsInHaystack,
   topicLooksLikeCoach,
   expandPlayerFullName,
+  listSecondaryImageSubjects,
+  personMentionedInText,
 } from './eofSceneImageQueries.mjs'
 import { normalizeFootballTopicQuery } from './eofFootballTopicNormalize.mjs'
 
@@ -325,6 +327,27 @@ describe('eofSceneImageQueries', () => {
     assert.equal(topicLooksLikeCoach('Sir Alex Ferguson'), true)
     assert.equal(expandPlayerFullName('ferguson'), 'Sir Alex Ferguson')
     assert.equal(expandPlayerFullName('conte'), 'Antonio Conte')
+  })
+
+  it('finds a caption-named secondary subject with personMentionedInText (Antonio job, Ferguson contrast)', () => {
+    // Regression: an Antonio job that contrasts him against Sir Alex Ferguson names
+    // Ferguson only as a secondary/contrast figure. The scene whose caption is
+    // actually about Ferguson must be able to detect that so his own photo can be
+    // sourced for that scene — a bare surname match on the caption is enough.
+    const topic = 'Michail Antonio'
+    const draft =
+      "Michail Antonio was refused compassionate leave for his own father's burial by his club. " +
+      'Contrast that with Sir Alex Ferguson, who always let players go home for family funerals.'
+    const secondaries = listSecondaryImageSubjects(topic, draft)
+    assert.ok(
+      secondaries.some((s) => /ferguson/i.test(s)),
+      `expected Ferguson among secondary subjects, got: ${JSON.stringify(secondaries)}`,
+    )
+    const fergusonCaption = 'Contrast that with Sir Alex Ferguson, who always let players go home.'
+    const antonioCaption = 'Michail Antonio was refused compassionate leave for his own father\'s burial.'
+    const fergusonMatch = secondaries.find((s) => personMentionedInText(s, fergusonCaption))
+    assert.ok(fergusonMatch, 'Ferguson caption must match a secondary subject')
+    assert.ok(!secondaries.some((s) => personMentionedInText(s, antonioCaption)), 'Antonio-only caption must not falsely match a secondary subject')
   })
 
   it('normalizes Cuccorea typo to Marc Cucurella for image search + subject cues', () => {
