@@ -1015,6 +1015,8 @@ export default function EofProductionPanel({
   const [scriptProvider, setScriptProvider] = useState(() => readStoredScriptProvider() || 'auto')
   const [preferredScriptProvider, setPreferredScriptProvider] = useState('template')
   const [ffmpegAvailable, setFfmpegAvailable] = useState(false)
+  const [externalWorkerConfigured, setExternalWorkerConfigured] = useState(false)
+  const [externalWorkerNote, setExternalWorkerNote] = useState('')
   const [topic, setTopic] = useState('')
   const [useOwnScript, setUseOwnScript] = useState(false)
   const [useVideoFootage, setUseVideoFootage] = useState(false)
@@ -1190,6 +1192,8 @@ export default function EofProductionPanel({
       }
       setScriptBillingNote(typeof j.scriptBillingNote === 'string' ? j.scriptBillingNote : '')
       setFfmpegAvailable(Boolean(j.ffmpegAvailable))
+      setExternalWorkerConfigured(Boolean(j.externalWorkerConfigured))
+      setExternalWorkerNote(typeof j.externalWorkerNote === 'string' ? j.externalWorkerNote : '')
       setRenderNote(typeof j.renderNote === 'string' ? j.renderNote : '')
       setImageSources(
         j.imageSources && typeof j.imageSources === 'object'
@@ -3180,6 +3184,10 @@ export default function EofProductionPanel({
               {' · RSS'}
             </p>
             <p>Video: {ffmpegAvailable ? 'Ready' : renderNote || 'ffmpeg missing'}</p>
+            <p className={externalWorkerConfigured ? 'text-[#22c55e]' : 'text-[#fbbf24]'}>
+              Railway worker: {externalWorkerConfigured ? 'Configured' : 'Not configured'}
+              {!externalWorkerConfigured && externalWorkerNote ? ` — ${externalWorkerNote}` : ''}
+            </p>
             <div className="space-y-1.5">
               <span className="text-[#aaaaaa]">Build mode</span>
               <div className="flex overflow-hidden rounded-lg border border-[#303030]">
@@ -5105,6 +5113,13 @@ export default function EofProductionPanel({
                 />
                 Use real video footage (yt-dlp) for this Short
               </label>
+              {!externalWorkerConfigured ? (
+                <p className="mt-2 text-xs text-[#fbbf24]">
+                  No Railway worker configured — this always no-ops on Vercel (silent still-image
+                  fallback for every scene), even with this switched on. Set EOF_WORKER_URL +
+                  EOF_WORKER_SECRET in Vercel to actually source real footage.
+                </p>
+              ) : null}
             </details>
 
             {/* Step 2 — Scenes */}

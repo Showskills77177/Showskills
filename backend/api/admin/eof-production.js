@@ -111,6 +111,7 @@ import {
   resolveElevenLabsVoiceSettings,
 } from '../../../shared/eofElevenLabsVoice.mjs'
 import { eofVoiceRegenerationStatus } from '../../../shared/eofVoiceRegeneration.mjs'
+import { isEofExternalWorkerConfigured } from '../lib/eofProductionWorkerDispatch.mjs'
 
 /** Defer ffmpeg / remux graph until Build / remux actions (hub GET must stay light on Vercel). */
 async function loadEofRenderRunner() {
@@ -338,6 +339,10 @@ export default async function handler(req, res) {
         renderNote: ffmpeg
           ? null
           : 'Video build needs ffmpeg (bundled ffmpeg-static on deploy, or FFMPEG_PATH locally).',
+        externalWorkerConfigured: isEofExternalWorkerConfigured(),
+        externalWorkerNote: isEofExternalWorkerConfigured()
+          ? null
+          : 'No Railway worker configured (EOF_WORKER_URL/EOF_WORKER_SECRET) — real video footage (yt-dlp) always no-ops on Vercel and every scene falls back to a still image, even with "Use real video footage" turned on.',
         pexelsConfigured: eofImageSourceStatus().pexels,
         imageSources: eofImageSourceStatus(),
         imageProvider: imageProviderSettings.imageProvider || 'auto',
