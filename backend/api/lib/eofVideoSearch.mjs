@@ -25,8 +25,16 @@ export async function searchEofVideoCandidates({
     let hits = []
     try {
       hits = await ytDlpSearchMetadata(q, { maxResults: perQuery })
-    } catch {
-      continue // one bad query shouldn't sink the whole search
+    } catch (err) {
+      // One bad query shouldn't sink the whole search, but we must not swallow
+      // the reason — this was previously silent, making "no candidates found"
+      // indistinguishable from a real 0-result search vs. yt-dlp being blocked
+      // (e.g. YouTube's anti-bot "Sign in to confirm you're not a bot" wall).
+      console.warn('[eof-video-footage] search query failed:', q, '—', err instanceof Error ? err.message : err)
+      continue
+    }
+    if (!hits.length) {
+      console.info('[eof-video-footage] search query returned 0 hits:', q)
     }
     for (const hit of hits) {
       if (!hit?.id || byId.has(hit.id)) continue
