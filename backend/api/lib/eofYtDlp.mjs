@@ -1,17 +1,75 @@
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
 let ytDlpPathCache
 let ytDlpAvailableCache
+let ytDlpCookiesPathCache // undefined = not resolved yet, null = resolved to "no cookies"
 
 const MAX_ERROR_MESSAGE = 1400
 const STDERR_EXCERPT = 700
 /** Search/metadata calls should be quick; downloads get their own longer budget. */
 const DEFAULT_SEARCH_TIMEOUT_MS = Number(process.env.EOF_YTDLP_SEARCH_TIMEOUT_MS) || 45_000
 const DEFAULT_DOWNLOAD_TIMEOUT_MS = Number(process.env.EOF_YTDLP_DOWNLOAD_TIMEOUT_MS) || 120_000
+
+/**
+ * YouTube now near-universally blocks yt-dlp's `ytsearch`/download requests
+ * from datacenter IPs with "Sign in to confirm you're not a bot" unless a
+ * real logged-in session's cookies are supplied — no player-client or
+ * user-agent trick reliably bypasses this as of 2026. We accept a Netscape
+ * cookies.txt via one of two env vars so the operator never has to bake a
+ * secret into the image or repo:
+ *   - EOF_YTDLP_COOKIES_PATH: absolute path to an already-mounted cookies file
+ *   - EOF_YTDLP_COOKIES_B64: base64-encoded cookies.txt contents (written to
+ *     a private tmp file once per process)
+ * Returns null (never throws) when neither is configured, so the feature
+ * fails soft back to "no cookies" rather than breaking the whole pipeline.
+ */
+function resolveYtDlpCookiesPath() {
+  if (ytDlpCookiesPathCache !== undefined) return ytDlpCookiesPathCache
+
+  const explicitPath = String(process.env.EOF_YTDLP_COOKIES_PATH || '').trim()
+  if (explicitPath && existsSync(explicitPath)) {
+    ytDlpCookiesPathCache = explicitPath
+    return ytDlpCookiesPathCache
+  }
+
+  const b64 = String(process.env.EOF_YTDLP_COOKIES_B64 || '').trim()
+  if (b64) {
+    try {
+      const dir = path.join(os.tmpdir(), 'eof-ytdlp')
+      mkdirSync(dir, { recursive: true, mode: 0o700 })
+      const outPath = path.join(dir, 'cookies.txt')
+      writeFileSync(outPath, Buffer.from(b64, 'base64'), { mode: 0o600 })
+      ytDlpCookiesPathCache = outPath
+      return ytDlpCookiesPathCache
+    } catch (err) {
+      console.warn(
+        '[eof-video-footage] could not write EOF_YTDLP_COOKIES_B64 to disk — continuing without cookies',
+        err instanceof Error ? err.message : err,
+      )
+    }
+  }
+
+  ytDlpCookiesPathCache = null
+  return ytDlpCookiesPathCache
+}
+
+/** True only once per process — used to log the cookie state exactly once at boot, not per-call. */
+let cookieStateLogged = false
+function logCookieStateOnce(cookiesPath) {
+  if (cookieStateLogged) return
+  cookieStateLogged = true
+  console.info(
+    cookiesPath
+      ? '[eof-video-footage] yt-dlp cookies configured — YouTube bot-check bypass active'
+      : '[eof-video-footage] no yt-dlp cookies configured — YouTube search/downloads will likely fail with "Sign in to confirm you\'re not a bot" (set EOF_YTDLP_COOKIES_B64)',
+  )
+}
 
 function resolveExecTimeoutMs(optsTimeout, fallback) {
   const n = Number(optsTimeout)
@@ -74,8 +132,11 @@ export async function runYtDlp(args, opts = {}) {
   const bin = resolveYtDlpPath()
   const { timeoutMs, ...rest } = opts
   const ms = resolveExecTimeoutMs(timeoutMs, DEFAULT_SEARCH_TIMEOUT_MS)
+  const cookiesPath = resolveYtDlpCookiesPath()
+  logCookieStateOnce(cookiesPath)
+  const fullArgs = cookiesPath ? ['--cookies', cookiesPath, ...args] : args
   try {
-    return await execFileAsync(bin, args, {
+    return await execFileAsync(bin, fullArgs, {
       ...rest,
       timeout: ms,
       killSignal: 'SIGKILL',
