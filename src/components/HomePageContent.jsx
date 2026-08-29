@@ -27,7 +27,11 @@ import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '.
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
-import { DRAW_COMPETITION_SLUG, pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
+import {
+  DRAW_COMPETITION_SLUG,
+  RONALDO_LEGACY_BUNDLE_ACTIVE,
+  pickCountdownPeriod,
+} from '../../shared/competitionPeriods.mjs'
 import { IPHONE_17_PRO_COMPETITION_ACTIVE, IPHONE_17_PRO_COMPETITION_SLUG } from '../../shared/iphone17ProCompetition.mjs'
 import {
   HOMEPAGE_HERO_BACKGROUNDS,
@@ -419,7 +423,7 @@ export function HomePageContent({
       data-editor-align-group
       data-editor-center-root
     >
-      {promo.visible !== false
+      {(RONALDO_LEGACY_BUNDLE_ACTIVE || editorMode) && promo.visible !== false
         ? editorMode
           ? wrapBlock('promo_strip', HOMEPAGE_BLOCK_LABELS.promo_strip, promoBlock)
           : promoBlock
@@ -831,16 +835,16 @@ export function HomePageContent({
 
       <div className="ss-hero-inner ss-site-container px-4 pt-5 pb-14 sm:px-6 sm:pt-11 sm:pb-10 lg:pt-12 lg:pb-20">
         <article className="ss-hero-merged-panel relative z-[2] grid gap-5 px-0 py-4 sm:gap-6 sm:py-5 md:grid-cols-2 md:items-stretch md:gap-x-5 md:gap-y-4 md:px-4 md:py-5 lg:gap-x-8 lg:gap-y-3 lg:p-6">
-          {intro.visible !== false
+          {(RONALDO_LEGACY_BUNDLE_ACTIVE || editorMode) && intro.visible !== false
             ? wrapBlock('hero_intro', HOMEPAGE_BLOCK_LABELS.hero_intro, introBlock)
             : null}
-          {prizes.visible !== false
+          {(RONALDO_LEGACY_BUNDLE_ACTIVE || editorMode) && prizes.visible !== false
             ? wrapBlock('hero_prizes', HOMEPAGE_BLOCK_LABELS.hero_prizes, prizesBlock)
             : null}
-          {details.visible !== false
+          {(RONALDO_LEGACY_BUNDLE_ACTIVE || editorMode) && details.visible !== false
             ? wrapBlock('hero_details', HOMEPAGE_BLOCK_LABELS.hero_details, detailsBlock)
             : null}
-          {bundles.visible !== false && showPaidBundles
+          {(RONALDO_LEGACY_BUNDLE_ACTIVE || editorMode) && bundles.visible !== false && showPaidBundles
             ? wrapBlock('ticket_bundles', HOMEPAGE_BLOCK_LABELS.ticket_bundles, bundlesBlock)
             : null}
           {wcBallPanelVisible || editorMode

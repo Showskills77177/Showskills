@@ -55,12 +55,12 @@ export function defaultHomepageLayout() {
     blockOrder: [...HOMEPAGE_BLOCK_IDS],
     blocks: {
       promo_strip: {
-        visible: true,
+        visible: false,
         livePromotionLabel: 'Live promotion',
         offsets: { badge: defaultOffset() },
       },
       hero_intro: {
-        visible: true,
+        visible: false,
         brandTitle: 'ShowSkills Rewards',
         headline:
           'Signed Legacy Bundle — pay online or enter by post, then answer 3 hard skill questions for the full kit draw. One attempt per entry — all correct to qualify.',
@@ -73,7 +73,7 @@ export function defaultHomepageLayout() {
         offsets: { ...DEFAULT_INTRO_OFFSETS },
       },
       hero_prizes: {
-        visible: true,
+        visible: false,
         ctaBlurb:
           'Buy tickets online or enter by post — same prize. Three Ronaldo questions, one attempt each. All correct to qualify for the main draw. Wrong answers? 2 automatic shirt giveaway entries (consolation).',
         ctaButtonLabel: 'Enter Bundle Draw',
@@ -85,12 +85,12 @@ export function defaultHomepageLayout() {
         offsets: { ...DEFAULT_PRIZES_OFFSETS },
       },
       hero_details: {
-        visible: true,
+        visible: false,
         title: 'Signed Legacy Bundle details',
         offsets: { ...DEFAULT_DETAILS_OFFSETS },
       },
       ticket_bundles: {
-        visible: true,
+        visible: false,
         offsets: { ...DEFAULT_BUNDLES_OFFSETS },
       },
       iphone_17_pro_panel: {

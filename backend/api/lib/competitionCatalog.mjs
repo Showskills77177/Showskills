@@ -1,5 +1,9 @@
 import { query, dbIsPostgres } from './db.mjs'
-import { DRAW_COMPETITION_SLUG, DRAW_COMPETITION_LABEL } from '../../../shared/competitionPeriods.mjs'
+import {
+  DRAW_COMPETITION_SLUG,
+  DRAW_COMPETITION_LABEL,
+  RONALDO_LEGACY_BUNDLE_ACTIVE,
+} from '../../../shared/competitionPeriods.mjs'
 import {
   IPHONE_17_PRO_BUNDLES,
   IPHONE_17_PRO_COMPETITION_ACTIVE,
@@ -191,7 +195,7 @@ const BUILTIN_MAIN_DRAWS = [
     summary:
       'Pay for ticket bundles or enter free by post, then answer three skill questions. All correct to qualify for the main random draw.',
     rulesMarkdown: `## How to enter\n\n- Buy a ticket bundle online or use free postal entry.\n- Answer all three skill questions correctly in one attempt.\n- Qualified ticket numbers enter the random draw for this competition period.\n\n## Consolation\n\nWrong answers on a qualifying spend may receive automatic entries into the separate Free Ronaldo Shirt Giveaway.`,
-    status: COMPETITION_STATUS.published,
+    status: RONALDO_LEGACY_BUNDLE_ACTIVE ? COMPETITION_STATUS.published : COMPETITION_STATUS.draft,
     kind: COMPETITION_KIND.mainDraw,
     sortOrder: 0,
     seedBundles: true,
@@ -463,14 +467,24 @@ async function ensureBuiltinCompetitions() {
       )
     } else if (
       c.slug === DRAW_COMPETITION_SLUG &&
-      existing.rows[0].status !== COMPETITION_STATUS.archived &&
-      existing.rows[0].status !== COMPETITION_STATUS.published
+      existing.rows[0].status !== COMPETITION_STATUS.archived
     ) {
-      await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
-        c.slug,
-        COMPETITION_STATUS.published,
-        now,
-      ])
+      if (!RONALDO_LEGACY_BUNDLE_ACTIVE && existing.rows[0].status === COMPETITION_STATUS.published) {
+        await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+          c.slug,
+          COMPETITION_STATUS.draft,
+          now,
+        ])
+      } else if (
+        RONALDO_LEGACY_BUNDLE_ACTIVE &&
+        existing.rows[0].status !== COMPETITION_STATUS.published
+      ) {
+        await query(`UPDATE competitions SET status = $2, updated_at = $3 WHERE slug = $1`, [
+          c.slug,
+          COMPETITION_STATUS.published,
+          now,
+        ])
+      }
     } else if (
       c.slug === IPHONE_17_PRO_COMPETITION_SLUG &&
       existing.rows[0].status !== COMPETITION_STATUS.archived

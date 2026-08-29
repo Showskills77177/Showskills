@@ -17,7 +17,7 @@ const {
   updateCompetition,
   createCompetition,
 } = await import('../backend/api/lib/competitionCatalog.mjs')
-const { DRAW_COMPETITION_SLUG } = await import('../shared/competitionPeriods.mjs')
+const { DRAW_COMPETITION_SLUG, RONALDO_LEGACY_BUNDLE_ACTIVE } = await import('../shared/competitionPeriods.mjs')
 const { IPHONE_17_PRO_COMPETITION_SLUG, IPHONE_17_PRO_COMPETITION_ACTIVE } = await import(
   '../shared/iphone17ProCompetition.mjs'
 )
@@ -37,7 +37,7 @@ await ensureCompetitionCatalogSchema()
 
 const legacy = await getCompetitionBySlug(DRAW_COMPETITION_SLUG)
 assert.ok(legacy, 'legacy competition seeded')
-assert.equal(legacy.status, 'published')
+assert.equal(legacy.status, RONALDO_LEGACY_BUNDLE_ACTIVE ? 'published' : 'draft')
 
 const bundles = await listCompetitionBundles(DRAW_COMPETITION_SLUG, { activeOnly: true })
 assert.ok(bundles.length >= 5, 'bundles seeded from static catalog')

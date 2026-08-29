@@ -18,6 +18,15 @@ export const DRAW_COMPETITION_SLUG = 'ronaldo_legacy_bundle'
 
 export const DRAW_COMPETITION_LABEL = 'Signed Legacy Bundle'
 
+/**
+ * Flip to true to relaunch the Ronaldo Signed Legacy Bundle draw (homepage
+ * hero, Competitions card, and checkout). While false: catalog status is
+ * forced to draft (blocks paid checkout), and the homepage hero/competitions
+ * card are hidden — existing ticket/entry data and the free shirt giveaway
+ * consolation history are left untouched.
+ */
+export const RONALDO_LEGACY_BUNDLE_ACTIVE = false
+
 export const PERIOD_COPY = {
   isolation:
     'Each competition period has its own entry window and draw pool. Ticket numbers from one period are never included in another period\'s draw.',

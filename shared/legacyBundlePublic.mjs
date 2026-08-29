@@ -1,4 +1,8 @@
-import { DRAW_COMPETITION_SLUG, DRAW_COMPETITION_LABEL } from './competitionPeriods.mjs'
+import {
+  DRAW_COMPETITION_SLUG,
+  DRAW_COMPETITION_LABEL,
+  RONALDO_LEGACY_BUNDLE_ACTIVE,
+} from './competitionPeriods.mjs'
 import { legacyEntryMethods } from './competitionEntryMethods.mjs'
 import { TICKET_BUNDLES } from './ticketBundles.mjs'
 
@@ -7,6 +11,7 @@ const DEFAULT_SUMMARY =
 
 /** Static public card when the API is down or the catalog row is missing. */
 export function createFallbackLegacyBundleCompetition(overrides = {}) {
+  if (!RONALDO_LEGACY_BUNDLE_ACTIVE) return null
   const publicBundles = TICKET_BUNDLES.filter((b) => !b.testOnly)
   const minBundlePence = publicBundles.length
     ? Math.min(...publicBundles.map((b) => b.totalPence))
@@ -23,8 +28,9 @@ export function createFallbackLegacyBundleCompetition(overrides = {}) {
   }
 }
 
-/** Signed Legacy Bundle is always shown on Competitions — prefer live API data. */
+/** Signed Legacy Bundle — only surfaced when the feature flag is on (deactivated until relaunch). */
 export function resolveLegacyBundlePublicCompetition({ detail, listItems } = {}) {
+  if (!RONALDO_LEGACY_BUNDLE_ACTIVE) return null
   if (detail?.slug === DRAW_COMPETITION_SLUG) return detail
   const fromList = listItems?.find((c) => c.slug === DRAW_COMPETITION_SLUG)
   if (fromList) return fromList
