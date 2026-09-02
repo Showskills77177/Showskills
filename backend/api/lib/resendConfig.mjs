@@ -9,6 +9,9 @@ const RESEND_TEST_FROM = 'ShowSkills Rewards <onboarding@resend.dev>'
 /** Verified domain sender (showskills.co.uk on Resend). */
 export const SHOWSKILLS_EMAIL_FROM = 'ShowSkills Rewards <orders@showskills.co.uk>'
 
+/** Verified domain sender for admin-composed / winner correspondence. */
+export const SHOWSKILLS_SALES_EMAIL_FROM = 'ShowSkills Rewards <sales@showskills.co.uk>'
+
 export const SHOWSKILLS_SITE_URL = 'https://showskills.co.uk'
 
 /** Resend key (Vercel integration may use RESEND_API_KEY). */
@@ -37,6 +40,14 @@ export function parseResendSandboxRecipient(message) {
 export function resolveResendFrom() {
   const custom = (process.env.PURCHASE_EMAIL_FROM || process.env.RESEND_FROM || '').trim()
   if (isResendProductionMode()) return custom || SHOWSKILLS_EMAIL_FROM
+  if (custom && process.env.RESEND_ALLOW_CUSTOM_FROM === '1') return custom
+  return RESEND_TEST_FROM
+}
+
+/** From address for sales@ correspondence (admin-composed emails, winner cheques). */
+export function resolveSalesEmailFrom() {
+  const custom = (process.env.SALES_EMAIL_FROM || '').trim()
+  if (isResendProductionMode()) return custom || SHOWSKILLS_SALES_EMAIL_FROM
   if (custom && process.env.RESEND_ALLOW_CUSTOM_FROM === '1') return custom
   return RESEND_TEST_FROM
 }
