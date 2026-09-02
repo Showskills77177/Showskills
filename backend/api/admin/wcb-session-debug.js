@@ -27,11 +27,18 @@ export default async function handler(req, res) {
     const pathUrl = new URL(req.originalUrl || req.url || '/', 'http://local')
     const submissionId = (pathUrl.searchParams.get('submissionId') || '').trim()
 
+    const ip = (pathUrl.searchParams.get('ip') || '').trim()
+
     let sessRes
     if (submissionId) {
       sessRes = await query(
         `SELECT * FROM world_cup_ball_sessions WHERE submission_id = $1`,
         [submissionId],
+      )
+    } else if (ip) {
+      sessRes = await query(
+        `SELECT * FROM world_cup_ball_sessions WHERE ip_address = $1 ORDER BY started_at DESC`,
+        [ip],
       )
     } else {
       sessRes = await query(
@@ -39,10 +46,15 @@ export default async function handler(req, res) {
       )
     }
 
+    const countRes = await query(`SELECT COUNT(*)::int AS c FROM world_cup_ball_sessions`)
     const winnersRes = await query(`SELECT * FROM world_cup_ball_winners ORDER BY created_at DESC LIMIT 20`)
 
     res.setHeader('Cache-Control', 'no-store')
-    return json(res, 200, { sessions: sessRes.rows, winners: winnersRes.rows })
+    return json(res, 200, {
+      totalSessions: countRes.rows[0]?.c ?? null,
+      sessions: sessRes.rows,
+      winners: winnersRes.rows,
+    })
   } catch (e) {
     console.error('[wcb-session-debug]', e)
     return json(res, 500, { error: 'debug query failed', message: e instanceof Error ? e.message : String(e) })
