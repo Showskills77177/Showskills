@@ -3,7 +3,17 @@
   "outputDirectory": "dist",
   "functions": {
     "api/[[...slug]].js": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/admin/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/submissions/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/submissions/world-cup-ball/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
     }
   },
   "headers": [

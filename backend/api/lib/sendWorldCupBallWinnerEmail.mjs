@@ -12,6 +12,7 @@ import {
   isResendProductionMode,
   parseResendSandboxRecipient,
 } from './resendConfig.mjs'
+import { generateWinnerChequePng } from './chequeGenerator.mjs'
 
 export async function sendWorldCupBallWinnerEmail({
   to,
@@ -23,6 +24,7 @@ export async function sendWorldCupBallWinnerEmail({
   detailsComplete = true,
   prizeFulfilment,
   countryCode,
+  cashPrizeUsd,
 }) {
   const apiKey = getResendApiKey()
   if (!apiKey) {
@@ -50,6 +52,29 @@ export async function sendWorldCupBallWinnerEmail({
       : undefined,
   }
 
+  // Cash-prize winners with complete claim details get an auto-generated winner's cheque
+  // attached — a failure here must never block the underlying notification email.
+  let attachments
+  if (detailsComplete && prizeFulfilment === 'international_cash' && cashPrizeUsd && winReference) {
+    try {
+      const chequePng = await generateWinnerChequePng({
+        fullName: customerFullName,
+        amountUsd: cashPrizeUsd,
+        chequeNumber: winReference,
+        dateIso: wonAt,
+      })
+      attachments = [
+        {
+          filename: `${winReference}-winners-cheque.png`,
+          content: chequePng.toString('base64'),
+          content_type: 'image/png',
+        },
+      ]
+    } catch (e) {
+      console.error('[email] Winner cheque generation failed, sending email without attachment:', e)
+    }
+  }
+
   async function postEmail(recipient, note) {
     const emailProps = note ? { ...props, sandboxNote: note } : props
     const res = await fetch('https://api.resend.com/emails', {
@@ -64,6 +89,7 @@ export async function sendWorldCupBallWinnerEmail({
         subject: worldCupBallWinnerEmailSubject(Boolean(detailsComplete)),
         html: buildWorldCupBallWinnerEmailHtml(emailProps),
         text: buildWorldCupBallWinnerEmailText(emailProps),
+        ...(attachments?.length ? { attachments } : {}),
       }),
     })
     const data = await res.json().catch(() => ({}))
