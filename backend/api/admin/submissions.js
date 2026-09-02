@@ -102,9 +102,7 @@ export default async function handler(req, res) {
           w.address_line2 AS winner_address_line2,
           w.city AS winner_city,
           w.postcode AS winner_postcode,
-          w.winner_email_sent_at,
-          w.prize_fulfilment AS winner_prize_fulfilment,
-          w.cash_prize_usd AS winner_cash_prize_usd
+          w.winner_email_sent_at
         FROM kickup_submissions ks
         LEFT JOIN world_cup_ball_winners w ON w.submission_id = ks.id
         ${where}

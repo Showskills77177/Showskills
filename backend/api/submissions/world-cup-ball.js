@@ -822,7 +822,6 @@ export async function claimWorldCupBallPrize(req, res) {
       detailsComplete: true,
       prizeFulfilment,
       countryCode,
-      cashPrizeUsd,
     })
     if (emailResult.ok && emailResult.id) {
       await markWorldCupBallWinnerEmailSent(winnerId, emailResult.id)

@@ -56,7 +56,6 @@
     "test:admin-email": "node scripts/test-admin-otp-email.mjs"
   },
   "dependencies": {
-    "@resvg/resvg-js": "^2.6.2",
     "@vercel/analytics": "^2.0.1",
     "altcha": "^3.1.0",
     "altcha-lib": "^2.2.0",
@@ -72,9 +71,7 @@
     "pg": "^8.14.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.14.0",
-    "satori": "^0.33.4",
-    "sharp": "^0.35.4"
+    "react-router-dom": "^7.14.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

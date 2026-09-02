@@ -33,7 +33,6 @@ export default function AdminSubmissionsPage() {
   const [expandedId, setExpandedId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
-  const [emailTarget, setEmailTarget] = useState(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 300)
@@ -181,9 +180,6 @@ export default function AdminSubmissionsPage() {
                             ) : null}
                             <MiniBtn onClick={() => setStatus(s.id, 'approved')}>Approve</MiniBtn>
                             <MiniBtn onClick={() => setStatus(s.id, 'rejected')}>Reject</MiniBtn>
-                            {isWorldCupBallWinnerEntry(s) && s.email ? (
-                              <MiniBtn onClick={() => setEmailTarget(s)}>Email</MiniBtn>
-                            ) : null}
                             <MiniBtn onClick={() => deleteSubmission(s.id)} danger>
                               Delete
                             </MiniBtn>
@@ -214,9 +210,6 @@ export default function AdminSubmissionsPage() {
           />
         </div>
       ) : null}
-      {emailTarget ? (
-        <SendEmailModal submission={emailTarget} onClose={() => setEmailTarget(null)} />
-      ) : null}
     </div>
   )
 }
@@ -224,130 +217,6 @@ export default function AdminSubmissionsPage() {
 function isWorldCupBallWinnerEntry(s) {
   return (
     s.competition === WORLD_CUP_BALL_GIVEAWAY_SLUG || s.video_ref === 'skill:world-cup-ball-giveaway'
-  )
-}
-
-function SendEmailModal({ submission, onClose }) {
-  const isCashWinner = submission.winner_prize_fulfilment === 'international_cash'
-  const [to, setTo] = useState(submission.email || '')
-  const [subject, setSubject] = useState(`Your ${WORLD_CUP_BALL_GIVEAWAY_LABEL} prize`)
-  const [message, setMessage] = useState(
-    `Congratulations again on your win, ${submission.full_name || ''}!\n\n`,
-  )
-  const [attachCheque, setAttachCheque] = useState(isCashWinner)
-  const [sending, setSending] = useState(false)
-  const [result, setResult] = useState(null)
-
-  async function send() {
-    setSending(true)
-    setResult(null)
-    try {
-      const res = await apiFetch('/api/admin/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to,
-          subject,
-          message,
-          recipientName: submission.full_name,
-          submissionId: submission.id,
-          attachCheque,
-        }),
-      })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) {
-        setResult({ ok: false, error: j.error || 'Send failed' })
-      } else {
-        setResult({
-          ok: true,
-          note: j.sandboxRedirect
-            ? `Sent (sandbox mode — delivered to ${j.deliveredTo})`
-            : j.chequeAttached
-              ? 'Sent with winner\u2019s cheque attached.'
-              : 'Sent.',
-        })
-      }
-    } catch (e) {
-      setResult({ ok: false, error: e instanceof Error ? e.message : 'Send failed' })
-    } finally {
-      setSending(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-xl border border-white/10 bg-stone-900 p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-100">Send email from sales@showskills.co.uk</h3>
-          <button type="button" onClick={onClose} className="text-stone-500 hover:text-stone-300">
-            ✕
-          </button>
-        </div>
-        <div className="space-y-3">
-          <Field label="To">
-            <input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/30 px-2.5 py-1.5 text-sm text-stone-200"
-            />
-          </Field>
-          <Field label="Subject">
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded border border-white/10 bg-black/30 px-2.5 py-1.5 text-sm text-stone-200"
-            />
-          </Field>
-          <Field label="Message">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={6}
-              className="w-full rounded border border-white/10 bg-black/30 px-2.5 py-1.5 text-sm text-stone-200"
-            />
-          </Field>
-          {isCashWinner ? (
-            <label className="flex items-center gap-2 text-xs text-stone-400">
-              <input
-                type="checkbox"
-                checked={attachCheque}
-                onChange={(e) => setAttachCheque(e.target.checked)}
-              />
-              Attach auto-generated winner&rsquo;s cheque (${submission.winner_cash_prize_usd || ''} USD, ref{' '}
-              {submission.entry_number})
-            </label>
-          ) : null}
-          {result ? (
-            <p className={`text-xs ${result.ok ? 'text-emerald-400' : 'text-red-400'}`}>
-              {result.ok ? result.note : result.error}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2 pt-1">
-            <MiniBtn onClick={onClose}>Cancel</MiniBtn>
-            <button
-              type="button"
-              onClick={send}
-              disabled={sending || !to.includes('@') || !subject.trim() || !message.trim()}
-              className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
-            >
-              {sending ? 'Sending…' : 'Send'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-stone-500">{label}</span>
-      {children}
-    </label>
   )
 }
 
