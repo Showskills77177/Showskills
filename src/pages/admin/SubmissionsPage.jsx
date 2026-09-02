@@ -256,7 +256,8 @@ function SendEmailModal({ submission, onClose }) {
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok || !j.ok) {
-        setResult({ ok: false, error: j.error || 'Send failed' })
+        const errMsg = typeof j.error === 'string' && j.error ? j.error : 'Send failed'
+        setResult({ ok: false, error: errMsg })
       } else {
         setResult({
           ok: true,
@@ -275,7 +276,14 @@ function SendEmailModal({ submission, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+      onClick={(e) => {
+        /** Only close when the backdrop itself is clicked, never on bubbled clicks from
+         * inside the panel — defends against the modal appearing to "close" unexpectedly. */
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
       <div
         className="w-full max-w-lg rounded-xl border border-white/10 bg-stone-900 p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
