@@ -6,11 +6,13 @@ import { generateWinnerChequePng } from '../lib/chequeGenerator.mjs'
 
 /**
  * POST /api/admin/send-email
- * Body: { to, subject, message, recipientName?, submissionId?, attachCheque? }
+ * Body: { to, subject, message, recipientName?, submissionId?, attachCheque?, cheque? }
  *
  * Sends a branded, admin-composed email from sales@showskills.co.uk. When `submissionId`
  * refers to a World Cup Ball cash-prize winner and `attachCheque` is truthy (or omitted),
- * an auto-generated winner's cheque PNG is attached.
+ * an auto-generated winner's cheque PNG is attached. Alternatively, an admin can supply
+ * `cheque: { fullName, amountUsd, chequeNumber, dateIso? }` directly (e.g. for ad-hoc test
+ * sends with no matching submission row) and the same cheque PNG will be generated/attached.
  */
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -65,6 +67,27 @@ export default async function handler(req, res) {
         attachments = [
           {
             filename: `${winner.win_reference}-winners-cheque.png`,
+            content: png.toString('base64'),
+            content_type: 'image/png',
+          },
+        ]
+      }
+    }
+
+    // Manual override: admin-supplied cheque details, used when there's no matching
+    // submission row (e.g. ad-hoc test sends) but a cheque should still be attached.
+    if (!attachments && attachCheque && body.cheque && typeof body.cheque === 'object') {
+      const { fullName, amountUsd, chequeNumber, dateIso } = body.cheque
+      if (fullName && amountUsd && chequeNumber) {
+        const png = await generateWinnerChequePng({
+          fullName: String(fullName),
+          amountUsd: Number(amountUsd),
+          chequeNumber: String(chequeNumber),
+          dateIso: dateIso || new Date().toISOString(),
+        })
+        attachments = [
+          {
+            filename: `${chequeNumber}-winners-cheque.png`,
             content: png.toString('base64'),
             content_type: 'image/png',
           },
