@@ -276,18 +276,16 @@ function SendEmailModal({ submission, onClose }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
-      onClick={(e) => {
-        /** Only close when the backdrop itself is clicked, never on bubbled clicks from
-         * inside the panel — defends against the modal appearing to "close" unexpectedly. */
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div
-        className="w-full max-w-lg rounded-xl border border-white/10 bg-stone-900 p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      {/*
+       * Deliberately no click-outside-to-close on this backdrop. It was reported that the
+       * modal appears to close while typing in the message box — a click-outside-style
+       * close is the only mechanism that can dismiss this modal from arbitrary DOM
+       * activity, so it's removed entirely rather than trying to out-guess the trigger
+       * (mobile keyboard/viewport resize, a browser extension mutating the textarea, etc).
+       * The modal now only closes via the explicit Cancel/✕ buttons.
+       */}
+      <div className="w-full max-w-lg rounded-xl border border-white/10 bg-stone-900 p-5 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-stone-100">Send email from sales@showskills.co.uk</h3>
           <button type="button" onClick={onClose} className="text-stone-500 hover:text-stone-300">
