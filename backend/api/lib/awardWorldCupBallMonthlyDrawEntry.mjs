@@ -79,11 +79,37 @@ export async function awardWorldCupBallMonthlyDrawEntry({ req, sessionId, ip, ou
   const id = randomUUID()
   const now = new Date().toISOString()
 
+  // Require a contact email on the session before awarding a monthly-draw entry.
+  const sRes = await query(
+    `SELECT contact_email FROM world_cup_ball_sessions WHERE id = $1 LIMIT 1`,
+    [sessionId],
+  )
+  const contactEmail = String(sRes.rows[0]?.contact_email || '').trim().toLowerCase()
+  if (!contactEmail || !contactEmail.includes('@')) {
+    // Log the attempt for audit/analytics and return a clear reason to callers.
+    await logEntryAttempt(req, {
+      competition: COMPETITION_WORLD_CUP_BALL,
+      flow: 'world_cup_ball_monthly_draw',
+      ip,
+      outcome: 'no_email',
+      metadata: { sessionId, drawMonth: period.drawMonth },
+    }).catch(() => {})
+
+    return {
+      awarded: false,
+      entryCount: 0,
+      entryNumbers: [],
+      drawMonth: period.drawMonth,
+      drawMonthLabel: period.label,
+      reason: 'email_required',
+    }
+  }
+
   await query(
     `INSERT INTO world_cup_ball_monthly_draw_entries (
-      id, session_id, draw_month, entry_number, ip_address, outcome, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, sessionId, period.drawMonth, entryNumber, ip || '', outcome || 'lost', now],
+      id, session_id, draw_month, entry_number, ip_address, outcome, created_at, email
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, sessionId, period.drawMonth, entryNumber, ip || '', outcome || 'lost', now, contactEmail],
   )
 
   await logEntryAttempt(req, {
@@ -97,6 +123,7 @@ export async function awardWorldCupBallMonthlyDrawEntry({ req, sessionId, ip, ou
       entryNumber,
       quizOutcome: outcome,
       preview: Boolean(period.preview),
+      contactEmail,
     },
   })
 

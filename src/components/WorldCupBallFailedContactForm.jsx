@@ -52,7 +52,7 @@ export function WorldCupBallFailedContactForm({ sessionId, className = '', onSav
       >
         <p className="font-semibold text-emerald-100">Email saved</p>
         <p className="mt-1 text-stone-300">
-          We will use this address if we need to contact you about the monthly draw or your attempt.
+          We will use this address to contact you if you win the monthly draw or about your attempt.
         </p>
       </div>
     )
@@ -63,16 +63,17 @@ export function WorldCupBallFailedContactForm({ sessionId, className = '', onSav
       onSubmit={handleSubmit}
       className={`mt-4 rounded-xl border border-stone-600/40 bg-stone-950/50 px-4 py-4 ${className}`.trim()}
     >
-      <p className="text-sm font-semibold text-stone-100">Leave your email (optional)</p>
+      <p className="text-sm font-semibold text-stone-100">Enter your email (required for monthly-draw entry)</p>
       <p className="mt-1 text-xs leading-relaxed text-stone-400">
-        If you entered the free monthly draw, we can contact you if you win. We will not use your email for
-        marketing without consent.
+        To be eligible for the monthly draw you must provide a contact email. We will not use this address for
+        marketing without your consent.
       </p>
       <label className="mt-3 block text-xs font-medium text-stone-400">
         Email address
         <input
           type="email"
           name="email"
+          required
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
