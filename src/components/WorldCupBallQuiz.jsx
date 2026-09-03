@@ -40,6 +40,8 @@ import { localizeQuizQuestion } from '../../shared/i18n/localizedQuiz.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
 
+const MONETAG_ZONE_ID = '1081fa6155dc3c5fb275'
+
 function QuizDontKnowButton({ onClick, disabled }) {
   return (
     <button
@@ -635,7 +637,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
         <MonetagAdGate
-          monetagUrl="https://omg10.com/4/11720148"
+          zoneId={MONETAG_ZONE_ID}
           onUnlocked={() => startPractice()}
           disabled={disabled}
         />
@@ -719,7 +721,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             </p>
             <div className="mt-3">
               <MonetagAdGate
-                monetagUrl="https://omg10.com/4/11720148"
+                zoneId={MONETAG_ZONE_ID}
                 onUnlocked={() => startPractice()}
                 disabled={disabled || submitting}
               />

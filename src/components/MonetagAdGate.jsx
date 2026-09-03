@@ -1,125 +1,115 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * Monetag Ad gate used to require watching an ad before unlocking the practice question.
+ * Monetag Rewarded Interstitial ad gate used to require watching an ad before unlocking the
+ * practice question. Uses Monetag's official SDK (libtl.com/sdk.js), which exposes a
+ * zone-scoped `show_<ZONE_ID>()` function returning a Promise that only resolves once the user
+ * has actually watched/completed the rewarded ad (it rejects if the ad fails to load or is
+ * closed early). There is no manual bypass — practice only unlocks when that promise resolves.
+ *
  * Props:
- * - monetagUrl: string (required)
+ * - zoneId: string (required) — Monetag zone ID from the dashboard
  * - onUnlocked: () => void
  * - disabled: boolean
  */
-export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false }) {
+const SDK_SRC = 'https://libtl.com/sdk.js'
+const SDK_FN_READY_TIMEOUT_MS = 10000
+const SDK_FN_POLL_INTERVAL_MS = 200
+
+// Module-level cache so the SDK script/function is only ever set up once per zone per page
+// load, even though the gate component can mount more than once (first + optional second
+// practice unlock).
+const sdkLoadPromises = new Map()
+
+function waitForShowFn(fnName, resolve, reject) {
+  const start = Date.now()
+  const poll = window.setInterval(() => {
+    if (typeof window[fnName] === 'function') {
+      window.clearInterval(poll)
+      resolve()
+    } else if (Date.now() - start > SDK_FN_READY_TIMEOUT_MS) {
+      window.clearInterval(poll)
+      reject(new Error('monetag_sdk_timeout'))
+    }
+  }, SDK_FN_POLL_INTERVAL_MS)
+}
+
+function loadMonetagSdk(zoneId) {
+  if (sdkLoadPromises.has(zoneId)) return sdkLoadPromises.get(zoneId)
+  const fnName = `show_${zoneId}`
+  const promise = new Promise((resolve, reject) => {
+    if (typeof window[fnName] === 'function') {
+      resolve()
+      return
+    }
+    const existing = document.querySelector(`script[data-zone="${zoneId}"]`)
+    if (existing) {
+      waitForShowFn(fnName, resolve, (err) => {
+        sdkLoadPromises.delete(zoneId)
+        reject(err)
+      })
+      return
+    }
+    const script = document.createElement('script')
+    script.src = SDK_SRC
+    script.setAttribute('data-zone', zoneId)
+    script.setAttribute('data-sdk', fnName)
+    script.async = true
+    script.onerror = () => {
+      sdkLoadPromises.delete(zoneId)
+      script.remove()
+      reject(new Error('monetag_sdk_failed'))
+    }
+    script.onload = () => {
+      waitForShowFn(fnName, resolve, (err) => {
+        sdkLoadPromises.delete(zoneId)
+        reject(err)
+      })
+    }
+    document.body.appendChild(script)
+  })
+  sdkLoadPromises.set(zoneId, promise)
+  return promise
+}
+
+export default function MonetagAdGate({ zoneId, onUnlocked, disabled = false }) {
   const [watching, setWatching] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
-  const [popupBlocked, setPopupBlocked] = useState(false)
-  const [adBlockDetected, setAdBlockDetected] = useState(false)
-  const popupRef = useRef(null)
-  const pollRef = useRef(null)
-  const popupOpenedAtRef = useRef(0)
-  const popupNavigatedRef = useRef(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true
     return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current)
-      if (popupRef.current && !popupRef.current.closed) popupRef.current.close()
+      mountedRef.current = false
     }
   }, [])
 
   function markWatched() {
+    if (!mountedRef.current) return
     setUnlocked(true)
     setWatching(false)
     onUnlocked?.()
   }
 
-  function openAndWatch() {
+  async function watchAd() {
     if (disabled || watching || unlocked) return
-    if (pollRef.current) window.clearInterval(pollRef.current)
-    popupOpenedAtRef.current = Date.now()
-    popupNavigatedRef.current = false
-    setAdBlockDetected(false)
-    setPopupBlocked(false)
-    const wW = 420
-    const wH = 700
-    const screenX = typeof window.screenX === 'number' ? window.screenX : (typeof window.screenLeft === 'number' ? window.screenLeft : 0)
-    const screenY = typeof window.screenY === 'number' ? window.screenY : (typeof window.screenTop === 'number' ? window.screenTop : 0)
-    const outerW = typeof window.outerWidth === 'number' ? window.outerWidth : (document.documentElement?.clientWidth || window.screen.availWidth)
-    const outerH = typeof window.outerHeight === 'number' ? window.outerHeight : (document.documentElement?.clientHeight || window.screen.availHeight)
-    const left = Math.max(0, Math.floor(screenX + (outerW - wW) / 2))
-    const top = Math.max(0, Math.floor(screenY + (outerH - wH) / 2))
-    const features = `width=${wW},height=${wH},left=${left},top=${top},menubar=no,toolbar=no,location=no,resizable=yes,scrollbars=yes,status=no`
-    let w = null
+    setErrorMessage('')
+    setWatching(true)
     try {
-      // Open a same-origin blank popup first so Safari returns a window handle reliably.
-      w = window.open('', 'monetag_ad_popup', features)
-    } catch (e) {
-      w = null
-    }
-    if (w) {
-      popupRef.current = w
-      try {
-        if ('opener' in w) w.opener = null
-      } catch {}
-      try {
-        w.location.replace(monetagUrl)
-      } catch {
-        w.location.href = monetagUrl
-      }
-      try { w.focus() } catch {}
-      setWatching(true)
-      // poll until the window is closed
-      pollRef.current = window.setInterval(() => {
-        if (!popupNavigatedRef.current) {
-          try {
-            const href = popupRef.current?.location?.href
-            if (href && href !== 'about:blank') {
-              popupNavigatedRef.current = true
-            }
-          } catch {
-            // Cross-origin access means navigation succeeded.
-            popupNavigatedRef.current = true
-          }
-
-          // Still stuck on about:blank after a grace period -> likely blocked by ad/content blocker.
-          if (!popupNavigatedRef.current && Date.now() - popupOpenedAtRef.current > 3000) {
-            if (pollRef.current) window.clearInterval(pollRef.current)
-            try {
-              if (popupRef.current && !popupRef.current.closed) popupRef.current.close()
-            } catch {}
-            popupRef.current = null
-            setWatching(false)
-            setAdBlockDetected(true)
-            return
-          }
-        }
-
-        try {
-          if (!popupRef.current || popupRef.current.closed) {
-            if (pollRef.current) window.clearInterval(pollRef.current)
-            if (popupNavigatedRef.current) {
-              markWatched()
-            } else {
-              setWatching(false)
-              setAdBlockDetected(true)
-            }
-          }
-        } catch (e) {
-          // cross-origin access may throw; still check closed
-          try {
-            if (popupRef.current && popupRef.current.closed) {
-              if (pollRef.current) window.clearInterval(pollRef.current)
-              if (popupNavigatedRef.current) {
-                markWatched()
-              } else {
-                setWatching(false)
-                setAdBlockDetected(true)
-              }
-            }
-          } catch (_) {}
-        }
-      }, 1000)
-    } else {
-      // Popup was blocked by the browser. Don't navigate away — show instructions only.
-      setPopupBlocked(true)
+      await loadMonetagSdk(zoneId)
+      const showAd = window[`show_${zoneId}`]
+      if (typeof showAd !== 'function') throw new Error('monetag_unavailable')
+      await showAd()
+      markWatched()
+    } catch (err) {
+      if (!mountedRef.current) return
       setWatching(false)
+      if (err?.message === 'monetag_sdk_failed' || err?.message === 'monetag_sdk_timeout') {
+        setErrorMessage('Ad/content blocker detected — disable your blocker for this page, then click "Watch ad to unlock" again.')
+      } else {
+        setErrorMessage('The ad could not be shown or was closed early. Click "Watch ad to unlock" to try again.')
+      }
     }
   }
 
@@ -136,19 +126,14 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-xs leading-relaxed text-stone-400">Watch a short ad to unlock the practice question.</p>
-          {popupBlocked ? (
+          {errorMessage ? (
             <p className="text-xs text-red-400" role="alert">
-              Popup blocked — please allow popups for this site, then click "Watch ad to unlock" again.
-            </p>
-          ) : null}
-          {adBlockDetected ? (
-            <p className="text-xs text-red-400" role="alert">
-              Ad/content blocker detected — disable your blocker for this page, then click "Watch ad to unlock" again.
+              {errorMessage}
             </p>
           ) : null}
           <button
             type="button"
-            onClick={openAndWatch}
+            onClick={() => void watchAd()}
             disabled={disabled || watching}
             className="w-full rounded-xl border border-amber-500/40 bg-amber-950/35 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
           >
