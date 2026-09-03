@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Monetag Ad gate used to require watching an ad before unlocking the practice question.
@@ -15,17 +15,6 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
   const pollRef = useRef(null)
 
   useEffect(() => {
-    // read persisted flag (sessionStorage) so reload doesn't require rewatching
-    try {
-      const v = sessionStorage.getItem('wc_practice_ad_watched')
-      if (v === '1') {
-        setUnlocked(true)
-        onUnlocked?.()
-      }
-    } catch {}
-  }, [])
-
-  useEffect(() => {
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current)
       if (popupRef.current && !popupRef.current.closed) popupRef.current.close()
@@ -33,9 +22,6 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
   }, [])
 
   function markWatched() {
-    try {
-      sessionStorage.setItem('wc_practice_ad_watched', '1')
-    } catch {}
     setUnlocked(true)
     setWatching(false)
     onUnlocked?.()
@@ -82,7 +68,7 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
         }
       }, 1000)
     } else {
-      // Popup was blocked by the browser. Don't navigate away — show instructions and manual confirm.
+      // Popup was blocked by the browser. Don't navigate away — show instructions only.
       setPopupBlocked(true)
       setWatching(false)
     }
@@ -103,31 +89,17 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
           <p className="text-xs leading-relaxed text-stone-400">Watch a short ad to unlock the practice question.</p>
           {popupBlocked ? (
             <p className="text-xs text-red-400" role="alert">
-              Popup blocked — please allow popups for this site, then click "Watch ad to unlock" again. If you already watched the ad in another tab/window, click "I watched".
+              Popup blocked — please allow popups for this site, then click "Watch ad to unlock" again.
             </p>
           ) : null}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={openAndWatch}
-              disabled={disabled || watching}
-              className="flex-1 rounded-xl border border-amber-500/40 bg-amber-950/35 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {watching ? 'Watching ad…' : 'Watch ad to unlock'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                // manual confirmation fallback
-                markWatched()
-              }}
-              disabled={disabled || watching}
-              className="rounded-xl border border-stone-600/40 bg-black/40 px-3 py-3 text-sm font-semibold text-stone-200 hover:border-stone-500"
-              title="Use this only if your browser blocked the ad popup."
-            >
-              I watched
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={openAndWatch}
+            disabled={disabled || watching}
+            className="w-full rounded-xl border border-amber-500/40 bg-amber-950/35 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {watching ? 'Watching ad…' : 'Watch ad to unlock'}
+          </button>
         </div>
       )}
     </div>
