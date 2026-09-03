@@ -29,7 +29,7 @@ import { apiUrl } from '../lib/api'
 import { fetchCaptchaConfig } from '../lib/captchaConfig.js'
 import { AltchaWidget } from './AltchaWidget'
 import { QuizQuestionTimer } from './QuizQuestionTimer'
-import MonetagAdGate from './MonetagAdGate'
+import AdsterraAdGate from './AdsterraAdGate'
 import { CAPTCHA_BODY_FIELD } from '../../shared/captcha.mjs'
 import {
   clearWorldCupBallQuizProgress,
@@ -39,6 +39,8 @@ import {
 import { localizeQuizQuestion } from '../../shared/i18n/localizedQuiz.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
+
+const ADSTERRA_AD_SCRIPT_URL = 'https://pl31173623.profitableratecpmnetwork.com/f6/c5/d6/f6c5d68822ae0e57ef2c6b116d04c1c5.js'
 
 function QuizDontKnowButton({ onClick, disabled }) {
   return (
@@ -634,8 +636,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
-        <MonetagAdGate
-          monetagUrl="https://omg10.com/4/11720148"
+        <AdsterraAdGate
+          adScriptUrl={ADSTERRA_AD_SCRIPT_URL}
           onUnlocked={() => startPractice()}
           disabled={disabled}
         />
@@ -718,8 +720,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
               Want a second practice question before the real test? Watch another short ad to unlock it.
             </p>
             <div className="mt-3">
-              <MonetagAdGate
-                monetagUrl="https://omg10.com/4/11720148"
+              <AdsterraAdGate
+                adScriptUrl={ADSTERRA_AD_SCRIPT_URL}
                 onUnlocked={() => startPractice()}
                 disabled={disabled || submitting}
               />
