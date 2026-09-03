@@ -81,7 +81,7 @@ export default function CompetitionsPage({
   const { layout: fetchedLayout, loading: layoutLoading } = usePageLayout(COMPETITIONS_PAGE_ID)
   const layout = mergeCompetitionsPageLayout(layoutProp || fetchedLayout)
   const layoutViewport = useLayoutViewport({ editorMode, editorViewport })
-  const { region, t, locale } = useSiteLocale()
+  const { t, locale } = useSiteLocale()
   const compDefaults = defaultCompetitionsPageLayout()
   const { competitions, loading: loadingCompetitions } = usePublishedCompetitions()
   const { giveaways, loading: loadingGiveaways } = usePublishedGiveaways()
@@ -93,6 +93,15 @@ export default function CompetitionsPage({
     )
     return [...(legacy ? [legacy] : []), ...(iphone ? [iphone] : []), ...extras]
   }, [competitions])
+  const sortedFreeGiveaways = useMemo(
+    () =>
+      [...giveaways].sort((a, b) =>
+        String(a?.title || a?.slug || '').localeCompare(String(b?.title || b?.slug || ''), undefined, {
+          sensitivity: 'base',
+        }),
+      ),
+    [giveaways],
+  )
   const loading = layoutLoading || loadingCompetitions || loadingGiveaways
 
   const desktopOffsets = layout.offsets || {}
@@ -102,7 +111,8 @@ export default function CompetitionsPage({
   const paidPrimaryCardOffset = offsets.paidPrimaryCard || { x: 0, y: 0, scale: 1 }
   const legacyBundleCard = layout.legacyBundleCard || {}
   const shirtGiveawayCard = layout.shirtGiveawayCard || {}
-  const showPaid = layout.sections.paid?.visible !== false && (editorMode || region.paidBundlesAvailable)
+  // Prize-draw competitions are temporarily hidden on the public page.
+  const showPaid = editorMode && layout.sections.paid?.visible !== false
   const showFree = layout.sections.free?.visible !== false
   const visibleSectionCount = (showPaid ? 1 : 0) + (showFree ? 1 : 0)
 
@@ -286,6 +296,9 @@ export default function CompetitionsPage({
         ) || t('region.giveawaysWorldBody')}
       </p>
       <ul className="mt-4 grid list-none gap-6">
+        <li className="ss-competition-free-wc-ball w-full">
+          <WorldCupBallGiveawayCard onEnter={() => openEntry('worldCupBall')} />
+        </li>
         <li className="ss-competition-free-primary w-full">
           <div
             ref={shirtCardRef}
@@ -294,16 +307,13 @@ export default function CompetitionsPage({
             {dragWrap('comp_shirt', 'Shirt giveaway card', 'shirtCard', shirtCard, { cssScaleOnly: true })}
           </div>
         </li>
-        <li className="ss-competition-free-wc-ball w-full">
-          <WorldCupBallGiveawayCard onEnter={() => openEntry('worldCupBall')} />
-        </li>
-        {giveaways.map((g) => (
+        {sortedFreeGiveaways.map((g) => (
           <li key={g.slug}>
             <GiveawayPublicCard giveaway={g} onEnter={() => openEntry('paid', { competitionSlug: g.slug })} />
           </li>
         ))}
       </ul>
-      {!loading && giveaways.length === 0 && layout.emptyFreeMessage ? (
+      {!loading && sortedFreeGiveaways.length === 0 && layout.emptyFreeMessage ? (
         <p className="mt-6 text-sm text-stone-500">{layout.emptyFreeMessage}</p>
       ) : null}
     </div>
@@ -326,11 +336,6 @@ export default function CompetitionsPage({
     <main className="ss-photo-page relative m-0 overflow-x-clip p-0">
       <PhotoPageBackdrop />
       <div className="relative z-[1] mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-        {!showPaid && !editorMode ? (
-          <p className="mb-4 rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-sm text-stone-300">
-            {t('competitions.paidUkHidden')}
-          </p>
-        ) : null}
         <div data-editor-align-group data-editor-center-root>
           {dragWrap(
             'comp_title',

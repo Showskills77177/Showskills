@@ -16,7 +16,9 @@ import {
 } from '../../shared/worldCupBallGiveaway.mjs'
 import { worldCupBallChoiceOptionLabel } from '../../shared/worldCupBallHistoricalChoices.mjs'
 import {
+  WORLD_CUP_BALL_MAX_PRACTICE_QUESTIONS,
   WORLD_CUP_BALL_PRACTICE_QUESTION,
+  WORLD_CUP_BALL_PRACTICE_QUESTIONS,
   WORLD_CUP_BALL_PRACTICE_INTRO,
   WORLD_CUP_BALL_PRACTICE_BONUS_TIP,
   WORLD_CUP_BALL_PRACTICE_TIMER_TIP,
@@ -75,6 +77,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const [practiceBonusActive, setPracticeBonusActive] = useState(false)
   const [practiceTimeouts, setPracticeTimeouts] = useState(0)
   const [practiceSummary, setPracticeSummary] = useState({ timedOutOnce: false, answered: false })
+  const [practiceAttemptsUsed, setPracticeAttemptsUsed] = useState(0)
+  const [activePracticeIndex, setActivePracticeIndex] = useState(0)
   const disqualifiedRef = useRef(false)
   const answersRef = useRef({})
   const practiceCompletedRef = useRef(false)
@@ -83,14 +87,19 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
   const [captchaPayload, setCaptchaPayload] = useState('')
   const [captchaError, setCaptchaError] = useState('')
 
+  const activePracticeQuestion =
+    WORLD_CUP_BALL_PRACTICE_QUESTIONS[
+      Math.min(activePracticeIndex, WORLD_CUP_BALL_PRACTICE_QUESTIONS.length - 1)
+    ] || WORLD_CUP_BALL_PRACTICE_QUESTION
+
   const practiceChoices = useMemo(() => {
-    const list = [...WORLD_CUP_BALL_PRACTICE_QUESTION.choices]
+    const list = [...activePracticeQuestion.choices]
     for (let i = list.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[list[i], list[j]] = [list[j], list[i]]
     }
     return list
-  }, [])
+  }, [activePracticeQuestion])
 
   const q = questions[index]
   const localizedQ = useMemo(() => (q ? localizeQuizQuestion(locale, q, t) : null), [locale, q, t])
@@ -470,8 +479,17 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
 
   const startPractice = () => {
     if (disabled) return
+    if (practiceAttemptsUsed >= WORLD_CUP_BALL_MAX_PRACTICE_QUESTIONS) return
     primeQuizTimerAudio()
     onError('')
+    const nextPracticeIndex = Math.min(
+      practiceAttemptsUsed,
+      WORLD_CUP_BALL_PRACTICE_QUESTIONS.length - 1,
+    )
+    setActivePracticeIndex(nextPracticeIndex)
+    setPracticeAttemptsUsed((count) =>
+      Math.min(count + 1, WORLD_CUP_BALL_MAX_PRACTICE_QUESTIONS),
+    )
     setPracticeSecondsLeft(WORLD_CUP_BALL_QUESTION_SECONDS)
     setPracticeBonusActive(false)
     setPracticeTimeouts(0)
@@ -658,7 +676,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           </p>
         </div>
         <p className="ss-wc-ball-quiz__prompt text-stone-100">
-          {WORLD_CUP_BALL_PRACTICE_QUESTION.prompt}
+          {activePracticeQuestion.prompt}
         </p>
         <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
           {practiceChoices.map((choice) => (
@@ -679,6 +697,7 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
 
   if (phase === 'practice_complete') {
     const tips = worldCupBallPracticeCompleteTips(practiceSummary)
+    const canUnlockSecondPractice = practiceAttemptsUsed < WORLD_CUP_BALL_MAX_PRACTICE_QUESTIONS
     return (
       <div className={quizShellClass}>
         <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
@@ -693,6 +712,20 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
             ))}
           </ul>
         </div>
+        {canUnlockSecondPractice ? (
+          <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-sm text-amber-50/95">
+            <p className="text-xs leading-relaxed text-amber-100/90">
+              Want a second practice question before the real test? Watch another short ad to unlock it.
+            </p>
+            <div className="mt-3">
+              <MonetagAdGate
+                monetagUrl="https://omg10.com/4/11720148"
+                onUnlocked={() => startPractice()}
+                disabled={disabled || submitting}
+              />
+            </div>
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={() => void startQuiz()}

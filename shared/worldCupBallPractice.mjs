@@ -9,15 +9,27 @@ import {
   WORLD_CUP_BALL_SESSION_MAX_MINUTES,
 } from './worldCupBallGiveaway.mjs'
 
-/** Fixed practice question — not sent to the server and does not count. */
-export const WORLD_CUP_BALL_PRACTICE_QUESTION = {
-  prompt: 'Which nation has won the most FIFA World Cups?',
-  choices: ['Brazil', 'Germany', 'Italy', 'Argentina'],
-  correctAnswer: 'Brazil',
-}
+export const WORLD_CUP_BALL_MAX_PRACTICE_QUESTIONS = 2
+
+/** Fixed practice questions — not sent to the server and do not count. */
+export const WORLD_CUP_BALL_PRACTICE_QUESTIONS = [
+  {
+    prompt: 'Which nation has won the most FIFA World Cups?',
+    choices: ['Brazil', 'Germany', 'Italy', 'Argentina'],
+    correctAnswer: 'Brazil',
+  },
+  {
+    prompt: 'Which player won the Golden Ball at the 2022 FIFA World Cup?',
+    choices: ['Lionel Messi', 'Kylian Mbappe', 'Luka Modric', 'Antoine Griezmann'],
+    correctAnswer: 'Lionel Messi',
+  },
+]
+
+/** Backward-compatible alias for code paths that still expect a single item. */
+export const WORLD_CUP_BALL_PRACTICE_QUESTION = WORLD_CUP_BALL_PRACTICE_QUESTIONS[0]
 
 export const WORLD_CUP_BALL_PRACTICE_INTRO =
-  `This practice question does not count. In the real test there is a ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — if the time-out expires once, you get a ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only. Use this to get used to the time-out before your real attempt.`
+  `Practice questions do not count. In the real test there is a ${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION} — if the time-out expires once, you get a ${WORLD_CUP_BALL_TIMEOUT_BONUS_SECONDS}-second extension on that question only. You can unlock one optional second practice question by watching another ad before your real attempt.`
 
 export const WORLD_CUP_BALL_PRACTICE_TIMER_TIP = `Each question has a ${WORLD_CUP_BALL_QUESTION_TIMEOUT_LABEL} (shown top right). Answer before the time-out expires.`
 
