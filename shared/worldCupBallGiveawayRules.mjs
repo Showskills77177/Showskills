@@ -56,7 +56,7 @@ export const WORLD_CUP_BALL_GAMEPLAY_NOTICE =
   `${WORLD_CUP_BALL_QUESTION_TIMING_NOTICE} ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_ANSWER_STYLE_INSTRUCTION} Minor spelling differences are accepted when the answer is clearly correct.`
 
 export const WORLD_CUP_BALL_TERMS_AD_GATE_NOTICE =
-  'Before the first practice question, watching the first ad is mandatory. A second practice question is optional and only unlocks if you choose to watch a second ad.'
+  'Before the first practice question, watching the first ad-popup is mandatory. A second practice question is optional and only unlocks if you choose to watch a second ad-popup.'
 
 export const WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE =
   `One wrong answer in the main quiz unlocks one bonus salvage question (${WORLD_CUP_BALL_QUESTION_TIMEOUT_PER_QUESTION}). Answer it correctly to win. A second wrong answer ends the attempt immediately. A second time-out on any question also disqualifies you.`
