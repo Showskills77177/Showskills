@@ -37,17 +37,25 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
     const outerH = typeof window.outerHeight === 'number' ? window.outerHeight : (document.documentElement?.clientHeight || window.screen.availHeight)
     const left = Math.max(0, Math.floor(screenX + (outerW - wW) / 2))
     const top = Math.max(0, Math.floor(screenY + (outerH - wH) / 2))
-    const features = `width=${wW},height=${wH},left=${left},top=${top},menubar=no,toolbar=no,location=no,resizable=yes,scrollbars=yes,status=no,noopener`
+    const features = `width=${wW},height=${wH},left=${left},top=${top},menubar=no,toolbar=no,location=no,resizable=yes,scrollbars=yes,status=no`
     let w = null
     try {
-      w = window.open(monetagUrl, 'monetag_ad_popup', features)
+      // Open a same-origin blank popup first so Safari returns a window handle reliably.
+      w = window.open('', 'monetag_ad_popup', features)
     } catch (e) {
       w = null
     }
     if (w) {
       popupRef.current = w
+      try {
+        if ('opener' in w) w.opener = null
+      } catch {}
+      try {
+        w.location.replace(monetagUrl)
+      } catch {
+        w.location.href = monetagUrl
+      }
       try { w.focus() } catch {}
-      try { if ('opener' in w) w.opener = null } catch {}
       setWatching(true)
       setPopupBlocked(false)
       // poll until the window is closed
