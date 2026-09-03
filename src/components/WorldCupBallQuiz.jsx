@@ -27,6 +27,7 @@ import { apiUrl } from '../lib/api'
 import { fetchCaptchaConfig } from '../lib/captchaConfig.js'
 import { AltchaWidget } from './AltchaWidget'
 import { QuizQuestionTimer } from './QuizQuestionTimer'
+import MonetagAdGate from './MonetagAdGate'
 import { CAPTCHA_BODY_FIELD } from '../../shared/captcha.mjs'
 import {
   clearWorldCupBallQuizProgress,
@@ -615,14 +616,11 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
-        <button
-          type="button"
-          onClick={startPractice}
+        <MonetagAdGate
+          monetagUrl="https://omg10.com/4/11720148"
+          onUnlocked={() => startPractice()}
           disabled={disabled}
-          className="w-full rounded-xl border border-amber-500/40 bg-amber-950/35 py-3 text-sm font-bold text-amber-100 shadow-lg transition hover:bg-amber-900/40 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Try practice question
-        </button>
+        />
         </div>
       </div>
     )
