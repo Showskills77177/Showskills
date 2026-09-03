@@ -11,8 +11,11 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
   const [watching, setWatching] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
+  const [adBlockDetected, setAdBlockDetected] = useState(false)
   const popupRef = useRef(null)
   const pollRef = useRef(null)
+  const popupOpenedAtRef = useRef(0)
+  const popupNavigatedRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -29,6 +32,11 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
 
   function openAndWatch() {
     if (disabled || watching || unlocked) return
+    if (pollRef.current) window.clearInterval(pollRef.current)
+    popupOpenedAtRef.current = Date.now()
+    popupNavigatedRef.current = false
+    setAdBlockDetected(false)
+    setPopupBlocked(false)
     const wW = 420
     const wH = 700
     const screenX = typeof window.screenX === 'number' ? window.screenX : (typeof window.screenLeft === 'number' ? window.screenLeft : 0)
@@ -57,20 +65,53 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
       }
       try { w.focus() } catch {}
       setWatching(true)
-      setPopupBlocked(false)
       // poll until the window is closed
       pollRef.current = window.setInterval(() => {
+        if (!popupNavigatedRef.current) {
+          try {
+            const href = popupRef.current?.location?.href
+            if (href && href !== 'about:blank') {
+              popupNavigatedRef.current = true
+            }
+          } catch {
+            // Cross-origin access means navigation succeeded.
+            popupNavigatedRef.current = true
+          }
+
+          // Still stuck on about:blank after a grace period -> likely blocked by ad/content blocker.
+          if (!popupNavigatedRef.current && Date.now() - popupOpenedAtRef.current > 3000) {
+            if (pollRef.current) window.clearInterval(pollRef.current)
+            try {
+              if (popupRef.current && !popupRef.current.closed) popupRef.current.close()
+            } catch {}
+            popupRef.current = null
+            setWatching(false)
+            setAdBlockDetected(true)
+            return
+          }
+        }
+
         try {
           if (!popupRef.current || popupRef.current.closed) {
             if (pollRef.current) window.clearInterval(pollRef.current)
-            markWatched()
+            if (popupNavigatedRef.current) {
+              markWatched()
+            } else {
+              setWatching(false)
+              setAdBlockDetected(true)
+            }
           }
         } catch (e) {
           // cross-origin access may throw; still check closed
           try {
             if (popupRef.current && popupRef.current.closed) {
               if (pollRef.current) window.clearInterval(pollRef.current)
-              markWatched()
+              if (popupNavigatedRef.current) {
+                markWatched()
+              } else {
+                setWatching(false)
+                setAdBlockDetected(true)
+              }
             }
           } catch (_) {}
         }
@@ -98,6 +139,11 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
           {popupBlocked ? (
             <p className="text-xs text-red-400" role="alert">
               Popup blocked — please allow popups for this site, then click "Watch ad to unlock" again.
+            </p>
+          ) : null}
+          {adBlockDetected ? (
+            <p className="text-xs text-red-400" role="alert">
+              Ad/content blocker detected — disable your blocker for this page, then click "Watch ad to unlock" again.
             </p>
           ) : null}
           <button
