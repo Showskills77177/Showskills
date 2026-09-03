@@ -1018,15 +1018,15 @@ export function EntryModal() {
                   <p className="mt-2 text-stone-300">
                     {wcBallWinnerEmail?.prizeFulfilment === 'international_cash'
                       ? wcBallWinnerEmail?.sent
-                        ? 'We have sent a winner confirmation email with a personal link back to this form. Your fulfilment details are saved and we will process your USD $60 cash prize after you provide the mandatory winning-cheque photograph.'
+                        ? 'We have sent a winner confirmation email with a personal link back to this form. Your fulfilment details are saved and we will process your USD $30 cash prize after you provide the mandatory winning-cheque photograph.'
                         : wcBallWinnerEmail?.skipped
-                          ? 'Your prize details are saved. We will contact you to arrange your USD $60 cash prize. (Email confirmation was not sent in this environment.)'
-                          : 'Your prize details are saved. We will contact you to arrange your USD $60 cash prize and mandatory winning-cheque photograph.'
+                          ? 'Your prize details are saved. We will contact you to arrange your USD $30 cash prize. (Email confirmation was not sent in this environment.)'
+                          : 'Your prize details are saved. We will contact you to arrange your USD $30 cash prize and mandatory winning-cheque photograph.'
                       : wcBallWinnerEmail?.sent
-                      ? 'We have sent a winner confirmation email with a personal link back to this form. Your delivery details are saved — we will arrange free UK shipping of your World Cup ball after you provide the mandatory USD $60 winning-cheque photograph.'
+                      ? 'We have sent a winner confirmation email with a personal link back to this form. Your delivery details are saved — we will arrange free UK shipping of your World Cup ball after you provide the mandatory USD $30 winning-cheque photograph.'
                       : wcBallWinnerEmail?.skipped
                         ? 'Your prize details are saved. We will contact you by phone to arrange free UK delivery after your mandatory winning-cheque photograph. (Email confirmation was not sent in this environment.)'
-                        : 'Your prize details are saved. We will contact you by phone to arrange free UK delivery of your World Cup ball after you provide the mandatory USD $60 winning-cheque photograph.'}
+                        : 'Your prize details are saved. We will contact you by phone to arrange free UK delivery of your World Cup ball after you provide the mandatory USD $30 winning-cheque photograph.'}
                   </p>
                 </div>
               ) : wcBallOutcome?.result === 'won' && wcBallClaimToken ? (

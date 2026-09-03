@@ -36,7 +36,7 @@ export const WORLD_CUP_BALL_FREE_SHIPPING_NOTICE =
 
 /** Short hero / card copy — no legal repetition. */
 export const WORLD_CUP_BALL_PAGE_INTRO =
-  `Win an official-style FIFA World Cup football (2026 design, not signed) by passing a free ${WORLD_CUP_BALL_QUESTION_COUNT}-question skill quiz — or USD $60 cash if you win from outside the UK. Separate from our paid prize draws and the Ronaldo shirt giveaway.`
+  `Win an official-style FIFA World Cup football (2026 design, not signed) by passing a free ${WORLD_CUP_BALL_QUESTION_COUNT}-question skill quiz — or USD $30 cash if you win from outside the UK. Separate from our paid prize draws and the Ronaldo shirt giveaway.`
 
 export const WORLD_CUP_BALL_RULES_INTRO =
   `${WORLD_CUP_BALL_PAGE_INTRO} ${WORLD_CUP_BALL_MONTHLY_DRAW_SHORT}`
@@ -119,7 +119,7 @@ export const WORLD_CUP_BALL_PUBLIC_STEPS = [
     num: 4,
     title: 'Complete the winner fulfilment form',
     detail:
-      'If you win, complete the form with your name, email, phone, country, and mailing address. UK winners get free ball delivery; international winners receive USD $60 cash.',
+      'If you win, complete the form with your name, email, phone, country, and mailing address. UK winners get free ball delivery; international winners receive USD $30 cash.',
   },
   {
     num: 5,

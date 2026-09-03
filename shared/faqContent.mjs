@@ -328,7 +328,7 @@ export const FAQ_SECTIONS = [
         id: 'wc-ball-what',
         question: `What is the ${WORLD_CUP_BALL_GIVEAWAY_LABEL}?`,
         answer:
-          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed), or USD $60 cash for international winners. Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win outright, or get exactly one wrong and answer a bonus salvage question correctly. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY} No payment is required.`,
+          `A free skill-based promotion for one official-style FIFA World Cup ball (not signed), or USD $30 cash for international winners. Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} difficult football questions correctly within strict time limits to win outright, or get exactly one wrong and answer a bonus salvage question correctly. ${WORLD_CUP_BALL_CHOICE_BONUS_NOTICE} ${WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY} No payment is required.`,
       },
       {
         id: 'wc-ball-how-win',

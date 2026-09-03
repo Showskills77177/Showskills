@@ -22,7 +22,7 @@ export const WORLD_CUP_BALL_GIVEAWAY_PATH = '/world-cup-ball-giveaway'
 export const WORLD_CUP_BALL_PRIZE_TITLE = 'Official-style FIFA World Cup ball'
 
 export const WORLD_CUP_BALL_PRIZE_DETAIL =
-  'UK winners receive one official-style FIFA World Cup football (2026 tournament design, not signed) with free UK delivery. International winners receive USD $60 cash instead. Awarded outright when you win the skill quiz — including via a successful salvage question after one wrong answer.'
+  'UK winners receive one official-style FIFA World Cup football (2026 tournament design, not signed) with free UK delivery. International winners receive USD $30 cash instead. Awarded outright when you win the skill quiz — including via a successful salvage question after one wrong answer.'
 
 export const WORLD_CUP_BALL_PRIZE_IMAGE_ALT =
   'Official-style FIFA World Cup ball on grass — white panel with blue 26 and Trionda branding.'
