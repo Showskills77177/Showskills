@@ -10,6 +10,7 @@ import { useEffect, useState, useRef } from 'react'
 export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false }) {
   const [watching, setWatching] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
+  const [popupBlocked, setPopupBlocked] = useState(false)
   const popupRef = useRef(null)
   const pollRef = useRef(null)
 
@@ -42,15 +43,27 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
 
   function openAndWatch() {
     if (disabled || watching || unlocked) return
-    let w
+    const wW = 420
+    const wH = 700
+    const screenX = typeof window.screenX === 'number' ? window.screenX : (typeof window.screenLeft === 'number' ? window.screenLeft : 0)
+    const screenY = typeof window.screenY === 'number' ? window.screenY : (typeof window.screenTop === 'number' ? window.screenTop : 0)
+    const outerW = typeof window.outerWidth === 'number' ? window.outerWidth : (document.documentElement?.clientWidth || window.screen.availWidth)
+    const outerH = typeof window.outerHeight === 'number' ? window.outerHeight : (document.documentElement?.clientHeight || window.screen.availHeight)
+    const left = Math.max(0, Math.floor(screenX + (outerW - wW) / 2))
+    const top = Math.max(0, Math.floor(screenY + (outerH - wH) / 2))
+    const features = `width=${wW},height=${wH},left=${left},top=${top},menubar=no,toolbar=no,location=no,resizable=yes,scrollbars=yes,status=no,noopener`
+    let w = null
     try {
-      w = window.open(monetagUrl, '_blank', 'noopener')
+      w = window.open(monetagUrl, 'monetag_ad_popup', features)
     } catch (e) {
       w = null
     }
     if (w) {
       popupRef.current = w
+      try { w.focus() } catch {}
+      try { if ('opener' in w) w.opener = null } catch {}
       setWatching(true)
+      setPopupBlocked(false)
       // poll until the window is closed
       pollRef.current = window.setInterval(() => {
         try {
@@ -69,12 +82,9 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
         }
       }, 1000)
     } else {
-      // popup blocked — show fallback: open in same tab
-      // open new tab via location.assign as fallback
-      // open in same tab and instruct user to return
-      window.location.href = monetagUrl
-      // After navigation they will be on the ad page; when they come back the session flag may not be set.
-      // Provide a manual "I watched the ad" fallback below by rendering a confirm button.
+      // Popup was blocked by the browser. Don't navigate away — show instructions and manual confirm.
+      setPopupBlocked(true)
+      setWatching(false)
     }
   }
 
@@ -91,6 +101,11 @@ export default function MonetagAdGate({ monetagUrl, onUnlocked, disabled = false
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-xs leading-relaxed text-stone-400">Watch a short ad to unlock the practice question.</p>
+          {popupBlocked ? (
+            <p className="text-xs text-red-400" role="alert">
+              Popup blocked — please allow popups for this site, then click "Watch ad to unlock" again. If you already watched the ad in another tab/window, click "I watched".
+            </p>
+          ) : null}
           <div className="flex gap-2">
             <button
               type="button"
