@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { query } from './db.mjs'
-import { ensureEntryAttemptLogSchema } from './ensureFreeEntrySchema.mjs'
+import { ensureEntryAttemptLogSchema, ensureFreeEntrySchema } from './ensureFreeEntrySchema.mjs'
 import { clientIp } from './rateLimit.mjs'
 import {
   buildNameAddressKey,

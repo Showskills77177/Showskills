@@ -7,7 +7,14 @@ import {
   MINIMUM_SALES_TERMS_INTRO,
   TICKET_NON_REFUND_SKILL_AND_VOLUNTARY,
 } from '../../shared/competitionMinimumSalesPolicy.mjs'
-import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
+import {
+  RONALDO_SHIRT_QUIZ_QUESTION_COUNT,
+  RONALDO_SHIRT_QUIZ_QUESTION_SECONDS,
+  RONALDO_SHIRT_QUIZ_MAX_WRONG_FOR_SALVAGE,
+  RONALDO_SHIRT_QUIZ_MAX_TIMEOUTS,
+  RONALDO_SHIRT_QUIZ_TIMEOUT_BONUS_SECONDS,
+} from '../../shared/ronaldoShirtQuiz.mjs'
 import {
   WORLD_CUP_BALL_TERMS_SECTIONS,
 } from '../../shared/worldCupBallGiveawayRules.mjs'
@@ -330,49 +337,9 @@ function PrivacyPolicySection() {
   )
 }
 
-export function TermsModal({ open, onClose }) {
-  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + card iframes).
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
+export function TermsAndPrivacyBody() {
   return (
-    <div
-      className="ss-terms-modal-root fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="terms-title"
-    >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/75"
-        aria-label="Close terms"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,1080px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-900/40 bg-stone-950 shadow-2xl shadow-emerald-950/20 sm:max-w-4xl lg:max-h-[min(94vh,1160px)] lg:max-w-5xl xl:max-w-6xl xl:max-h-[min(94vh,1200px)]">
-        <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent" aria-hidden />
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4">
-          <h2 id="terms-title" className="text-lg font-semibold text-stone-100">
-            Terms &amp; privacy
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-stone-500 hover:bg-white/5 hover:text-stone-200"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="overflow-y-auto px-5 py-5 text-left text-base leading-relaxed text-zinc-400 ss-terms-modal-body sm:px-6">
+    <>
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
             promotions in the United Kingdom, including the paid <strong>Signed Legacy Bundle</strong> skill competition
@@ -496,7 +463,8 @@ export function TermsModal({ open, onClose }) {
           <h3 className="mb-2 mt-6 font-semibold text-stone-200">6. Free Ronaldo shirt giveaway (separate)</h3>
           <p className="mb-3">
             The Ronaldo shirt giveaway is a <strong>separate, free engagement giveaway</strong> for promotion only. Entry
-            is <strong>free</strong> (no payment). You answer one simple qualification question; subscribe to the
+            is <strong>free</strong> (no payment). You must <strong>pass a timed 25-question football skill quiz</strong>{' '}
+            (see the mistake and time-out allowances below) before you can submit the entry form; subscribe to the
             ShowSkills newsletter; follow us on <strong>TikTok, Instagram, or Facebook</strong> (your choice — you only
             need one); and provide your social handle so we can verify engagement. The prize is a{' '}
             <strong>signed Cristiano Ronaldo Manchester United home shirt from the {SHIRT_GIVEAWAY_SEASON_LABEL}</strong>{' '}
@@ -505,8 +473,12 @@ export function TermsModal({ open, onClose }) {
             questions wrong may receive <strong>automatic consolation entries</strong> into this shirt draw — see section 2a above.
           </p>
           <p className="mb-3">
-            The qualification question is: <strong>{SHIRT_GIVEAWAY_QUESTION}</strong>. Correct eligible entries qualify
-            for the giveaway draw. We may disqualify entries that cannot be verified or breach these rules.
+            The quiz is {RONALDO_SHIRT_QUIZ_QUESTION_COUNT} questions with a {RONALDO_SHIRT_QUIZ_QUESTION_SECONDS}-second
+            time-out per question. You are allowed up to {RONALDO_SHIRT_QUIZ_MAX_WRONG_FOR_SALVAGE} wrong answers — each
+            mistake grants one bonus question to make up for it — and up to {RONALDO_SHIRT_QUIZ_MAX_TIMEOUTS} question
+            time-outs, each giving a one-off {RONALDO_SHIRT_QUIZ_TIMEOUT_BONUS_SECONDS}-second extension. Exceeding either
+            allowance ends the attempt. Passing the quiz unlocks the entry form for a short time only; eligible entries then
+            qualify for the giveaway draw. We may disqualify entries that cannot be verified or breach these rules.
           </p>
           <p className="mb-3">
             <strong>One entry per device:</strong> only one shirt giveaway entry is allowed per connection/device (IP),
@@ -694,6 +666,54 @@ export function TermsModal({ open, onClose }) {
             </a>
             .
           </p>
+    </>
+  )
+}
+
+export function TermsModal({ open, onClose }) {
+  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + card iframes).
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return (
+    <div
+      className="ss-terms-modal-root fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="terms-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/75"
+        aria-label="Close terms"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex max-h-[min(92vh,1080px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-900/40 bg-stone-950 shadow-2xl shadow-emerald-950/20 sm:max-w-4xl lg:max-h-[min(94vh,1160px)] lg:max-w-5xl xl:max-w-6xl xl:max-h-[min(94vh,1200px)]">
+        <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent" aria-hidden />
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4">
+          <h2 id="terms-title" className="text-lg font-semibold text-stone-100">
+            Terms &amp; privacy
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-stone-500 hover:bg-white/5 hover:text-stone-200"
+            aria-label="Close"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-5 text-left text-base leading-relaxed text-zinc-400 ss-terms-modal-body sm:px-6">
+          <TermsAndPrivacyBody />
         </div>
         <div className="border-t border-white/10 px-6 py-4">
           <button

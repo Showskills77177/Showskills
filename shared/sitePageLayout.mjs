@@ -42,17 +42,24 @@ export const SITE_PAGE_BACKGROUNDS = {
 
 const DEFAULT_NAV = [
   { id: 'home', label: 'Home', path: '/', visible: true, mobile: true },
+  { id: 'quizzes', label: 'Quizzes', path: '/quizzes', visible: true, mobile: true },
   { id: 'competitions', label: 'Competitions', path: '/competitions', visible: true, mobile: true },
   { id: 'faq', label: 'FAQ', path: '/faq', visible: true, mobile: true },
   { id: 'terms', label: 'T&C', action: 'terms', visible: true, mobile: true },
 ]
 
 const DEFAULT_FOOTER_LINKS = {
+  quizzes: { label: 'Quizzes', path: '/quizzes', visible: true },
+  howItWorks: { label: 'How it works', path: '/how-it-works', visible: true },
+  giveaways: { label: 'Giveaways', path: '/giveaways', visible: true },
+  winners: { label: 'Winners', path: '/winners', visible: true },
   competitions: { label: 'Competitions', path: '/competitions', visible: true },
   newsletter: { label: 'Newsletter', path: '/newsletter', visible: true },
+  about: { label: 'About', path: '/about', visible: true },
   contact: { label: 'Contact', path: '/contact', visible: true },
   faq: { label: 'FAQ', path: '/faq', visible: true },
   terms: { label: 'Full terms & privacy', action: 'terms', visible: true },
+  privacy: { label: 'Privacy policy', path: '/privacy', visible: true },
   ticketTerms: { label: 'Paid ticket terms', action: 'ticketTerms', visible: true },
 }
 
@@ -89,7 +96,7 @@ export function defaultSiteShell() {
       showTrustpilot: true,
       showSocial: true,
       socialLinks: { ...DEFAULT_SOCIAL_LINKS },
-      linkOrder: ['competitions', 'newsletter', 'contact', 'faq', 'terms', 'ticketTerms'],
+      linkOrder: ['quizzes', 'howItWorks', 'giveaways', 'winners', 'competitions', 'newsletter', 'about', 'contact', 'faq', 'terms', 'privacy', 'ticketTerms'],
       links: { ...DEFAULT_FOOTER_LINKS },
     },
   }

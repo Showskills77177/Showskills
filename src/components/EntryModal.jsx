@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useEntryFlow } from '../entry/entryContext'
-import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL } from '../../shared/shirtGiveaway.mjs'
 import {
   SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS,
   isShirtGiveawayRequirementMet,
@@ -34,6 +34,7 @@ import { resolvePublicSocialLinks } from '../../shared/socialLinks.mjs'
 import { ShirtGiveawaySocialFollow } from './ShirtGiveawaySocialFollow'
 import { ShirtGiveawayJerseyImagery } from './ShirtGiveawayJerseyImagery'
 import { WorldCupBallQuiz } from './WorldCupBallQuiz'
+import { RonaldoShirtQuiz } from './RonaldoShirtQuiz'
 import { WorldCupBallClaimForm } from './WorldCupBallClaimForm'
 import { WorldCupBallWrongReview } from './WorldCupBallWrongReview'
 import { WorldCupBallMonthlyDrawEntryCallout } from './WorldCupBallMonthlyDrawEntryCallout'
@@ -119,8 +120,8 @@ export function EntryModal() {
     paypalCaptureOrderApi,
     kickFullName,
     setKickFullName,
-    kickAnswer,
-    setKickAnswer,
+    kickQuizPassToken,
+    setKickQuizPassToken,
     kickEmail,
     setKickEmail,
     kickConsent,
@@ -205,6 +206,16 @@ export function EntryModal() {
     const scroll = panelRef.current?.querySelector('.ss-entry-modal-scroll')
     if (scroll) scroll.scrollTop = 0
   }, [wcBallQuizFocus, wcBallQuizPhase])
+
+  const [kickQuizLost, setKickQuizLost] = useState(false)
+  const [kickQuizRestartNonce, setKickQuizRestartNonce] = useState(0)
+
+  useEffect(() => {
+    if (entryModalType === 'kickups') {
+      setKickQuizLost(false)
+      setKickQuizRestartNonce((n) => n + 1)
+    }
+  }, [entryModalType])
 
   const showPaymentSheet =
     hasEmbeddedCardCheckout &&
@@ -822,7 +833,7 @@ export function EntryModal() {
               <ul className="space-y-2 rounded-xl border border-lime-500/25 bg-lime-950/20 p-3" aria-label="Entry requirements">
                 {SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS.map((req) => {
                   const done = isShirtGiveawayRequirementMet(req.id, {
-                    answer: kickAnswer,
+                    quizPassed: Boolean(kickQuizPassToken),
                     email: kickEmail,
                     newsletterOptIn: kickNewsletterOptIn,
                     socialPlatform: kickSocialPlatform,
@@ -881,8 +892,52 @@ export function EntryModal() {
                     </a>
                   ) : null}
                 </div>
+              ) : !kickQuizPassToken ? (
+                <div className="mt-4">
+                  {kickQuizLost ? (
+                    <div className="rounded-xl border border-rose-500/35 bg-rose-950/25 px-4 py-4 text-sm text-rose-100/95">
+                      <p className="font-semibold text-rose-50">Not quite — you can try again</p>
+                      <p className="mt-2 text-stone-300">
+                        You didn&apos;t pass the skill quiz this time. Take another attempt whenever you&apos;re ready — there
+                        is no limit on retries, but each entry still requires one pass per device.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setKickQuizLost(false)
+                          setKickQuizRestartNonce((n) => n + 1)
+                        }}
+                        className="mt-4 w-full rounded-xl bg-gradient-to-r from-lime-700 to-emerald-700 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <RonaldoShirtQuiz
+                      key={kickQuizRestartNonce}
+                      disabled={kickVpnBlocked || kickCheckingVpn}
+                      onError={setKickError}
+                      onResult={(result) => {
+                        if (result?.passToken) {
+                          setKickQuizPassToken(result.passToken)
+                        } else {
+                          setKickQuizLost(true)
+                        }
+                      }}
+                    />
+                  )}
+                  {kickError ? (
+                    <div className="mt-2.5">
+                      <ErrorBanner message={kickError} />
+                    </div>
+                  ) : null}
+                </div>
               ) : (
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleKickupsGiveawaySubmit}>
+                <div className="flex items-center gap-2 rounded-xl border border-lime-500/35 bg-lime-950/20 px-3 py-2.5 text-sm font-semibold text-lime-200">
+                  <span aria-hidden>✓</span>
+                  <span>Skill quiz passed — finish your details below</span>
+                </div>
                 <ShirtGiveawaySocialFollow
                   socialLinks={socialLinks}
                   platform={kickSocialPlatform}
@@ -904,24 +959,6 @@ export function EntryModal() {
                     onChange={(e) => setKickFullName(e.target.value)}
                     className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
                     placeholder="Your name"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="modal-kick-answer" className="block text-sm font-medium text-stone-300">
-                    Qualification question
-                  </label>
-                  <p className="mt-1 text-sm text-stone-500">{SHIRT_GIVEAWAY_QUESTION}</p>
-                  <input
-                    id="modal-kick-answer"
-                    type="text"
-                    autoComplete="off"
-                    value={kickAnswer}
-                    onChange={(e) => {
-                      setKickAnswer(e.target.value)
-                      setKickError('')
-                    }}
-                    className="ss-entry-field mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-stone-200 placeholder:text-stone-600 focus:border-emerald-600/50 focus:outline-none focus:ring-2 focus:ring-emerald-900/40"
-                    placeholder="Type the answer"
                   />
                 </div>
                 <div>

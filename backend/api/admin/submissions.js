@@ -104,7 +104,11 @@ export default async function handler(req, res) {
           w.postcode AS winner_postcode,
           w.winner_email_sent_at,
           w.prize_fulfilment AS winner_prize_fulfilment,
-          w.cash_prize_usd AS winner_cash_prize_usd
+          w.cash_prize_usd AS winner_cash_prize_usd,
+          w.reward_choice AS winner_reward_choice,
+          w.fraud_score AS winner_fraud_score,
+          w.fraud_flagged AS winner_fraud_flagged,
+          w.fraud_flags_json AS winner_fraud_flags_json
         FROM kickup_submissions ks
         LEFT JOIN world_cup_ball_winners w ON w.submission_id = ks.id
         ${where}

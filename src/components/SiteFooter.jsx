@@ -9,6 +9,7 @@ import { offsetStyle } from '../../shared/layoutOffsets.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { translateFooterLabel } from '../../shared/i18n/translate.mjs'
 import { localizedLayoutTextOrCms } from '../../shared/i18n/localizedLayout.mjs'
+import { SHOWSKILLS_POSITIONING_STATEMENT } from '../../shared/sitePositioning.mjs'
 
 function LogoMark({ className = 'h-7 sm:h-8' }) {
   return (
@@ -125,6 +126,7 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
         </div>
 
         <div className="mt-4 max-w-2xl space-y-1.5">
+          <p className="text-sm leading-relaxed text-stone-400 sm:text-[13px]">{SHOWSKILLS_POSITIONING_STATEMENT}</p>
           {withOffset(
             footerOffsets,
             'legal',

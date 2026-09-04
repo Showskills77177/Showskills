@@ -27,6 +27,8 @@ import { liveOffsetStyle, resolveLayoutOffsets, EDITOR_VIEWPORT_MOBILE } from '.
 import { LiveLayoutOffset } from './LiveLayoutOffset'
 import { useLayoutViewport } from '../hooks/useLayoutViewport'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
+import { useSeoMeta } from '../hooks/useSeoMeta'
+import { SHOWSKILLS_POSITIONING_STATEMENT } from '../../shared/sitePositioning.mjs'
 import {
   DRAW_COMPETITION_SLUG,
   RONALDO_LEGACY_BUNDLE_ACTIVE,
@@ -213,6 +215,16 @@ export function HomePageContent({
   const prizes = layout.blocks.hero_prizes
   const promo = layout.blocks.promo_strip
   const details = layout.blocks.hero_details
+
+  useSeoMeta(
+    editorMode
+      ? {}
+      : {
+          title: 'ShowSkills — Free Football Skill Quizzes & Giveaways',
+          description: SHOWSKILLS_POSITIONING_STATEMENT,
+          path: '/',
+        },
+  )
   const bundles = layout.blocks.ticket_bundles
   const winnersBlock = layout.blocks.winners_panel
   const hubBlock = layout.blocks.competitions_hub
@@ -501,6 +513,9 @@ export function HomePageContent({
             </p>,
           )
         : null}
+      <p className="ss-hero-positioning-copy max-w-xl text-sm leading-relaxed text-emerald-200/70">
+        {SHOWSKILLS_POSITIONING_STATEMENT}
+      </p>
       {dragWrap(
         'intro_cta_row',
         'CTA links',

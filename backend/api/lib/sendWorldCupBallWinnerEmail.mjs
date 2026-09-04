@@ -13,6 +13,7 @@ import {
   parseResendSandboxRecipient,
 } from './resendConfig.mjs'
 import { generateWinnerChequePng } from './chequeGenerator.mjs'
+import { WORLD_CUP_BALL_PRIZE_TITLE } from '../../../shared/worldCupBallGiveaway.mjs'
 
 export async function sendWorldCupBallWinnerEmail({
   to,
@@ -52,17 +53,27 @@ export async function sendWorldCupBallWinnerEmail({
       : undefined,
   }
 
-  // Cash-prize winners with complete claim details get an auto-generated winner's cheque
-  // attached — a failure here must never block the underlying notification email.
+  // Winners with complete claim details get an auto-generated winner's cheque attached —
+  // a USD figure for cash winners, or a ball-prize variant for UK winners who keep the ball.
+  // A failure here must never block the underlying notification email.
   let attachments
-  if (detailsComplete && prizeFulfilment === 'international_cash' && cashPrizeUsd && winReference) {
+  if (detailsComplete && winReference && (prizeFulfilment === 'international_cash' ? cashPrizeUsd : prizeFulfilment === 'uk_ball')) {
     try {
-      const chequePng = await generateWinnerChequePng({
-        fullName: customerFullName,
-        amountUsd: cashPrizeUsd,
-        chequeNumber: winReference,
-        dateIso: wonAt,
-      })
+      const chequePng = await generateWinnerChequePng(
+        prizeFulfilment === 'international_cash'
+          ? {
+              fullName: customerFullName,
+              amountUsd: cashPrizeUsd,
+              chequeNumber: winReference,
+              dateIso: wonAt,
+            }
+          : {
+              fullName: customerFullName,
+              prizeLabel: WORLD_CUP_BALL_PRIZE_TITLE,
+              chequeNumber: winReference,
+              dateIso: wonAt,
+            },
+      )
       attachments = [
         {
           filename: `${winReference}-winners-cheque.png`,

@@ -169,6 +169,26 @@ export async function ensureWorldCupBallSchema() {
     } catch {
       /* column exists */
     }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN reward_choice TEXT`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN fraud_score INTEGER`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN fraud_flagged INTEGER NOT NULL DEFAULT 0`)
+    } catch {
+      /* column exists */
+    }
+    try {
+      await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN fraud_flags_json TEXT`)
+    } catch {
+      /* column exists */
+    }
   }
 
   if (dbIsPostgres()) {
@@ -176,6 +196,10 @@ export async function ensureWorldCupBallSchema() {
     await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS prize_fulfilment TEXT`)
     await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS cash_prize_usd INTEGER`)
     await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS check_photo_acknowledged_at TIMESTAMPTZ`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS reward_choice TEXT`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS fraud_score INTEGER`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS fraud_flagged BOOLEAN NOT NULL DEFAULT false`)
+    await query(`ALTER TABLE world_cup_ball_winners ADD COLUMN IF NOT EXISTS fraud_flags_json JSONB`)
   }
 
   await ensureWorldCupBallMonthlyDrawSchema()
@@ -342,16 +366,22 @@ export async function recordWorldCupBallWinner({
   prizeFulfilment,
   cashPrizeUsd = null,
   checkPhotoAcknowledgedAt = null,
+  rewardChoice = null,
+  fraudScore = null,
+  fraudFlagged = false,
+  fraudFlags = null,
 }) {
   await ensureWorldCupBallSchema()
   const id = randomUUID()
   const now = new Date().toISOString()
+  const fraudFlagsJson = fraudFlags ? JSON.stringify(fraudFlags) : null
   await query(
     `INSERT INTO world_cup_ball_winners (
       id, session_id, submission_id, full_name, phone, name_key, phone_key, address_key,
       address_line1, address_line2, city, postcode, email, country_code, prize_fulfilment,
-      cash_prize_usd, check_photo_acknowledged_at, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+      cash_prize_usd, check_photo_acknowledged_at, reward_choice, fraud_score, fraud_flagged,
+      fraud_flags_json, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
     [
       id,
       sessionId,
@@ -370,6 +400,10 @@ export async function recordWorldCupBallWinner({
       prizeFulfilment || null,
       cashPrizeUsd,
       checkPhotoAcknowledgedAt,
+      rewardChoice || null,
+      fraudScore,
+      dbIsPostgres() ? Boolean(fraudFlagged) : fraudFlagged ? 1 : 0,
+      fraudFlagsJson,
       now,
     ],
   )

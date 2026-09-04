@@ -55,14 +55,22 @@ export function isWorldCupBallUkCountry(countryCode) {
   return WORLD_CUP_BALL_UK_COUNTRY_CODES.has(String(countryCode || '').trim().toUpperCase())
 }
 
-/** @param {string | null | undefined} countryCode @returns {WorldCupBallPrizeFulfilment} */
-export function resolveWorldCupBallPrizeFulfilment(countryCode) {
-  return isWorldCupBallUkCountry(countryCode) ? 'uk_ball' : 'international_cash'
+/**
+ * Physical ball shipping is UK-only, so international winners always get the cash prize. UK
+ * winners get the ball by default, but can explicitly opt for the cash prize instead via
+ * `{ preferCash: true }` (set from the winner's choice on the claim form).
+ * @param {string | null | undefined} countryCode
+ * @param {{ preferCash?: boolean }} [options]
+ * @returns {WorldCupBallPrizeFulfilment}
+ */
+export function resolveWorldCupBallPrizeFulfilment(countryCode, { preferCash = false } = {}) {
+  if (!isWorldCupBallUkCountry(countryCode)) return 'international_cash'
+  return preferCash ? 'international_cash' : 'uk_ball'
 }
 
-/** @param {string | null | undefined} countryCode */
-export function worldCupBallCashPrizeUsdForCountry(countryCode) {
-  return resolveWorldCupBallPrizeFulfilment(countryCode) === 'international_cash'
+/** @param {string | null | undefined} countryCode @param {{ preferCash?: boolean }} [options] */
+export function worldCupBallCashPrizeUsdForCountry(countryCode, options) {
+  return resolveWorldCupBallPrizeFulfilment(countryCode, options) === 'international_cash'
     ? WORLD_CUP_BALL_INTERNATIONAL_CASH_USD
     : null
 }

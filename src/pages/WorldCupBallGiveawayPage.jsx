@@ -20,6 +20,17 @@ import { WorldCupBallTimingCallout } from '../components/WorldCupBallTimingCallo
 import { WorldCupBallGiveawayBackdrop } from '../components/WorldCupBallGiveawayBackdrop'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { localizedLayoutText } from '../../shared/i18n/localizedLayout.mjs'
+import { useSeoMeta } from '../hooks/useSeoMeta'
+import { JsonLd } from '../components/JsonLd'
+import { buildFaqPageJsonLd, buildQuizJsonLd } from '../../shared/seoSchema.mjs'
+import { SHOWSKILLS_LOTTERY_FAQ_QUESTION, SHOWSKILLS_LOTTERY_FAQ_ANSWER } from '../../shared/sitePositioning.mjs'
+
+const WORLD_CUP_BALL_QUIZ_FAQ = [
+  {
+    question: SHOWSKILLS_LOTTERY_FAQ_QUESTION,
+    answer: SHOWSKILLS_LOTTERY_FAQ_ANSWER,
+  },
+]
 
 function HostNationsBadge({ t }) {
   return (
@@ -78,6 +89,13 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
 
   const handleStart = () => openEntry('worldCupBall')
 
+  useSeoMeta({
+    title: `${WORLD_CUP_BALL_GIVEAWAY_LABEL} — Free Football Skill Quiz | ShowSkills`,
+    description:
+      'Free World Cup Ball skill quiz — no tickets, no lottery. Answer football questions correctly to win outright.',
+    path: '/world-cup-ball-giveaway',
+  })
+
   return (
     <main
       className={`ss-wc-ball-giveaway-page relative m-0 overflow-x-hidden p-0 ${
@@ -85,6 +103,15 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
       }`}
     >
       <WorldCupBallGiveawayBackdrop />
+      <JsonLd
+        data={buildQuizJsonLd({
+          name: WORLD_CUP_BALL_GIVEAWAY_LABEL,
+          description: 'Free football skill quiz. No tickets, no lottery. Correct answers can win outright.',
+          url: '/world-cup-ball-giveaway',
+          questionCount: WORLD_CUP_BALL_QUESTION_COUNT,
+        })}
+      />
+      <JsonLd data={buildFaqPageJsonLd(WORLD_CUP_BALL_QUIZ_FAQ)} />
 
       {/* Hero */}
       <section className="ss-wc-ball-giveaway-page__hero relative">
@@ -175,6 +202,13 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
                     </li>
                   ))}
                 </ol>
+              </div>
+
+              <div className="ss-wc-ball-giveaway-page__glass rounded-2xl p-5 sm:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-amber-300/90">
+                  {SHOWSKILLS_LOTTERY_FAQ_QUESTION}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-amber-100/78">{SHOWSKILLS_LOTTERY_FAQ_ANSWER}</p>
               </div>
 
               <div className="ss-wc-ball-giveaway-page__glass rounded-2xl p-5 sm:p-6">

@@ -1,13 +1,25 @@
 import { KICKUPS_GIVEAWAY_IMAGE } from '../competitionVisuals'
 import { useEntryFlow } from '../entry/entryContext'
 import { ShirtGiveawayCtaButton } from '../components/siteChrome'
-import { SHIRT_GIVEAWAY_QUESTION, SHIRT_GIVEAWAY_SEASON_LABEL, SHIRT_GIVEAWAY_PRIZE_TITLE } from '../../shared/shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL, SHIRT_GIVEAWAY_PRIZE_TITLE } from '../../shared/shirtGiveaway.mjs'
+import { RONALDO_SHIRT_QUIZ_QUESTION_COUNT } from '../../shared/ronaldoShirtQuiz.mjs'
 import { SHIRT_GIVEAWAY_PUBLIC_STEPS } from '../../shared/shirtGiveawayEntryRequirements.mjs'
 import { usePageLayout } from '../hooks/useSitePages'
 import { useShirtGiveawayCompetition } from '../hooks/useShirtGiveawayCompetition'
 import { CompetitionCountdown } from '../components/CompetitionCountdown'
 import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import { SHIRT_GIVEAWAY_PAGE_ID, mergeShirtGiveawayPageLayout } from '../../shared/sitePageLayout.mjs'
+import { useSeoMeta } from '../hooks/useSeoMeta'
+import { JsonLd } from '../components/JsonLd'
+import { buildFaqPageJsonLd } from '../../shared/seoSchema.mjs'
+
+const SHIRT_GIVEAWAY_FAQ = [
+  {
+    question: 'Is this a lottery?',
+    answer:
+      'No. There is no ticket to buy. Pass the free 25-question skill quiz and follow the entry steps to qualify — the winner is then picked from qualifying entries.',
+  },
+]
 
 /** Free Ronaldo shirt giveaway (direct URL / footer links). */
 export default function KickupsArchivePage({ layout: layoutProp = null, editorMode = false }) {
@@ -18,10 +30,22 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
   const { competition: shirtCompetition, loading: shirtPeriodLoading } = useShirtGiveawayCompetition()
   const countdownPeriod = pickCountdownPeriod(shirtCompetition)
 
+  useSeoMeta(
+    editorMode
+      ? {}
+      : {
+          title: 'Free Ronaldo Shirt Giveaway | ShowSkills',
+          description:
+            'Free Ronaldo signed shirt giveaway on ShowSkills. No ticket purchase — pass a free 25-question skill quiz to qualify.',
+          path: '/archive/ronaldo-shirt-giveaway',
+        },
+  )
+
   return (
     <main
       className={`m-0 p-0 ${editorMode ? 'ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none' : ''}`}
     >
+      <JsonLd data={editorMode ? null : buildFaqPageJsonLd(SHIRT_GIVEAWAY_FAQ)} />
       <section className="ss-rules-pitch-guide border-t border-lime-400/20">
         <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
           <header className="max-w-3xl text-left">
@@ -102,12 +126,15 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
             </div>
 
             <aside className="mx-auto w-full max-w-[360px] rounded-2xl border border-lime-400/25 bg-black/25 p-5 lg:mx-0 lg:max-w-none lg:sticky lg:top-24 lg:self-start">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90">Question</p>
-              <p className="mt-3 text-lg font-semibold leading-snug text-white">{SHIRT_GIVEAWAY_QUESTION}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-lime-300/90">How to qualify</p>
+              <p className="mt-3 text-lg font-semibold leading-snug text-white">
+                Pass the {RONALDO_SHIRT_QUIZ_QUESTION_COUNT}-question football skill quiz
+              </p>
               <p className="mt-3 text-sm leading-relaxed text-lime-200/70">
-                Type your answer in the giveaway form. Pick TikTok, Instagram, or Facebook, open our profile in a new tab to
-                follow us, enter your handle, tick to confirm, subscribe to the newsletter, agree to the terms, then
-                submit.
+                Open the giveaway form and take the timed quiz first — up to 2 mistakes and 2 time-outs are
+                tolerated, each with a bonus chance. Once you pass, pick TikTok, Instagram, or Facebook, open our
+                profile in a new tab to follow us, enter your handle, tick to confirm, subscribe to the newsletter,
+                agree to the terms, then submit.
               </p>
               <button
                 type="button"

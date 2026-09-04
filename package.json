@@ -51,6 +51,7 @@
     "test:competition-catalog": "node scripts/test-competition-catalog.mjs",
     "test:user-account": "node scripts/test-user-account-api.mjs",
     "test:world-cup-ball": "node scripts/test-world-cup-ball-api.mjs",
+    "test:ronaldo-shirt-quiz": "node scripts/test-ronaldo-shirt-quiz-api.mjs",
     "test:world-cup-ball-monthly-draw": "node scripts/test-world-cup-ball-monthly-draw.mjs",
     "reset:world-cup-ball": "node scripts/reset-world-cup-ball-local.mjs",
     "test:admin-email": "node scripts/test-admin-otp-email.mjs"

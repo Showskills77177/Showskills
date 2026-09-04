@@ -3,6 +3,7 @@ import { EntryTermsConsent } from './EntryTermsConsent'
 import { ErrorBanner } from './ErrorBanner'
 import { apiUrl } from '../lib/api'
 import { PHONE_COLLECTION_NOTICE } from '../../shared/contactPhone.mjs'
+import { SHOWSKILLS_CONTACT_EMAIL } from '../../shared/siteContact.mjs'
 import { WORLD_CUP_BALL_PRIZE_TITLE } from '../../shared/worldCupBallGiveaway.mjs'
 import {
   WORLD_CUP_BALL_FREE_SHIPPING_NOTICE,
@@ -18,7 +19,7 @@ import {
   worldCupBallPrizeHeadlineForCountry,
 } from '../../shared/worldCupBallInternationalPrize.mjs'
 import {
-  WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY,
+  worldCupBallPhotographySummaryForFulfilment,
 } from '../../shared/worldCupBallPhotography.mjs'
 
 /**
@@ -48,11 +49,17 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
   const [linkSent, setLinkSent] = useState(false)
   const [localError, setLocalError] = useState('')
 
+  const [prizeChoice, setPrizeChoice] = useState('ball')
   const needsGuardian = entrantAgeBand === '16-17'
-  const prizeFulfilment = countryCode ? resolveWorldCupBallPrizeFulfilment(countryCode) : null
   const isUkWinner = countryCode ? isWorldCupBallUkCountry(countryCode) : false
+  const preferCash = isUkWinner && prizeChoice === 'cash'
+  const prizeFulfilment = countryCode ? resolveWorldCupBallPrizeFulfilment(countryCode, { preferCash }) : null
   const isInternationalCash = prizeFulfilment === 'international_cash'
-  const prizeHeadline = countryCode ? worldCupBallPrizeHeadlineForCountry(countryCode) : WORLD_CUP_BALL_PRIZE_TITLE
+  const prizeHeadline = countryCode
+    ? isUkWinner
+      ? (preferCash ? `USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} cash prize` : WORLD_CUP_BALL_PRIZE_TITLE)
+      : worldCupBallPrizeHeadlineForCountry(countryCode)
+    : WORLD_CUP_BALL_PRIZE_TITLE
 
   const submit = async (e) => {
     e.preventDefault()
@@ -71,9 +78,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
       return
     }
     if (!checkPhotoAcknowledged) {
-      setLocalError(
-        `You must agree to provide a mandatory photograph holding the USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque.`,
-      )
+      setLocalError('You must agree to provide a photograph holding your winning cheque (or email us your official reason if you cannot).')
       return
     }
     if (!fullName.trim()) {
@@ -108,6 +113,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
           claimToken,
           entrantAgeBand,
           countryCode,
+          prizeChoice: isUkWinner ? prizeChoice : 'cash',
           checkPhotoAcknowledged,
           fullName: fullName.trim(),
           email: email.trim(),
@@ -226,6 +232,34 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
           </p>
         ) : null}
       </div>
+
+      {isUkWinner ? (
+        <fieldset className="rounded-lg border border-white/10 bg-black/20 px-3 py-3">
+          <legend className="px-1 text-sm font-medium text-stone-300">Choose your reward</legend>
+          <div className="mt-2 flex flex-col gap-2 text-sm text-stone-300">
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="wc-ball-prize-choice"
+                checked={prizeChoice === 'ball'}
+                onChange={() => setPrizeChoice('ball')}
+                className="mt-1"
+              />
+              <span>{WORLD_CUP_BALL_PRIZE_TITLE} — free UK delivery</span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="wc-ball-prize-choice"
+                checked={prizeChoice === 'cash'}
+                onChange={() => setPrizeChoice('cash')}
+                className="mt-1"
+              />
+              <span>USD ${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} cash prize instead</span>
+            </label>
+          </div>
+        </fieldset>
+      ) : null}
 
       <fieldset className="rounded-lg border border-white/10 bg-black/20 px-3 py-3">
         <legend className="px-1 text-sm font-medium text-stone-300">Your age</legend>
@@ -439,7 +473,7 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
       ) : null}
 
       <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 p-4">
-        <p className="text-xs leading-relaxed text-amber-100/90">{WORLD_CUP_BALL_WINNING_CHECK_PHOTO_SUMMARY}</p>
+        <p className="text-xs leading-relaxed text-amber-100/90">{worldCupBallPhotographySummaryForFulfilment(prizeFulfilment)}</p>
         <label className="mt-3 flex items-start gap-2 text-sm text-stone-300">
           <input
             type="checkbox"
@@ -448,8 +482,8 @@ export function WorldCupBallClaimForm({ claimToken, onOpenTerms, onClaimed, onEr
             className="mt-1"
           />
           <span>
-            I agree to provide a mandatory photograph of myself holding the official ShowSkills USD $
-            {WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque before my prize is released.
+            I agree to provide a photograph of myself holding my official ShowSkills winning cheque before my prize is
+            released (or email {SHOWSKILLS_CONTACT_EMAIL} with my official reason if I am unable to).
           </span>
         </label>
       </div>
