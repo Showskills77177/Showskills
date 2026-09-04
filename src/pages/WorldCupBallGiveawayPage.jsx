@@ -70,6 +70,7 @@ export default function WorldCupBallGiveawayPage({ layout: layoutProp = null, ed
   const atAGlance = [
     t('wcBall.oneAttemptShort', { fallback: WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_SHORT }),
     t('wcBall.atAGlance.adRequired', { fallback: 'A short ad video is mandatory before you can start — no skip or bypass' }),
+    t('wcBall.atAGlance.adPatience', { fallback: 'Some ads run over a minute — please be patient, this helps fund the rewards' }),
     t('wcBall.atAGlance.free'),
     t('wcBall.atAGlance.noVpn'),
     t('wcBall.atAGlance.delivery'),
