@@ -640,6 +640,10 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           You must watch the ad video in full to unlock the practice question — there is no skip, close, or bypass
           option.
         </p>
+        <p className="rounded-lg border border-sky-500/30 bg-sky-950/20 px-3 py-2.5 text-xs leading-relaxed text-sky-100/90">
+          Please be patient while the ad loads and plays — some ads run for over a minute. We show these ads to
+          help fund the rewards, so thank you for bearing with us.
+        </p>
         <VastVideoAdGate
           vastTagUrl={HILLTOPADS_VAST_TAG_URL}
           onUnlocked={() => startPractice()}
@@ -722,6 +726,9 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
           <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-sm text-amber-50/95">
             <p className="text-xs leading-relaxed text-amber-100/90">
               Want a second practice question before the real test? Watch another short ad to unlock it.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-amber-100/70">
+              Some ads run over a minute — thanks for your patience, this helps fund the rewards.
             </p>
             <div className="mt-3">
               <VastVideoAdGate
