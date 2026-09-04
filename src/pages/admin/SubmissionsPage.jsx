@@ -166,6 +166,14 @@ export default function AdminSubmissionsPage() {
                         </td>
                         <td className="max-w-[10rem] truncate px-2.5 py-2 font-medium text-stone-200">
                           {s.full_name}
+                          {isWorldCupBallWinnerEntry(s) && Boolean(s.winner_fraud_flagged) && s.winner_fraud_flagged !== 0 ? (
+                            <span
+                              className="ml-1.5 inline-block rounded border border-red-500/40 bg-red-950/40 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-300"
+                              title="Flagged for heuristic fraud/scouting review — see Details"
+                            >
+                              ⚠ Flagged
+                            </span>
+                          ) : null}
                         </td>
                         <td className="max-w-[12rem] truncate px-2.5 py-2 text-stone-400">{s.email}</td>
                         <td className="px-2.5 py-2">
@@ -365,9 +373,39 @@ function SubmissionMedia({ s }) {
       s.winner_city || null,
       s.winner_postcode || null,
     ].filter(Boolean)
+    const isFlagged = Boolean(s.winner_fraud_flagged) && s.winner_fraud_flagged !== 0
+    let fraudReasons = []
+    if (s.winner_fraud_flags_json) {
+      try {
+        const parsed =
+          typeof s.winner_fraud_flags_json === 'string'
+            ? JSON.parse(s.winner_fraud_flags_json)
+            : s.winner_fraud_flags_json
+        if (Array.isArray(parsed)) fraudReasons = parsed
+      } catch {
+        fraudReasons = []
+      }
+    }
     return (
       <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-3 text-sm">
         <p className="text-xs font-semibold uppercase tracking-wider text-amber-300/80">{WORLD_CUP_BALL_GIVEAWAY_LABEL} winner</p>
+        {isFlagged ? (
+          <div className="mt-2 rounded-md border border-red-500/40 bg-red-950/30 px-2.5 py-2">
+            <p className="text-xs font-semibold text-red-300">
+              ⚠️ Flagged for review{s.winner_fraud_score != null ? ` (risk score ${s.winner_fraud_score}/100)` : ''}
+            </p>
+            <p className="mt-1 text-[11px] text-red-200/80">
+              Heuristic signals only — not proof of cheating. Review manually before fulfilment.
+            </p>
+            {fraudReasons.length ? (
+              <ul className="mt-1 list-disc pl-4 text-[11px] text-red-200/70">
+                {fraudReasons.map((reason, i) => (
+                  <li key={i}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <dl className="mt-2 grid gap-1.5 text-stone-300 sm:grid-cols-2">
           <div>
             <dt className="text-xs text-stone-500">Win reference</dt>
@@ -377,6 +415,12 @@ function SubmissionMedia({ s }) {
             <dt className="text-xs text-stone-500">Phone</dt>
             <dd>{s.winner_phone || String(s.video_filename || '').replace(/^Phone:\s*/i, '') || '—'}</dd>
           </div>
+          {s.winner_reward_choice ? (
+            <div>
+              <dt className="text-xs text-stone-500">Reward chosen</dt>
+              <dd>{s.winner_reward_choice === 'cash' ? 'Cash instead of ball' : 'World Cup ball'}</dd>
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
             <dt className="text-xs text-stone-500">UK delivery address</dt>
             <dd>{addressParts.length ? addressParts.join(', ') : '—'}</dd>

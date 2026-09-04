@@ -59,7 +59,7 @@ import {
   normalizeWorldCupBallCountryCode,
   resolveWorldCupBallPrizeFulfilment,
   worldCupBallCashPrizeUsdForCountry,
-  WORLD_CUP_BALL_INTERNATIONAL_CASH_USD,
+  isWorldCupBallUkCountry,
 } from '../../../shared/worldCupBallInternationalPrize.mjs'
 import { countryDisplayName } from '../../../shared/trafficSource.mjs'
 import { getCountryFromRequest } from '../lib/visitorGeo.mjs'
@@ -67,6 +67,7 @@ import { isWorldCupBallQuizBypass } from '../lib/worldCupBallDev.mjs'
 import { verifyCaptchaPayload } from '../lib/captcha.mjs'
 import { CAPTCHA_BODY_FIELD } from '../../../shared/captcha.mjs'
 import { maybeAwardWorldCupBallMonthlyDrawEntry } from '../lib/awardWorldCupBallMonthlyDrawEntry.mjs'
+import { assessWorldCupBallWinnerRisk } from '../lib/worldCupBallFraudSignals.mjs'
 import { isWorldCupBallStagingResetServerEnabled } from '../../../shared/worldCupBallStagingReset.mjs'
 
 /** @param {import('http').IncomingMessage} req */
@@ -714,11 +715,13 @@ export async function claimWorldCupBallPrize(req, res) {
   const countryCode = normalizeWorldCupBallCountryCode(body.countryCode)
   if (!countryCode) return json(res, 400, { error: 'Please select your country.' })
 
-  const prizeFulfilment = resolveWorldCupBallPrizeFulfilment(countryCode)
+  const prizeChoice = body.prizeChoice === 'cash' ? 'cash' : 'ball'
+  const preferCash = isWorldCupBallUkCountry(countryCode) && prizeChoice === 'cash'
+  const prizeFulfilment = resolveWorldCupBallPrizeFulfilment(countryCode, { preferCash })
   const checkPhotoAcknowledged = body.checkPhotoAcknowledged === true
   if (!checkPhotoAcknowledged) {
     return json(res, 400, {
-      error: `You must agree to provide a mandatory photograph holding the USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque.`,
+      error: 'You must agree to provide a photograph holding your winning cheque (or email us your official reason if you cannot).',
     })
   }
 
@@ -769,10 +772,18 @@ export async function claimWorldCupBallPrize(req, res) {
   try {
     const submissionId = randomUUID()
     const winReference = `WC-${submissionId.slice(0, 8).toUpperCase()}`
-    const cashPrizeUsd = worldCupBallCashPrizeUsdForCountry(countryCode)
+    const cashPrizeUsd = worldCupBallCashPrizeUsdForCountry(countryCode, { preferCash })
     const countryName = countryDisplayName(countryCode)
-    let adminNotes = `${WORLD_CUP_BALL_GIVEAWAY_LABEL} — instant skill win.\nAll ${WORLD_CUP_BALL_QUESTION_COUNT} answers correct.\nTimeouts used: ${session.timeouts_used ?? 0}\nEntrant age band: ${entrantAgeBand} (${WORLD_CUP_BALL_MIN_AGE}+ required).\nCountry: ${countryName} (${countryCode})\nPrize fulfilment: ${prizeFulfilment === 'international_cash' ? `USD $${cashPrizeUsd} cash` : 'UK football delivery'}\nEmail: ${email}\nContact phone: ${phoneCheck.phone}\nMailing address: ${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}, ${address.postcode}`
+    let adminNotes = `${WORLD_CUP_BALL_GIVEAWAY_LABEL} — instant skill win.\nAll ${WORLD_CUP_BALL_QUESTION_COUNT} answers correct.\nTimeouts used: ${session.timeouts_used ?? 0}\nEntrant age band: ${entrantAgeBand} (${WORLD_CUP_BALL_MIN_AGE}+ required).\nCountry: ${countryName} (${countryCode})\nPrize fulfilment: ${prizeFulfilment === 'international_cash' ? `USD $${cashPrizeUsd} cash` : 'UK football delivery'}${preferCash ? ' (winner chose cash instead of the ball)' : ''}\nEmail: ${email}\nContact phone: ${phoneCheck.phone}\nMailing address: ${address.addressLine1}${address.addressLine2 ? `, ${address.addressLine2}` : ''}, ${address.city}, ${address.postcode}`
     adminNotes += `\nWinning-cheque photo: mandatory acknowledgement received at claim.`
+    const riskAssessment = assessWorldCupBallWinnerRisk({
+      session,
+      vpnDetection: vpn.detection,
+      claimCountryCode: countryCode,
+    })
+    if (riskAssessment.flagged) {
+      adminNotes += `\n⚠️ Flagged for review (heuristic risk score ${riskAssessment.score}/100): ${riskAssessment.reasons.join(' ')}`
+    }
     if (entrantAgeBand === '16-17') {
       const guardianPhoneCheck = validateContactPhone(guardianPhoneRaw)
       adminNotes += `\nParent/guardian: ${guardianName}\nGuardian phone: ${guardianPhoneCheck.phone}\nGuardian address: ${guardianAddress.addressLine1}${guardianAddress.addressLine2 ? `, ${guardianAddress.addressLine2}` : ''}, ${guardianAddress.city}, ${guardianAddress.postcode}`
@@ -809,6 +820,10 @@ export async function claimWorldCupBallPrize(req, res) {
       prizeFulfilment,
       cashPrizeUsd,
       checkPhotoAcknowledgedAt: new Date().toISOString(),
+      rewardChoice: isWorldCupBallUkCountry(countryCode) ? prizeChoice : 'cash',
+      fraudScore: riskAssessment.score,
+      fraudFlagged: riskAssessment.flagged,
+      fraudFlags: riskAssessment.reasons.length ? riskAssessment.reasons : null,
     })
 
     const claimUrl = buildWorldCupBallClaimUrl(resolveSiteUrl(), claimToken)

@@ -83,12 +83,12 @@ export function buildWorldCupBallWinnerEmailHtml(props) {
     }).format(new Date(wonAt))
 
   const introComplete = isInternationalCash
-    ? `You answered every skill question correctly within the time limits and have won <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. Your fulfilment details are saved and we will issue your official ShowSkills winning cheque for USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} after you provide the mandatory winning-cheque photograph.`
-    : `You answered every skill question correctly within the time limits and have won the <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. Your delivery details are saved and we will arrange <strong style="color:#fef3c7">free UK shipping</strong> of your football after you provide the mandatory USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning-cheque photograph.`
+    ? `You answered every skill question correctly within the time limits and have won <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. Your fulfilment details are saved and we will issue your official ShowSkills winning cheque for USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} after you provide the winning-cheque photograph.`
+    : `You answered every skill question correctly within the time limits and have won the <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. Your delivery details are saved and we will arrange <strong style="color:#fef3c7">free UK shipping</strong> of your football after you provide the winning-cheque photograph.`
 
   const introPending = isInternationalCash
-    ? `You answered every skill question correctly within the time limits and have won <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. <strong style="color:#fef3c7">Please provide your fulfilment details</strong> using the secure link below so we can process your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} cash prize. You must agree to the mandatory winning-cheque photograph.`
-    : `You answered every skill question correctly within the time limits and have won the <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. <strong style="color:#fef3c7">Please provide your delivery details</strong> using the secure link below so we can ship your football — UK delivery is free for the winner. You must agree to the mandatory USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning-cheque photograph.`
+    ? `You answered every skill question correctly within the time limits and have won <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. <strong style="color:#fef3c7">Please provide your fulfilment details</strong> using the secure link below so we can process your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} cash prize. You must agree to provide the winning-cheque photograph.`
+    : `You answered every skill question correctly within the time limits and have won the <strong style="color:#fef3c7">${prize}</strong> in the <strong style="color:#fef3c7">${promotion}</strong>. <strong style="color:#fef3c7">Please provide your delivery details</strong> using the secure link below so we can ship your football — UK delivery is free for the winner. You must agree to provide the winning-cheque photograph.`
 
   const detailRows = []
   if (winReference) {
@@ -140,11 +140,11 @@ export function buildWorldCupBallWinnerEmailHtml(props) {
   const nextSteps = [
     detailsComplete
       ? isInternationalCash
-        ? `<strong style="color:#fef3c7">Your fulfilment details are saved.</strong> We will contact you to issue your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque once you provide the mandatory photograph holding it.`
-        : `<strong style="color:#fef3c7">Your delivery details are saved.</strong> We will ship your football to the UK address you provided after you provide the mandatory USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning-cheque photograph.`
+        ? `<strong style="color:#fef3c7">Your fulfilment details are saved.</strong> We will contact you to issue your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque once you provide the photograph holding it.`
+        : `<strong style="color:#fef3c7">Your delivery details are saved.</strong> We will ship your football to the UK address you provided after you provide the winning-cheque photograph.`
       : isInternationalCash
-        ? '<strong style="color:#fef3c7">Complete the fulfilment form</strong> with your name, email, contact phone, country, and mailing address (parent or guardian details if you are 16 or 17). You must agree to the mandatory winning-cheque photograph.'
-        : `<strong style="color:#fef3c7">Complete the delivery form</strong> with your name, email, mobile number, and UK postal address (parent or guardian details if you are 16 or 17). You must agree to the mandatory USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning-cheque photograph.`,
+        ? '<strong style="color:#fef3c7">Complete the fulfilment form</strong> with your name, email, contact phone, country, and mailing address (parent or guardian details if you are 16 or 17). You must agree to provide the winning-cheque photograph.'
+        : `<strong style="color:#fef3c7">Complete the delivery form</strong> with your name, email, mobile number, and UK postal address (parent or guardian details if you are 16 or 17). You must agree to provide the winning-cheque photograph.`,
     isInternationalCash ? null : escapeHtml(WORLD_CUP_BALL_FREE_SHIPPING_NOTICE),
     escapeHtml(photographySummary),
     `Questions? Email <a href="mailto:${SHOWSKILLS_CONTACT_EMAIL}" style="color:#fbbf24;text-decoration:none">${SHOWSKILLS_CONTACT_EMAIL}</a>.`,
@@ -253,11 +253,11 @@ export function buildWorldCupBallWinnerEmailText(props) {
     'What happens next:',
     detailsComplete
       ? isInternationalCash
-        ? `• Your fulfilment details are saved. We will issue your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque after the mandatory photograph is provided.`
-        : `• Your delivery details are saved. We will arrange free UK shipping of your football after the mandatory USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning-cheque photograph is provided.`
+        ? `• Your fulfilment details are saved. We will issue your USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning cheque after the photograph is provided.`
+        : `• Your delivery details are saved. We will arrange free UK shipping of your football after the winning-cheque photograph is provided.`
       : isInternationalCash
         ? '• Please provide your name, email, contact phone, country, and mailing address using the link above.'
-        : `• Please provide your name, email, mobile number, and UK postal address using the link above. You must agree to the mandatory USD $${WORLD_CUP_BALL_INTERNATIONAL_CASH_USD} winning-cheque photograph.`,
+        : `• Please provide your name, email, mobile number, and UK postal address using the link above. You must agree to provide the winning-cheque photograph.`,
   )
   if (!isInternationalCash) {
     lines.push(`• ${WORLD_CUP_BALL_FREE_SHIPPING_NOTICE}`)

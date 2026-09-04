@@ -29,6 +29,8 @@ const CANVAS_HEIGHT = 1342
 const OUTPUT_WIDTH = 1400 // downscaled on export to keep email attachment size reasonable
 const GOLD = '#D9AD5B'
 const CREAM = '#EAE6E2'
+const TEAL = '#1E9C7C'
+const TEMPLATE_BG = '#041120'
 
 let cachedAssets = null
 function loadAssets() {
@@ -90,26 +92,51 @@ function textNode({ box, text, fontFamily, fontSize, color, letterSpacing }) {
   }
 }
 
+/** Solid patch used to blank out template artwork text before drawing a replacement over it. */
+function coverNode({ left, top, width, height, background }) {
+  return {
+    type: 'div',
+    props: {
+      style: {
+        position: 'absolute',
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        background,
+      },
+    },
+  }
+}
+
 /**
  * @param {object} params
  * @param {string} params.fullName - winner's full name
- * @param {number} params.amountUsd - whole/decimal USD amount (e.g. 60)
+ * @param {number} [params.amountUsd] - whole/decimal USD amount (e.g. 60). Omit for a ball-prize cheque.
+ * @param {string} [params.prizeLabel] - non-cash prize description (e.g. "Official-style FIFA World Cup ball"),
+ *   used instead of a USD figure when `amountUsd` is not provided.
  * @param {string} params.chequeNumber - e.g. "WC-DF6EEF9B"
  * @param {string|Date} [params.dateIso] - when the cheque is dated (defaults to now)
  * @returns {Promise<Buffer>} PNG buffer of the composited cheque, ready to attach to an email
  */
-export async function generateWinnerChequePng({ fullName, amountUsd, chequeNumber, dateIso }) {
+export async function generateWinnerChequePng({ fullName, amountUsd, prizeLabel, chequeNumber, dateIso }) {
   const { template, oswaldBold, dmSansBold } = loadAssets()
 
   const name = String(fullName || '').trim() || 'Winner'
+  const isBallPrize = amountUsd == null && Boolean(prizeLabel)
   const amount = Number.isFinite(amountUsd) ? amountUsd : Number(amountUsd) || 0
-  const amountLabel = `$${amount.toFixed(2)}`
-  const amountWords = numberToUsdWords(amount)
+  const amountLabel = isBallPrize ? 'BALL' : `$${amount.toFixed(2)}`
+  const amountWords = isBallPrize ? String(prizeLabel).trim() : numberToUsdWords(amount)
   const dateLabel = formatChequeDate(dateIso)
   const chequeRef = String(chequeNumber || '').trim() || 'WC-00000000'
+  // The template artwork bakes in "International cash prize" and "USD" — cover both with a
+  // matching-background patch and redraw the correct label so ball-prize cheques read correctly.
+  const fulfilmentLabel = isBallPrize ? 'UK ball prize' : 'International cash prize'
+  const figureUnitLabel = isBallPrize ? 'PRIZE' : 'USD'
 
   const nameFontSize = fitFontSize(name, 50, 26)
   const wordsFontSize = fitFontSize(amountWords, 44, 34)
+  const figureFontSize = fitFontSize(amountLabel, 90, 14)
 
   const overlaySvg = await satori(
     {
@@ -122,6 +149,26 @@ export async function generateWinnerChequePng({ fullName, amountUsd, chequeNumbe
           display: 'flex',
         },
         children: [
+          // Cover + redraw the "International cash prize" fulfilment tag baked into the template
+          coverNode({ left: 1225, top: 618, width: 470, height: 60, background: TEMPLATE_BG }),
+          textNode({
+            box: { left: 1243, top: 622, width: 450, height: 54 },
+            text: fulfilmentLabel,
+            fontFamily: 'DM Sans',
+            fontSize: 38,
+            color: TEAL,
+          }),
+          // Cover + redraw the "USD" unit label baked into the template (kept clear of the box's
+          // left border stroke at x≈1220-1224)
+          coverNode({ left: 1227, top: 945, width: 118, height: 125, background: TEMPLATE_BG }),
+          textNode({
+            box: { left: 1227, top: 955, width: 110, height: 110 },
+            text: figureUnitLabel,
+            fontFamily: 'Oswald',
+            fontSize: figureUnitLabel.length > 4 ? 30 : 50,
+            color: GOLD,
+            letterSpacing: 1,
+          }),
           // Cheque reference number, centered inside its bordered box
           textNode({
             box: { left: 709, top: 698, width: 581, height: 92, justifyContent: 'center' },
@@ -155,12 +202,12 @@ export async function generateWinnerChequePng({ fullName, amountUsd, chequeNumbe
             fontSize: wordsFontSize,
             color: CREAM,
           }),
-          // USD figure
+          // USD figure (or ball-prize badge)
           textNode({
-            box: { left: 1372, top: 915, width: 473, height: 200 },
+            box: { left: 1372, top: 915, width: 473, height: 200, justifyContent: isBallPrize ? 'center' : 'flex-start' },
             text: amountLabel,
             fontFamily: 'Oswald',
-            fontSize: 90,
+            fontSize: figureFontSize,
             color: GOLD,
           }),
         ],
