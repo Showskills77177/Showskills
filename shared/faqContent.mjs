@@ -27,6 +27,7 @@ import {
   WORLD_CUP_BALL_TERMS_FAIL_REVIEW_NOTICE,
   WORLD_CUP_BALL_ONE_ATTEMPT_PER_CONNECTION_NOTICE,
   WORLD_CUP_BALL_WINNER_NOTICE,
+  WORLD_CUP_BALL_TERMS_AD_GATE_NOTICE,
 } from './worldCupBallGiveawayRules.mjs'
 import { WORLD_CUP_BALL_MONTHLY_DRAW_SUMMARY } from './worldCupBallMonthlyDraw.mjs'
 import { worldCupBallPhotographyFaqAnswer } from './worldCupBallPhotography.mjs'
@@ -335,6 +336,11 @@ export const FAQ_SECTIONS = [
         question: 'How do I win the ball?',
         answer:
           `Answer all ${WORLD_CUP_BALL_QUESTION_COUNT} main questions correctly to win outright, or get exactly one wrong and pass the bonus salvage question. ${WORLD_CUP_BALL_TERMS_SALVAGE_NOTICE}`,
+      },
+      {
+        id: 'wc-ball-ad-required',
+        question: 'Do I have to watch an ad before I can start?',
+        answer: WORLD_CUP_BALL_TERMS_AD_GATE_NOTICE,
       },
       {
         id: 'wc-ball-monthly-draw',
