@@ -1,10 +1,7 @@
 /** Mandatory steps for the free Ronaldo shirt giveaway entry flow. */
 
-import {
-  isCorrectShirtGiveawayAnswer,
-  SHIRT_GIVEAWAY_QUESTION,
-  SHIRT_GIVEAWAY_SEASON_LABEL,
-} from './shirtGiveaway.mjs'
+import { SHIRT_GIVEAWAY_SEASON_LABEL } from './shirtGiveaway.mjs'
+import { RONALDO_SHIRT_QUIZ_QUESTION_COUNT } from './ronaldoShirtQuiz.mjs'
 
 export const SHIRT_GIVEAWAY_SOCIAL_PLATFORMS = [
   { id: 'tiktok', label: 'TikTok' },
@@ -14,9 +11,9 @@ export const SHIRT_GIVEAWAY_SOCIAL_PLATFORMS = [
 
 export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
   {
-    id: 'skill_answer',
-    title: 'Answer the skill question correctly',
-    detail: `${SHIRT_GIVEAWAY_QUESTION} Ronaldo R9 or Cristiano Ronaldo qualifies you.`,
+    id: 'skill_quiz',
+    title: `Pass the ${RONALDO_SHIRT_QUIZ_QUESTION_COUNT}-question skill quiz`,
+    detail: 'Answer the timed quiz — up to 2 mistakes and 2 time-outs are tolerated, each with a bonus chance.',
   },
   {
     id: 'newsletter',
@@ -35,8 +32,8 @@ export const SHIRT_GIVEAWAY_ENTRY_REQUIREMENTS = [
 export const SHIRT_GIVEAWAY_PUBLIC_STEPS = [
   {
     num: '1',
-    title: 'Answer the skill question correctly',
-    detail: `${SHIRT_GIVEAWAY_QUESTION} Wrong answers cannot be submitted.`,
+    title: `Pass the ${RONALDO_SHIRT_QUIZ_QUESTION_COUNT}-question skill quiz`,
+    detail: 'A timed football skill quiz. Up to 2 mistakes and 2 time-outs are tolerated, each with a bonus chance to make up for it.',
   },
   {
     num: '2',
@@ -78,8 +75,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function isShirtGiveawayRequirementMet(reqId, fields = {}) {
   switch (reqId) {
-    case 'skill_answer':
-      return isCorrectShirtGiveawayAnswer(fields.answer)
+    case 'skill_quiz':
+      return Boolean(fields.quizPassed)
     case 'newsletter':
       return (
         fields.newsletterOptIn === true &&

@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { parseJsonBody, json } from '../lib/http.mjs'
 import { query, isDbConfigured } from '../lib/db.mjs'
-import {
-  SHIRT_GIVEAWAY_QUESTION,
-  isCorrectShirtGiveawayAnswer,
-} from '../../../shared/shirtGiveaway.mjs'
 import { applyRateLimit } from '../lib/rateLimit.mjs'
 import { checkShirtGiveawayLimits, logEntryAttempt } from '../lib/freeEntryAbuse.mjs'
 import { checkVpnForRequest } from '../lib/vpnDetection.mjs'
@@ -18,6 +14,12 @@ import { sendShirtGiveawayConfirmationEmail } from '../lib/sendShirtGiveawayConf
 import { ensureShirtPreviewToken } from '../lib/shirtPreviewToken.mjs'
 import { buildShirtPrizeRevealUrl } from '../../../shared/shirtPrizeReveal.mjs'
 import { resolveSiteUrl } from '../lib/resendConfig.mjs'
+import { RONALDO_SHIRT_QUIZ_LABEL, RONALDO_SHIRT_QUIZ_QUESTION_COUNT, RONALDO_SHIRT_QUIZ_PASS_TOKEN_GRACE_MINUTES } from '../../../shared/ronaldoShirtQuiz.mjs'
+import {
+  getRonaldoShirtQuizSessionByPassToken,
+  consumeRonaldoShirtQuizPassToken,
+} from '../lib/ronaldoShirtQuizSchema.mjs'
+import { assessRonaldoShirtQuizWinnerRisk } from '../lib/ronaldoShirtQuizFraudSignals.mjs'
 
 /** Public: Ronaldo shirt giveaway submission. Also keeps legacy video-link support for old archived flows. */
 export default async function handler(req, res) {
@@ -46,8 +48,8 @@ export default async function handler(req, res) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 320) : ''
   const videoRef = typeof body.videoUrl === 'string' ? body.videoUrl.trim().slice(0, 2000) : ''
   const videoFilename = typeof body.videoFilename === 'string' ? body.videoFilename.trim().slice(0, 500) : ''
-  const qualificationAnswer =
-    typeof body.qualificationAnswer === 'string' ? body.qualificationAnswer.trim().slice(0, 500) : ''
+  const quizPassToken =
+    typeof body.quizPassToken === 'string' ? body.quizPassToken.trim().slice(0, 200) : ''
   const newsletterOptIn = body.newsletterOptIn === true || body.newsletterOptIn === 'true'
   const socialPlatform =
     typeof body.socialPlatform === 'string' ? body.socialPlatform.trim().toLowerCase() : ''
@@ -55,6 +57,8 @@ export default async function handler(req, res) {
     typeof body.socialHandle === 'string' ? body.socialHandle.trim().slice(0, 120) : ''
   const socialFollowConfirmed =
     body.socialFollowConfirmed === true || body.socialFollowConfirmed === 'true'
+  const entryCountryCode =
+    typeof body.countryCode === 'string' ? body.countryCode.trim().toUpperCase().slice(0, 2) : ''
 
   const phone =
     typeof body.phone === 'string'
@@ -69,9 +73,18 @@ export default async function handler(req, res) {
   if (!fullName || !email.includes('@')) {
     return json(res, 400, { error: 'fullName and valid email required' })
   }
-  if (qualificationAnswer) {
-    if (!isCorrectShirtGiveawayAnswer(qualificationAnswer)) {
-      return json(res, 400, { error: 'Qualification answer is incorrect' })
+
+  let quizSession = null
+  if (quizPassToken) {
+    quizSession = await getRonaldoShirtQuizSessionByPassToken(
+      quizPassToken,
+      RONALDO_SHIRT_QUIZ_PASS_TOKEN_GRACE_MINUTES,
+    )
+    if (!quizSession) {
+      return json(res, 400, {
+        error: 'Your quiz pass has expired or is invalid. Please watch and complete the quiz again.',
+        code: 'invalid_quiz_pass_token',
+      })
     }
     if (!newsletterOptIn) {
       return json(res, 400, { error: 'Newsletter subscription is required to enter the free shirt giveaway.' })
@@ -86,7 +99,7 @@ export default async function handler(req, res) {
       return json(res, 400, { error: 'Confirm that you follow ShowSkills on the social network you selected.' })
     }
   } else if (!videoRef.startsWith('https://')) {
-    return json(res, 400, { error: 'qualificationAnswer required' })
+    return json(res, 400, { error: 'quizPassToken required — pass the 25-question skill quiz first.' })
   }
 
   const vpn = await checkVpnForRequest(req)
@@ -115,20 +128,51 @@ export default async function handler(req, res) {
     }
     const id = randomUUID()
     const entryNumber = await allocateShirtEntryNumber()
-    const storedRef = qualificationAnswer ? 'answer:ronaldo-shirt-giveaway' : videoRef
-    const storedFilename = qualificationAnswer ? `Answer: ${qualificationAnswer}` : videoFilename || null
+    const storedRef = quizSession ? 'quiz:ronaldo-shirt-giveaway' : videoRef
+    const storedFilename = quizSession ? `Passed ${RONALDO_SHIRT_QUIZ_QUESTION_COUNT}-question quiz` : videoFilename || null
     const socialLine = socialPlatform
       ? `Social follow: ${socialPlatform} (@${socialHandle.replace(/^@/, '')})`
       : ''
-    const adminNotes = qualificationAnswer
-      ? `Question: ${SHIRT_GIVEAWAY_QUESTION}\nAnswer: ${qualificationAnswer}\nNewsletter: yes\n${socialLine}\nEntry number: ${entryNumber}`
+
+    let fraudScore = null
+    let fraudFlagged = false
+    let fraudFlagsJson = null
+    if (quizSession) {
+      const risk = assessRonaldoShirtQuizWinnerRisk({
+        session: quizSession,
+        vpnDetection: vpn.detection,
+        entryCountryCode,
+      })
+      fraudScore = risk.score
+      fraudFlagged = risk.flagged
+      fraudFlagsJson = JSON.stringify(risk.reasons)
+    }
+
+    const adminNotes = quizSession
+      ? `Passed: ${RONALDO_SHIRT_QUIZ_LABEL}\nNewsletter: yes\n${socialLine}\nEntry number: ${entryNumber}`
       : `Entry number: ${entryNumber}`
     const r = await query(
-      `INSERT INTO kickup_submissions (id, full_name, email, video_ref, video_filename, admin_notes, entry_number, competition)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, entry_number`,
-      [id, fullName, email, storedRef || null, storedFilename, adminNotes, entryNumber, COMPETITION_SHIRT_GIVEAWAY],
+      `INSERT INTO kickup_submissions (id, full_name, email, video_ref, video_filename, admin_notes, entry_number, competition, fraud_score, fraud_flagged, fraud_flags_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id, entry_number`,
+      [
+        id,
+        fullName,
+        email,
+        storedRef || null,
+        storedFilename,
+        adminNotes,
+        entryNumber,
+        COMPETITION_SHIRT_GIVEAWAY,
+        fraudScore,
+        fraudFlagged ? 1 : 0,
+        fraudFlagsJson,
+      ],
     )
     const submissionId = r.rows[0].id
+
+    if (quizSession) {
+      await consumeRonaldoShirtQuizPassToken(quizSession.id).catch(() => {})
+    }
 
     const previewToken = await ensureShirtPreviewToken(submissionId)
     const shirtPrizeRevealUrl = previewToken

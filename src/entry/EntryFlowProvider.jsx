@@ -21,7 +21,6 @@ import {
 import { clearWorldCupBallQuizProgress } from '../lib/worldCupBallQuizProgress.mjs'
 import { isWorldCupBallStagingResetClientEnabled } from '../../shared/worldCupBallStagingReset.mjs'
 import { EntryFlowContext } from './entryContext'
-import { isCorrectShirtGiveawayAnswer } from '../../shared/shirtGiveaway.mjs'
 import { FREE_ENTRY_ERRORS } from '../../shared/freeEntryLimits.mjs'
 import { validateContactPhone } from '../../shared/contactPhone.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
@@ -123,7 +122,7 @@ export function EntryFlowProvider({ children }) {
   const [freeQuizSubmitting, setFreeQuizSubmitting] = useState(false)
 
   const [kickFullName, setKickFullName] = useState('')
-  const [kickAnswer, setKickAnswer] = useState('')
+  const [kickQuizPassToken, setKickQuizPassToken] = useState('')
   const [kickEmail, setKickEmail] = useState('')
   const [kickPhone, setKickPhone] = useState('')
   const [kickConsent, setKickConsent] = useState(false)
@@ -669,7 +668,7 @@ export function EntryFlowProvider({ children }) {
       setKickEmailSent(false)
       setKickVpnBlocked(false)
       setKickFullName('')
-      setKickAnswer('')
+      setKickQuizPassToken('')
       setKickEmail('')
       setKickPhone('')
       setKickConsent(false)
@@ -1305,13 +1304,9 @@ export function EntryFlowProvider({ children }) {
         setKickError('Please confirm you have followed ShowSkills on the social network you selected.')
         return
       }
-      const answer = kickAnswer.trim()
-      if (!answer) {
-        setKickError('Please answer the qualification question.')
-        return
-      }
-      if (!isCorrectShirtGiveawayAnswer(answer)) {
-        setKickError('That answer is not correct. Check the Ronaldo shirt question and try again.')
+      const passToken = kickQuizPassToken.trim()
+      if (!passToken) {
+        setKickError('Please pass the 25-question skill quiz before entering.')
         return
       }
       try {
@@ -1324,7 +1319,7 @@ export function EntryFlowProvider({ children }) {
             email: kickEmailNorm,
             phone: kickPhone.trim(),
             customerPhone: kickPhone.trim(),
-            qualificationAnswer: answer,
+            quizPassToken: passToken,
             newsletterOptIn: true,
             socialPlatform: kickSocialPlatform,
             socialHandle: kickSocialHandle.trim(),
@@ -1345,7 +1340,7 @@ export function EntryFlowProvider({ children }) {
       }
     },
     [
-      kickAnswer,
+      kickQuizPassToken,
       kickConsent,
       kickEmail,
       kickFullName,
@@ -1446,8 +1441,8 @@ export function EntryFlowProvider({ children }) {
       paypalCaptureOrderApi,
       kickFullName,
       setKickFullName,
-      kickAnswer,
-      setKickAnswer,
+      kickQuizPassToken,
+      setKickQuizPassToken,
       kickEmail,
       setKickEmail,
       kickPhone,
@@ -1562,7 +1557,7 @@ export function EntryFlowProvider({ children }) {
       paypalCreateOrderApi,
       paypalCaptureOrderApi,
       kickFullName,
-      kickAnswer,
+      kickQuizPassToken,
       kickEmail,
       kickConsent,
       kickNewsletterOptIn,

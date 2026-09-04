@@ -48,6 +48,21 @@ export async function ensureShirtEntrySchema() {
   } catch {
     /* column exists */
   }
+  try {
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN fraud_score INTEGER`)
+  } catch {
+    /* column exists */
+  }
+  try {
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN fraud_flagged INTEGER NOT NULL DEFAULT 0`)
+  } catch {
+    /* column exists */
+  }
+  try {
+    await query(`ALTER TABLE kickup_submissions ADD COLUMN fraud_flags_json TEXT`)
+  } catch {
+    /* column exists */
+  }
   await query(
     `UPDATE kickup_submissions SET competition = $1 WHERE competition IS NULL OR competition = ''`,
     [COMPETITION_SHIRT_GIVEAWAY],

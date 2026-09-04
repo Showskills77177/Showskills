@@ -81,6 +81,8 @@ export const FREE_ENTRY_ERRORS = {
     'That postal address has already been used to claim this prize.',
   worldCupBallInvalidSession:
     'Your quiz session expired or is invalid. Please start again from the rules page.',
+  ronaldoShirtQuizInvalidSession:
+    'Your quiz session expired or is invalid. Please start the quiz again.',
   vpnNotAllowed: "We don't allow VPNs. Please turn off your VPN and try again.",
   invalidAddress: 'Please enter your full postal address (line 1, town/city, and postcode).',
   setupRequired: 'Card verification is required to complete your free entry (no charge).',
