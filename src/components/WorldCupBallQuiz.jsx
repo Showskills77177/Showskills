@@ -636,6 +636,10 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
+        <p className="rounded-lg border border-red-500/40 bg-red-950/25 px-3 py-2.5 text-xs font-semibold leading-relaxed text-red-100">
+          You must watch the ad video in full to unlock the practice question — there is no skip, close, or bypass
+          option.
+        </p>
         <VastVideoAdGate
           vastTagUrl={HILLTOPADS_VAST_TAG_URL}
           onUnlocked={() => startPractice()}
