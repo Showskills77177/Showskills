@@ -29,7 +29,7 @@ import { apiUrl } from '../lib/api'
 import { fetchCaptchaConfig } from '../lib/captchaConfig.js'
 import { AltchaWidget } from './AltchaWidget'
 import { QuizQuestionTimer } from './QuizQuestionTimer'
-import MonetagAdGate from './MonetagAdGate'
+import VastVideoAdGate from './VastVideoAdGate'
 import { CAPTCHA_BODY_FIELD } from '../../shared/captcha.mjs'
 import {
   clearWorldCupBallQuizProgress,
@@ -40,7 +40,7 @@ import { localizeQuizQuestion } from '../../shared/i18n/localizedQuiz.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
 
-const MONETAG_ZONE_ID = '1081fa6155dc3c5fb275'
+const HILLTOPADS_VAST_TAG_URL = 'https://surefootedpause.com/dvm/F.z_dkGVN-v/Z/GrUA/xeOmQ9xuCZrUalEkPPmTTc/z/OtDpEj5vM/jYEDtfN/z/MP4/MyT/kIydNCQc'
 
 function QuizDontKnowButton({ onClick, disabled }) {
   return (
@@ -636,8 +636,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
         <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
           {WORLD_CUP_BALL_PRACTICE_INTRO}
         </p>
-        <MonetagAdGate
-          zoneId={MONETAG_ZONE_ID}
+        <VastVideoAdGate
+          vastTagUrl={HILLTOPADS_VAST_TAG_URL}
           onUnlocked={() => startPractice()}
           disabled={disabled}
         />
@@ -720,8 +720,8 @@ export function WorldCupBallQuiz({ onResult, onError, onPhaseChange, disabled = 
               Want a second practice question before the real test? Watch another short ad to unlock it.
             </p>
             <div className="mt-3">
-              <MonetagAdGate
-                zoneId={MONETAG_ZONE_ID}
+              <VastVideoAdGate
+                vastTagUrl={HILLTOPADS_VAST_TAG_URL}
                 onUnlocked={() => startPractice()}
                 disabled={disabled || submitting}
               />
