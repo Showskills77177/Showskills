@@ -330,49 +330,9 @@ function PrivacyPolicySection() {
   )
 }
 
-export function TermsModal({ open, onClose }) {
-  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + card iframes).
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
+export function TermsAndPrivacyBody() {
   return (
-    <div
-      className="ss-terms-modal-root fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center sm:p-6"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="terms-title"
-    >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/75"
-        aria-label="Close terms"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[min(92vh,1080px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-900/40 bg-stone-950 shadow-2xl shadow-emerald-950/20 sm:max-w-4xl lg:max-h-[min(94vh,1160px)] lg:max-w-5xl xl:max-w-6xl xl:max-h-[min(94vh,1200px)]">
-        <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent" aria-hidden />
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4">
-          <h2 id="terms-title" className="text-lg font-semibold text-stone-100">
-            Terms &amp; privacy
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-stone-500 hover:bg-white/5 hover:text-stone-200"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="overflow-y-auto px-5 py-5 text-left text-base leading-relaxed text-zinc-400 ss-terms-modal-body sm:px-6">
+    <>
           <p className="mb-4 text-zinc-200">
             These Terms and Conditions and the Privacy Policy below govern <strong>ShowSkills Rewards</strong>{' '}
             promotions in the United Kingdom, including the paid <strong>Signed Legacy Bundle</strong> skill competition
@@ -694,6 +654,54 @@ export function TermsModal({ open, onClose }) {
             </a>
             .
           </p>
+    </>
+  )
+}
+
+export function TermsModal({ open, onClose }) {
+  // No body scroll lock — it breaks keyboard input in Safari/Brave (entry modal + card iframes).
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return (
+    <div
+      className="ss-terms-modal-root fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="terms-title"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/75"
+        aria-label="Close terms"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex max-h-[min(92vh,1080px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-emerald-900/40 bg-stone-950 shadow-2xl shadow-emerald-950/20 sm:max-w-4xl lg:max-h-[min(94vh,1160px)] lg:max-w-5xl xl:max-w-6xl xl:max-h-[min(94vh,1200px)]">
+        <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent" aria-hidden />
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-6 py-4">
+          <h2 id="terms-title" className="text-lg font-semibold text-stone-100">
+            Terms &amp; privacy
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-stone-500 hover:bg-white/5 hover:text-stone-200"
+            aria-label="Close"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto px-5 py-5 text-left text-base leading-relaxed text-zinc-400 ss-terms-modal-body sm:px-6">
+          <TermsAndPrivacyBody />
         </div>
         <div className="border-t border-white/10 px-6 py-4">
           <button

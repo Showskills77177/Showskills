@@ -13,6 +13,9 @@ import {
   getLocalizedFaqPageTitle,
   getLocalizedFaqSections,
 } from '../../shared/i18n/localizedFaq.mjs'
+import { useSeoMeta } from '../hooks/useSeoMeta'
+import { JsonLd } from '../components/JsonLd'
+import { buildFaqPageJsonLd } from '../../shared/seoSchema.mjs'
 
 function FaqItemCard({ item, open, onToggle }) {
   const panelId = `faq-answer-${item.id}`
@@ -71,6 +74,17 @@ export default function FaqPage() {
   const pageTitle = getLocalizedFaqPageTitle(locale, t)
   const pageSubtitle = getLocalizedFaqPageSubtitle(locale, t)
 
+  useSeoMeta({
+    title: `${pageTitle} | ShowSkills`,
+    description: pageSubtitle,
+    path: '/faq',
+  })
+
+  const faqJsonLdItems = useMemo(
+    () => localizedSections.flatMap((section) => section.items.map((item) => ({ question: item.question, answer: item.answer }))),
+    [localizedSections],
+  )
+
   const filteredSections = useMemo(() => {
     let sections = filterFaqSections(localizedSections, query)
     if (activeSection !== 'all') {
@@ -114,6 +128,7 @@ export default function FaqPage() {
   return (
     <main className="ss-photo-page ss-faq-page relative m-0 overflow-x-visible p-0">
       <PhotoPageBackdrop />
+      <JsonLd data={buildFaqPageJsonLd(faqJsonLdItems)} />
       <div className="relative z-[1]">
       {/* Hero */}
       <section className="relative overflow-visible border-b border-emerald-900/25">

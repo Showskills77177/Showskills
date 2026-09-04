@@ -8,6 +8,17 @@ import { useShirtGiveawayCompetition } from '../hooks/useShirtGiveawayCompetitio
 import { CompetitionCountdown } from '../components/CompetitionCountdown'
 import { pickCountdownPeriod } from '../../shared/competitionPeriods.mjs'
 import { SHIRT_GIVEAWAY_PAGE_ID, mergeShirtGiveawayPageLayout } from '../../shared/sitePageLayout.mjs'
+import { useSeoMeta } from '../hooks/useSeoMeta'
+import { JsonLd } from '../components/JsonLd'
+import { buildFaqPageJsonLd } from '../../shared/seoSchema.mjs'
+
+const SHIRT_GIVEAWAY_FAQ = [
+  {
+    question: 'Is this a lottery?',
+    answer:
+      'No. There is no ticket to buy. Answer the free skill question correctly and follow the entry steps to qualify — the winner is then picked from qualifying entries.',
+  },
+]
 
 /** Free Ronaldo shirt giveaway (direct URL / footer links). */
 export default function KickupsArchivePage({ layout: layoutProp = null, editorMode = false }) {
@@ -18,10 +29,22 @@ export default function KickupsArchivePage({ layout: layoutProp = null, editorMo
   const { competition: shirtCompetition, loading: shirtPeriodLoading } = useShirtGiveawayCompetition()
   const countdownPeriod = pickCountdownPeriod(shirtCompetition)
 
+  useSeoMeta(
+    editorMode
+      ? {}
+      : {
+          title: 'Free Ronaldo Shirt Giveaway | ShowSkills',
+          description:
+            'Free Ronaldo signed shirt giveaway on ShowSkills. No ticket purchase — answer a skill question to qualify.',
+          path: '/archive/ronaldo-shirt-giveaway',
+        },
+  )
+
   return (
     <main
       className={`m-0 p-0 ${editorMode ? 'ss-page-editor-preview [&_button:not([data-editor-ui])]:pointer-events-none' : ''}`}
     >
+      <JsonLd data={editorMode ? null : buildFaqPageJsonLd(SHIRT_GIVEAWAY_FAQ)} />
       <section className="ss-rules-pitch-guide border-t border-lime-400/20">
         <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
           <header className="max-w-3xl text-left">

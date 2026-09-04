@@ -41,6 +41,13 @@ import PrizeRevealPage from './pages/PrizeRevealPage'
 import ShirtPrizeRevealPage from './pages/ShirtPrizeRevealPage'
 import WorldCupBallGiveawayPage from './pages/WorldCupBallGiveawayPage'
 import AdminSiteVisitsPage from './pages/admin/SiteVisitsPage'
+import QuizzesPage from './pages/QuizzesPage'
+import HowItWorksPage from './pages/HowItWorksPage'
+import WinnersPage from './pages/WinnersPage'
+import AboutPage from './pages/AboutPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
+import GiveawaysPage from './pages/GiveawaysPage'
 
 const rawBase = import.meta.env.BASE_URL
 const routerBasename =
@@ -116,6 +123,13 @@ export default function App() {
           >
             <Route index element={<HomePage />} />
             <Route path="competitions" element={<CompetitionsPage />} />
+            <Route path="quizzes" element={<QuizzesPage />} />
+            <Route path="how-it-works" element={<HowItWorksPage />} />
+            <Route path="giveaways" element={<GiveawaysPage />} />
+            <Route path="winners" element={<WinnersPage />} />
+            <Route path="about" element={<AboutPage />} />
+            <Route path="terms" element={<TermsPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="login" element={<AuthModalRedirect view="login" />} />
