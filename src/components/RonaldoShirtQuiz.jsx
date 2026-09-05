@@ -15,11 +15,24 @@ import {
   RONALDO_SHIRT_QUIZ_MAX_WRONG_FOR_SALVAGE,
 } from '../../shared/ronaldoShirtQuiz.mjs'
 import { worldCupBallChoiceOptionLabel } from '../../shared/worldCupBallHistoricalChoices.mjs'
+import {
+  RONALDO_SHIRT_QUIZ_MAX_PRACTICE_QUESTIONS,
+  RONALDO_SHIRT_QUIZ_PRACTICE_QUESTION,
+  RONALDO_SHIRT_QUIZ_PRACTICE_QUESTIONS,
+  RONALDO_SHIRT_QUIZ_PRACTICE_INTRO,
+  RONALDO_SHIRT_QUIZ_PRACTICE_BONUS_TIP,
+  RONALDO_SHIRT_QUIZ_PRACTICE_TIMER_TIP,
+  RONALDO_SHIRT_QUIZ_PRACTICE_TYPING_TIP,
+  ronaldoShirtQuizPracticeCompleteTips,
+} from '../../shared/ronaldoShirtQuizPractice.mjs'
 import { apiUrl } from '../lib/api'
 import { QuizQuestionTimer } from './QuizQuestionTimer'
+import VastVideoAdGate from './VastVideoAdGate'
 import { localizeQuizQuestion } from '../../shared/i18n/localizedQuiz.mjs'
 import { useSiteLocale } from '../i18n/SiteLocaleProvider.jsx'
 import { primeQuizTimerAudio, speakBonusUsed } from '../lib/quizTimerFeedback'
+
+const HILLTOPADS_VAST_TAG_URL = 'https://surefootedpause.com/dvm/F.z_dkGVN-v/Z/GrUA/xeOmQ9xuCZrUalEkPPmTTc/z/OtDpEj5vM/jYEDtfN/z/MP4/MyT/kIydNCQc'
 
 function QuizDontKnowButton({ onClick, disabled }) {
   return (
@@ -37,10 +50,15 @@ function QuizDontKnowButton({ onClick, disabled }) {
 /**
  * Timed 25-question skill quiz gate for the free Ronaldo shirt giveaway.
  *
- * Simplifications versus the World Cup Ball quiz this is adapted from (kept
- * intentionally out of scope for this giveaway): no practice-mode warm-up, no
- * captcha widget, no VAST ad gate, and no resume-after-refresh persistence — a
- * page refresh mid-quiz simply requires starting a fresh attempt.
+ * Same HilltopAds VAST video ad gate as the World Cup Ball quiz, plus up to
+ * 3 practice questions (each behind an ad watch — the first is mandatory,
+ * two more are optional) so users can see how the timer/bonus rules work
+ * before their real, scored attempt starts.
+ *
+ * Simplification versus the World Cup Ball quiz this is adapted from (kept
+ * intentionally out of scope for this giveaway): no captcha widget and no
+ * resume-after-refresh persistence — a page refresh mid-quiz simply requires
+ * starting a fresh attempt (practice included).
  *
  * @param {{ onResult: (result: object) => void, onError: (msg: string) => void, onPhaseChange?: (phase: string) => void, disabled?: boolean }} props
  */
@@ -61,8 +79,29 @@ export function RonaldoShirtQuiz({ onResult, onError, onPhaseChange, disabled = 
   const [submitting, setSubmitting] = useState(false)
   const [salvageQuestion, setSalvageQuestion] = useState(null)
   const [salvageRound, setSalvageRound] = useState(0)
+  const [practiceSecondsLeft, setPracticeSecondsLeft] = useState(RONALDO_SHIRT_QUIZ_QUESTION_SECONDS)
+  const [practiceBonusActive, setPracticeBonusActive] = useState(false)
+  const [practiceTimeouts, setPracticeTimeouts] = useState(0)
+  const [practiceSummary, setPracticeSummary] = useState({ timedOutOnce: false, answered: false })
+  const [practiceAttemptsUsed, setPracticeAttemptsUsed] = useState(0)
+  const [activePracticeIndex, setActivePracticeIndex] = useState(0)
   const disqualifiedRef = useRef(false)
   const answersRef = useRef({})
+  const practiceCompletedRef = useRef(false)
+
+  const activePracticeQuestion =
+    RONALDO_SHIRT_QUIZ_PRACTICE_QUESTIONS[
+      Math.min(activePracticeIndex, RONALDO_SHIRT_QUIZ_PRACTICE_QUESTIONS.length - 1)
+    ] || RONALDO_SHIRT_QUIZ_PRACTICE_QUESTION
+
+  const practiceChoices = useMemo(() => {
+    const list = [...activePracticeQuestion.choices]
+    for (let i = list.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[list[i], list[j]] = [list[j], list[i]]
+    }
+    return list
+  }, [activePracticeQuestion])
 
   const q = questions[index]
   const localizedQ = useMemo(() => (q ? localizeQuizQuestion(locale, q, t) : null), [locale, q, t])
@@ -244,7 +283,7 @@ export function RonaldoShirtQuiz({ onResult, onError, onPhaseChange, disabled = 
             ? ' Could not reach the API — if you are developing locally, run npm run dev:all (or npm run dev:api in a second terminal).'
             : ''
         onError(typeof data.error === 'string' ? data.error : `Could not start the quiz.${apiOffline}`)
-        setPhase('idle')
+        setPhase(practiceCompletedRef.current ? 'practice_complete' : 'idle')
         return
       }
       const questionList = Array.isArray(data.questions) ? data.questions : []
@@ -273,8 +312,37 @@ export function RonaldoShirtQuiz({ onResult, onError, onPhaseChange, disabled = 
       onError(
         'Could not reach the server. If you are developing locally, run npm run dev:all (or npm run dev:api in a second terminal).',
       )
-      setPhase('idle')
+      setPhase(practiceCompletedRef.current ? 'practice_complete' : 'idle')
     }
+  }
+
+  const startPractice = () => {
+    if (disabled) return
+    if (practiceAttemptsUsed >= RONALDO_SHIRT_QUIZ_MAX_PRACTICE_QUESTIONS) return
+    primeQuizTimerAudio()
+    onError('')
+    const nextPracticeIndex = Math.min(
+      practiceAttemptsUsed,
+      RONALDO_SHIRT_QUIZ_PRACTICE_QUESTIONS.length - 1,
+    )
+    setActivePracticeIndex(nextPracticeIndex)
+    setPracticeAttemptsUsed((count) =>
+      Math.min(count + 1, RONALDO_SHIRT_QUIZ_MAX_PRACTICE_QUESTIONS),
+    )
+    setPracticeSecondsLeft(RONALDO_SHIRT_QUIZ_QUESTION_SECONDS)
+    setPracticeBonusActive(false)
+    setPracticeTimeouts(0)
+    setPracticeSummary({ timedOutOnce: false, answered: false })
+    setPhase('practice')
+  }
+
+  const finishPractice = (answered) => {
+    practiceCompletedRef.current = true
+    setPracticeSummary({
+      timedOutOnce: practiceTimeouts > 0,
+      answered: Boolean(answered),
+    })
+    setPhase('practice_complete')
   }
 
   const handleSubmitAnswer = (e) => {
@@ -296,6 +364,25 @@ export function RonaldoShirtQuiz({ onResult, onError, onPhaseChange, disabled = 
     const intervalId = window.setInterval(tick, 1000)
     return () => window.clearInterval(intervalId)
   }, [phase, disabled, sessionDeadlineMs, finishQuiz, timeoutsUsed, submitting])
+
+  useEffect(() => {
+    if (phase !== 'practice' || disabled) return undefined
+    if (practiceSecondsLeft <= 0) {
+      if (practiceTimeouts >= RONALDO_SHIRT_QUIZ_MAX_TIMEOUTS) {
+        practiceCompletedRef.current = true
+        setPracticeSummary({ timedOutOnce: true, answered: false })
+        setPhase('practice_complete')
+        return undefined
+      }
+      setPracticeTimeouts((count) => count + 1)
+      setPracticeBonusActive(true)
+      setPracticeSecondsLeft(RONALDO_SHIRT_QUIZ_TIMEOUT_BONUS_SECONDS)
+      speakBonusUsed()
+      return undefined
+    }
+    const t = window.setTimeout(() => setPracticeSecondsLeft((s) => s - 1), 1000)
+    return () => window.clearTimeout(t)
+  }, [phase, practiceSecondsLeft, practiceTimeouts, disabled])
 
   useEffect(() => {
     if ((phase !== 'active' && phase !== 'salvage') || disabled) return undefined
@@ -327,13 +414,117 @@ export function RonaldoShirtQuiz({ onResult, onError, onPhaseChange, disabled = 
             Pass this free {RONALDO_SHIRT_QUIZ_QUESTION_COUNT}-question football skill quiz to unlock the shirt
             giveaway entry form. {RONALDO_SHIRT_QUIZ_QUESTION_TIMING_NOTICE} {RONALDO_SHIRT_QUIZ_SALVAGE_NOTICE}
           </p>
+          <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs leading-relaxed text-amber-100/85">
+            {RONALDO_SHIRT_QUIZ_PRACTICE_INTRO}
+          </p>
+          <p className="rounded-lg border border-red-500/40 bg-red-950/25 px-3 py-2.5 text-xs font-semibold leading-relaxed text-red-100">
+            You must watch the ad video in full to unlock the practice question — there is no skip, close, or bypass
+            option.
+          </p>
+          <p className="rounded-lg border border-sky-500/30 bg-sky-950/20 px-3 py-2.5 text-xs leading-relaxed text-sky-100/90">
+            Please be patient while the ad loads and plays — some ads run for over a minute. We show these ads to
+            help fund the rewards, so thank you for bearing with us.
+          </p>
+          <VastVideoAdGate
+            vastTagUrl={HILLTOPADS_VAST_TAG_URL}
+            onUnlocked={() => startPractice()}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'practice') {
+    return (
+      <div className={quizShellClass}>
+        <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
+          <div className="ss-wc-ball-quiz__intro rounded-xl border border-teal-500/30 bg-teal-950/25 px-4 py-3 text-sm text-teal-50/95">
+            <p className="font-semibold text-teal-100">Practice — not counted</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-stone-300">{RONALDO_SHIRT_QUIZ_PRACTICE_INTRO}</p>
+            <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{RONALDO_SHIRT_QUIZ_PRACTICE_TIMER_TIP}</p>
+            <p className="mt-2 rounded-md border border-amber-400/35 bg-amber-950/30 px-2.5 py-2 text-xs font-semibold leading-relaxed text-amber-100/95">
+              {RONALDO_SHIRT_QUIZ_PRACTICE_BONUS_TIP}
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-teal-100/85">{RONALDO_SHIRT_QUIZ_PRACTICE_TYPING_TIP}</p>
+          </div>
+          <QuizQuestionTimer
+            secondsLeft={practiceSecondsLeft}
+            label={`Practice · ${RONALDO_SHIRT_QUIZ_QUESTION_TIMEOUT_LABEL}`}
+            bonusActive={practiceBonusActive}
+            enabled={!disabled}
+          />
+          {practiceBonusActive ? (
+            <p className="ss-wc-ball-quiz__bonus-note rounded-lg border border-amber-400/40 bg-amber-950/35 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-50">
+              <strong className="text-amber-200">+{RONALDO_SHIRT_QUIZ_TIMEOUT_BONUS_SECONDS} second extension active.</strong> Answer
+              now — in the real quiz you only get this twice per attempt.
+            </p>
+          ) : null}
+          <div className="ss-wc-ball-quiz__callout rounded-lg border border-amber-400/30 bg-amber-950/25 px-3 py-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Multiple choice</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
+              Tap one option below before the time-out expires.
+            </p>
+          </div>
+          <p className="ss-wc-ball-quiz__prompt text-stone-100">{activePracticeQuestion.prompt}</p>
+          <div className="ss-wc-ball-quiz__choices grid grid-cols-2 gap-2 lg:grid-cols-3">
+            {practiceChoices.map((choice) => (
+              <button
+                key={choice}
+                type="button"
+                onClick={() => finishPractice(true)}
+                className="ss-wc-ball-quiz__choice-btn rounded-xl border border-amber-500/35 bg-amber-950/30 px-4 py-3 text-left text-sm font-semibold text-amber-50 transition hover:border-amber-400/55 hover:bg-amber-900/40"
+              >
+                {choice}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'practice_complete') {
+    const tips = ronaldoShirtQuizPracticeCompleteTips(practiceSummary)
+    const canUnlockNextPractice = practiceAttemptsUsed < RONALDO_SHIRT_QUIZ_MAX_PRACTICE_QUESTIONS
+    return (
+      <div className={quizShellClass}>
+        <div className="ss-wc-ball-quiz__stack flex flex-col gap-4">
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-4 py-4 text-sm text-emerald-50/95">
+            <p className="font-semibold text-emerald-100">Practice complete</p>
+            <p className="mt-2 text-xs leading-relaxed text-stone-300">
+              Good — you have seen how the time-out works. Your real attempt starts when you press the button below.
+            </p>
+            <ul className="ss-wc-ball-quiz__practice-tips mt-3 list-inside list-disc space-y-1.5 text-xs leading-relaxed text-stone-300">
+              {tips.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+          {canUnlockNextPractice ? (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-sm text-amber-50/95">
+              <p className="text-xs leading-relaxed text-amber-100/90">
+                Want another practice question before the real test? Watch another short ad to unlock it.
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-amber-100/70">
+                Some ads run over a minute — thanks for your patience, this helps fund the rewards.
+              </p>
+              <div className="mt-3">
+                <VastVideoAdGate
+                  vastTagUrl={HILLTOPADS_VAST_TAG_URL}
+                  onUnlocked={() => startPractice()}
+                  disabled={disabled || submitting}
+                />
+              </div>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => void startQuiz()}
             disabled={disabled || submitting}
             className="ss-wc-ball-quiz__primary-btn w-full rounded-xl bg-gradient-to-r from-lime-600 to-emerald-600 py-3 text-sm font-bold text-stone-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Start quiz ({RONALDO_SHIRT_QUIZ_QUESTION_COUNT} questions · {RONALDO_SHIRT_QUIZ_QUESTION_TIMEOUT_LABEL} each)
+            Start test ({RONALDO_SHIRT_QUIZ_QUESTION_COUNT} questions · {RONALDO_SHIRT_QUIZ_QUESTION_TIMEOUT_LABEL} each)
           </button>
         </div>
       </div>
