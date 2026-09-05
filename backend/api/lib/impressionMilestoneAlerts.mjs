@@ -1,12 +1,13 @@
 import { query } from './db.mjs'
 import { sendSalesEmail } from './sendSalesEmail.mjs'
+import { resolveAdminAlertEmail } from './adminAlerts.mjs'
 
 /** Send an email alert every N total page-view "impressions" recorded. */
 export const IMPRESSION_ALERT_STEP = 50
 
 /** Where impression milestone alerts are sent. Overridable via env for testing/other deployments. */
 export function resolveImpressionAlertEmail() {
-  return (process.env.IMPRESSION_ALERT_EMAIL || 'alexander77177@protonmail.com').trim()
+  return resolveAdminAlertEmail()
 }
 
 /**
