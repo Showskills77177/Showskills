@@ -14,6 +14,7 @@ import {
 } from './resendConfig.mjs'
 import { generateWinnerChequePng } from './chequeGenerator.mjs'
 import { WORLD_CUP_BALL_PRIZE_TITLE } from '../../../shared/worldCupBallGiveaway.mjs'
+import { notifyAdminOfDrawWinner } from './notifyAdminOfDrawWinner.mjs'
 
 export async function sendWorldCupBallWinnerEmail({
   to,
@@ -128,6 +129,20 @@ export async function sendWorldCupBallWinnerEmail({
     console.error('[email] World Cup Ball winner notification failed:', msg)
     return { ok: false, error: msg }
   }
+
+  await notifyAdminOfDrawWinner({
+    competitionLabel: WORLD_CUP_BALL_PRIZE_TITLE || 'World Cup Ball giveaway',
+    winnerEmail: intendedTo,
+    winnerFullName: customerFullName,
+    detailLines: [
+      winReference ? `Win reference: ${winReference}` : null,
+      prizeFulfilment ? `Prize choice: ${prizeFulfilment}` : null,
+      countryCode ? `Country: ${countryCode}` : null,
+      cashPrizeUsd ? `Cash prize (USD): ${cashPrizeUsd}` : null,
+      wonAt ? `Won at: ${wonAt}` : null,
+      detailsComplete ? 'Full claim details submitted.' : 'Initial win notification only — claim details pending.',
+    ],
+  })
 
   return {
     ok: true,

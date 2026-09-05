@@ -12,6 +12,7 @@ import {
   isResendProductionMode,
   parseResendSandboxRecipient,
 } from './resendConfig.mjs'
+import { notifyAdminOfDrawWinner } from './notifyAdminOfDrawWinner.mjs'
 
 export async function sendWinnerNotificationEmail({
   to,
@@ -87,6 +88,18 @@ export async function sendWinnerNotificationEmail({
     console.error('[email] Winner notification failed:', msg)
     return { ok: false, error: msg }
   }
+
+  await notifyAdminOfDrawWinner({
+    competitionLabel: periodTitle || 'Main draw',
+    winnerEmail: intendedTo,
+    winnerFullName: customerFullName,
+    detailLines: [
+      winningTicketNumber ? `Winning ticket/entry number: ${winningTicketNumber}` : null,
+      orderRef ? `Order ref: ${orderRef}` : null,
+      drawnAt ? `Drawn at: ${drawnAt}` : null,
+    ],
+  })
+
   return {
     ok: true,
     id: data.id,
