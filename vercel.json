@@ -14,6 +14,24 @@
     },
     "api/submissions/world-cup-ball/[...slug].js": {
       "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/submissions/ronaldo-shirt-quiz/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/analytics/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/auth/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/entries/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/newsletter/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
+    },
+    "api/visitor/[...slug].js": {
+      "includeFiles": "node_modules/{harfbuzzjs,@resvg,@img,sharp}/**"
     }
   },
   "headers": [

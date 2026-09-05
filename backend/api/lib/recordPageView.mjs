@@ -3,6 +3,7 @@ import { resolveTrafficSource } from '../../../shared/trafficSource.mjs'
 import { query } from './db.mjs'
 import { ensureAnalyticsSchema } from './ensureAnalyticsSchema.mjs'
 import { getCountryFromRequest } from './visitorGeo.mjs'
+import { checkImpressionMilestone } from './impressionMilestoneAlerts.mjs'
 
 function referrerHost(referrer) {
   if (!referrer || typeof referrer !== 'string') return null
@@ -52,6 +53,10 @@ export async function recordPageView(req, body) {
       referrerHost(referrer),
     ],
   )
+
+  const countResult = await query(`SELECT COUNT(*)::int AS c FROM site_visits`)
+  const totalImpressions = Number(countResult.rows?.[0]?.c) || 0
+  await checkImpressionMilestone(totalImpressions)
 
   return {
     ok: true,
