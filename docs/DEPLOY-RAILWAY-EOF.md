@@ -37,6 +37,8 @@ If `EOF_WORKER_URL` is unset, behaviour is unchanged (Vercel encode).
 | `DATABASE_URL` or `POSTGRES_URL` | Yes | **Same** Neon/Postgres as Vercel staging |
 | `EOF_WORKER_SECRET` | Yes | Long random string; must match Vercel |
 | `SERPAPI_API_KEY` | Recommended | Same as staging for stills |
+| `EOF_YTDLP_COOKIES_B64` | Recommended | Base64 Netscape `cookies.txt`; YouTube commonly blocks Railway/datacenter downloads without it |
+| `XAI_API_KEY` | Optional | Enables exact-moment frame matching; without it, safe clips use their midpoint |
 | `PORT` | Auto | Railway sets this |
 | `VERCEL` / `VERCEL_ENV` | **Must be unset** | So encodes use the full profile |
 | `SQLITE_PATH` | **Unset** | Would bypass Postgres |
@@ -65,6 +67,8 @@ curl -sS -X POST https://YOUR.up.railway.app/eof-worker/render \
 ```
 
 Expect `202` then watch the job reach `video_rendered` in EOF Production.
+The health response also reports `ytDlpCookiesConfigured` and
+`visionMatchingConfigured` without exposing either secret.
 
 Also check the deploy's boot logs for one of:
 

@@ -73,10 +73,10 @@ function cleanupFrameDir(frames) {
  * Frames are local files, so we send base64 data URLs rather than public URLs.
  * @param {Array<{ path: string, timestampSec: number }>} frames
  * @param {{ sceneCaption: string, subject?: string }} opts
- * @returns {Promise<{ bestTimestampSec: number|null, score: number, reason: string }>}
+ * @returns {Promise<{ bestTimestampSec: number|null, score: number, reason: string, evaluated: boolean }>}
  */
 export async function matchEofVideoFramesToScene(frames, opts = {}) {
-  const none = { bestTimestampSec: null, score: 0, reason: 'not evaluated' }
+  const none = { bestTimestampSec: null, score: 0, reason: 'not evaluated', evaluated: false }
   if (!isXaiConfigured() || !frames?.length) return none
 
   const subject = String(opts.subject || '').trim()
@@ -134,6 +134,7 @@ Return JSON only: { "best_index": number, "score": number, "reason": string }
       bestTimestampSec: frame ? frame.timestampSec : null,
       score,
       reason: String(parsed?.reason || ''),
+      evaluated: true,
     }
   } catch (e) {
     console.warn('[eof-video-frame-match] skipped', e instanceof Error ? e.message : e)
@@ -150,7 +151,15 @@ export const MIN_EOF_VIDEO_FRAME_MATCH_SCORE = 5
  */
 export async function findBestEofVideoMoment({ filePath, durationSec, sceneCaption, subject }) {
   const frames = await sampleEofVideoFrames(filePath, { durationSec })
-  if (!frames.length) return { bestTimestampSec: null, score: 0, matched: false, reason: 'no frames sampled' }
+  if (!frames.length) {
+    return {
+      bestTimestampSec: null,
+      score: 0,
+      matched: false,
+      reason: 'no frames sampled',
+      evaluated: false,
+    }
+  }
   try {
     const result = await matchEofVideoFramesToScene(frames, { sceneCaption, subject })
     return { ...result, matched: result.score >= MIN_EOF_VIDEO_FRAME_MATCH_SCORE }

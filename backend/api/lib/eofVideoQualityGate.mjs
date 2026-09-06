@@ -1,7 +1,7 @@
 /**
- * Quality Gate: technical checks + copyright-risk + content-relevance.
- * Pass => continue to processing. Fail on ANY check => abandon this video,
- * caller falls back to images. Never force a bad/risky clip through.
+ * Quality Gate: technical checks + copyright-risk + optional content relevance.
+ * Technical, copyright, and completed vision checks remain strict. If optional
+ * vision is unavailable, the caller uses the source midpoint.
  */
 import { statSync } from 'node:fs'
 import { runFfprobe } from './eofFfmpeg.mjs'
@@ -10,6 +10,36 @@ import {
   assessEofVideoCopyrightRisk,
 } from '../../../shared/eofVideoFootage.mjs'
 import { findBestEofVideoMoment } from './eofVideoFrameMatch.mjs'
+import { isXaiConfigured } from './eofXaiClient.mjs'
+
+/**
+ * Vision matching improves clip selection, but it is an optional refinement.
+ * If xAI is unconfigured or cannot evaluate, keep the technical and copyright
+ * gates and use the source midpoint rather than rejecting every candidate.
+ */
+export function resolveEofVideoMomentDecision({ visionConfigured, moment } = {}) {
+  if (!visionConfigured || moment?.evaluated === false) {
+    return {
+      pass: true,
+      reason: visionConfigured
+        ? `vision matching unavailable; using source midpoint (${moment?.reason || 'not evaluated'})`
+        : 'vision matching not configured; using source midpoint',
+      bestTimestampSec: null,
+    }
+  }
+  if (!moment?.matched) {
+    return {
+      pass: false,
+      reason: `no matching moment found (score ${Number(moment?.score) || 0}): ${moment?.reason || 'n/a'}`,
+      bestTimestampSec: null,
+    }
+  }
+  return {
+    pass: true,
+    reason: 'ok',
+    bestTimestampSec: moment.bestTimestampSec,
+  }
+}
 
 /**
  * ffprobe a downloaded file for duration/width/height.
@@ -76,16 +106,23 @@ export async function runEofVideoQualityGate({ candidate, filePath, sceneCaption
     }
   }
 
-  const moment = await findBestEofVideoMoment({
-    filePath,
-    durationSec: probe.durationSec,
-    sceneCaption,
-    subject,
-  })
-  if (!moment.matched) {
+  const visionConfigured = isXaiConfigured()
+  const moment = visionConfigured
+    ? await findBestEofVideoMoment({
+        filePath,
+        durationSec: probe.durationSec,
+        sceneCaption,
+        subject,
+      })
+    : null
+  const momentDecision = resolveEofVideoMomentDecision({ visionConfigured, moment })
+  if (momentDecision.pass && momentDecision.bestTimestampSec == null) {
+    console.warn(`[eof-video-footage] ${momentDecision.reason}`)
+  }
+  if (!momentDecision.pass) {
     return {
       pass: false,
-      reason: `no matching moment found (score ${moment.score}): ${moment.reason || 'n/a'}`,
+      reason: momentDecision.reason,
       bestTimestampSec: null,
       durationSec: probe.durationSec,
     }
@@ -93,8 +130,8 @@ export async function runEofVideoQualityGate({ candidate, filePath, sceneCaption
 
   return {
     pass: true,
-    reason: 'ok',
-    bestTimestampSec: moment.bestTimestampSec,
+    reason: momentDecision.reason,
+    bestTimestampSec: momentDecision.bestTimestampSec,
     durationSec: probe.durationSec,
   }
 }

@@ -59,6 +59,10 @@ function resolveYtDlpCookiesPath() {
   return ytDlpCookiesPathCache
 }
 
+export function isYtDlpCookiesConfigured() {
+  return Boolean(resolveYtDlpCookiesPath())
+}
+
 /** True only once per process — used to log the cookie state exactly once at boot, not per-call. */
 let cookieStateLogged = false
 function logCookieStateOnce(cookiesPath) {

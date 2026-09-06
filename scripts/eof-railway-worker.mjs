@@ -30,7 +30,11 @@ import {
   markEofProductionJobFailed,
 } from '../backend/api/lib/eofProductionJobs.mjs'
 import { EOF_PRODUCTION_JOB_STATUS } from '../shared/eofProduction.mjs'
-import { isYtDlpAvailable } from '../backend/api/lib/eofYtDlp.mjs'
+import {
+  isYtDlpAvailable,
+  isYtDlpCookiesConfigured,
+} from '../backend/api/lib/eofYtDlp.mjs'
+import { isXaiConfigured } from '../backend/api/lib/eofXaiClient.mjs'
 
 const PORT = Number(process.env.PORT) || 8080
 const SECRET = String(process.env.EOF_WORKER_SECRET || '').trim()
@@ -55,6 +59,8 @@ app.get('/health', (_req, res) => {
     service: 'eof-railway-worker',
     activeJobs: activeJobs.size,
     ffmpegBudget: 'non-vercel-full',
+    ytDlpCookiesConfigured: isYtDlpCookiesConfigured(),
+    visionMatchingConfigured: isXaiConfigured(),
   })
 })
 
@@ -161,6 +167,16 @@ app.listen(PORT, '0.0.0.0', () => {
   }
   if (process.env.VERCEL || process.env.VERCEL_ENV) {
     console.warn('[eof-worker] VERCEL env is set — unset it so encodes use the full (non-Pro-cap) profile')
+  }
+  if (!isYtDlpCookiesConfigured()) {
+    console.warn(
+      '[eof-worker] EOF_YTDLP_COOKIES_B64 / EOF_YTDLP_COOKIES_PATH missing — YouTube may block footage downloads',
+    )
+  }
+  if (!isXaiConfigured()) {
+    console.info(
+      '[eof-worker] XAI_API_KEY not set — footage remains enabled; valid clips use their midpoint',
+    )
   }
   // Check once at boot, not just lazily per-scene — a wrong Railway Builder
   // setting (Nixpacks/Railpack instead of the Dockerfile) silently ships a
