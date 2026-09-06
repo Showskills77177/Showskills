@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 # Install ffmpeg, ca-certificates, and the yt-dlp standalone binary (video-footage pipeline).
 # yt-dlp only ever runs here (Railway worker) — never on Vercel.
