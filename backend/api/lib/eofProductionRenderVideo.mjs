@@ -1041,26 +1041,42 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         resolveImageSubject(job.topic, String(job.script?.plainTextDraft || '').trim()) ||
         String(job.topic || '').trim()
       const workDirForFootage = eofProductionWorkDir(jobId)
-      for (const scene of scenesForVideo) {
-        try {
-          const videoClipPath = await getEofSceneVideoClip({
-            jobId,
-            workDir: workDirForFootage,
-            sceneIndex: scene.index,
-            subject: footageSubject,
-            topic: job.topic,
-            sceneCaption: scene.caption,
-            targetDurationSec: scene.durationSec,
-            captionStyle: job.captionStyle,
-            captionLayout: job.captionLayout || job.script?.captionLayout || null,
+      let footageIndex = 0
+      const stopFootageHb = startProgressHeartbeat(async () => {
+        await report('images', footageIndex, {
+          force: true,
+          message: `Sourcing video footage ${Math.min(footageIndex + 1, sceneCount)} of ${sceneCount}…`,
+        })
+      }, 3500)
+      try {
+        for (const scene of scenesForVideo) {
+          footageIndex = scene.index
+          await report('images', footageIndex, {
+            force: true,
+            message: `Sourcing video footage ${Math.min(footageIndex + 1, sceneCount)} of ${sceneCount}…`,
           })
-          if (videoClipPath) scene.videoClipPath = videoClipPath
-        } catch (err) {
-          console.warn(
-            `[eof-video-footage] scene ${scene.index} failed — using image`,
-            err instanceof Error ? err.message : err,
-          )
+          try {
+            const videoClipPath = await getEofSceneVideoClip({
+              jobId,
+              workDir: workDirForFootage,
+              sceneIndex: scene.index,
+              subject: footageSubject,
+              topic: job.topic,
+              sceneCaption: scene.caption,
+              targetDurationSec: scene.durationSec,
+              captionStyle: job.captionStyle,
+              captionLayout: job.captionLayout || job.script?.captionLayout || null,
+            })
+            if (videoClipPath) scene.videoClipPath = videoClipPath
+          } catch (err) {
+            console.warn(
+              `[eof-video-footage] scene ${scene.index} failed — using image`,
+              err instanceof Error ? err.message : err,
+            )
+          }
         }
+      } finally {
+        stopFootageHb()
       }
     }
 
