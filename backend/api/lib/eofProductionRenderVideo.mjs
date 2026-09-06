@@ -60,7 +60,7 @@ import {
   runEofImageGenAlongsideScrape,
   sortEofPoolHitsPreferScrape,
 } from './eofImageGen.mjs'
-import { renderEofProductionVideo, eofProductionVideoRelPath, eofProductionVideoAbsPath, clearEofSceneClipCache, assertEofCleanPlateImagePath } from './eofProductionVideo.mjs'
+import { renderEofProductionVideo, eofProductionVideoAbsPath, clearEofSceneClipCache, assertEofCleanPlateImagePath } from './eofProductionVideo.mjs'
 import {
   mapWithConcurrency,
   createThrottledWriter,
@@ -135,8 +135,11 @@ export const EOF_POOL_RESCUE_LIMIT = 6
  * @param {Array<{ url?: string, localPath?: string, title?: string, source?: string, visionScore?: number, visionRejected?: boolean }>} hits
  * @param {number} [limit]
  */
-export function rescueEofFilteredPoolHits(hits, limit = EOF_POOL_RESCUE_LIMIT) {
-  const rows = (Array.isArray(hits) ? hits : []).filter((h) => h && (h.url || h.localPath))
+export function rescueEofFilteredPoolHits(hits, limit = EOF_POOL_RESCUE_LIMIT, opts = {}) {
+  const sourceRows = (Array.isArray(hits) ? hits : []).filter((h) => h && (h.url || h.localPath))
+  const rows = isNamedFootballSubject(opts.subject)
+    ? filterHitsRequiringSubjectNameCue(sourceRows, opts.subject, { log: false })
+    : sourceRows
   if (!rows.length) return []
   const scored = rows.map((hit, i) => {
     const vision = Number(hit.visionScore)
@@ -748,8 +751,8 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
                 maxImages: Math.min(isEofVercelRuntime() ? 4 : 8, oxyPool.hits.length),
               })
               if (visionScores.size) {
-                // Fallback keeps query-named empty-title stills if vision rejects everything
-                // (Cucurella empty-title CDN thumbs) so the pool is never wiped to a hard fail.
+                // If vision could not evaluate, retain only independently
+                // named stills. Completed low-score checks remain rejected.
                 oxyPool.hits = applyVisionScoresWithNameCueFallback(
                   oxyPool.hits,
                   oxyPool.subject || leadSubject,
@@ -854,10 +857,11 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             console.warn(
               `eof:serp pool emptied after subject/vision filter subject=${String(leadSubject || '').slice(0, 40)} before=${imageFetchDiag.scrapeHitsBeforeFilter}`,
             )
-            // Rescue: the search worked, so put the best-ranked stills back rather than
-            // marching on to placeholders and a hard "no scene images" failure. A slightly
-            // off still beats a Short that refuses to build.
-            const rescued = rescueEofFilteredPoolHits(hitsBeforeSubjectFilter)
+            // Generic topics may rescue the best-ranked rows. Named people stay
+            // strict: a wrong person is worse than moving to a fallback provider.
+            const rescued = rescueEofFilteredPoolHits(hitsBeforeSubjectFilter, EOF_POOL_RESCUE_LIMIT, {
+              subject: oxyPool.subject || leadSubject,
+            })
             if (rescued.length) {
               oxyPool.hits = rescued
               oxyPool.rescuedFromFilter = true

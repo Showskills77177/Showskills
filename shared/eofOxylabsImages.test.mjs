@@ -58,7 +58,7 @@ describe('eofOxylabsImages', () => {
     assert.match(q1, /long hair|Chelsea/i)
   })
 
-  it('claims empty-title Serp CDN hits when job query names Cucurella', () => {
+  it('rejects empty-title Serp hits even when the job query names Cucurella', () => {
     const query = '"Marc Cucurella" Chelsea hair'
     const emptyTitle = {
       url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-cdn-1',
@@ -73,7 +73,7 @@ describe('eofOxylabsImages', () => {
       imageQuery: query,
       jobQuery: query,
     })
-    assert.ok(score > -100, `empty-title + named query must be claimable, got ${score}`)
+    assert.ok(score <= -400, `empty-title hit must be rejected, got ${score}`)
     const claimed = claimOxylabsPoolHit({
       hits: [
         emptyTitle,
@@ -90,13 +90,10 @@ describe('eofOxylabsImages', () => {
       jobQuery: query,
       keyPrefix: 'serpapi',
     })
-    assert.ok(claimed, 'must claim the empty-title Cucurella Serp hit')
-    assert.match(claimed.imgUrl, /cuc-cdn-1/)
+    assert.equal(claimed, null, 'must not claim an unverified empty-title Serp hit')
   })
 
-  it('still claims empty-title Cucurella hits that carry a low visionScore', () => {
-    // Name-cue fallback can leave hits with visionScore=2–3 from Grok on tiny CDN thumbs.
-    // Old scorer hard-rejected any vision < MIN even when emptyTitleQueryOk — Build still failed.
+  it('rejects empty-title Cucurella hits that vision scored below threshold', () => {
     const query = '"Marc Cucurella" Chelsea hair'
     const hit = {
       url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-low-vision',
@@ -112,7 +109,7 @@ describe('eofOxylabsImages', () => {
       imageQuery: query,
       jobQuery: query,
     })
-    assert.ok(score > -100, `low-vision empty-title must stay claimable, got ${score}`)
+    assert.ok(score <= -400, `low-vision empty-title must be rejected, got ${score}`)
     const claimed = claimOxylabsPoolHit({
       hits: [hit],
       claimed: new Set(),
@@ -122,7 +119,7 @@ describe('eofOxylabsImages', () => {
       jobQuery: query,
       keyPrefix: 'serpapi',
     })
-    assert.ok(claimed, 'must claim low-vision empty-title Cucurella hit')
+    assert.equal(claimed, null, 'must not claim low-vision empty-title Cucurella hit')
   })
 
   it('surfaces Oxylabs auth failure (not only Wikimedia) in no-images errors', () => {
@@ -249,6 +246,17 @@ describe('eofOxylabsImages', () => {
     const portrait = scoreImageCandidate('https://cdn.example.com/a.jpg', 900, 1400)
     const wide = scoreImageCandidate('https://cdn.example.com/b.jpg', 1600, 900)
     assert.ok(portrait > wide, `portrait (${portrait}) should beat wide (${wide})`)
+  })
+
+  it('does not rescue wrong-person stills for a named subject', () => {
+    const hits = [
+      { url: 'https://cdn.example.com/city.jpg', title: 'Manchester City transfer graphic', source: 'serpapi' },
+      { url: 'https://cdn.example.com/blank.jpg', title: '', source: 'serpapi' },
+    ]
+    assert.deepEqual(
+      rescueEofFilteredPoolHits(hits, 2, { subject: 'Sir Alex Ferguson' }),
+      [],
+    )
   })
 
   it('is opt-in: credentials alone do not configure; needs OXYLABS_ENABLED=1', () => {

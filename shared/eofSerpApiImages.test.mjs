@@ -9,10 +9,12 @@ import {
   searchSerpApiGoogleImages,
   searchSerpApiGoogleImagesWithStatus,
   formatSerpApiSearchHealthNote,
+  fetchEofSerpApiJobPool,
   withoutAmericanSportsAmbiguity,
   EOF_SERPAPI_MAX_QUERIES_PER_JOB,
   serpApiEngine,
 } from '../backend/api/lib/eofSerpApiImages.mjs'
+import { filterHitsRequiringSubjectNameCue } from './eofSceneImageQueries.mjs'
 
 describe('eofSerpApiImages', () => {
   it('detects SERPAPI_API_KEY and SERP_API_KEY alias', () => {
@@ -137,10 +139,74 @@ describe('eofSerpApiImages', () => {
         },
       ],
     })
+
+    it('never mistakes a SerpAPI source-page link for an image URL', () => {
+      const rows = extractSerpApiImageRows({
+        images_results: [
+          {
+            title: 'Sir Alex Ferguson profile',
+            link: 'https://news.example.com/sir-alex-ferguson-profile',
+            thumbnail: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:thumb-only',
+          },
+        ],
+      })
+      assert.deepEqual(rows, [])
+    })
     assert.ok(rows.length >= 1)
     assert.equal(rows[0].url, 'https://cdn.example.com/photos/rooney-portrait.jpg')
     assert.equal(rows[0].title, 'Wayne Rooney Everton portrait')
     assert.ok(rows.some((r) => r.url.includes('wide.jpg')))
+    assert.ok(
+      rows.every((r) => !r.url.includes('encrypted-tbn0.gstatic.com')),
+      'thumbnail-only Google CDN rows must not be promoted to production stills',
+    )
+  })
+
+  it('drops wrong-person and blank-metadata rows before creating a named-subject job pool', async () => {
+    const prevKey = process.env.SERPAPI_API_KEY
+    process.env.SERPAPI_API_KEY = 'mock-key'
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        images_results: [
+          {
+            title: 'Sir Alex Ferguson watches Manchester United train',
+            original: 'https://cdn.example.com/sir-alex-ferguson-training.jpg',
+            original_width: 900,
+            original_height: 1200,
+          },
+          {
+            title: 'Manchester City transfer graphic',
+            original: 'https://cdn.example.com/city-transfer.jpg',
+            original_width: 1080,
+            original_height: 1080,
+          },
+          {
+            title: '',
+            original: 'https://cdn.example.com/unlabelled.jpg',
+            original_width: 1080,
+            original_height: 1920,
+          },
+        ],
+      }),
+      text: async () => '',
+    }))
+    try {
+      const pool = await fetchEofSerpApiJobPool({
+        topic: 'Windows',
+        plainTextDraft: 'Fourteen transfer windows after Sir Alex walked out the door.',
+        sceneCount: 3,
+      })
+      assert.equal(pool.subject, 'Sir Alex Ferguson')
+      const strict = filterHitsRequiringSubjectNameCue(pool.hits, pool.subject, { log: false })
+      assert.deepEqual(strict.map((hit) => hit.title), ['Sir Alex Ferguson watches Manchester United train'])
+    } finally {
+      globalThis.fetch = originalFetch
+      if (prevKey == null) delete process.env.SERPAPI_API_KEY
+      else process.env.SERPAPI_API_KEY = prevKey
+    }
   })
 
   it('caps billable Google Images queries to ≤2 per Short job (lead + optional secondary)', () => {

@@ -160,9 +160,17 @@ export function extractSerpApiImageRows(payload) {
 
   for (const item of images) {
     if (!item || typeof item !== 'object') continue
-    const original = item.original || item.original_image || item.link
+    // `link` is the source webpage in SerpAPI's Google Images schema, not an
+    // image. Feeding it to the downloader produces HTML and wastes a scene.
+    const original = item.original || item.original_image
     const thumb = item.thumbnail
-    const candidates = [original, thumb].filter(isHttpUrl).map((u) => String(u).trim())
+    const candidates = [original, thumb]
+      .filter(isHttpUrl)
+      .map((u) => String(u).trim())
+      // A thumbnail-only Google CDN result is both too soft for 1080x1920 and
+      // has no trustworthy page/title context. Let another provider fill the
+      // scene instead of promoting it as a full-size football still.
+      .filter((url) => original || !/encrypted-tbn\d*\.gstatic\.com/i.test(url))
     if (!candidates.length) continue
 
     let best = null
@@ -465,6 +473,9 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
     signal: opts.signal,
     timeoutMs: opts.timeoutMs || DEFAULT_TIMEOUT_MS,
   })
+  const subject = resolveImageSubject(opts.topic || '', opts.plainTextDraft || '') || ''
+  // Keep sparse-metadata rows until the render stage so configured vision can
+  // verify them. Without vision, the downstream subject-name gate rejects them.
   const hits = filterBlockedStockImages(rawHits)
   const kept = hits.slice(0, Math.min(hits.length, need + 2))
   const healthNote = formatSerpApiSearchHealthNote(health)
@@ -482,7 +493,7 @@ export async function fetchEofSerpApiJobPool(opts = {}) {
     query,
     intent,
     source: 'serpapi',
-    subject: resolveImageSubject(opts.topic || '', opts.plainTextDraft || '') || null,
+    subject: subject || null,
     health,
     healthNote,
     hits: kept.map((h) => ({

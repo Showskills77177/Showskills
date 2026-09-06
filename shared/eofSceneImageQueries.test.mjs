@@ -488,12 +488,13 @@ describe('eofSceneImageQueries', () => {
     )
     assert.equal(kept.length, titles.length, 'all real Cucurella titles must survive the pool filter')
 
-    // Empty title + person query: keep (Google Images often omits title).
+    // Empty title + person query is not evidence that the returned image is
+    // actually the person. Prefer another provider over a random still.
     const emptyKept = filterHitsRequiringSubjectNameCue(
       [{ url: 'https://cdn.example.com/anon.jpg', title: '', source: 'serpapi' }],
       subject,
       { log: false, query },
     )
-    assert.equal(emptyKept.length, 1, 'empty-title hit from a person Serp query must be kept')
+    assert.equal(emptyKept.length, 0, 'empty-title hit must be rejected without vision or a URL name cue')
   })
 })

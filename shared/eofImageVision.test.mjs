@@ -154,12 +154,11 @@ describe('eofImageVision clamp + apply', () => {
   })
 })
 
-describe('vision name-cue fallback (Cucurella empty-title pool must not be wiped)', () => {
+describe('vision name-cue fallback', () => {
   const query = '"Marc Cucurella" Chelsea hair'
   const subject = 'Marc Cucurella'
 
-  it('keeps query-named empty-title CDN hits when vision rejects everything', () => {
-    // Exact Cucurella shape: Google Images CDN thumbs with blank titles from a person query.
+  it('preserves completed vision rejection instead of reviving name-only hits', () => {
     const hits = [
       { url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-1', title: '', source: 'serpapi' },
       { url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-2', title: '', source: 'serpapi' },
@@ -173,12 +172,10 @@ describe('vision name-cue fallback (Cucurella empty-title pool must not be wiped
     assert.equal(applyVisionScoresToHits(hits, scores).length, 0, 'precondition: strict vision empties pool')
 
     const kept = applyVisionScoresWithNameCueFallback(hits, subject, scores, { query })
-    assert.ok(kept.length >= 1, `fallback must keep at least one Cucurella still, got ${kept.length}`)
-    // The named-title hit and the empty-title CDN hits (query names the person) all survive.
-    assert.equal(kept.length, 3)
+    assert.equal(kept.length, 0, 'completed low vision scores must remain rejected')
   })
 
-  it('strips low visionScore on fallback so claim does not re-reject rescued stills', () => {
+  it('does not rescue a blank hit that vision rejected', () => {
     const hits = [
       {
         url: 'https://encrypted-tbn0.gstatic.com/images?q=cuc-scored',
@@ -189,18 +186,16 @@ describe('vision name-cue fallback (Cucurella empty-title pool must not be wiped
     ]
     const scores = new Map([['https://encrypted-tbn0.gstatic.com/images?q=cuc-scored', 2]])
     const kept = applyVisionScoresWithNameCueFallback(hits, subject, scores, { query })
-    assert.equal(kept.length, 1)
-    assert.equal(kept[0].visionScore, undefined)
-    const claimed = claimOxylabsPoolHit({
-      hits: kept,
-      claimed: new Set(),
-      subject,
-      topic: subject,
-      imageQuery: query,
-      jobQuery: query,
-      keyPrefix: 'serpapi',
-    })
-    assert.ok(claimed, 'rescued empty-title still must be claimable after score strip')
+    assert.equal(kept.length, 0)
+  })
+
+  it('uses strict name cues when vision produced no usable evaluation', () => {
+    const hits = [
+      { url: 'https://cdn.example.com/cucurella.jpg', title: 'Marc Cucurella Chelsea hair', source: 'serpapi' },
+      { url: 'https://cdn.example.com/wrong.jpg', title: 'Cristiano Ronaldo', source: 'serpapi' },
+    ]
+    const kept = applyVisionScoresWithNameCueFallback(hits, subject, new Map(), { query })
+    assert.deepEqual(kept.map((hit) => hit.title), ['Marc Cucurella Chelsea hair'])
   })
 
   it('still returns vision-approved stills unchanged when some pass', () => {

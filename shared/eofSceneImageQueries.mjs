@@ -410,8 +410,6 @@ export function looksLikeSoloPortraitCue(title = '', url = '') {
 export function filterHitsRequiringSubjectNameCue(hits, subject, opts = {}) {
   if (!Array.isArray(hits) || !hits.length) return []
   if (!isNamedFootballSubject(subject)) return hits
-  // When the Serp/Oxylabs query already names the person, empty-title hits (CDN URLs) stay usable.
-  const queryNamesSubject = hitMentionsSubject(subject, String(opts.query || ''), '')
   const kept = []
   for (const hit of hits) {
     const src = String(hit?.source || '')
@@ -423,11 +421,6 @@ export function filterHitsRequiringSubjectNameCue(hits, subject, opts = {}) {
       continue
     }
     if (!hitMentionsSubject(subject, title, url)) {
-      // Person was in the Serp query + title empty → keep (Google often omits titles).
-      if (queryNamesSubject && !title.trim() && url) {
-        kept.push(hit)
-        continue
-      }
       if (opts.log !== false) {
         console.info(
           '[eof-images] reject no subject cue',
