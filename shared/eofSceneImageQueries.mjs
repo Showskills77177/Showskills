@@ -72,6 +72,8 @@ const STOP = new Set([
 /** Competition / event noise — never let these outrank the player name in search. */
 const COMP_NOISE_RE =
   /\b(world\s*cup|champions\s*league|premier\s*league|la\s*liga|serie\s*a|bundesliga|ligue\s*1|euros?|copa\s*america|nations\s*league|fifa|uefa|finals?|qualifier|qualifiers)\b/i
+const GENERIC_TOPIC_SUBJECT_RE =
+  /^(windows?|transfer(?:\s+windows?)?|transfers?|football(?:\s+news)?|news|update|roundup)$/i
 
 /** Well-known managers/coaches — avoid “football player” image queries. */
 const KNOWN_COACH_RE =
@@ -535,6 +537,22 @@ export function resolveImageSubject(topic, plainTextDraft = '') {
   named.sort((a, b) => a.at - b.at || b.full.length - a.full.length)
   if (named[0]?.full) return named[0].full
 
+  // Manual jobs can retain a placeholder topic such as "Windows" while the
+  // actual headline and named subject live in the draft.
+  if (GENERIC_TOPIC_SUBJECT_RE.test(cleaned) && plainTextDraft) {
+    const headline = String(plainTextDraft).split(/[.!?\n]/, 1)[0]
+    const draftCleaned = sanitizeTopicForImageSearch(headline)
+    const draftHay = draftCleaned.toLowerCase()
+    const draftNamed = primaryImageEntities(draftCleaned)
+      .map((entity) => ({
+        full: expandEntityFullName(entity),
+        at: draftHay.indexOf(entity.toLowerCase()),
+      }))
+      .filter((entry) => entry.full)
+      .sort((a, b) => a.at - b.at || b.full.length - a.full.length)
+    if (draftNamed[0]?.full) return draftNamed[0].full
+  }
+
   const first = entities[0] || cleaned || String(topic || '').trim()
   const cleanedEnt = first
     .split(/\s+/)
@@ -946,7 +964,7 @@ export function buildSceneImageSearchQueries({
     extractTopicImageTokens(name).slice(0, 2).join(' ') ||
     name ||
     'football'
-  const rawLead = entities[0] || fallbackCore
+  const rawLead = resolveImageSubject(name, plainTextDraft) || entities[0] || fallbackCore
   const fullName = expandEntityFullName(rawLead)
   // Once a known person is resolved, never glue headline counters/actions onto
   // their search key ("Sir Alex Fourteen", "Rooney slammed"). Those words are
