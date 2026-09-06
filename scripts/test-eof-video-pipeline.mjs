@@ -11,7 +11,10 @@ try {
 }
 
 const { ensureEofProductionSchema } = await import('../backend/api/lib/ensureEofProductionSchema.mjs')
-const { createEofProductionJob } = await import('../backend/api/lib/eofProductionJobs.mjs')
+const {
+  createEofProductionJob,
+  updateEofProductionJob,
+} = await import('../backend/api/lib/eofProductionJobs.mjs')
 const { renderEofProductionVideoJob } = await import('../backend/api/lib/eofProductionRenderVideo.mjs')
 const { eofProductionWorkDir } = await import('../backend/api/lib/eofSceneTts.mjs')
 const { isFfmpegAvailable } = await import('../backend/api/lib/eofFfmpeg.mjs')
@@ -28,7 +31,28 @@ const job = await createEofProductionJob({
   topic: 'Pipeline test',
   createdBy: 'test',
   format: 'listicle',
-  mode: 'full',
+  manualDraft: 'A deterministic local render test that does not require an AI provider.',
+})
+const scenes = [
+  {
+    caption: 'The first scene verifies image generation.',
+    narration: 'The first scene verifies image generation.',
+    imageQuery: 'football stadium',
+    durationSec: 3,
+  },
+  {
+    caption: 'The second scene verifies video encoding.',
+    narration: 'The second scene verifies video encoding.',
+    imageQuery: 'football training',
+    durationSec: 3,
+  },
+]
+const prepared = await updateEofProductionJob(job.id, {
+  script: {
+    ...job.script,
+    scenes,
+    plainTextDraft: scenes.map((scene) => scene.narration).join(' '),
+  },
 })
 const workDir = eofProductionWorkDir(job.id)
 mkdirSync(workDir, { recursive: true })
@@ -40,7 +64,7 @@ if (finished.status !== 'video_rendered') throw new Error(`expected video_render
 if (!existsSync(videoPath)) throw new Error('short.mp4 missing')
 if (statSync(videoPath).size < 10_000) throw new Error('short.mp4 too small')
 
-for (let i = 0; i < job.script.scenes.length; i += 1) {
+for (let i = 0; i < prepared.script.scenes.length; i += 1) {
   if (!existsSync(join(workDir, `scene-${i + 1}.jpg`))) throw new Error(`scene-${i + 1}.jpg missing`)
 }
 

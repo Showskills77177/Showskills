@@ -9,6 +9,7 @@ import {
   resolveEofVideoClipWindow,
   EOF_VIDEO_MAX_FILE_BYTES,
 } from './eofVideoFootage.mjs'
+import { resolveEofVideoMomentDecision } from '../backend/api/lib/eofVideoQualityGate.mjs'
 
 describe('extractEofSceneMomentKeywords', () => {
   it('pulls distinctive non-stopword keywords from a caption', () => {
@@ -126,5 +127,72 @@ describe('resolveEofVideoClipWindow', () => {
     const win = resolveEofVideoClipWindow({ sourceDurationSec: 100, targetDurationSec: 10 })
     assert.equal(win.startSec, 45)
     assert.equal(win.endSec, 55)
+  })
+})
+
+describe('resolveEofVideoMomentDecision', () => {
+  it('allows a technically safe clip to use its midpoint when optional vision is not configured', () => {
+    assert.deepEqual(
+      resolveEofVideoMomentDecision({ visionConfigured: false }),
+      {
+        pass: true,
+        reason: 'vision matching not configured; using source midpoint',
+        bestTimestampSec: null,
+      },
+    )
+  })
+
+  it('still rejects a clip when configured vision cannot match the narrated moment', () => {
+    const decision = resolveEofVideoMomentDecision({
+      visionConfigured: true,
+      moment: { matched: false, score: 2, reason: 'wrong player', evaluated: true },
+    })
+    assert.equal(decision.pass, false)
+    assert.match(decision.reason, /wrong player/)
+  })
+
+  it('uses the midpoint when the configured vision provider cannot evaluate the clip', () => {
+    const decision = resolveEofVideoMomentDecision({
+      visionConfigured: true,
+      moment: {
+        matched: false,
+        score: 0,
+        reason: 'provider request failed',
+        evaluated: false,
+      },
+    })
+    assert.equal(decision.pass, true)
+    assert.equal(decision.bestTimestampSec, null)
+    assert.match(decision.reason, /provider request failed/)
+  })
+
+  it('uses the midpoint when frame sampling could not produce an evaluation', () => {
+    const decision = resolveEofVideoMomentDecision({
+      visionConfigured: true,
+      moment: {
+        matched: false,
+        score: 0,
+        reason: 'no frames sampled',
+        evaluated: false,
+      },
+    })
+    assert.equal(decision.pass, true)
+    assert.equal(decision.bestTimestampSec, null)
+  })
+
+  it('uses the matched timestamp when configured vision approves the clip', () => {
+    assert.deepEqual(
+      resolveEofVideoMomentDecision({
+        visionConfigured: true,
+        moment: {
+          matched: true,
+          score: 8,
+          bestTimestampSec: 42,
+          reason: 'correct scene',
+          evaluated: true,
+        },
+      }),
+      { pass: true, reason: 'ok', bestTimestampSec: 42 },
+    )
   })
 })
