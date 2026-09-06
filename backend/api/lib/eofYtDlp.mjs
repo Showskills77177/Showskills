@@ -129,6 +129,18 @@ export async function isYtDlpAvailable() {
 }
 
 /**
+ * YouTube now requires its JavaScript challenge to be solved before it exposes
+ * downloadable formats. The standalone yt-dlp binary bundles the solver scripts,
+ * but an external runtime must be enabled explicitly.
+ * @param {string[]} args
+ * @param {string|null} cookiesPath
+ */
+export function buildYtDlpInvocationArgs(args, cookiesPath = null) {
+  const authArgs = cookiesPath ? ['--cookies', cookiesPath] : []
+  return ['--js-runtimes', 'node', ...authArgs, ...args]
+}
+
+/**
  * @param {string[]} args
  * @param {import('node:child_process').ExecFileOptions & { timeoutMs?: number }} [opts]
  */
@@ -138,7 +150,7 @@ export async function runYtDlp(args, opts = {}) {
   const ms = resolveExecTimeoutMs(timeoutMs, DEFAULT_SEARCH_TIMEOUT_MS)
   const cookiesPath = resolveYtDlpCookiesPath()
   logCookieStateOnce(cookiesPath)
-  const fullArgs = cookiesPath ? ['--cookies', cookiesPath, ...args] : args
+  const fullArgs = buildYtDlpInvocationArgs(args, cookiesPath)
   try {
     return await execFileAsync(bin, fullArgs, {
       ...rest,

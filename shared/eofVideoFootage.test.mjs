@@ -10,6 +10,19 @@ import {
   EOF_VIDEO_MAX_FILE_BYTES,
 } from './eofVideoFootage.mjs'
 import { resolveEofVideoMomentDecision } from '../backend/api/lib/eofVideoQualityGate.mjs'
+import { buildYtDlpInvocationArgs } from '../backend/api/lib/eofYtDlp.mjs'
+
+describe('buildYtDlpInvocationArgs', () => {
+  it('enables the Node challenge solver and preserves cookie authentication', () => {
+    assert.deepEqual(buildYtDlpInvocationArgs(['https://youtube.test/video'], '/tmp/cookies.txt'), [
+      '--js-runtimes',
+      'node',
+      '--cookies',
+      '/tmp/cookies.txt',
+      'https://youtube.test/video',
+    ])
+  })
+})
 
 describe('extractEofSceneMomentKeywords', () => {
   it('pulls distinctive non-stopword keywords from a caption', () => {
