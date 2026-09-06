@@ -1,33 +1,37 @@
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 
 # Install ffmpeg, ca-certificates, and the yt-dlp standalone binary (video-footage pipeline).
 # yt-dlp only ever runs here (Railway worker) — never on Vercel.
-# Debian's mirror network occasionally resets connections mid-fetch on Railway's build
-# infra; retry apt itself (Acquire::Retries) and retry the whole install a few times so a
-# single flaky package fetch doesn't fail the entire image build.
+# Refresh package metadata on every retry. Bullseye's security repository started
+# returning 404s for superseded ffmpeg dependencies, and retrying install against
+# the same stale package lists could never recover.
 #
 # IMPORTANT: fetch `yt-dlp_linux`, NOT the bare `yt-dlp` release asset. The bare asset is a
 # ~3MB Python zipapp that requires a `python3` interpreter on PATH to run at all -- this
-# base image (node:20-bullseye-slim) has no Python3, so that binary downloads and chmods
+# slim Node base image has no Python3, so that binary downloads and chmods
 # fine but fails every single invocation at runtime with "python3: not found", which
 # isYtDlpAvailable() correctly reports as unavailable. `yt-dlp_linux` is a self-contained
 # PyInstaller build (~20MB) with zero external interpreter dependency.
 #
 # The trailing `--version`/`-version` checks make a broken binary fail the BUILD itself,
 # instead of shipping silently and only surfacing as a boot-time log line nobody watches.
-RUN apt-get update \
-  && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-       ffmpeg ca-certificates curl \
-  || apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-       ffmpeg ca-certificates curl \
-  || (apt-get update && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
-       ffmpeg ca-certificates curl) \
-  && curl --retry 5 --retry-connrefused -L \
+RUN set -eux; \
+  for attempt in 1 2 3; do \
+    rm -rf /var/lib/apt/lists/*; \
+    apt-get update; \
+    if apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 install -y --no-install-recommends \
+         ffmpeg ca-certificates curl; then \
+      break; \
+    fi; \
+    if [ "$attempt" -eq 3 ]; then exit 1; fi; \
+    sleep 5; \
+  done; \
+  curl --fail --show-error --retry 5 --retry-connrefused -L \
        https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
-  && chmod a+rx /usr/local/bin/yt-dlp \
-  && rm -rf /var/lib/apt/lists/* \
-  && /usr/local/bin/yt-dlp --version \
-  && ffmpeg -version >/dev/null
+  && chmod a+rx /usr/local/bin/yt-dlp; \
+  rm -rf /var/lib/apt/lists/*; \
+  /usr/local/bin/yt-dlp --version; \
+  ffmpeg -version >/dev/null
 
 WORKDIR /app
 
