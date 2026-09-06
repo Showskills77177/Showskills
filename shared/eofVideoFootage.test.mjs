@@ -6,6 +6,8 @@ import {
   assessEofVideoCopyrightRisk,
   rankEofVideoCandidates,
   assessEofVideoTechnicalGate,
+  assessEofVideoRelevance,
+  scoreEofVideoAspect,
   resolveEofVideoClipWindow,
   EOF_VIDEO_MAX_FILE_BYTES,
 } from './eofVideoFootage.mjs'
@@ -47,6 +49,7 @@ describe('buildEofVideoSearchQueries', () => {
     })
     assert.ok(queries.length > 0)
     assert.ok(queries[0].toLowerCase().includes('cucurella'))
+    assert.ok(queries[0].includes('"Marc Cucurella"'))
     assert.equal(new Set(queries).size, queries.length)
   })
 
@@ -80,13 +83,102 @@ describe('rankEofVideoCandidates', () => {
   it('ranks low-risk, subject-matching, short clips above risky ones', () => {
     const ranked = rankEofVideoCandidates(
       [
-        { id: 'a', title: 'Official Full Match Highlights 2024', channel: 'Premier League', duration: 95 * 60 },
+        { id: 'a', title: 'Cucurella Official Full Match Highlights 2024', channel: 'Premier League', duration: 95 * 60 },
         { id: 'b', title: 'Cucurella classic training footage', channel: 'Archive', duration: 90 },
       ],
       { subject: 'Cucurella' },
     )
     assert.equal(ranked[0].id, 'b')
     assert.equal(ranked[1].id, 'a')
+  })
+
+  it('rejects unrelated search results instead of trusting YouTube result order', () => {
+    const ranked = rankEofVideoCandidates(
+      [
+        { id: 'wrong', title: 'Manchester City best transfers', channel: 'Football Daily', duration: 90 },
+        { id: 'right', title: 'Sir Alex Ferguson rare Manchester United interview', channel: 'Archive', duration: 90 },
+      ],
+      {
+        subject: 'Sir Alex Ferguson',
+        sceneCaption: 'Fourteen transfer windows after Sir Alex walked out.',
+      },
+    )
+    assert.deepEqual(ranked.map((candidate) => candidate.id), ['right'])
+  })
+
+  it('prefers vertical, portrait and square sources over wide footage when relevance is equal', () => {
+    const base = {
+      title: 'Marc Cucurella Chelsea training footage',
+      channel: 'Football Archive',
+      duration: 60,
+    }
+    const ranked = rankEofVideoCandidates(
+      [
+        { ...base, id: 'wide', width: 1920, height: 1080 },
+        { ...base, id: 'square', width: 1080, height: 1080 },
+        { ...base, id: 'portrait', width: 1080, height: 1440 },
+        { ...base, id: 'vertical', width: 1080, height: 1920 },
+      ],
+      { subject: 'Marc Cucurella', sceneCaption: 'Cucurella training at Chelsea' },
+    )
+    assert.deepEqual(ranked.map((candidate) => candidate.id), [
+      'vertical',
+      'portrait',
+      'square',
+      'wide',
+    ])
+  })
+
+  it('keeps a stronger scene match ahead of a merely vertical source', () => {
+    const ranked = rankEofVideoCandidates(
+      [
+        {
+          id: 'vertical-generic',
+          title: 'Marc Cucurella career footage',
+          channel: 'Archive',
+          duration: 60,
+          width: 1080,
+          height: 1920,
+        },
+        {
+          id: 'wide-specific',
+          title: 'Marc Cucurella Chelsea training session',
+          channel: 'Archive',
+          duration: 60,
+          width: 1920,
+          height: 1080,
+        },
+      ],
+      { subject: 'Marc Cucurella', sceneCaption: 'Cucurella at a Chelsea training session' },
+    )
+    assert.equal(ranked[0].id, 'wide-specific')
+  })
+})
+
+describe('assessEofVideoRelevance', () => {
+  it('requires a named subject in candidate metadata', () => {
+    assert.equal(
+      assessEofVideoRelevance(
+        { title: 'Manchester United transfer debate', channel: 'Football Daily' },
+        { subject: 'Sir Alex Ferguson' },
+      ).pass,
+      false,
+    )
+    assert.equal(
+      assessEofVideoRelevance(
+        { title: 'Sir Alex Ferguson discusses Manchester United', channel: 'Archive' },
+        { subject: 'Sir Alex Ferguson' },
+      ).pass,
+      true,
+    )
+  })
+})
+
+describe('scoreEofVideoAspect', () => {
+  it('orders TikTok-friendly source shapes ahead of wide video', () => {
+    assert.ok(scoreEofVideoAspect(1080, 1920).score > scoreEofVideoAspect(1080, 1440).score)
+    assert.ok(scoreEofVideoAspect(1080, 1440).score > scoreEofVideoAspect(1080, 1080).score)
+    assert.ok(scoreEofVideoAspect(1080, 1080).score > scoreEofVideoAspect(1920, 1080).score)
   })
 })
 

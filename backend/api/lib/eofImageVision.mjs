@@ -308,17 +308,8 @@ export function applyVisionScoresToHits(hits, visionScores, opts = {}) {
 }
 
 /**
- * Vision re-rank with a subject-name-cue fallback so a named-subject pool is never wiped to
- * empty (→ "No real scene images" fail) when vision rejects every still.
- *
- * Cucurella-specific failure: Google Images returns CDN thumbnails with EMPTY titles for
- * `"Marc Cucurella" Chelsea hair`. Grok vision often can't confirm the face on tiny thumbs and
- * scores them below MIN, so `applyVisionScoresToHits` drops all of them. Tuchel pools have real
- * titles ("Thomas Tuchel …") that pass, which is why Tuchel rebuilt and Cucurella did not.
- *
- * When the ranked pool comes back empty for a named subject, fall back to the name-cue filter —
- * it keeps empty-title hits when the Serp query already named the person. Better a query-named
- * still than a hard build failure.
+ * Vision re-rank with a strict subject-name fallback only when vision produced
+ * no evaluation. Completed low-score evaluations remain rejected.
  *
  * @param {Array<{ url: string, title?: string|null, source?: string, localPath?: string }>} hits
  * @param {string} subject
@@ -326,10 +317,17 @@ export function applyVisionScoresToHits(hits, visionScores, opts = {}) {
  * @param {{ query?: string }} [opts]
  */
 export function applyVisionScoresWithNameCueFallback(hits, subject, visionScores, opts = {}) {
-  const ranked = applyVisionScoresToHits(hits, visionScores)
+  const hasVisionScores = visionScores instanceof Map && visionScores.size > 0
+  const ranked = hasVisionScores ? applyVisionScoresToHits(hits, visionScores) : []
   if (ranked.length) return ranked
   if (!Array.isArray(hits) || !hits.length) return ranked
   if (!isNamedFootballSubject(subject)) return ranked
+  if (
+    hasVisionScores &&
+    [...visionScores.values()].some((score) => Number.isFinite(Number(score)))
+  ) {
+    return ranked
+  }
   const fallback = filterHitsRequiringSubjectNameCue(hits, subject, {
     query: opts.query || '',
     log: false,
@@ -342,11 +340,5 @@ export function applyVisionScoresWithNameCueFallback(hits, subject, visionScores
       String(subject).slice(0, 40),
     )
   }
-  // Strip low visionScore so claimOxylabsPoolHit does not hard-reject the same stills
-  // the fallback just rescued (empty-title Cucurella CDN thumbs score 2–3 on tiny thumbs).
-  return fallback.map((h) => {
-    if (!h || typeof h !== 'object' || h.visionScore == null) return h
-    const { visionScore: _drop, ...rest } = h
-    return rest
-  })
+  return fallback
 }

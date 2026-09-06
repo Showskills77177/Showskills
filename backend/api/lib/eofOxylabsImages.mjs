@@ -176,7 +176,7 @@ export function buildOxylabsJobQuery(topic, attempt = 0, context = {}) {
 function pickUrlFromOrganicItem(item) {
   if (!item || typeof item !== 'object') return null
   // Prefer full-size when Oxylabs provides it (common key: high_res_image).
-  const candidates = [
+  const fullSizeCandidates = [
     item.high_res_image,
     item.highResImage,
     item.original,
@@ -189,14 +189,19 @@ function pickUrlFromOrganicItem(item) {
     item.src,
     item.url,
     item.image,
-    item.thumbnail,
-    item.thumb,
-  ]
+  ].filter(isHttpUrl)
+  const candidates = [...fullSizeCandidates, item.thumbnail, item.thumb]
   let best = null
   let bestScore = -Infinity
   for (const raw of candidates) {
     if (!isHttpUrl(raw)) continue
     const url = String(raw).trim()
+    if (
+      !fullSizeCandidates.length &&
+      /encrypted-tbn\d*\.gstatic\.com/i.test(url)
+    ) {
+      continue
+    }
     const w = Number(item.width || item.img_width || item.image_width || 0) || 0
     const h = Number(item.height || item.img_height || item.image_height || 0) || 0
     const score = scoreImageCandidate(url, w, h)
@@ -717,22 +722,15 @@ export function scoreOxylabsHitForScene(hit, scene = {}) {
   const src = String(hit?.source || '')
   const isGen = src === 'grok-imagine' || src === 'free-gen'
   const vision = Number(hit?.visionScore)
-  const poolQuery = String(scene.jobQuery || scene.poolQuery || scene.query || '').trim()
-  // Google Images often returns CDN URLs with empty titles; if the Serp query already
-  // named the person (`"Marc Cucurella" Chelsea hair`), keep those hits claimable.
-  const queryNamesSubject = Boolean(poolQuery) && hitMentionsSubject(subject, poolQuery, '')
-  const emptyTitleQueryOk = queryNamesSubject && !title && Boolean(url)
 
   // Named subject (Rooney / Tuchel / …): title/URL must name them, OR vision already verified.
   if (isNamedFootballSubject(subject) && !isGen) {
     const visionOk = Number.isFinite(vision) && vision >= MIN_EOF_VISION_SCORE
-    if (!visionOk && !hitMentionsSubject(subject, title, url) && !emptyTitleQueryOk) {
+    if (!visionOk && !hitMentionsSubject(subject, title, url)) {
       return -500
     }
     // Vision already rejected this face — never claim.
-    // Exception: empty-title CDN thumbs kept by name-cue fallback often carry a low
-    // visionScore (Grok fails on tiny Serp thumbs). emptyTitleQueryOk must still claim.
-    if (Number.isFinite(vision) && vision < MIN_EOF_VISION_SCORE && !emptyTitleQueryOk) {
+    if (Number.isFinite(vision) && vision < MIN_EOF_VISION_SCORE) {
       return -500
     }
   }
@@ -804,7 +802,6 @@ export function claimOxylabsPoolHit(opts = {}) {
   const subject =
     resolveImageSubject(scene.subject || scene.topic, scene.plainTextDraft || '') ||
     String(scene.subject || '').trim()
-  const queryNamesSubject = Boolean(poolQuery) && hitMentionsSubject(subject, poolQuery, '')
   const ranked = hits
     .map((hit, i) => {
       const hitSource = String(hit?.source || '').trim()
@@ -812,13 +809,10 @@ export function claimOxylabsPoolHit(opts = {}) {
         hitSource === 'grok-imagine' || hitSource === 'free-gen' ? hitSource : prefix
       const identity = String(hit?.localPath || hit?.url || '').trim()
       const score = scoreOxylabsHitForScene(hit, scene)
-      const emptyTitleQueryOk =
-        queryNamesSubject && !String(hit?.title || '').trim() && Boolean(identity)
       if (
         score <= -400 &&
         isNamedFootballSubject(subject) &&
-        !hitMentionsSubject(subject, hit?.title || '', identity) &&
-        !emptyTitleQueryOk
+        !hitMentionsSubject(subject, hit?.title || '', identity)
       ) {
         console.info(
           '[eof-images] reject claim candidate',
@@ -849,8 +843,7 @@ export function claimOxylabsPoolHit(opts = {}) {
     if (hitSource === 'grok-imagine' || hitSource === 'free-gen') return true
     if (!isNamedFootballSubject(subject)) return true
     if (hitMentionsSubject(subject, title || '', url || '')) return true
-    // Empty-title Serp CDN row kept because the job query named the person.
-    return queryNamesSubject && !String(title || '').trim() && Boolean(url)
+    return false
   }
   let fallback = null
   for (const row of usable) {

@@ -43,5 +43,13 @@ export async function searchEofVideoCandidates({
   }
 
   const candidates = Array.from(byId.values())
-  return rankEofVideoCandidates(candidates, { subject })
+  const ranked = rankEofVideoCandidates(candidates, { subject, sceneCaption, topic })
+  console.info(
+    '[eof-video-footage] candidates',
+    `${ranked.length}/${candidates.length} relevant`,
+    ranked.slice(0, 3).map((candidate) =>
+      `${candidate.id}:${candidate.rankScore}:${candidate.orientation || 'unknown'}`,
+    ).join(', '),
+  )
+  return ranked
 }

@@ -20,7 +20,7 @@ import {
   getEofPinterestAccessToken,
 } from './eofPinterestImages.mjs'
 import { isEofGoogleCseConfigured, searchGoogleCseImages } from './eofGoogleImages.mjs'
-import { searchWikimediaCommonsImages, listWikimediaPersonImages } from './eofWikimediaImages.mjs'
+import { searchWikimediaCommonsImages } from './eofWikimediaImages.mjs'
 import {
   isEofApImagesConfigured,
   searchApMediaPicture,
@@ -370,10 +370,6 @@ async function fetchEofSceneImageInner({
     const activePoolQuery = useSecondary
       ? String(oxyPool.secondaryQuery || poolQuery).trim()
       : poolQuery
-    const queryNamesSubject =
-      Boolean(activePoolQuery) &&
-      isNamedFootballSubject(activeSubject) &&
-      hitMentionsSubject(activeSubject, activePoolQuery, '')
     const maxDownloadTries = 5
     for (let t = 0; t < maxDownloadTries; t += 1) {
       const claimed = claimOxylabsPoolHit({
@@ -391,12 +387,12 @@ async function fetchEofSceneImageInner({
         jobQuery: activePoolQuery,
       })
       if (!claimed) break
-      const titleBlank = !String(claimed.title || '').trim()
-      const subjectCue =
-        hitMentionsSubject(activeSubject, claimed.title || '', claimed.imgUrl || '') ||
-        (queryNamesSubject && titleBlank)
+      const subjectCue = hitMentionsSubject(
+        activeSubject,
+        claimed.title || '',
+        claimed.imgUrl || '',
+      )
       // Named subject: refuse stills that never mention them (titles lie less often than pixels, but still a gate).
-      // Exception: empty-title Serp CDN URLs when the job query already named the person.
       if (
         isNamedFootballSubject(activeSubject) &&
         claimed.hitSource !== 'grok-imagine' &&
@@ -461,10 +457,6 @@ async function fetchEofSceneImageInner({
     }
     // Secondary pool empty/failed → fall back to lead pool once (still must match lead subject).
     if (useSecondary && Array.isArray(oxyPool.hits)) {
-      const leadQueryNames =
-        Boolean(poolQuery) &&
-        isNamedFootballSubject(leadPoolSubject) &&
-        hitMentionsSubject(leadPoolSubject, poolQuery, '')
       for (let t = 0; t < 3; t += 1) {
         const claimed = claimOxylabsPoolHit({
           hits: oxyPool.hits,
@@ -481,10 +473,11 @@ async function fetchEofSceneImageInner({
           jobQuery: poolQuery,
         })
         if (!claimed) break
-        const titleBlank = !String(claimed.title || '').trim()
-        const leadCue =
-          hitMentionsSubject(leadPoolSubject, claimed.title || '', claimed.imgUrl || '') ||
-          (leadQueryNames && titleBlank)
+        const leadCue = hitMentionsSubject(
+          leadPoolSubject,
+          claimed.title || '',
+          claimed.imgUrl || '',
+        )
         if (
           isNamedFootballSubject(leadPoolSubject) &&
           claimed.hitSource !== 'grok-imagine' &&

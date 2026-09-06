@@ -4,6 +4,10 @@
  * yt-dlp / ffmpeg / vision calls live in backend/api/lib/eofVideo*.mjs and
  * call into these pure helpers so the decision logic stays unit-testable.
  */
+import {
+  hitMentionsSubject,
+  isNamedFootballSubject,
+} from './eofSceneImageQueries.mjs'
 
 /** Hard cap on downloaded file size — reject/handle-carefully above this. */
 export const EOF_VIDEO_MAX_FILE_BYTES = 100 * 1024 * 1024 // 100MB
@@ -76,12 +80,72 @@ const OFFICIAL_CHANNEL_KEYWORDS = [
 const RECENT_YEAR_KEYWORDS = ['2023', '2024', '2025', '2026']
 
 function normalize(s) {
-  return String(s || '').toLowerCase().trim()
+  return String(s || '')
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim()
 }
 
 function containsAny(haystack, needles) {
   const h = normalize(haystack)
   return needles.some((n) => h.includes(n))
+}
+
+/**
+ * Score how naturally a source frame maps into a vertical Short. Metadata can
+ * be absent in YouTube search results, so unknown dimensions stay neutral.
+ * 9:16, 3:4 and square are preferred in that order; wide sources remain
+ * eligible when they are the only relevant footage.
+ */
+export function scoreEofVideoAspect(width, height) {
+  const w = Number(width) || 0
+  const h = Number(height) || 0
+  if (!(w > 0 && h > 0)) return { score: 0, orientation: 'unknown', aspect: null }
+  const aspect = w / h
+  if (aspect <= 0.64) return { score: 6, orientation: 'vertical-9:16', aspect }
+  if (aspect <= 0.84) return { score: 5, orientation: 'portrait-3:4', aspect }
+  if (aspect <= 1.08) return { score: 3, orientation: 'square', aspect }
+  if (aspect <= 1.45) return { score: 0, orientation: 'landscape', aspect }
+  return { score: -3, orientation: 'wide', aspect }
+}
+
+/**
+ * Require a clear subject cue and reward metadata that also matches the
+ * narrated beat. Search rank alone is not evidence that a result is relevant.
+ */
+export function assessEofVideoRelevance(candidate, opts = {}) {
+  const subject = String(opts.subject || '').trim()
+  const title = String(candidate?.title || '')
+  const channel = String(candidate?.channel || candidate?.uploader || '')
+  const url = String(candidate?.webpage_url || '')
+  const hay = `${title} ${channel} ${url}`
+  const reasons = []
+  let score = 0
+
+  if (subject) {
+    const subjectMatched = hitMentionsSubject(subject, title, `${channel} ${url}`)
+    if (isNamedFootballSubject(subject) && !subjectMatched) {
+      return { pass: false, score: -100, reasons: ['title/channel does not name the subject'] }
+    }
+    if (subjectMatched) score += 8
+    else {
+      const subjectTokens = normalize(subject)
+        .split(/[^a-z0-9]+/)
+        .filter((token) => token.length >= 4)
+      const matched = subjectTokens.filter((token) => normalize(hay).includes(token))
+      if (subjectTokens.length && !matched.length) {
+        return { pass: false, score: -100, reasons: ['metadata has no subject cue'] }
+      }
+      if (matched.length) score += Math.min(6, matched.length * 2)
+    }
+  }
+
+  const momentWords = extractEofSceneMomentKeywords(opts.sceneCaption || '', 6)
+  const momentMatches = momentWords.filter((word) => normalize(hay).includes(word))
+  score += Math.min(6, momentMatches.length * 2)
+  if (momentMatches.length) reasons.push(`matches scene: ${momentMatches.join(', ')}`)
+  return { pass: true, score, reasons }
 }
 
 /**
@@ -124,22 +188,23 @@ export function extractEofSceneMomentKeywords(caption, maxWords = 6) {
 export function buildEofVideoSearchQueries({ subject, sceneCaption = '', topic = '' } = {}) {
   const who = String(subject || topic || '').trim()
   if (!who) return []
+  const quotedWho = /\s/.test(who) ? `"${who.replaceAll('"', '')}"` : who
   const momentWords = extractEofSceneMomentKeywords(sceneCaption, 5)
   const queries = []
 
   // 1. Exact-moment attempt: subject + distinctive scene keywords.
   if (momentWords.length >= 2) {
-    queries.push(`${who} ${momentWords.join(' ')}`.trim())
+    queries.push(`${quotedWho} ${momentWords.join(' ')}`.trim())
   }
   // 2. Subject + moment keywords + safety bias.
   if (momentWords.length >= 1) {
-    queries.push(`${who} ${momentWords.slice(0, 3).join(' ')} footage`.trim())
+    queries.push(`${quotedWho} ${momentWords.slice(0, 3).join(' ')} football footage`.trim())
   }
   // 3. Subject + classic/career framing — good general b-roll, lower risk.
-  queries.push(`${who} classic footage compilation`)
-  queries.push(`${who} career highlights old`)
+  queries.push(`${quotedWho} classic football footage compilation`)
+  queries.push(`${quotedWho} career highlights old`)
   // 4. Training / non-match footage — usually lower production value = lower risk.
-  queries.push(`${who} training session`)
+  queries.push(`${quotedWho} football training session`)
 
   return queries.filter(Boolean).filter((q, i, arr) => arr.indexOf(q) === i).slice(0, 5)
 }
@@ -193,20 +258,34 @@ export function assessEofVideoCopyrightRisk(meta = {}) {
  * @param {{ subject?: string }} [opts]
  */
 export function rankEofVideoCandidates(candidates, opts = {}) {
-  const subject = normalize(opts.subject || '')
-  const scored = (Array.isArray(candidates) ? candidates : []).map((c) => {
+  const scored = (Array.isArray(candidates) ? candidates : []).flatMap((c) => {
+    const relevance = assessEofVideoRelevance(c, opts)
+    if (!relevance.pass) return []
     const { risk, riskPoints, reasons } = assessEofVideoCopyrightRisk(c)
     const duration = Number(c.duration) || 0
-    let score = 10 - riskPoints
-    const title = normalize(c.title)
-    const channel = normalize(c.channel || c.uploader)
-    if (subject && (title.includes(subject) || channel.includes(subject))) score += 2
+    const aspect = scoreEofVideoAspect(c.width, c.height)
+    let score = 10 - riskPoints + relevance.score
     if (duration > 0 && duration < 5 * 60) score += 1 // short clips are easier/safer
     if (duration > EOF_VIDEO_MAX_SOURCE_DURATION_SEC) score -= 4
     if (duration > 0 && duration < EOF_VIDEO_MIN_SOURCE_DURATION_SEC) score -= 4
-    return { ...c, risk, riskPoints, riskReasons: reasons, rankScore: score }
+    return [{
+      ...c,
+      risk,
+      riskPoints,
+      riskReasons: reasons,
+      relevanceScore: relevance.score,
+      relevanceReasons: relevance.reasons,
+      orientation: aspect.orientation,
+      aspectRatio: aspect.aspect,
+      aspectScore: aspect.score,
+      rankScore: score,
+    }]
   })
-  return scored.sort((a, b) => b.rankScore - a.rankScore)
+  return scored.sort(
+    (a, b) =>
+      b.rankScore - a.rankScore ||
+      b.aspectScore - a.aspectScore,
+  )
 }
 
 /**
