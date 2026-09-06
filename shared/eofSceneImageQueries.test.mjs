@@ -340,11 +340,27 @@ describe('eofSceneImageQueries', () => {
       sceneIndex: 0,
       captions: [topic],
     })
+
     assert.match(queries[0], /Sir Alex Ferguson/i)
     assert.ok(
       queries.every((query) => /Sir Alex Ferguson/i.test(query)),
       `a query omitted Ferguson's full name: ${JSON.stringify(queries)}`,
     )
+  })
+
+  it('uses the draft headline when the stored job topic is only Windows', () => {
+    const topic = 'Windows'
+    const plainTextDraft =
+      'Fourteen transfer windows after Sir Alex walked out the door. Fourteen. City just had the better window again.'
+    assert.equal(resolveImageSubject(topic, plainTextDraft), 'Sir Alex Ferguson')
+
+    const queries = buildSceneImageSearchQueries({
+      topic,
+      plainTextDraft,
+      captions: [plainTextDraft],
+    })
+    assert.ok(queries.every((query) => /Sir Alex Ferguson/i.test(query)), JSON.stringify(queries))
+    assert.ok(queries.every((query) => !/^Windows\b/i.test(query)), JSON.stringify(queries))
   })
 
   it('finds a caption-named secondary subject with personMentionedInText (Antonio job, Ferguson contrast)', () => {
