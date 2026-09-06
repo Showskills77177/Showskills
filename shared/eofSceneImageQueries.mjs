@@ -75,7 +75,7 @@ const COMP_NOISE_RE =
 
 /** Well-known managers/coaches — avoid “football player” image queries. */
 const KNOWN_COACH_RE =
-  /\b(tuchel|guardiola|klopp|mourinho|ancelotti|arteta|slot|postecoglou|ten\s*hag|conte|sarri|flick|nagelsmann|spalletti|deschamps|scaloni|southgate|xabi\s*alonso|alonso|de\s*zerbi|emery|roger[s]?|kompany|inzaghi|pirez|pirlo|lampard|gerrard|neville|ferguson|wenger|moyes|benitez|redknapp|ranieri|allardyce|hodgson|dyche|maresca|amorim|iraola)\b/i
+  /\b(tuchel|guardiola|klopp|mourinho|ancelotti|arteta|slot|postecoglou|ten\s*hag|conte|sarri|flick|nagelsmann|spalletti|deschamps|scaloni|southgate|xabi\s*alonso|alonso|de\s*zerbi|emery|roger[s]?|kompany|inzaghi|pirez|pirlo|lampard|gerrard|neville|sir\s+alex|ferguson|wenger|moyes|benitez|redknapp|ranieri|allardyce|hodgson|dyche|maresca|amorim|iraola)\b/i
 
 const COACH_ROLE_RE = /\b(manager|coach|gaffer|boss|head\s*coach)\b/i
 
@@ -159,6 +159,7 @@ const PLAYER_FULL_NAMES = [
   [/^ancelotti$/i, 'Carlo Ancelotti'],
   [/^nagelsmann$/i, 'Julian Nagelsmann'],
   [/^southgate$/i, 'Gareth Southgate'],
+  [/^sir\s+alex$/i, 'Sir Alex Ferguson'],
   [/^ferguson$/i, 'Sir Alex Ferguson'],
   [/^conte$/i, 'Antonio Conte'],
   [/^wenger$/i, 'Arsene Wenger'],
@@ -196,6 +197,8 @@ const COMP_WORD_RE =
 function expandEntityFullName(entity) {
   const e = String(entity || '').trim()
   if (!e) return ''
+  const direct = expandPlayerFullName(e)
+  if (direct) return direct
   for (const w of e.split(/\s+/)) {
     const full = expandPlayerFullName(w)
     if (full) return full
@@ -938,7 +941,22 @@ export function buildSceneImageSearchQueries({
   const name = String(topic || '').trim()
   const custom = String(imageQuery || '').trim()
   const entities = primaryImageEntities(name, custom)
-  const core = entities.slice(0, 2).join(' ') || extractTopicImageTokens(name).slice(0, 2).join(' ') || name || 'football'
+  const fallbackCore =
+    entities.slice(0, 2).join(' ') ||
+    extractTopicImageTokens(name).slice(0, 2).join(' ') ||
+    name ||
+    'football'
+  const rawLead = entities[0] || fallbackCore
+  const fullName = expandEntityFullName(rawLead)
+  // Once a known person is resolved, never glue headline counters/actions onto
+  // their search key ("Sir Alex Fourteen", "Rooney slammed"). Those words are
+  // story context, not part of the person's identity.
+  const lead = fullName || rawLead
+  const core = fullName || fallbackCore
+  const normalizedCustom =
+    fullName && custom && rawLead.includes(' ') && !custom.toLowerCase().includes(fullName.toLowerCase())
+      ? custom.replace(new RegExp(`\\b${escapeRe(rawLead)}\\b`, 'i'), fullName)
+      : custom
   const year = new Date().getFullYear()
   // A secondary manager named only as a contrast ("Antonio vs a manager like
   // Moyes") must not hijack an unrecognized/player subject's own search intent
@@ -961,16 +979,13 @@ export function buildSceneImageSearchQueries({
   const angles = anglesForIntent(intent)
   const angle = angles[sceneIndex % angles.length](core)
   const roleTag = coach ? 'manager' : pundit ? 'pundit' : 'football'
-  const lead = entities[0] || core
-
-  /** Expand mononyms that stock APIs understand better as full names. */
-  const fullName = expandPlayerFullName(lead)
   const person = fullName || lead
 
   const queries = [
     // Prefer the scene’s own imageQuery when it already names the person/club
-    custom && entities.some((e) => new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(custom))
-      ? custom
+    normalizedCustom &&
+    entities.some((e) => new RegExp(e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(normalizedCustom))
+      ? normalizedCustom
       : '',
     pundit ? `"${person}" pundit` : '',
     pundit ? `"${person}" TV studio ${year}` : '',
@@ -987,9 +1002,9 @@ export function buildSceneImageSearchQueries({
       : pundit
         ? `${person} studio suit`
         : `${lead} celebrating football`,
-    name && !COMP_NOISE_RE.test(name) ? `${name} ${roleTag}` : '',
+    fullName ? `${person} ${roleTag}` : name && !COMP_NOISE_RE.test(name) ? `${name} ${roleTag}` : '',
     !pundit && /world\s*cup/i.test(`${name} ${custom}`) ? `${fullName || lead} World Cup football` : '',
-    custom,
+    normalizedCustom,
   ]
 
   return [...new Set(queries.map((q) => q.trim()).filter((q) => q.length > 2))]
