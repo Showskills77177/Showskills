@@ -12,6 +12,7 @@ import {
   EOF_VIDEO_MAX_FILE_BYTES,
 } from './eofVideoFootage.mjs'
 import { resolveEofVideoMomentDecision } from '../backend/api/lib/eofVideoQualityGate.mjs'
+import { resolveEofVideoFrameVisionDecision } from '../backend/api/lib/eofVideoFrameMatch.mjs'
 import { buildYtDlpInvocationArgs } from '../backend/api/lib/eofYtDlp.mjs'
 
 describe('buildYtDlpInvocationArgs', () => {
@@ -236,15 +237,101 @@ describe('resolveEofVideoClipWindow', () => {
 })
 
 describe('resolveEofVideoMomentDecision', () => {
-  it('allows a technically safe clip to use its midpoint when optional vision is not configured', () => {
+  it('allows a metadata-selected clip to use its midpoint when vision is not configured', () => {
     assert.deepEqual(
       resolveEofVideoMomentDecision({ visionConfigured: false }),
       {
         pass: true,
-        reason: 'vision matching not configured; using source midpoint',
+        reason: 'vision matching not configured; using metadata-selected source midpoint',
         bestTimestampSec: null,
       },
     )
+  })
+
+  describe('resolveEofVideoFrameVisionDecision', () => {
+    const frames = [
+      { timestampSec: 10 },
+      { timestampSec: 20 },
+    ]
+
+    it('accepts a frame only when both the subject and narrated scene match', () => {
+      const result = resolveEofVideoFrameVisionDecision({
+        subject: 'Sir Alex Ferguson',
+        frames,
+        parsed: {
+          best_index: 2,
+          score: 9,
+          person: 'Sir Alex Ferguson',
+          subject_visible: true,
+          scene_match: true,
+          reason: 'Ferguson on the touchline',
+        },
+      })
+      assert.equal(result.score, 9)
+      assert.equal(result.bestTimestampSec, 20)
+    })
+
+    it('rejects a high-scoring frame of the wrong person', () => {
+      const result = resolveEofVideoFrameVisionDecision({
+        subject: 'Sir Alex Ferguson',
+        frames,
+        parsed: {
+          best_index: 1,
+          score: 9,
+          person: 'Pep Guardiola',
+          subject_visible: true,
+          scene_match: true,
+          reason: 'football manager',
+        },
+      })
+      assert.ok(result.score <= 1)
+      assert.match(result.reason, /wrong person/i)
+    })
+
+    it('rejects a generic frame that does not depict the narration', () => {
+      const result = resolveEofVideoFrameVisionDecision({
+        subject: 'Sir Alex Ferguson',
+        frames,
+        parsed: {
+          best_index: 1,
+          score: 8,
+          person: 'Sir Alex Ferguson',
+          subject_visible: true,
+          scene_match: false,
+          reason: 'generic interview',
+        },
+      })
+      assert.ok(result.score <= 3)
+      assert.match(result.reason, /does not match narration/i)
+    })
+
+    it('rejects a malformed frame index instead of falling back to the midpoint', () => {
+      const result = resolveEofVideoFrameVisionDecision({
+        subject: 'Sir Alex Ferguson',
+        frames,
+        parsed: {
+          best_index: 99,
+          score: 9,
+          person: 'Sir Alex Ferguson',
+          subject_visible: true,
+          scene_match: true,
+        },
+      })
+      assert.equal(result.score, 0)
+      assert.equal(result.bestTimestampSec, null)
+      assert.match(result.reason, /best_index/i)
+    })
+
+    it('marks an incomplete vision response as unevaluated', () => {
+      const result = resolveEofVideoFrameVisionDecision({
+        subject: 'Sir Alex Ferguson',
+        frames,
+        parsed: { best_index: 1, score: 9, reason: 'old response shape' },
+      })
+      assert.equal(result.evaluated, false)
+      assert.equal(result.bestTimestampSec, null)
+      assert.match(result.reason, /missing identity/i)
+    })
   })
 
   it('still rejects a clip when configured vision cannot match the narrated moment', () => {
@@ -256,7 +343,7 @@ describe('resolveEofVideoMomentDecision', () => {
     assert.match(decision.reason, /wrong player/)
   })
 
-  it('uses the midpoint when the configured vision provider cannot evaluate the clip', () => {
+  it('rejects a clip when the configured vision provider cannot evaluate it', () => {
     const decision = resolveEofVideoMomentDecision({
       visionConfigured: true,
       moment: {
@@ -266,12 +353,12 @@ describe('resolveEofVideoMomentDecision', () => {
         evaluated: false,
       },
     })
-    assert.equal(decision.pass, true)
+    assert.equal(decision.pass, false)
     assert.equal(decision.bestTimestampSec, null)
     assert.match(decision.reason, /provider request failed/)
   })
 
-  it('uses the midpoint when frame sampling could not produce an evaluation', () => {
+  it('rejects a clip when frame sampling could not produce an evaluation', () => {
     const decision = resolveEofVideoMomentDecision({
       visionConfigured: true,
       moment: {
@@ -281,7 +368,7 @@ describe('resolveEofVideoMomentDecision', () => {
         evaluated: false,
       },
     })
-    assert.equal(decision.pass, true)
+    assert.equal(decision.pass, false)
     assert.equal(decision.bestTimestampSec, null)
   })
 

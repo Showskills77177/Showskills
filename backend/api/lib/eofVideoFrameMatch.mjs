@@ -11,6 +11,7 @@ import path from 'node:path'
 import { runFfmpeg } from './eofFfmpeg.mjs'
 import { getXaiApiKey, isXaiConfigured, xaiModelCandidates } from './eofXaiClient.mjs'
 import { isEofVercelRuntime } from './eofProductionServerless.mjs'
+import { hitMentionsSubject, isNamedFootballSubject } from '../../../shared/eofSceneImageQueries.mjs'
 
 /** Never let frame-matching burn the Vercel isolate's 300s budget — Railway-only in practice. */
 function frameMatchTimeoutMs() {
@@ -69,6 +70,64 @@ function cleanupFrameDir(frames) {
 }
 
 /**
+ * Clamp one vision response so a generic football frame or wrong person can
+ * never pass on the model's numeric score alone.
+ */
+export function resolveEofVideoFrameVisionDecision({ parsed, frames, subject } = {}) {
+  const idx = Number(parsed?.best_index) - 1
+  const frame =
+    Array.isArray(frames) && Number.isInteger(idx) && idx >= 0 && idx < frames.length
+      ? frames[idx]
+      : null
+  if (!frame) {
+    return {
+      bestTimestampSec: null,
+      score: 0,
+      reason: `unusable best_index: ${String(parsed?.best_index ?? 'missing')}`,
+      evaluated: true,
+    }
+  }
+  if (
+    !parsed ||
+    !Object.hasOwn(parsed, 'subject_visible') ||
+    !Object.hasOwn(parsed, 'scene_match') ||
+    !Object.hasOwn(parsed, 'person')
+  ) {
+    return {
+      bestTimestampSec: null,
+      score: 0,
+      reason: 'vision response missing identity or scene fields',
+      evaluated: false,
+    }
+  }
+  let score = Math.max(0, Math.min(10, Number(parsed?.score) || 0))
+  const person = String(parsed?.person || '').trim()
+  const subjectVisible = parsed?.subject_visible === true
+  const sceneMatch = parsed?.scene_match === true
+  const subjectNamed = isNamedFootballSubject(subject)
+  const personMatches = !subjectNamed || hitMentionsSubject(subject, person, '')
+  const rejectionReasons = []
+
+  if (subjectNamed && (!subjectVisible || !personMatches)) {
+    score = Math.min(score, 1)
+    rejectionReasons.push(
+      !subjectVisible ? 'subject not visible' : `wrong person: ${person || 'unknown'}`,
+    )
+  }
+  if (!sceneMatch) {
+    score = Math.min(score, 3)
+    rejectionReasons.push('scene does not match narration')
+  }
+
+  return {
+    bestTimestampSec: frame.timestampSec,
+    score,
+    reason: [...rejectionReasons, String(parsed?.reason || '').trim()].filter(Boolean).join('; '),
+    evaluated: true,
+  }
+}
+
+/**
  * Ask Grok vision which sampled frame best depicts the scene's narration/moment.
  * Frames are local files, so we send base64 data URLs rather than public URLs.
  * @param {Array<{ path: string, timestampSec: number }>} frames
@@ -93,10 +152,14 @@ export async function matchEofVideoFramesToScene(frames, opts = {}) {
 Scene narration this clip must visually match: "${sceneCaption}"
 ${subject ? `Subject: ${subject}` : ''}
 
-Return JSON only: { "best_index": number, "score": number, "reason": string }
+Return JSON only: { "best_index": number, "score": number, "person": string, "subject_visible": boolean, "scene_match": boolean, "reason": string }
 - best_index: 1-based index of the single frame that best matches the described moment.
 - score: 0-10, how well that frame actually depicts the described moment (not just "a football scene").
+- person: the real name of the main visible person, or "unknown".
+- subject_visible: true only when the requested subject is clearly visible in the selected frame.
+- scene_match: true only when the selected frame depicts the narration, not merely the same sport/person.
 - If NONE of the frames plausibly show the described moment, set score <= 3 and best_index to the least-bad frame.
+- If the requested subject is absent or cannot be identified, set subject_visible=false and score <= 2.
 - Be strict: a generic match ("a football scene") is NOT the same as the specific described moment.`,
     },
     ...frames.map((f) => ({
@@ -127,15 +190,7 @@ Return JSON only: { "best_index": number, "score": number, "reason": string }
     }
     const data = await res.json()
     const parsed = parseJsonContent(data?.choices?.[0]?.message?.content)
-    const idx = Number(parsed?.best_index) - 1
-    const score = Math.max(0, Math.min(10, Number(parsed?.score) || 0))
-    const frame = frames[idx]
-    return {
-      bestTimestampSec: frame ? frame.timestampSec : null,
-      score,
-      reason: String(parsed?.reason || ''),
-      evaluated: true,
-    }
+    return resolveEofVideoFrameVisionDecision({ parsed, frames, subject })
   } catch (e) {
     console.warn('[eof-video-frame-match] skipped', e instanceof Error ? e.message : e)
     return none

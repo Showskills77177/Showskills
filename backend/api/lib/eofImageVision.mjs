@@ -150,7 +150,7 @@ export async function rankEofPoolHitsWithVision(opts = {}) {
   const hits = (Array.isArray(opts.hits) ? opts.hits : [])
     .filter((h) => h?.url && /^https?:\/\//i.test(h.url))
     .slice(0, Math.max(4, Math.min(isEofVercelRuntime() ? 4 : 10, Number(opts.maxImages) || 8)))
-  if (hits.length < 2) return scores
+  if (!hits.length) return scores
 
   const subject = String(opts.subject || 'football person').trim()
   const intent = String(opts.intent || 'neutral')
