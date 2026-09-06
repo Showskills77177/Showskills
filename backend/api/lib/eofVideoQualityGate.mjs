@@ -13,17 +13,22 @@ import { findBestEofVideoMoment } from './eofVideoFrameMatch.mjs'
 import { isXaiConfigured } from './eofXaiClient.mjs'
 
 /**
- * Vision matching improves clip selection, but it is an optional refinement.
- * If xAI is unconfigured or cannot evaluate, keep the technical and copyright
- * gates and use the source midpoint rather than rejecting every candidate.
+ * Once vision is configured, relevance must be proven. Provider or frame
+ * sampling failures reject that candidate so another candidate/image can be
+ * tried instead of accepting an arbitrary midpoint.
  */
 export function resolveEofVideoMomentDecision({ visionConfigured, moment } = {}) {
-  if (!visionConfigured || moment?.evaluated === false) {
+  if (!visionConfigured) {
     return {
       pass: true,
-      reason: visionConfigured
-        ? `vision matching unavailable; using source midpoint (${moment?.reason || 'not evaluated'})`
-        : 'vision matching not configured; using source midpoint',
+      reason: 'vision matching not configured; using metadata-selected source midpoint',
+      bestTimestampSec: null,
+    }
+  }
+  if (!moment || moment.evaluated === false) {
+    return {
+      pass: false,
+      reason: `vision matching unavailable: ${moment?.reason || 'not evaluated'}`,
       bestTimestampSec: null,
     }
   }

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { describe, it } from 'node:test'
+import { describe, it, mock } from 'node:test'
 import {
   MIN_EOF_VISION_SCORE,
   clampEofVisionRow,
   applyVisionScoresToHits,
   applyVisionScoresWithNameCueFallback,
+  rankEofPoolHitsWithVision,
 } from '../backend/api/lib/eofImageVision.mjs'
 import {
   hitMentionsSubject,
@@ -151,6 +152,55 @@ describe('eofImageVision clamp + apply', () => {
     )
     assert.equal(ranked[0].source, 'serpapi')
     assert.equal(ranked[1].source, 'grok-imagine')
+  })
+
+  it('visually evaluates a one-image pool instead of skipping it', async () => {
+    const previousKey = process.env.XAI_API_KEY
+    const previousVision = process.env.EOF_IMAGE_VISION
+    const originalFetch = globalThis.fetch
+    process.env.XAI_API_KEY = 'test-key'
+    process.env.EOF_IMAGE_VISION = 'on'
+    globalThis.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                scores: [
+                  {
+                    index: 1,
+                    score: 8,
+                    person: 'Wayne Rooney',
+                    era: 'pundit',
+                    watermark: false,
+                    burned_captions: false,
+                    subject_visible: true,
+                    reason: 'clear studio portrait',
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      }),
+    }))
+    try {
+      const scores = await rankEofPoolHitsWithVision({
+        hits: [{ url: 'https://images.example.com/rooney.jpg', title: 'Wayne Rooney studio' }],
+        subject: 'Wayne Rooney',
+        intent: 'pundit',
+        maxImages: 1,
+      })
+      assert.equal(scores.get('https://images.example.com/rooney.jpg'), 8)
+      assert.equal(globalThis.fetch.mock.callCount(), 1)
+    } finally {
+      globalThis.fetch = originalFetch
+      if (previousKey == null) delete process.env.XAI_API_KEY
+      else process.env.XAI_API_KEY = previousKey
+      if (previousVision == null) delete process.env.EOF_IMAGE_VISION
+      else process.env.EOF_IMAGE_VISION = previousVision
+    }
   })
 })
 

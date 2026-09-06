@@ -965,7 +965,7 @@ export async function collectEofShortQualityVisionChecks(job) {
     })
     .filter(Boolean)
 
-  if (hits.length < 2) {
+  if (!hits.length) {
     checks.push({
       id: 'vision_skipped_no_urls',
       severity: 'skip',
@@ -979,7 +979,7 @@ export async function collectEofShortQualityVisionChecks(job) {
     const scores = await rankEofPoolHitsWithVision({
       hits: hits.map((h) => ({ url: h.url, title: h.title })),
       subject: String(job?.topic || 'football person'),
-      intent: 'quality-gate',
+      intent: 'neutral',
       maxImages: Math.min(8, hits.length),
     })
     if (!scores.size) {
