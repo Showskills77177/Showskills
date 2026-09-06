@@ -329,6 +329,24 @@ describe('eofSceneImageQueries', () => {
     assert.equal(expandPlayerFullName('conte'), 'Antonio Conte')
   })
 
+  it('resolves a Sir Alex transfer-window headline to Ferguson without gluing the count into queries', () => {
+    const topic = 'Fourteen transfer windows after Sir Alex walked out'
+    assert.equal(resolveImageSubject(topic), 'Sir Alex Ferguson')
+    assert.equal(expandPlayerFullName('Sir Alex'), 'Sir Alex Ferguson')
+    assert.equal(topicLooksLikeCoach(topic), true)
+
+    const queries = buildSceneImageSearchQueries({
+      topic,
+      sceneIndex: 0,
+      captions: [topic],
+    })
+    assert.match(queries[0], /Sir Alex Ferguson/i)
+    assert.ok(
+      queries.every((query) => /Sir Alex Ferguson/i.test(query)),
+      `a query omitted Ferguson's full name: ${JSON.stringify(queries)}`,
+    )
+  })
+
   it('finds a caption-named secondary subject with personMentionedInText (Antonio job, Ferguson contrast)', () => {
     // Regression: an Antonio job that contrasts him against Sir Alex Ferguson names
     // Ferguson only as a secondary/contrast figure. The scene whose caption is
