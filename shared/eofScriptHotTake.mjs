@@ -21,9 +21,14 @@ const ARTICLE_GLUE =
 const TIMELY =
   /\b(just|today|tonight|this week|this morning|after|following|last night|hours ago|now|confirmed|hit back|hits back|responded|slammed|cost (us|them|england)|according to)\b/i
 
-/** Tactics/selection AND human-interest stakes (pride, criticism, personal reason, quote verbs). */
+/**
+ * Tactics/selection/result AND human-interest stakes (pride, criticism, personal reason, quote verbs).
+ * Includes result/record-based stakes (record, beaten, conceded, corner, set piece, etc.) so a
+ * factual "record vs current-season contrast" take (e.g. corners record now conceding from them)
+ * isn't wrongly flagged as having no concrete stake.
+ */
 const STAKE =
-  /\b(cost|selection|tactics|dropped|benched|heat|pride|respect|disrespect|win|loss|defeat|final|press|shape|midfield|back[\s-]?line|quote|said|says|saying|claim(?:s|ed)?|row|beef|exchange|criticism|critics?|backlash|mock(?:ed|ing)?|joke(?:s|d)?|digs?|hair|locks|personal|family|son|daughter|autis(?:m|tic)|distraction|hit\s+back|hits\s+back|responded|slammed|pile-?on)\b/i
+  /\b(cost|selection|tactics|dropped|benched|heat|pride|respect|disrespect|win|loss|defeat|final|press|shape|midfield|back[\s-]?line|quote|said|says|saying|claim(?:s|ed)?|row|beef|exchange|criticism|critics?|backlash|mock(?:ed|ing)?|joke(?:s|d)?|digs?|hair|locks|personal|family|son|daughter|autis(?:m|tic)|distraction|hit\s+back|hits\s+back|responded|slammed|pile-?on|result|record|beaten|beat|concede(?:s|d)?|conceding|corner|set[\s-]?piece|capitulat\w*|collapse|collapsed|cooked|thrash(?:ed|ing)?|humiliat\w*|exposed|exposing|table|form)\b/i
 
 /**
  * Local hot-take + timeliness score (0–10).

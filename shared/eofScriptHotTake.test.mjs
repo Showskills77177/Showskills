@@ -40,6 +40,16 @@ describe('eofScriptHotTake', () => {
     assert.ok(v.bite >= 6)
   })
 
+  it('passes a record/result stake without tactics or personal-angle words', () => {
+    const draft = `Arsenal just got cooked 3-0 by Brighton and somehow their biggest problem might be a corner kick. Brighton scored their third from a corner, exposing Arsenal's defending from the exact set piece they've dominated for years. Arsenal scored a Premier League-record 19 goals from corners last season, but this season the Gunners are still waiting for their first one. So Arsenal are getting beaten by corners while not scoring from them. Did the set-piece merchants forget the cheat code, or is this just one bad afternoon?`
+    const v = scoreDraftHotTake(draft, {
+      format: 'debate',
+      topic: 'Arsenal Brighton corners',
+    })
+    assert.ok(v.pass, JSON.stringify(v))
+    assert.ok(v.bite >= 6)
+  })
+
   it('merges hot-take fail into a soft model pass', () => {
     const hot = scoreDraftHotTake(
       `Wayne Rooney transfer talk — that is the football story fans are arguing about right now. Ignore the noise and strip the tribal noise. Who comes out of this looking stronger? Comment.`,
