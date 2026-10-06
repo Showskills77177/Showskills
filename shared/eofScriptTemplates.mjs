@@ -49,6 +49,9 @@ export const EOF_DEFAULT_SCRIPT_FORMAT = 'news'
 export const EOF_MAX_SCENES = 8
 export const EOF_MIN_SCENES = 1
 
+/** Full Video mode (long-form, 10–15+ min) needs far more scenes than a Short. */
+export const EOF_MAX_SCENES_FULL = 90
+
 /**
  * Association football worldwide (call it football — never “soccer” in scripts).
  * Includes World Cup 2026, all confederations, club + international.
@@ -298,8 +301,10 @@ export function buildFactsShortScript(topic, opts = {}) {
  * @param {object} script
  * @param {string} [topicFallback]
  */
-export function normalizeEofScript(script, topicFallback = '') {
+export function normalizeEofScript(script, topicFallback = '', opts = {}) {
   if (!script || typeof script !== 'object') return null
+  const maxScenes = Math.max(1, Number(opts.maxScenes) || EOF_MAX_SCENES)
+  const skipShortsfeedTag = opts.skipShortsfeedTag === true
   const topic = String(script.topic || topicFallback || '').trim() || 'Football'
   const plainTextDraft = String(script.plainTextDraft || script.plain_text_draft || '').trim()
   const scenesIn = Array.isArray(script.scenes) ? script.scenes : []
@@ -331,12 +336,16 @@ export function normalizeEofScript(script, topicFallback = '') {
       })
     })
     .filter(Boolean)
-    .slice(0, EOF_MAX_SCENES)
+    .slice(0, maxScenes)
 
   const tags = Array.isArray(script.tags)
     ? script.tags.map(String).filter((t) => t.toLowerCase() !== 'soccer')
     : tagify(topic)
-  const withShortsfeed = tags.includes('shortsfeed') ? tags : [...tags, 'shortsfeed']
+  const withShortsfeed = skipShortsfeedTag
+    ? tags
+    : tags.includes('shortsfeed')
+      ? tags
+      : [...tags, 'shortsfeed']
   const format = String(script.format || EOF_DEFAULT_SCRIPT_FORMAT)
 
   // Draft-only scripts are valid before "Adapt to scenes"

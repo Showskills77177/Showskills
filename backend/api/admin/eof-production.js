@@ -40,6 +40,9 @@ import {
   EOF_RENDER_STACK,
   EOF_DEFAULT_VOICE_PRESET,
   EOF_DEFAULT_MUSIC_VOLUME,
+  EOF_VIDEO_LENGTH_OPTIONS,
+  EOF_DEFAULT_VIDEO_LENGTH,
+  isEofFullVideoLength,
   listEofFreeVoicePresets,
 } from '../../../shared/eofProduction.mjs'
 import { eofCaptionEngineStatus, listZapcapTemplates } from '../lib/eofZapcapCaptions.mjs'
@@ -263,6 +266,8 @@ export default async function handler(req, res) {
         defaultEnhanceStyle: EOF_DEFAULT_ENHANCE_STYLE,
         overlayMomentsOptions: listEofOverlayMomentsOptions(),
         defaultOverlayMoments: EOF_DEFAULT_OVERLAY_MOMENTS,
+        videoLengthOptions: EOF_VIDEO_LENGTH_OPTIONS,
+        defaultVideoLength: EOF_DEFAULT_VIDEO_LENGTH,
         videoEffectsCatalog: listEofVideoEffects(),
         videoEffectPresets: listEofEffectPresets(),
         videoEffectsMotion: EOF_MOTION_EFFECTS.map(({ id, label, detail, vibe, preview }) => ({
@@ -913,6 +918,25 @@ export default async function handler(req, res) {
         }
       }
 
+      if (action === 'update-video-length') {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : ''
+        if (!jobId) return json(res, 400, { error: 'jobId is required.' })
+        const existing = await getEofProductionJob(jobId)
+        if (!existing) return json(res, 404, { error: 'Job not found.' })
+        const videoLength = isEofFullVideoLength(body.videoLength) ? 'full' : EOF_DEFAULT_VIDEO_LENGTH
+        try {
+          const job = await updateEofProductionJob(jobId, {
+            videoLength,
+            videoFootageMode: videoLength === 'full' ? 'auto' : existing.videoFootageMode,
+          })
+          return json(res, 200, { ok: true, job })
+        } catch (e) {
+          return json(res, 500, {
+            error: e instanceof Error ? e.message : 'Could not update video length',
+          })
+        }
+      }
+
       if (action === 'delete') {
         try {
           await requireEofOwner(req)
@@ -1100,6 +1124,7 @@ export default async function handler(req, res) {
           error: 'Pasted script is too short — paste the full narration (at least a sentence or two).',
         })
       }
+      const videoLength = isEofFullVideoLength(body.videoLength) ? 'full' : EOF_DEFAULT_VIDEO_LENGTH
       try {
         const job = await createEofProductionJob({
           topic,
@@ -1117,6 +1142,7 @@ export default async function handler(req, res) {
           stickers,
           manualDraft,
           videoFootageMode: body.videoFootageMode === 'auto' ? 'auto' : 'off',
+          videoLength,
         })
         return json(res, 201, {
           ok: true,

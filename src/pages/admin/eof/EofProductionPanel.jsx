@@ -9,6 +9,8 @@ import {
   buildFallbackRenderProgress,
   EOF_DEFAULT_VOICE_PRESET,
   EOF_DEFAULT_MUSIC_VOLUME,
+  EOF_DEFAULT_VIDEO_LENGTH,
+  EOF_VIDEO_LENGTH_OPTIONS,
 } from '../../../../shared/eofProduction.mjs'
 import EofMusicSegmentMixer from './EofMusicSegmentMixer'
 import {
@@ -1021,6 +1023,8 @@ export default function EofProductionPanel({
   const [useOwnScript, setUseOwnScript] = useState(false)
   const [useVideoFootage, setUseVideoFootage] = useState(false)
   const [manualDraft, setManualDraft] = useState('')
+  const [videoLength, setVideoLength] = useState(EOF_DEFAULT_VIDEO_LENGTH)
+  const [videoLengthOptions, setVideoLengthOptions] = useState(EOF_VIDEO_LENGTH_OPTIONS)
   const [selectedId, setSelectedId] = useState(readStoredSelectedId)
   const [draftScript, setDraftScript] = useState(null)
   const [draftDirty, setDraftDirty] = useState(false)
@@ -1126,6 +1130,11 @@ export default function EofProductionPanel({
       if (j.defaultTransitionStyle) setTransitionStyle((prev) => prev || j.defaultTransitionStyle)
       setOverlayMomentsOptions(Array.isArray(j.overlayMomentsOptions) ? j.overlayMomentsOptions : [])
       if (j.defaultOverlayMoments) setOverlayMoments((prev) => prev || j.defaultOverlayMoments)
+      setVideoLengthOptions(
+        Array.isArray(j.videoLengthOptions) && j.videoLengthOptions.length
+          ? j.videoLengthOptions
+          : EOF_VIDEO_LENGTH_OPTIONS,
+      )
       setVideoEffectsMotion(Array.isArray(j.videoEffectsMotion) ? j.videoEffectsMotion : [])
       setVideoEffectsLight(Array.isArray(j.videoEffectsLight) ? j.videoEffectsLight : [])
       setVideoEffectsColour(Array.isArray(j.videoEffectsColour) ? j.videoEffectsColour : [])
@@ -2687,8 +2696,9 @@ export default function EofProductionPanel({
           overlayMoments,
           videoEffects: normalizeEofVideoEffects(videoEffects),
           stickers: normalizeEofStickers(stickers),
-          plainTextDraft: useOwnScript ? manualDraft.trim() : '',
-          videoFootageMode: useVideoFootage ? 'auto' : 'off',
+          plainTextDraft: useOwnScript || videoLength === 'full' ? manualDraft.trim() : '',
+          videoFootageMode: useVideoFootage || videoLength === 'full' ? 'auto' : 'off',
+          videoLength,
         }),
       })
       const j = await res.json().catch(() => ({}))
@@ -3385,6 +3395,38 @@ export default function EofProductionPanel({
 
       <section className={`${PX.surface} p-6 sm:p-8`}>
         <form onSubmit={createJob} className="space-y-5">
+          <fieldset className="space-y-2">
+            <legend className={PX.label}>Video type</legend>
+            <div className="flex flex-col gap-3 sm:flex-row sm:gap-5">
+              {(videoLengthOptions.length ? videoLengthOptions : EOF_VIDEO_LENGTH_OPTIONS).map((opt) => (
+                <label key={opt.id} className="flex items-start gap-2 text-sm text-[#aaa]">
+                  <input
+                    type="radio"
+                    name="video-length"
+                    value={opt.id}
+                    checked={videoLength === opt.id}
+                    onChange={() => {
+                      setVideoLength(opt.id)
+                      if (opt.id === 'full') setUseOwnScript(true)
+                    }}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-[#eee]">{opt.label}</span>
+                    <span className="block text-xs text-[#888]">{opt.detail}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {videoLength === 'full' ? (
+              <p className="text-xs text-[#fbbf24]">
+                Full Video needs a pasted script (the AI writer is tuned for Shorts), always sources
+                real scraped footage/photos, and skips burned-in captions/stickers — add subtitles on
+                another platform. Renders on the Railway worker.
+              </p>
+            ) : null}
+          </fieldset>
+
           <label className={`block ${PX.label}`}>
             Topic
             <input
@@ -3407,22 +3449,26 @@ export default function EofProductionPanel({
           <label className="flex items-center gap-2 text-sm text-[#aaa]">
             <input
               type="checkbox"
-              checked={useOwnScript}
+              checked={useOwnScript || videoLength === 'full'}
+              disabled={videoLength === 'full'}
               onChange={(e) => setUseOwnScript(e.target.checked)}
             />
             Post my own script (skip the AI writer)
+            {videoLength === 'full' ? ' — required for Full Video' : ''}
           </label>
 
           <label className="flex items-center gap-2 text-sm text-[#aaa]">
             <input
               type="checkbox"
-              checked={useVideoFootage}
+              checked={useVideoFootage || videoLength === 'full'}
+              disabled={videoLength === 'full'}
               onChange={(e) => setUseVideoFootage(e.target.checked)}
             />
             Use real video footage (yt-dlp) when available, not just stills
+            {videoLength === 'full' ? ' — always on for Full Video' : ''}
           </label>
 
-          {useOwnScript ? (
+          {useOwnScript || videoLength === 'full' ? (
             <label className={`block ${PX.label}`}>
               Your script
               <textarea
@@ -3431,7 +3477,7 @@ export default function EofProductionPanel({
                 className={`${inputCls} min-h-[160px] text-base`}
                 placeholder="Paste your already-written narration here. It's used as-is — no AI writing. Click Adapt to scenes afterward to build the timed shot list."
                 minLength={20}
-                required={useOwnScript}
+                required={useOwnScript || videoLength === 'full'}
               />
             </label>
           ) : null}
@@ -4162,13 +4208,18 @@ export default function EofProductionPanel({
                     }`}
                   >
                     <div className="truncate text-sm text-[#ececec]">{j.title || j.topic}</div>
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
                       <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[10px] ${statusPill(j.status)}`}>
                         {(j.status === 'rendering' || j.status === 'rendering_video') &&
                         j.renderProgress?.percent != null
                           ? `${Math.round(j.renderProgress.percent)}%`
                           : productionJobStatusLabel(j.status)}
                       </span>
+                      {j.videoLength === 'full' ? (
+                        <span className="inline-block rounded-md border border-[#3b82f6]/40 bg-[#3b82f6]/10 px-1.5 py-0.5 text-[10px] text-[#93c5fd]">
+                          Full video
+                        </span>
+                      ) : null}
                     </div>
                   </button>
                   <button
@@ -4201,6 +4252,11 @@ export default function EofProductionPanel({
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusPill(selected.status)}`}>
                       {productionJobStatusLabel(selected.status)}
                     </span>
+                    {selected.videoLength === 'full' ? (
+                      <span className="rounded-full border border-[#3b82f6]/40 bg-[#3b82f6]/10 px-2 py-0.5 text-[10px] font-medium text-[#93c5fd]">
+                        Full video (16:9)
+                      </span>
+                    ) : null}
                     {draftScript.format ? <span>{draftScript.format}</span> : null}
                     {scriptSourceLabel ? <span>AI: {scriptSourceLabel}</span> : null}
                     {draftDirty ? <span className="text-[#fbbf24]">Unsaved edits</span> : null}
@@ -5107,11 +5163,12 @@ export default function EofProductionPanel({
               <label className="mt-3 flex items-center gap-2 text-sm text-[#aaa]">
                 <input
                   type="checkbox"
-                  disabled={busy || isRendering}
-                  checked={selected.videoFootageMode === 'auto'}
+                  disabled={busy || isRendering || selected.videoLength === 'full'}
+                  checked={selected.videoFootageMode === 'auto' || selected.videoLength === 'full'}
                   onChange={(e) => toggleVideoFootageMode(e.target.checked)}
                 />
-                Use real video footage (yt-dlp) for this Short
+                Use real video footage (yt-dlp) for this {selected.videoLength === 'full' ? 'video' : 'Short'}
+                {selected.videoLength === 'full' ? ' — always on for Full Video' : ''}
               </label>
               {!externalWorkerConfigured ? (
                 <p className="mt-2 text-xs text-[#fbbf24]">

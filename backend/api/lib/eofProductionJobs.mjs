@@ -9,6 +9,8 @@ import {
   EOF_DEFAULT_MUSIC_VOLUME,
   EOF_DEFAULT_VOICE_PRESET,
   EOF_VOICE_PRESETS,
+  EOF_DEFAULT_VIDEO_LENGTH,
+  isEofFullVideoLength,
   parseProductionScript,
   parseRenderProgress,
 } from '../../../shared/eofProduction.mjs'
@@ -62,7 +64,7 @@ const EOF_JOB_SELECT = `id, topic, title, status, script_json, script_source, mu
   tts_audio_hash, tts_synth_count,
   caption_style, caption_engine, caption_layout_json, zapcap_template_id, transition_style, color_grade, enhance_style,
   overlay_moments, video_effects_json, stickers_json, quality_gate_json, quality_gate_history_json,
-  video_footage_mode,
+  video_footage_mode, video_length,
   narration_manifest_json, mixed_audio_path, render_output_path,
   youtube_project_id, error_message, render_progress_json, created_by, created_at, updated_at`
 
@@ -140,6 +142,7 @@ function rowToJob(row) {
     qualityGate: parseEofQualityGate(row.quality_gate_json),
     qualityGateHistory: parseEofQualityGateHistory(row.quality_gate_history_json),
     videoFootageMode: row.video_footage_mode === 'auto' ? 'auto' : 'off',
+    videoLength: isEofFullVideoLength(row.video_length) ? 'full' : EOF_DEFAULT_VIDEO_LENGTH,
     narrationManifest: (() => {
       if (!row.narration_manifest_json) return null
       try {
@@ -206,10 +209,13 @@ export async function createEofProductionJob({
    * (old highlights / training clips) per scene before falling back to stills.
    */
   videoFootageMode = 'off',
+  /** 'short' (default, 9:16) = existing Shorts pipeline · 'full' (16:9) = long-form landscape video. */
+  videoLength = EOF_DEFAULT_VIDEO_LENGTH,
 }) {
   await ensureEofProductionSchema()
   let t = String(topic || '').trim()
   if (t.length < 2) throw new Error('Topic is required (min 2 characters).')
+  const isFullVideo = isEofFullVideoLength(videoLength)
 
   const track = await pickEofMusicTrackForTopic(t, musicTrackId)
   const id = randomUUID()
@@ -246,6 +252,11 @@ export async function createEofProductionJob({
     scriptSource = 'manual'
     status = EOF_PRODUCTION_JOB_STATUS.DRAFT
   } else if (mode === 'full') {
+    if (isFullVideo) {
+      throw new Error(
+        'Full Video needs a pasted script for now — use "Write your own script" and paste your long-form draft. AI script generation is tuned for Shorts.',
+      )
+    }
     const written = await writeEofProductionScript({ topic: t, format, context, scriptProvider })
     script = written.script
     scriptSource = written.source || 'template'
@@ -253,6 +264,11 @@ export async function createEofProductionJob({
     failureDetail = written.failureDetail || ''
     if (written.script?.topic) t = String(written.script.topic).trim() || t
   } else {
+    if (isFullVideo) {
+      throw new Error(
+        'Full Video needs a pasted script for now — use "Write your own script" and paste your long-form draft. AI script generation is tuned for Shorts.',
+      )
+    }
     const draft = await writeEofPlainTextDraft({
       topic: t,
       format,
@@ -305,8 +321,14 @@ export async function createEofProductionJob({
   )
 
   const created = await getEofProductionJob(id)
-  if (videoFootageMode === 'auto') {
-    return updateEofProductionJob(id, { videoFootageMode: 'auto' })
+  // Full Video always prefers real scraped footage over stills (per the "scrape quality
+  // footage and photos" requirement) — there is no opt-out for the long-form pipeline yet.
+  const effectiveFootageMode = isFullVideo ? 'auto' : videoFootageMode
+  if (isFullVideo || effectiveFootageMode === 'auto') {
+    return updateEofProductionJob(id, {
+      videoFootageMode: effectiveFootageMode === 'auto' ? 'auto' : 'off',
+      videoLength: isFullVideo ? 'full' : EOF_DEFAULT_VIDEO_LENGTH,
+    })
   }
   return failureDetail ? { ...created, scriptFailureDetail: failureDetail } : created
 }
@@ -392,6 +414,7 @@ export async function adaptEofProductionDraftToScenes(id, { format, plainTextDra
     format: fmt,
     scriptProvider,
     isManualScript: job.scriptSource === 'manual',
+    videoLength: job.videoLength,
   })
   script.plainTextDraft = draft
   const track = await pickEofMusicTrackForTopic(job.topic, job.musicTrackId)
@@ -534,6 +557,11 @@ export async function updateEofProductionJob(id, patch) {
     (patch.videoFootageMode !== undefined ? patch.videoFootageMode : job.videoFootageMode) === 'auto'
       ? 'auto'
       : 'off'
+  const videoLength = isEofFullVideoLength(
+    patch.videoLength !== undefined ? patch.videoLength : job.videoLength,
+  )
+    ? 'full'
+    : EOF_DEFAULT_VIDEO_LENGTH
 
   await query(
     `UPDATE eof_production_jobs
@@ -570,6 +598,7 @@ export async function updateEofProductionJob(id, patch) {
          quality_gate_json = $32,
          quality_gate_history_json = $33,
         video_footage_mode = $34,
+        video_length = $35,
         updated_at = ${nowSql()}
     WHERE id = $1`,
     [
@@ -609,6 +638,7 @@ export async function updateEofProductionJob(id, patch) {
        ? JSON.stringify(qualityGateHistory)
        : null,
      videoFootageMode,
+     videoLength,
     ],
   )
 

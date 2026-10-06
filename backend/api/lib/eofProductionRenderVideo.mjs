@@ -1166,6 +1166,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
           stickers: job.stickers,
           hasSecondarySubject,
           secondarySceneIndex,
+          videoLength: job.videoLength,
           onSceneProgress: async (done) => {
             videoProgressIndex = done
             await report('video', done)

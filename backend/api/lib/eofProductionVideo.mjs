@@ -52,6 +52,7 @@ import { burnZapcapCaptions } from './eofZapcapCaptions.mjs'
 import { applyEofWatermark } from './eofWatermark.mjs'
 import { mixOverlaySfxIntoAudio, resolveEofWhooshSfxPath } from './eofAudioMix.mjs'
 import { isEofForceSlim, isEofVercelRuntime, resolveEofProEncodeCaps } from './eofProductionServerless.mjs'
+import { resolveEofVideoFrameDims } from '../../../shared/eofProduction.mjs'
 
 const __eofLibDir = dirname(fileURLToPath(import.meta.url))
 
@@ -260,18 +261,22 @@ function buildSceneBaseFilters({
   logoBlurLabelPrefix = 'mlb',
   sourceWidth = 0,
   sourceHeight = 0,
+  frameW,
+  frameH,
 }) {
   const { framing, filters: head } = buildEofSceneScaleCropFilters({
     width: sourceWidth,
     height: sourceHeight,
+    frameW,
+    frameH,
   })
   if (lookFilters?.length) head.push(...lookFilters)
 
   let chain = head.join(',')
   if (logoBlur) {
     const blur = buildNewsAgencyLogoBlurFilterFragment({
-      frameW: 1080,
-      frameH: 1920,
+      frameW: frameW || 1080,
+      frameH: frameH || 1920,
       labelPrefix: logoBlurLabelPrefix,
     })
     if (blur) chain = `${chain},${blur}`
@@ -284,6 +289,8 @@ function buildSceneBaseFilters({
       frames,
       fps: VIDEO_FPS,
       mild: Boolean(mildKenBurns),
+      frameW,
+      frameH,
     })}`
   } else {
     chain += `,fps=${VIDEO_FPS}`
@@ -360,6 +367,8 @@ function buildSceneVideoFilter({
   logoBlur = false,
   sourceWidth = 0,
   sourceHeight = 0,
+  frameW,
+  frameH,
 }) {
   const base = buildSceneBaseFilters({
     frames,
@@ -369,6 +378,8 @@ function buildSceneVideoFilter({
     logoBlur,
     sourceWidth,
     sourceHeight,
+    frameW,
+    frameH,
   })
   const tail = [
     ...(effectFilters?.length ? effectFilters : []),
@@ -407,6 +418,8 @@ function buildSceneOverlayFilterComplex({
   overlayLogoBlur = false,
   sourceWidth = 0,
   sourceHeight = 0,
+  frameW,
+  frameH,
 }) {
   const baseChain = buildSceneBaseFilters({
     frames,
@@ -417,6 +430,8 @@ function buildSceneOverlayFilterComplex({
     logoBlurLabelPrefix: 'mlb',
     sourceWidth,
     sourceHeight,
+    frameW,
+    frameH,
   })
   const pop = buildOverlayPopFilterFragments({
     startSec: overlayMoment.startSec,
@@ -488,6 +503,8 @@ function buildSceneStickerFilterComplex({
   logoBlur = false,
   sourceWidth = 0,
   sourceHeight = 0,
+  frameW,
+  frameH,
 }) {
   const baseChain = buildSceneBaseFilters({
     frames,
@@ -498,6 +515,8 @@ function buildSceneStickerFilterComplex({
     logoBlurLabelPrefix: 'mlb',
     sourceWidth,
     sourceHeight,
+    frameW,
+    frameH,
   })
   const fxChain = effectFilters?.length ? effectFilters.join(',') : ''
   const captionChain = buildSceneCaptionFilters({
@@ -547,6 +566,8 @@ async function encodeSceneClip({
   stickers = null,
   skipLogoBlur = false,
   onHeartbeat = null,
+  frameW,
+  frameH,
 }) {
   const contentDur = Math.max(2, Number(scene.durationSec) || 3)
   const dur = Math.max(contentDur, Number(encodeDurationSec) || contentDur)
@@ -581,7 +602,7 @@ async function encodeSceneClip({
     )
   }
 
-  const framingOpts = { mildKenBurns, sourceWidth, sourceHeight }
+  const framingOpts = { mildKenBurns, sourceWidth, sourceHeight, frameW, frameH }
   const ffmpegHb = typeof onHeartbeat === 'function' ? { onHeartbeat } : {}
 
   const overlayPath = overlayMoment?.overlayImagePath
@@ -940,14 +961,22 @@ export async function renderEofProductionVideo({
   secondarySceneIndex = null,
   onSceneProgress,
   forceSlim = undefined,
+  /** 'short' (default, 9:16) = existing Shorts pipeline · 'full' (16:9) = long-form landscape. */
+  videoLength = 'short',
 }) {
   const sorted = [...scenes].sort((a, b) => a.index - b.index)
   if (!sorted.length) throw new Error('No scenes to render.')
 
+  const isFullVideo = videoLength === 'full'
+  const { frameW, frameH } = resolveEofVideoFrameDims(videoLength)
+
   const out = outputPath || eofProductionVideoAbsPath(jobId)
   const workDir = dirname(out)
   mkdirSync(workDir, { recursive: true })
-  const plan = resolveCaptionRenderPlan({ captionStyle, captionMode })
+  // Full Video has no burned-in captions/stickers/pop-card overlays by design — subtitles
+  // are added externally on another platform, and the caption/sticker layout math is
+  // hardcoded to the vertical 1080-wide frame (see eofTikTokCaptions.mjs).
+  const plan = resolveCaptionRenderPlan({ captionStyle: isFullVideo ? 'off' : captionStyle, captionMode })
   const { requestedStyle, style, forceFreeCaptions, zapcapOnly, burnCaptions, callZapcap } = plan
   const look = autoTuneVideoLook({
     format: format || 'news',
@@ -962,7 +991,8 @@ export async function renderEofProductionVideo({
   })
   const videoEffects = normalizeEofVideoEffects(videoEffectsRaw)
   const effectFilters = videoEffectsFilterChain(videoEffects)
-  const stickers = normalizeEofStickers(stickersRaw)
+  // Pop-card overlays and stickers are also hardcoded to the vertical frame — skip for Full Video.
+  const stickers = isFullVideo ? normalizeEofStickers(null) : normalizeEofStickers(stickersRaw)
   const serverlessSlim = forceSlim === undefined ? isEofForceSlim() : Boolean(forceSlim)
   const encodeCaps = resolveEofProEncodeCaps({
     sceneCount: sorted.length,
@@ -985,7 +1015,7 @@ export async function renderEofProductionVideo({
     !encodeCaps.skipKenBurns &&
     (Boolean(look.kenBurns) || process.env.EOF_VIDEO_KEN_BURNS === '1')
   const overlayMode =
-    serverlessSlim || encodeCaps.skipOverlays
+    isFullVideo || serverlessSlim || encodeCaps.skipOverlays
       ? 'off'
       : resolveEofOverlayMoments(overlayMomentsMode)
   // Probe still dimensions up front (best-effort) so the overlay planner can refuse a
@@ -1126,6 +1156,8 @@ export async function renderEofProductionVideo({
       stickers,
       skipLogoBlur: encodeCaps.skipLogoBlur,
       onHeartbeat: clipHeartbeat,
+      frameW,
+      frameH,
     })
     clipsDone += 1
     if (onSceneProgress) await onSceneProgress(clipsDone, sorted.length)
@@ -1201,6 +1233,8 @@ export async function renderEofProductionVideo({
           stickers,
           skipLogoBlur: encodeCaps.skipLogoBlur,
           onHeartbeat: clipHeartbeat,
+          frameW,
+          frameH,
         })
       })
       // mapWithConcurrency preserves input order

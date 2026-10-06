@@ -1,14 +1,23 @@
 import { defaultSceneImageQuery } from './eofSceneImageQueries.mjs'
-import { EOF_MAX_SCENES, normalizeEofScript } from './eofScriptTemplates.mjs'
+import { EOF_MAX_SCENES, EOF_MAX_SCENES_FULL, normalizeEofScript } from './eofScriptTemplates.mjs'
 
 /**
  * Short scripts do not need 7 stills — prefer 3–5 beats.
+ * Full Video mode scales scene count with narration length instead (far longer drafts).
  * @param {string} draft
+ * @param {{ videoLength?: 'short' | 'full' }} [opts]
  * @returns {{ min: number, max: number }}
  */
-export function targetSceneCountForDraft(draft) {
+export function targetSceneCountForDraft(draft, opts = {}) {
   const words = wordCount(draft)
   const sentences = splitDraftIntoSentences(draft).length
+  if (opts.videoLength === 'full') {
+    // ~1 scene per ~18 narration words (same density as a Short scene caption),
+    // floor of 6 scenes so even a modest full-video draft still gets real beats.
+    const estimate = Math.max(6, Math.round(words / 18))
+    const max = Math.min(EOF_MAX_SCENES_FULL, estimate + 4)
+    return { min: Math.min(max, Math.max(6, estimate - 4)), max }
+  }
   if (words < 70 || sentences <= 3) return { min: 3, max: 4 }
   if (words < 105 || sentences <= 4) return { min: 3, max: 5 }
   // Cap auto-adapt at 5 — more scenes = more same-face stills and wasted SERP picks
@@ -186,25 +195,35 @@ function titleFromDraft(topic, draft) {
  * Deterministic, faithful split of an approved plain-text draft into Short scenes.
  * Keeps the writer's words (no paraphrase, no dropped tail) and ties every image
  * query to the topic's player/club (Bellingham, Messi, …).
- * @param {{ plainTextDraft: string, topic: string, format?: string, forceMinScenes?: number }} input
+ * @param {{ plainTextDraft: string, topic: string, format?: string, forceMinScenes?: number, videoLength?: 'short' | 'full' }} input
  * `forceMinScenes` overrides the normal 3-scene floor — pass 1 for a guaranteed,
  * credit-free last-resort split of a manual/own script (even a single short
  * sentence becomes a valid one-scene Short instead of falling back to AI or a
  * generic template).
+ * `videoLength: 'full'` lifts the scene cap and scales scene count with narration
+ * length for long-form videos instead of the 3–5 scene Short default.
  */
-export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, format = 'news', forceMinScenes } = {}) {
+export function adaptPlainTextDraftToScenesLocally({
+  plainTextDraft,
+  topic,
+  format = 'news',
+  forceMinScenes,
+  videoLength = 'short',
+} = {}) {
   const draft = String(plainTextDraft || '').trim()
   const t = String(topic || '').trim() || 'Football'
+  const isFull = videoLength === 'full'
   const allowSingleSentence = Number.isFinite(forceMinScenes) && forceMinScenes <= 1
   const sentences = splitDraftIntoSentences(draft)
   if (!sentences.length) return null
   if (sentences.length < 2 && !allowSingleSentence) return null
 
-  const target = targetSceneCountForDraft(draft)
+  const target = targetSceneCountForDraft(draft, { videoLength })
+  const sceneCap = isFull ? EOF_MAX_SCENES_FULL : EOF_MAX_SCENES
   const min = Number.isFinite(forceMinScenes) && forceMinScenes > 0 ? Math.max(1, Math.floor(forceMinScenes)) : target.min
   const units = balanceSceneUnits(sentences, {
     min,
-    max: Math.min(target.max, EOF_MAX_SCENES),
+    max: Math.min(target.max, sceneCap),
     capWords: 16,
   })
   const requiredMin = Number.isFinite(forceMinScenes) && forceMinScenes > 0 ? Math.max(1, Math.floor(forceMinScenes)) : 3
@@ -230,13 +249,16 @@ export function adaptPlainTextDraftToScenesLocally({ plainTextDraft, topic, form
     {
       topic: t,
       title: titleFromDraft(t, draft),
-      description: `${t}. Eyes Of Football Short. #Shorts #shortsfeed #football`,
-      tags: ['shortsfeed', 'football', 'shorts'],
+      description: isFull
+        ? `${t}. Eyes Of Football.`
+        : `${t}. Eyes Of Football Short. #Shorts #shortsfeed #football`,
+      tags: isFull ? ['football'] : ['shortsfeed', 'football', 'shorts'],
       format: fmt,
       plainTextDraft: draft,
       scenes,
     },
     t,
+    { maxScenes: sceneCap, skipShortsfeedTag: isFull },
   )
 }
 

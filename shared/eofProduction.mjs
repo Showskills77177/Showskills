@@ -12,6 +12,41 @@ export const EOF_PRODUCTION_JOB_STATUS = {
   PUBLISHED: 'published',
 }
 
+/**
+ * Short (default) = vertical 9:16, ≤8 quick scenes, captions/stickers/music bed —
+ * the proven YouTube Shorts pipeline.
+ * Full Video = landscape 16:9, long-form (10–15+ min) narration with many more
+ * scenes, real scraped footage/photos preferred over stills, no caption/sticker
+ * burn-in (subtitles are added on another platform) — must render on the
+ * external Railway worker (Vercel's ~280s budget cannot encode a long video).
+ */
+export const EOF_VIDEO_LENGTH_OPTIONS = [
+  {
+    id: 'short',
+    label: 'Short (vertical)',
+    detail: '9:16 YouTube Short — quick hot-take, captions + music, renders in ~1–2 min.',
+  },
+  {
+    id: 'full',
+    label: 'Full video (landscape)',
+    detail:
+      '16:9 long-form video (10–15+ min) — real scraped footage/photos, no burned-in captions (add subtitles elsewhere). Requires the Railway worker.',
+  },
+]
+
+export const EOF_DEFAULT_VIDEO_LENGTH = 'short'
+
+export function isEofFullVideoLength(videoLength) {
+  return String(videoLength || '').trim() === 'full'
+}
+
+/** Render frame dimensions for a video length — vertical Short vs landscape Full video. */
+export function resolveEofVideoFrameDims(videoLength) {
+  return isEofFullVideoLength(videoLength)
+    ? { frameW: 1920, frameH: 1080 }
+    : { frameW: 1080, frameH: 1920 }
+}
+
 export const EOF_VOICE_PRESETS = {
   british: {
     id: 'british',
