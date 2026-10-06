@@ -85,6 +85,9 @@ async function maybeCapScenesForServerlessBuild(jobId) {
   if (!(await isEofSlimBuildEnabled())) return
   const job = await getEofProductionJob(jobId)
   if (!job?.script?.scenes?.length) return
+  // Full Video always runs on the external (Railway) worker, which has no Vercel
+  // scene/duration budget — never clip its (much longer) scene list.
+  if (job.videoLength === 'full') return
   const capped = capEofScriptScenesForServerless(job.script)
   if (!capped.trimmed) return
   console.warn(
@@ -108,6 +111,12 @@ export async function renderEofProductionFullBuild(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+  if (job.videoLength === 'full' && !isEofExternalWorkerConfigured()) {
+    const msg =
+      'Full Video requires the Railway render worker (EOF_WORKER_URL) — Vercel cannot encode a 10-15 minute video in-process. Configure the worker and try again.'
+    await markEofProductionJobFailed(jobId, msg)
+    throw new Error(msg)
+  }
 
   const qualityGateMode = opts.qualityGateMode === 'auto' ? 'auto' : 'manual'
 
@@ -148,6 +157,12 @@ export async function continueEofProductionBuild(jobId, opts = {}) {
   const job = await getEofProductionJob(jobId)
   if (!job) throw new Error('Production job not found.')
   if (!job.script?.scenes?.length) throw new Error('Job has no script scenes.')
+  if (job.videoLength === 'full' && !isEofExternalWorkerConfigured()) {
+    const msg =
+      'Full Video requires the Railway render worker (EOF_WORKER_URL) — Vercel cannot encode a 10-15 minute video in-process. Configure the worker and try again.'
+    await markEofProductionJobFailed(jobId, msg)
+    throw new Error(msg)
+  }
 
   const status = String(job.status || '')
   if (

@@ -1355,6 +1355,8 @@ export async function adaptEofPlainTextToScenes({
   scriptProvider,
   /** Skip AI relevance/factuality/drift gates entirely for a user-authored ("post your own script") draft — the writer owns the content and topic themselves. */
   isManualScript = false,
+  /** 'short' (default) or 'full' — scales the scene-count cap/floor for long-form landscape video. */
+  videoLength = 'short',
 }) {
   const draft = String(plainTextDraft || '').trim()
   if (draft.length < 40) throw new Error('Plain-text draft is too short — write or generate a fuller script first.')
@@ -1380,7 +1382,7 @@ export async function adaptEofPlainTextToScenes({
   // Faithful, deterministic split FIRST — keeps the approved script's exact words and
   // ties every scene image to the named player/club. AI paraphrase tends to butcher a
   // good draft, so we only fall back to it when the draft can't be split cleanly.
-  const local = adaptPlainTextDraftToScenesLocally({ plainTextDraft: draft, topic: t, format: fmt })
+  const local = adaptPlainTextDraftToScenesLocally({ plainTextDraft: draft, topic: t, format: fmt, videoLength })
   if (local?.scenes?.length >= 3) {
     return { script: local, source: 'local-split' }
   }
@@ -1395,6 +1397,7 @@ export async function adaptEofPlainTextToScenes({
       topic: t,
       format: fmt,
       forceMinScenes: 1,
+      videoLength,
     })
     if (guaranteed?.scenes?.length >= 1) {
       return { script: guaranteed, source: 'local-split-minimal' }

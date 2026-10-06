@@ -117,6 +117,7 @@ async function addEofProductionJobColumns() {
     'video_footage_mode',
     'manual_voiceover_base64',
     'manual_voiceover_mime',
+    'video_length',
   ]
   if (dbIsPostgres()) {
     for (const col of columns) {
