@@ -125,4 +125,43 @@ describe('post-your-own-voiceover (skip TTS) — renderEofProductionAudio', () =
       /No voiceover uploaded yet/,
     )
   })
+
+  it('rejects a voiceover that is far too short for the script instead of silently clamping durations', async () => {
+    const { createEofProductionJob, updateEofProductionJob } = await import(
+      '../backend/api/lib/eofProductionJobs.mjs'
+    )
+    const { saveEofManualVoiceoverArtifact } = await import(
+      '../backend/api/lib/eofProductionArtifacts.mjs'
+    )
+    const { renderEofProductionAudio } = await import('../backend/api/lib/eofProductionRender.mjs')
+
+    const created = await createEofProductionJob({
+      topic: 'Full match recap',
+      createdBy: 'tester',
+      manualDraft: 'A long full-video script with many scenes.',
+    })
+
+    // 20 scenes with real narration text (each ~2.4s+ estimated) — a full-video-sized script.
+    const scenes = Array.from({ length: 20 }, (_, i) => ({
+      id: `s${i + 1}`,
+      narration: `This is scene number ${i + 1} describing a key moment from the match in detail.`,
+      caption: `Scene ${i + 1}`,
+      imageQuery: 'football match',
+    }))
+    await updateEofProductionJob(created.id, {
+      voicePreset: 'manual',
+      script: { ...created.script, scenes },
+    })
+
+    // Upload a voiceover far too short (1s) for a ~20-scene script (which needs roughly a minute-plus).
+    const tinyUploadPath = join(tmpDir, 'too-short.wav')
+    await makeSilentWav(tinyUploadPath, 1)
+    const saved = await saveEofManualVoiceoverArtifact(created.id, tinyUploadPath, 'audio/wav')
+    assert.ok(saved, 'expected the uploaded voiceover to be saved as a durable artifact')
+
+    await assert.rejects(
+      renderEofProductionAudio(created.id, { allowNoMusic: true }),
+      /uploaded voiceover is only .*needs roughly/i,
+    )
+  })
 })
