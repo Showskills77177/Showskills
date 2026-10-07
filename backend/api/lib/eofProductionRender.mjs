@@ -7,6 +7,7 @@ import {
   buildEofRenderProgress,
   estimateEofRenderDurationSec,
 } from '../../../shared/eofProduction.mjs'
+import { estimateCaptionDurationSec } from '../../../shared/eofScriptTemplates.mjs'
 import {
   hashEofTtsFingerprint,
   hashEofSceneTtsLine,
@@ -494,6 +495,23 @@ async function renderEofProductionAudioFromManualVoiceover(jobId, job, { fingerp
       throw new Error('Could not read your uploaded voiceover file — try re-uploading it as MP3 or WAV.')
     }
 
+    // Sanity-check the upload against the script it's meant to narrate — without this,
+    // a VO that's much shorter than the script (e.g. a short test clip uploaded against
+    // a full 10-15 min script) gets silently split into near-zero per-scene durations
+    // (floor-clamped to 1s below), which later fails the quality gate with a wall of
+    // cryptic "duration too short" errors instead of one clear, actionable message now.
+    const expectedNarrationSec = job.script.scenes.reduce(
+      (sum, scene) =>
+        sum + (Number(scene.durationSec) || estimateCaptionDurationSec(scene.caption || scene.narration || '')),
+      0,
+    )
+    const MIN_VOICEOVER_COVERAGE = 0.4
+    if (expectedNarrationSec > 0 && totalDurationSec < expectedNarrationSec * MIN_VOICEOVER_COVERAGE) {
+      throw new Error(
+        `Your uploaded voiceover is only ${totalDurationSec.toFixed(1)}s but this script (${job.script.scenes.length} scenes) needs roughly ${Math.round(expectedNarrationSec)}s of narration. Upload a recording of the full script, or shorten the script to match your voiceover.`,
+      )
+    }
+
     // The uploaded file can be any container/codec (WAV, M4A, etc.) — normalize to MP3 first.
     // The downstream mixer concatenates narration parts with `-c copy`, which requires a
     // single consistent codec; feeding it the raw upload as-is can produce a broken output.
@@ -506,8 +524,10 @@ async function renderEofProductionAudioFromManualVoiceover(jobId, job, { fingerp
       Math.max(1, String(scene.narration || '').trim().length),
     )
     const totalChars = charCounts.reduce((a, b) => a + b, 0)
+    // Floor above the quality gate's own "too short for a beat" threshold (1.2s) so a
+    // borderline-length upload can never still slip a scene under it.
     const sceneDurations = charCounts.map((chars) =>
-      Math.max(1, (chars / totalChars) * totalDurationSec),
+      Math.max(1.3, (chars / totalChars) * totalDurationSec),
     )
 
     const wantNoMusic = shouldEofAllowNoMusic({ allowNoMusic }, job)
