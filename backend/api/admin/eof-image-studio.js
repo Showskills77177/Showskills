@@ -7,14 +7,26 @@ import {
   EOF_IMAGE_STUDIO_ASPECT_RATIOS,
   normalizeEofImageStudioAspectRatio,
 } from '../lib/eofGrokImagineImages.mjs'
+import {
+  buildEofImageStudioPrompt,
+  describeEofReferenceImage,
+  MAX_DOCUMENT_TEXT_CHARS,
+  parseEofReferenceImageDataUrl,
+  truncateEofDocumentText,
+} from '../lib/eofImageStudioReference.mjs'
 
 /**
  * Ad-hoc xAI (Grok Imagine) image generation — a free-form "chat prompt" tool for thumbnails
  * or any other one-off image work, decoupled from any production job/scene pipeline.
  *
  * GET  — configuration status + supported aspect ratios.
- * POST { prompt, aspectRatio? } — generate one image, returned inline as base64 (no disk persistence;
- *       Vercel's /tmp is ephemeral per-instance, so bytes are handed back directly instead).
+ * POST { prompt, aspectRatio?, referenceImage?, documentText? } — generate one image, returned
+ *       inline as base64 (no disk persistence; Vercel's /tmp is ephemeral per-instance, so bytes
+ *       are handed back directly instead).
+ *       `referenceImage` is a `data:image/...;base64,...` string — xAI's generation endpoint has
+ *       no image-to-image input, so it's described via a Grok vision call and folded into the
+ *       prompt (style/subject guidance only, not a pixel-accurate edit).
+ *       `documentText` is plain text (e.g. pasted/`.txt`/`.md` content) folded in as extra context.
  */
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -45,6 +57,7 @@ export default async function handler(req, res) {
       configured: isEofGrokImagineConfigured(),
       aspectRatios: EOF_IMAGE_STUDIO_ASPECT_RATIOS,
       costNote: '~$0.05 per image (xAI Grok Imagine quality model)',
+      maxDocumentTextChars: MAX_DOCUMENT_TEXT_CHARS,
     })
   }
 
@@ -57,16 +70,40 @@ export default async function handler(req, res) {
   }
 
   const aspectRatio = normalizeEofImageStudioAspectRatio(body.aspectRatio)
+  const documentExcerpt = truncateEofDocumentText(body.documentText)
+
+  let referenceDescription = ''
+  let referenceImageUsed = false
+  let referenceImageWarning = ''
+  const referenceImageInput = typeof body.referenceImage === 'string' ? body.referenceImage.trim() : ''
+  if (referenceImageInput) {
+    try {
+      const { dataUrl } = parseEofReferenceImageDataUrl(referenceImageInput)
+      referenceDescription = await describeEofReferenceImage({ dataUrl })
+      referenceImageUsed = true
+    } catch (e) {
+      // Non-fatal — fall back to generating from the text prompt (+ document) alone.
+      referenceImageWarning = e instanceof Error ? e.message : 'Could not use the reference image.'
+      console.warn('[eof-image-studio] reference image skipped:', referenceImageWarning)
+    }
+  }
+
+  const finalPrompt = buildEofImageStudioPrompt({ prompt, documentExcerpt, referenceDescription })
 
   try {
-    const { buffer, mime, promptUsed } = await fetchEofGrokImagineBuffer({ prompt, aspectRatio })
+    const { buffer, mime, promptUsed } = await fetchEofGrokImagineBuffer({ prompt: finalPrompt, aspectRatio })
     return json(res, 200, {
       ok: true,
       mime,
       bytes: buffer.length,
       imageBase64: buffer.toString('base64'),
       prompt: promptUsed,
+      userPrompt: prompt,
       aspectRatio,
+      referenceImageUsed,
+      referenceDescription: referenceImageUsed ? referenceDescription : '',
+      referenceImageWarning,
+      documentExcerptUsed: Boolean(documentExcerpt),
       createdAt: new Date().toISOString(),
     })
   } catch (e) {
