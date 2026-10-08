@@ -228,7 +228,7 @@ describe('eof image provider settings DB read/write', () => {
     assert.equal(oxy.password, undefined)
     assert.deepEqual(
       Object.keys(gen).sort(),
-      ['id', 'imageProvider', 'imageGenMode', 'imageGenProvider', 'updatedAt'].sort(),
+      ['id', 'imageProvider', 'imageGenMode', 'imageGenProvider', 'storyMediaMode', 'updatedAt'].sort(),
     )
   })
 
@@ -236,5 +236,17 @@ describe('eof image provider settings DB read/write', () => {
     const stories = await updateEofImageProviderSettings({ imageProvider: 'gen' })
     assert.equal(stories.imageProvider, 'gen')
     assert.equal((await getEofImageProviderSettings()).imageProvider, 'gen')
+  })
+
+  it('defaults storyMediaMode to image and persists video preference', async () => {
+    const initial = await getEofImageProviderSettings()
+    assert.equal(initial.storyMediaMode, 'image')
+
+    const toVideo = await updateEofImageProviderSettings({ storyMediaMode: 'video' })
+    assert.equal(toVideo.storyMediaMode, 'video')
+    assert.equal((await getEofImageProviderSettings()).storyMediaMode, 'video')
+
+    const toImage = await updateEofImageProviderSettings({ storyMediaMode: 'image' })
+    assert.equal(toImage.storyMediaMode, 'image')
   })
 })

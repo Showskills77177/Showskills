@@ -55,9 +55,11 @@ import {
   isEofImageProviderGenOnly,
 } from './eofImageProviderSettings.mjs'
 import { generateEofStorySceneImage } from './eofStoryImages.mjs'
+import { getEofStorySceneVideoClip } from './eofStoryVideoClips.mjs'
 import {
   normalizeEofImageGenMode,
   normalizeEofImageGenProvider,
+  normalizeEofStoryMediaMode,
   mergeEofScrapeAndGenHits,
   runEofImageGenAlongsideScrape,
   sortEofPoolHitsPreferScrape,
@@ -491,6 +493,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     // Daily Stories: fully AI-generated, no real photo search / vision / subject pool at all.
     let storyGenMode = false
     let storyGenProvider = 'auto'
+    // Daily Stories media type: 'image' (default, illustrated stills) or 'video'
+    // (Pollinations AI cartoon clips per scene, upgrading each still after it's made).
+    let storyMediaMode = 'image'
     /** @type {{ providerOrder: string[], providerAttempts: Array<{ provider: string, status?: string, detail?: string, hits?: number, query?: string }>, scrapeHitsBeforeFilter: number, scrapeHitsAfterFilter: number, wikiHits: number|null, genHits: number, subject: string|null }} */
     const imageFetchDiag = {
       providerOrder: [],
@@ -510,6 +515,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         imageProvider: 'auto',
         imageGenMode: 'auto',
         imageGenProvider: 'auto',
+        storyMediaMode: 'image',
       }))
       // Per-build override (Production UI Build / Rebuild) wins over the saved admin default.
       const preferredProvider = imageProviderOverride || imageSettings.imageProvider || 'auto'
@@ -521,6 +527,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         process.env.EOF_IMAGE_GEN_PROVIDER || imageSettings.imageGenProvider || 'auto',
       )
       storyGenProvider = imageGenProvider
+      storyMediaMode = normalizeEofStoryMediaMode(
+        process.env.EOF_STORY_MEDIA_MODE || imageSettings.storyMediaMode || 'image',
+      )
       const providerOrder = resolveEofImageProviderAttemptOrder(preferredProvider, {
         serpapi: isEofSerpApiConfigured(),
         oxylabs: isEofOxylabsConfigured(),
@@ -1137,6 +1146,51 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         }
       } finally {
         stopFootageHb()
+      }
+    }
+
+    // Daily Stories AI cartoon-video upgrade (storyMediaMode === 'video'): each scene
+    // already has its illustrated still (generated above); try to additionally generate
+    // a short Pollinations text-to-video clip and swap it in. Never blocks the build —
+    // getEofStorySceneVideoClip() swallows all its own errors and the scene simply
+    // keeps its still on any failure (missing key, timeout, bad response, etc.).
+    if (storyGenMode && storyMediaMode === 'video') {
+      const workDirForStoryVideo = eofProductionWorkDir(jobId)
+      let storyVideoIndex = 0
+      const stopStoryVideoHb = startProgressHeartbeat(async () => {
+        await report('images', storyVideoIndex, {
+          force: true,
+          message: `Generating AI video clip ${Math.min(storyVideoIndex + 1, sceneCount)} of ${sceneCount}…`,
+        })
+      }, 3500)
+      try {
+        for (const scene of scenesForVideo) {
+          storyVideoIndex = scene.index
+          await report('images', storyVideoIndex, {
+            force: true,
+            message: `Generating AI video clip ${Math.min(storyVideoIndex + 1, sceneCount)} of ${sceneCount}…`,
+          })
+          try {
+            const videoClipPath = await getEofStorySceneVideoClip({
+              workDir: workDirForStoryVideo,
+              sceneIndex: scene.index,
+              caption: scene.caption,
+              narration: scene.narration,
+              topic: job.topic,
+              targetDurationSec: scene.durationSec,
+              captionStyle: job.captionStyle,
+              captionLayout: job.captionLayout || job.script?.captionLayout || null,
+            })
+            if (videoClipPath) scene.videoClipPath = videoClipPath
+          } catch (err) {
+            console.warn(
+              `[eof-story-video] scene ${scene.index} failed — using still`,
+              err instanceof Error ? err.message : err,
+            )
+          }
+        }
+      } finally {
+        stopStoryVideoHb()
       }
     }
 

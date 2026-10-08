@@ -10,6 +10,9 @@ import {
   sortEofPoolHitsPreferScrape,
   shouldMergeEofImageGen,
   eofImageGenMaxPerJob,
+  normalizeEofStoryMediaMode,
+  listEofStoryMediaModeOptions,
+  eofStoryMediaModeConfigurationNote,
 } from '../backend/api/lib/eofImageGen.mjs'
 import { buildPollinationsImageUrl } from '../backend/api/lib/eofFreeGenImages.mjs'
 import { applyVisionScoresToHits } from '../backend/api/lib/eofImageVision.mjs'
@@ -210,5 +213,65 @@ describe('Grok Imagine client (mocked HTTP)', () => {
     assert.equal(seen.body.aspect_ratio, '9:16')
     assert.equal(seen.body.n, 1)
     assert.match(seen.body.prompt, /Wayne Rooney/)
+  })
+})
+
+describe('normalizeEofStoryMediaMode (Daily Stories media type)', () => {
+  it('normalizes known values and aliases', () => {
+    assert.equal(normalizeEofStoryMediaMode('image'), 'image')
+    assert.equal(normalizeEofStoryMediaMode('video'), 'video')
+    assert.equal(normalizeEofStoryMediaMode('AI-Video'), 'video')
+    assert.equal(normalizeEofStoryMediaMode('cartoon'), 'video')
+    assert.equal(normalizeEofStoryMediaMode('clip'), 'video')
+    assert.equal(normalizeEofStoryMediaMode('clips'), 'video')
+    assert.equal(normalizeEofStoryMediaMode('still'), 'image')
+    assert.equal(normalizeEofStoryMediaMode('stills'), 'image')
+    assert.equal(normalizeEofStoryMediaMode('photo'), 'image')
+  })
+
+  it('defaults unknown / empty to image', () => {
+    assert.equal(normalizeEofStoryMediaMode(''), 'image')
+    assert.equal(normalizeEofStoryMediaMode(null), 'image')
+    assert.equal(normalizeEofStoryMediaMode('nonsense'), 'image')
+  })
+})
+
+describe('listEofStoryMediaModeOptions / eofStoryMediaModeConfigurationNote', () => {
+  const prevKey = process.env.POLLINATIONS_API_KEY
+  const prevKeyAlt = process.env.EOF_POLLINATIONS_API_KEY
+
+  before(() => {
+    delete process.env.POLLINATIONS_API_KEY
+    delete process.env.EOF_POLLINATIONS_API_KEY
+  })
+
+  after(() => {
+    if (prevKey === undefined) delete process.env.POLLINATIONS_API_KEY
+    else process.env.POLLINATIONS_API_KEY = prevKey
+    if (prevKeyAlt === undefined) delete process.env.EOF_POLLINATIONS_API_KEY
+    else process.env.EOF_POLLINATIONS_API_KEY = prevKeyAlt
+  })
+
+  it('image is always configured; video depends on a Pollinations API key', () => {
+    const opts = listEofStoryMediaModeOptions()
+    const image = opts.find((o) => o.id === 'image')
+    const video = opts.find((o) => o.id === 'video')
+    assert.ok(image)
+    assert.ok(video)
+    assert.equal(image.configured, true)
+    assert.equal(video.configured, false)
+
+    process.env.POLLINATIONS_API_KEY = 'sk_test_key'
+    const optsWithKey = listEofStoryMediaModeOptions()
+    assert.equal(optsWithKey.find((o) => o.id === 'video')?.configured, true)
+  })
+
+  it('returns null note for image mode, and a config-dependent note for video mode', () => {
+    assert.equal(eofStoryMediaModeConfigurationNote('image'), null)
+    delete process.env.POLLINATIONS_API_KEY
+    delete process.env.EOF_POLLINATIONS_API_KEY
+    assert.match(eofStoryMediaModeConfigurationNote('video'), /missing/i)
+    process.env.POLLINATIONS_API_KEY = 'sk_test_key'
+    assert.match(eofStoryMediaModeConfigurationNote('video'), /billed per/i)
   })
 })

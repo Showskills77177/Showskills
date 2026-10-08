@@ -8,12 +8,15 @@ import { detectImageRoleIntent, resolveImageSubject } from '../../../shared/eofS
 import { buildEofImageGenPrompt } from './eofImageGenPrompt.mjs'
 import { isEofGrokImagineConfigured, fetchEofGrokImaginePool } from './eofGrokImagineImages.mjs'
 import { isEofFreeGenConfigured, fetchEofFreeGenPool } from './eofFreeGenImages.mjs'
+import { isEofPollinationsVideoConfigured } from './eofPollinationsVideo.mjs'
 
 export { buildEofImageGenPrompt }
 
 export const EOF_IMAGE_GEN_SOURCES = new Set(['grok-imagine', 'free-gen'])
 export const EOF_IMAGE_GEN_MODES = new Set(['off', 'auto', 'always'])
 export const EOF_IMAGE_GEN_PROVIDERS = new Set(['auto', 'grok', 'free'])
+/** Daily Stories media type: illustrated stills (default) or AI video clips per scene. */
+export const EOF_STORY_MEDIA_MODES = new Set(['image', 'video'])
 
 /** Default cap per Short / rebuild (cost control for Grok quality model). */
 export const EOF_IMAGE_GEN_MAX_PER_JOB_DEFAULT = 3
@@ -38,6 +41,45 @@ export function normalizeEofImageGenProvider(value) {
   if (v === 'pollinations' || v === 'free-gen' || v === 'free_gen') return 'free'
   if (EOF_IMAGE_GEN_PROVIDERS.has(v)) return v
   return 'auto'
+}
+
+/** Daily Stories media type: 'image' (illustrated stills, default) or 'video' (AI clips). */
+export function normalizeEofStoryMediaMode(value) {
+  const v = String(value || '')
+    .trim()
+    .toLowerCase()
+  if (v === 'ai-video' || v === 'ai_video' || v === 'cartoon' || v === 'clip' || v === 'clips') return 'video'
+  if (v === 'still' || v === 'stills' || v === 'photo') return 'image'
+  if (EOF_STORY_MEDIA_MODES.has(v)) return v
+  return 'image'
+}
+
+export function listEofStoryMediaModeOptions() {
+  const videoConfigured = isEofPollinationsVideoConfigured()
+  return [
+    {
+      id: 'image',
+      label: 'Illustrated stills',
+      configured: true,
+      detail: 'One AI-generated still per scene (Grok Imagine / free Pollinations), animated by ken-burns pan/zoom.',
+    },
+    {
+      id: 'video',
+      label: 'AI cartoon video (Pollinations)',
+      configured: videoConfigured,
+      detail: videoConfigured
+        ? 'Generates a short motion clip per scene via Pollinations text-to-video (paid, billed per second). Falls back to a still per-scene on failure.'
+        : 'Needs a paid POLLINATIONS_API_KEY from enter.pollinations.ai (video is not free, unlike image gen).',
+    },
+  ]
+}
+
+export function eofStoryMediaModeConfigurationNote(mode = 'image') {
+  const m = normalizeEofStoryMediaMode(mode)
+  if (m !== 'video') return null
+  return isEofPollinationsVideoConfigured()
+    ? 'Daily Stories: AI video mode — each scene tries a Pollinations text-to-video clip first, falling back to its illustrated still on failure. Billed per generated second.'
+    : 'Daily Stories: AI video mode selected but POLLINATIONS_API_KEY is missing — every scene will fall back to its illustrated still.'
 }
 
 export function eofImageGenMaxPerJob(envValue = process.env.EOF_IMAGE_GEN_MAX_PER_JOB) {
