@@ -14,6 +14,14 @@ import { buildEofImageGenPrompt } from './eofImageGenPrompt.mjs'
 const DEFAULT_MODEL = 'grok-imagine-image-quality'
 const DEFAULT_TIMEOUT_MS = 90_000
 
+/** Aspect ratios accepted by the Image Studio ad-hoc generator (thumbnails want 16:9, Shorts stills want 9:16). */
+export const EOF_IMAGE_STUDIO_ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:5', '3:2']
+
+export function normalizeEofImageStudioAspectRatio(value) {
+  const v = String(value || '').trim()
+  return EOF_IMAGE_STUDIO_ASPECT_RATIOS.includes(v) ? v : '16:9'
+}
+
 function envTrim(...names) {
   for (const name of names) {
     const v = String(process.env[name] || '').trim()
@@ -45,7 +53,7 @@ function looksLikeImageBuffer(buf) {
 
 /**
  * Call xAI images/generations once.
- * @param {{ prompt: string, signal?: AbortSignal }} opts
+ * @param {{ prompt: string, aspectRatio?: string, signal?: AbortSignal }} opts
  * @returns {Promise<{ url?: string, b64?: string }>}
  */
 export async function requestGrokImagineImage(opts = {}) {
@@ -53,6 +61,8 @@ export async function requestGrokImagineImage(opts = {}) {
   if (!key) throw new Error('XAI_API_KEY is not set')
   const prompt = String(opts.prompt || '').trim()
   if (!prompt) throw new Error('Grok Imagine prompt is required')
+  // Default stays 9:16 so existing scene/Daily-Stories callers are unaffected.
+  const aspectRatio = opts.aspectRatio ? normalizeEofImageStudioAspectRatio(opts.aspectRatio) : '9:16'
 
   const model = eofGrokImagineModel()
   const timeoutMs = requestTimeoutMs()
@@ -74,7 +84,7 @@ export async function requestGrokImagineImage(opts = {}) {
         model,
         prompt,
         n: 1,
-        aspect_ratio: '9:16',
+        aspect_ratio: aspectRatio,
         response_format: 'url',
       }),
       signal: controller.signal,
@@ -94,15 +104,23 @@ export async function requestGrokImagineImage(opts = {}) {
   }
 }
 
-async function materializeImage({ url, b64 }, outPath) {
-  mkdirSync(dirname(outPath), { recursive: true })
+function inferImageMime(buf) {
+  if (buf && buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return 'image/png'
+  }
+  if (buf && buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+    return 'image/webp'
+  }
+  return 'image/jpeg'
+}
+
+/** Resolve a Grok Imagine `{ url, b64 }` result to raw bytes, without touching disk. */
+async function resolveImageBuffer({ url, b64 }) {
   if (b64) {
     const buf = Buffer.from(b64, 'base64')
-    if (!looksLikeImageBuffer(buf) || buf.length < 8_000) return false
-    await writeFile(outPath, buf)
-    return true
+    return looksLikeImageBuffer(buf) && buf.length >= 8_000 ? buf : null
   }
-  if (!url || !/^https?:\/\//i.test(url)) return false
+  if (!url || !/^https?:\/\//i.test(url)) return null
   const imgRes = await fetch(url, {
     headers: {
       'User-Agent': 'ShowSkillsEOF/1.0 (eof-grok-imagine)',
@@ -111,11 +129,33 @@ async function materializeImage({ url, b64 }, outPath) {
     redirect: 'follow',
     signal: AbortSignal.timeout(45_000),
   })
-  if (!imgRes.ok) return false
+  if (!imgRes.ok) return null
   const buf = Buffer.from(await imgRes.arrayBuffer())
-  if (!looksLikeImageBuffer(buf) || buf.length < 8_000) return false
+  return looksLikeImageBuffer(buf) && buf.length >= 8_000 ? buf : null
+}
+
+async function materializeImage(result, outPath) {
+  const buf = await resolveImageBuffer(result)
+  if (!buf) return false
+  mkdirSync(dirname(outPath), { recursive: true })
   await writeFile(outPath, buf)
   return true
+}
+
+/**
+ * Generate one ad-hoc image for the Image Studio tab and return raw bytes (no disk write) —
+ * the caller (an admin endpoint) returns bytes directly to the browser as base64.
+ * @param {{ prompt: string, aspectRatio?: string, signal?: AbortSignal }} opts
+ * @returns {Promise<{ buffer: Buffer, mime: string, promptUsed: string }>}
+ */
+export async function fetchEofGrokImagineBuffer(opts = {}) {
+  const prompt = String(opts.prompt || '').trim()
+  if (!prompt) throw new Error('Prompt is required')
+  const aspectRatio = normalizeEofImageStudioAspectRatio(opts.aspectRatio)
+  const result = await requestGrokImagineImage({ prompt, aspectRatio, signal: opts.signal })
+  const buffer = await resolveImageBuffer(result)
+  if (!buffer) throw new Error('Grok Imagine returned no usable image')
+  return { buffer, mime: inferImageMime(buffer), promptUsed: prompt }
 }
 
 /**
