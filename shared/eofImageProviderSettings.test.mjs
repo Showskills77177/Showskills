@@ -6,6 +6,7 @@ import { after, before, describe, it } from 'node:test'
 import {
   normalizeEofImageProvider,
   resolveEofImageProviderAttemptOrder,
+  isEofImageProviderGenOnly,
   listEofImageProviderOptions,
   eofImageProviderConfigurationNote,
   getEofImageProviderSettings,
@@ -20,6 +21,14 @@ describe('normalizeEofImageProvider', () => {
     assert.equal(normalizeEofImageProvider('serp'), 'serpapi')
     assert.equal(normalizeEofImageProvider('serp_api'), 'serpapi')
     assert.equal(normalizeEofImageProvider('oxy'), 'oxylabs')
+  })
+
+  it('accepts gen (Daily Stories) and common aliases', () => {
+    assert.equal(normalizeEofImageProvider('gen'), 'gen')
+    assert.equal(normalizeEofImageProvider('story'), 'gen')
+    assert.equal(normalizeEofImageProvider('daily-stories'), 'gen')
+    assert.equal(normalizeEofImageProvider('ai'), 'gen')
+    assert.equal(normalizeEofImageProvider('AI_ONLY'), 'gen')
   })
 
   it('defaults unknown / empty to auto', () => {
@@ -64,6 +73,17 @@ describe('resolveEofImageProviderAttemptOrder', () => {
 
   it('returns empty when neither Google Images provider is keyed', () => {
     assert.deepEqual(resolveEofImageProviderAttemptOrder('auto', { serpapi: false, oxylabs: false }), [])
+  })
+
+  it('gen (Daily Stories) never touches real photo search, even when both are keyed', () => {
+    assert.deepEqual(
+      resolveEofImageProviderAttemptOrder('gen', { serpapi: true, oxylabs: true }),
+      [],
+    )
+    assert.equal(isEofImageProviderGenOnly('gen'), true)
+    assert.equal(isEofImageProviderGenOnly('story'), true)
+    assert.equal(isEofImageProviderGenOnly('auto'), false)
+    assert.equal(isEofImageProviderGenOnly('serpapi'), false)
   })
 
   it('configured Serp → serp first; unconfigured Serp → skip (Oxylabs opt-in off)', () => {
@@ -119,6 +139,17 @@ describe('listEofImageProviderOptions + notes', () => {
     assert.equal(opts.find((o) => o.id === 'oxylabs')?.configured, true)
     assert.match(eofImageProviderConfigurationNote('serpapi'), /SerpAPI preferred/i)
     assert.match(eofImageProviderConfigurationNote('oxylabs'), /Oxylabs preferred/i)
+  })
+
+  it('includes a Daily Stories (gen) option, configured note depends on gen providers', () => {
+    const opts = listEofImageProviderOptions()
+    const gen = opts.find((o) => o.id === 'gen')
+    assert.ok(gen, 'gen option should be listed')
+    assert.match(gen.label, /Daily Stories/i)
+    // Free gen (Pollinations) is on by default with no key required, so gen
+    // should read as configured out of the box.
+    assert.equal(gen.configured, true)
+    assert.match(eofImageProviderConfigurationNote('gen'), /Daily Stories/i)
   })
 
   it('keeps Oxylabs unconfigured when credentials exist but OXYLABS_ENABLED is unset', () => {
@@ -199,5 +230,11 @@ describe('eof image provider settings DB read/write', () => {
       Object.keys(gen).sort(),
       ['id', 'imageProvider', 'imageGenMode', 'imageGenProvider', 'updatedAt'].sort(),
     )
+  })
+
+  it('persists the Daily Stories (gen) provider preference', async () => {
+    const stories = await updateEofImageProviderSettings({ imageProvider: 'gen' })
+    assert.equal(stories.imageProvider, 'gen')
+    assert.equal((await getEofImageProviderSettings()).imageProvider, 'gen')
   })
 })

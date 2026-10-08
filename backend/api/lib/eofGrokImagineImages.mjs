@@ -132,23 +132,27 @@ async function materializeImage({ url, b64 }, outPath) {
 export async function generateEofGrokImagineHit(opts = {}) {
   if (!isEofGrokImagineConfigured()) return null
   const subject = String(opts.subject || '').trim()
-  if (!subject) return null
-  const intent = String(opts.intent || 'neutral')
   const workDir = String(opts.workDir || '').trim()
   if (!workDir) throw new Error('workDir is required for Grok Imagine')
+  // Daily Stories passes a fully-built scene prompt directly (no real "subject").
+  const promptOverride = String(opts.prompt || '').trim()
+  if (!promptOverride && !subject) return null
+  const intent = String(opts.intent || 'neutral')
 
-  const prompt = buildEofImageGenPrompt({
-    subject,
-    intent,
-    topic: opts.topic,
-  })
+  const prompt =
+    promptOverride ||
+    buildEofImageGenPrompt({
+      subject,
+      intent,
+      topic: opts.topic,
+    })
   const index = Math.max(0, Number(opts.index) || 0)
   const localPath = join(workDir, `gen-grok-${index + 1}.jpg`)
 
   const result = await requestGrokImagineImage({ prompt, signal: opts.signal })
   const ok = await materializeImage(result, localPath)
   if (!ok || !existsSync(localPath)) {
-    console.warn('[eof-grok-imagine] materialize failed for', subject.slice(0, 40))
+    console.warn('[eof-grok-imagine] materialize failed for', (subject || `scene ${index + 1}`).slice(0, 40))
     return null
   }
 
@@ -156,7 +160,7 @@ export async function generateEofGrokImagineHit(opts = {}) {
   return {
     url: remoteUrl || `file://${localPath}`,
     localPath,
-    title: `${subject} — AI press photo (${intent})`,
+    title: subject ? `${subject} — AI press photo (${intent})` : `AI story still ${index + 1}`,
     width: 768,
     height: 1344,
     source: 'grok-imagine',

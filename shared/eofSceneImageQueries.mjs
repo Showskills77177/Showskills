@@ -373,6 +373,27 @@ export function isNamedFootballSubject(subject) {
   return subjectNameCues(resolved).tokens.length >= 2 && surname.length >= 4
 }
 
+/**
+ * Like isNamedFootballSubject, but for an already-resolved scene subject
+ * (the "core" passed to imageAngleFromCaption/anglesForIntent) — skips the
+ * generic "any two-word proper noun" fallback above, which wrongly treats a
+ * two-club pairing like "Arsenal Brighton" as a person's full name. Used to
+ * gate player/coach-only image beats (training, press conference, sideline,
+ * manager) so a match-recap script never asks for a club's "press
+ * conference" or "training" photo — neither exists as a club-level concept
+ * the way they do for an individual player or coach.
+ * @param {string} subject
+ */
+function isKnownPersonSubject(subject) {
+  const resolved = String(subject || '').trim()
+  if (!resolved || /^football$/i.test(resolved)) return false
+  const { surname } = subjectNameCues(resolved)
+  if (expandPlayerFullName(surname) || expandPlayerFullName(resolved)) return true
+  if (KNOWN_PLAYER_RE.test(resolved) || KNOWN_COACH_RE.test(resolved)) return true
+  if (topicLooksLikeCoach(resolved)) return true
+  return false
+}
+
 /** Title/URL cues that scream group / duo / unrelated couple posing. */
 const GROUP_PHOTO_CUE_RE =
   /\b(two\s+(guys|men|players|friends)|duo|couple|posing\s+with|with\s+friends|group\s+photo|team\s+mates|teammates|alongside|and\s+wife|and\s+girlfriend|bros?|mates\s+pose)\b/i
@@ -898,6 +919,18 @@ const PLAYER_ANGLES = [
   (core) => `${core} training`,
 ]
 
+// Used instead of PLAYER_ANGLES when the resolved subject is not a known
+// individual (player/coach) — e.g. a two-club match recap like "Arsenal
+// Brighton". A club doesn't have a "press conference" or "training" beat the
+// way an individual does, so every angle here stays at the match/team level.
+const MATCH_ANGLES = [
+  (core) => `${core} football`,
+  (core) => `${core} match`,
+  (core) => `${core} match action`,
+  (core) => `${core} celebrating football`,
+  (core) => `${core} highlights`,
+]
+
 const PUNDIT_ANGLES = [
   (core) => `${core} pundit`,
   (core) => `${core} TV studio`,
@@ -930,10 +963,14 @@ function stripOtherNamedCoachMentions(text) {
 
 /**
  * @param {'pundit'|'playing'|'coach'|'neutral'} intent
+ * @param {string} [subject] resolved scene subject ("core") — gates
+ *   player-only beats (press conference, training) off a club/match subject
+ *   like "Arsenal Brighton" that isn't a known individual.
  */
-function anglesForIntent(intent) {
+function anglesForIntent(intent, subject) {
   if (intent === 'pundit') return PUNDIT_ANGLES
   if (intent === 'coach') return COACH_ANGLES
+  if (!isKnownPersonSubject(subject)) return MATCH_ANGLES
   return PLAYER_ANGLES
 }
 
@@ -987,7 +1024,7 @@ export function buildSceneImageSearchQueries({
   })
   const coach = intent === 'coach'
   const pundit = intent === 'pundit'
-  const angles = anglesForIntent(intent)
+  const angles = anglesForIntent(intent, core)
   const angle = angles[sceneIndex % angles.length](core)
   const roleTag = coach ? 'manager' : pundit ? 'pundit' : 'football'
   const person = fullName || lead
@@ -1132,6 +1169,10 @@ export function imageAngleFromCaption(caption, subject, coachOrIntent = false) {
         : detectImageRoleIntent({ caption, topic: subject })
   const coach = intent === 'coach'
   const pundit = intent === 'pundit'
+  // Press conference / training / sideline are individual-only beats — a
+  // two-club match recap like "Arsenal Brighton" has no such photo, so fall
+  // back to a match-level angle instead of mis-querying for one.
+  const isPerson = isKnownPersonSubject(core)
 
   if (pundit || /\b(pundit|studio|sky|tnt|presenter|analysis|desk)\b/.test(c)) {
     if (/\bsky\b/.test(c)) return `${core} Sky Sports`
@@ -1144,11 +1185,12 @@ export function imageAngleFromCaption(caption, subject, coachOrIntent = false) {
   }
   if (/\bengland\b/.test(c) && coach) return `${core} England manager`
   if (/\bpress|interview|says|said|quotes?\b/.test(c)) {
-    return pundit ? `${core} TV studio` : `${core} press conference`
+    if (pundit) return `${core} TV studio`
+    return isPerson ? `${core} press conference` : `${core} match football`
   }
-  if (/\btrain|session|drill\b/.test(c)) return `${core} training`
+  if (/\btrain|session|drill\b/.test(c)) return isPerson ? `${core} training` : `${core} match football`
   if (/\bcelebrat|goal|scores?|winner\b/.test(c)) return `${core} celebrating football`
-  if (/\bsideline|touchline|bench\b/.test(c)) return `${core} sideline`
+  if (/\bsideline|touchline|bench\b/.test(c)) return isPerson ? `${core} sideline` : `${core} match football`
   if (/\bmatch|game|derby|final\b/.test(c)) return `${core} match football`
   if (coach) return `${core} manager`
   if (pundit) return `${core} pundit`
@@ -1220,7 +1262,7 @@ export function defaultSceneImageQuery(topic, sceneIndex, opts = {}) {
   if (caption && captionNamesSpecificImageBeat(caption)) {
     return imageAngleFromCaption(caption, core, resolvedIntent)
   }
-  const angles = anglesForIntent(resolvedIntent)
+  const angles = anglesForIntent(resolvedIntent, core)
   return angles[sceneIndex % angles.length](core)
 }
 

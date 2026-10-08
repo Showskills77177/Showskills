@@ -102,6 +102,14 @@ const SELECTED_JOB_KEY = 'eof_production_selected_job'
 const FREE_CAPTION_PREVIEW_SAMPLE = 'Spain beat Belgium last night'
 const FREE_CAPTION_PREVIEW_LOOP_SEC = 3.2
 
+/** Short label for the active Google Images / Daily Stories provider id. */
+function imageProviderLabel(id) {
+  if (id === 'serpapi') return 'SerpAPI'
+  if (id === 'oxylabs') return 'Oxylabs'
+  if (id === 'gen') return 'Daily Stories (AI-generated)'
+  return 'Auto'
+}
+
 /** Looping clock for free CapCut-style caption thumbs (no video decode). */
 function useLoopClock(durationSec) {
   const [t, setT] = useState(0)
@@ -1820,11 +1828,35 @@ export default function EofProductionPanel({
     const baselineUpdatedAt = opts.baselineUpdatedAt != null ? String(opts.baselineUpdatedAt) : null
     const deadline = Date.now() + 12 * 60 * 1000
     let sawRendering = false
+    // A single transient poll failure (cold start, network blip, brief 5xx) must not
+    // surface as "Build failed" while the server keeps rendering in the background —
+    // that mismatch (DB ends up video_rendered seconds later, user sees a failure) was
+    // the real "no video" bug, not the render itself. Tolerate a run of failures and
+    // only give up once they persist for a while.
+    const MAX_CONSECUTIVE_POLL_FAILURES = 6
+    let consecutivePollFailures = 0
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 1500))
-      const j = await fetchProduction()
+      let j
+      try {
+        j = await fetchProduction()
+      } catch (e) {
+        consecutivePollFailures += 1
+        if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+          throw e instanceof Error ? e : new Error('Could not check build status')
+        }
+        continue
+      }
       const job = (j.jobs || []).find((row) => row.id === jobId)
-      if (!job) throw new Error('Job disappeared during build.')
+      if (!job) {
+        // Could be a transient list/poll glitch rather than the job really vanishing.
+        consecutivePollFailures += 1
+        if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+          throw new Error('Job disappeared during build.')
+        }
+        continue
+      }
+      consecutivePollFailures = 0
       upsertJob(job)
       if (job.renderProgress) setRenderProgress(job.renderProgress)
       if (job.status === 'rendering' || job.status === 'rendering_video') sawRendering = true
@@ -1849,8 +1881,7 @@ export default function EofProductionPanel({
   async function buildShort() {
     if (!selectedId || !draftScript) return
     const imagesVia = rebuildImageProvider || imageProvider || 'auto'
-    const imagesViaLabel =
-      imagesVia === 'serpapi' ? 'SerpAPI' : imagesVia === 'oxylabs' ? 'Oxylabs' : 'Auto'
+    const imagesViaLabel = imageProviderLabel(imagesVia)
     setBusy(true)
     setErr('')
     setSuccess(`Building Short — voiceover, photos via ${imagesViaLabel}, captions…`)
@@ -2357,9 +2388,7 @@ export default function EofProductionPanel({
     setBusy(true)
     setErr('')
     setSuccess(
-      `Rebuilding video — reusing voiceover, refreshing images via ${
-        imagesVia === 'serpapi' ? 'SerpAPI' : imagesVia === 'oxylabs' ? 'Oxylabs' : 'Auto'
-      } (free captions)…`,
+      `Rebuilding video — reusing voiceover, refreshing images via ${imageProviderLabel(imagesVia)} (free captions)…`,
     )
     setRenderPhase('rendering-video')
     setVideoPreviewUrl('')
@@ -2410,9 +2439,7 @@ export default function EofProductionPanel({
       await loadVideoPreview()
       setRenderProgress({ percent: 100, message: 'Short ready', etaLabel: '0:00 left', pipeline: 'video' })
       setSuccess(
-        `Video rebuilt — same voiceover, fresh images via ${
-          imagesVia === 'serpapi' ? 'SerpAPI' : imagesVia === 'oxylabs' ? 'Oxylabs' : 'Auto'
-        }, free captions. No ElevenLabs or ZapCap charges.`,
+        `Video rebuilt — same voiceover, fresh images via ${imageProviderLabel(imagesVia)}, free captions. No ElevenLabs or ZapCap charges.`,
       )
       upsertJob(finishedJob)
       hydratedJobIdRef.current = selectedId

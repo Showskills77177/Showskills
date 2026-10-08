@@ -77,16 +77,19 @@ export function buildPollinationsImageUrl(prompt, opts = {}) {
 export async function generateEofFreeGenHit(opts = {}) {
   if (!isEofFreeGenConfigured()) return null
   const subject = String(opts.subject || '').trim()
-  if (!subject) return null
+  const promptOverride = String(opts.prompt || '').trim()
+  if (!promptOverride && !subject) return null
   const intent = String(opts.intent || 'neutral')
   const workDir = String(opts.workDir || '').trim()
   if (!workDir) throw new Error('workDir is required for free-gen')
 
-  const prompt = buildEofImageGenPrompt({
-    subject,
-    intent,
-    topic: opts.topic,
-  })
+  const prompt =
+    promptOverride ||
+    buildEofImageGenPrompt({
+      subject,
+      intent,
+      topic: opts.topic,
+    })
   const index = Math.max(0, Number(opts.index) || 0)
   const seed = 10_000 + index * 97 + (subject.length % 50)
   const imageUrl = buildPollinationsImageUrl(prompt, { seed })
@@ -129,7 +132,7 @@ export async function generateEofFreeGenHit(opts = {}) {
     // (re-fetching Pollinations would regenerate a different image).
     url: `file://${localPath}`,
     localPath,
-    title: `${subject} — free AI still (${intent})`,
+    title: subject ? `${subject} — free AI still (${intent})` : `AI story still ${index + 1}`,
     width: 768,
     height: 1344,
     source: 'free-gen',

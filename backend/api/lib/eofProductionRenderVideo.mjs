@@ -52,7 +52,9 @@ import {
   getEofImageProviderSettings,
   normalizeEofImageProvider,
   resolveEofImageProviderAttemptOrder,
+  isEofImageProviderGenOnly,
 } from './eofImageProviderSettings.mjs'
+import { generateEofStorySceneImage } from './eofStoryImages.mjs'
 import {
   normalizeEofImageGenMode,
   normalizeEofImageGenProvider,
@@ -486,6 +488,9 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
     // Order follows admin imageProvider (auto / serpapi / oxylabs opt-in), then AP/CSE per scene.
     let oxyPool = null
     let wikiPool = []
+    // Daily Stories: fully AI-generated, no real photo search / vision / subject pool at all.
+    let storyGenMode = false
+    let storyGenProvider = 'auto'
     /** @type {{ providerOrder: string[], providerAttempts: Array<{ provider: string, status?: string, detail?: string, hits?: number, query?: string }>, scrapeHitsBeforeFilter: number, scrapeHitsAfterFilter: number, wikiHits: number|null, genHits: number, subject: string|null }} */
     const imageFetchDiag = {
       providerOrder: [],
@@ -508,12 +513,14 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       }))
       // Per-build override (Production UI Build / Rebuild) wins over the saved admin default.
       const preferredProvider = imageProviderOverride || imageSettings.imageProvider || 'auto'
+      storyGenMode = isEofImageProviderGenOnly(preferredProvider)
       const imageGenMode = normalizeEofImageGenMode(
         process.env.EOF_IMAGE_GEN_MODE || imageSettings.imageGenMode || 'auto',
       )
       const imageGenProvider = normalizeEofImageGenProvider(
         process.env.EOF_IMAGE_GEN_PROVIDER || imageSettings.imageGenProvider || 'auto',
       )
+      storyGenProvider = imageGenProvider
       const providerOrder = resolveEofImageProviderAttemptOrder(preferredProvider, {
         serpapi: isEofSerpApiConfigured(),
         oxylabs: isEofOxylabsConfigured(),
@@ -647,6 +654,16 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
         return pool
       }
 
+      if (storyGenMode) {
+        // Daily Stories: no real photo search, no vision/subject filtering — every
+        // scene is generated directly in the per-scene loop below.
+        console.info(
+          '[eof-video] Daily Stories mode — skipping real photo search entirely',
+          `| gen=${storyGenProvider}`,
+          `| topic=${String(job.topic || '').slice(0, 80)}`,
+        )
+        await report('images', 0, { force: true, message: 'Generating AI story scenes…' })
+      } else {
       let imagePhaseNote = 'Searching Google Images (SerpAPI)…'
       const stopImageHb = startProgressHeartbeat(async () => {
         await report('images', 0, { force: true, message: imagePhaseNote })
@@ -901,6 +918,7 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
       } finally {
         stopImageHb()
       }
+      }
     }
 
     // Explicit Build / Rebuild (opts.forceFreshImages) OR prior placeholders → clear avoidKeys.
@@ -952,6 +970,44 @@ export async function renderEofProductionVideoJob(jobId, opts = {}) {
             imageUrl: prior?.imageUrl || null,
             sourcePage: prior?.sourcePage || null,
           }
+        } else if (storyGenMode) {
+          const attempt = hadPriorImage ? imageAttempt + 1 : 0
+          try {
+            imageMeta = await generateEofStorySceneImage({
+              caption: row.caption,
+              narration: row.narration,
+              topic: job.topic,
+              genProvider: storyGenProvider,
+              workDir,
+              outPath: imagePath,
+              index: row.index,
+            })
+          } catch (e) {
+            console.warn(
+              '[eof-video] story scene generation failed, falling back',
+              row.index + 1,
+              e instanceof Error ? e.message : e,
+            )
+            imageMeta = null
+          }
+          if (!imageMeta) {
+            // Gen failed/not configured for this scene — fall back to the normal
+            // search pipeline (AP/CSE/Pexels/Wikimedia/placeholder) so one bad
+            // generation never blocks the whole Short.
+            imageMeta = await fetchEofSceneImage({
+              topic: job.topic,
+              imageQuery: row.imageQuery,
+              caption: row.caption,
+              outPath: imagePath,
+              index: row.index,
+              refresh: true,
+              attempt,
+              avoidKeys,
+              plainTextDraft: String(job.script?.plainTextDraft || '').trim(),
+              skipSlowFallbacks: false,
+            })
+          }
+          imageAttempt = attempt
         } else {
           const attempt = hadPriorImage ? imageAttempt + 1 : 0
           imageMeta = await fetchEofSceneImage({
