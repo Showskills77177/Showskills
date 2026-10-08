@@ -13,6 +13,46 @@ const ASPECT_LABELS = {
   '3:2': '3:2 — classic photo',
 }
 
+const REFERENCE_IMAGE_MAX_DIM = 1280
+const TEXT_DOCUMENT_RE = /\.(txt|md|markdown|csv|json)$/i
+
+/** Downscale + re-encode as JPEG in the browser so the data URL stays well under the request-size limit. */
+function readReferenceImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read the image file.'))
+    reader.onload = () => {
+      img.onerror = () => reject(new Error('Could not decode the image file.'))
+      img.onload = () => {
+        const scale = Math.min(1, REFERENCE_IMAGE_MAX_DIM / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = String(reader.result)
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+function readDocumentTextFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!TEXT_DOCUMENT_RE.test(file.name)) {
+      reject(new Error('Unsupported document type — upload .txt, .md, .csv, or .json (PDF/Word aren\'t supported yet).'))
+      return
+    }
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read the document file.'))
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.readAsText(file)
+  })
+}
+
 /**
  * Ad-hoc xAI (Grok Imagine) image generator — a free-form "chat prompt" tool for thumbnails
  * or any other one-off image work, decoupled from any production job/scene.
@@ -26,6 +66,11 @@ export default function EofImageStudioPanel() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [history, setHistory] = useState([])
+  const [refImageDataUrl, setRefImageDataUrl] = useState('')
+  const [refImageName, setRefImageName] = useState('')
+  const [docText, setDocText] = useState('')
+  const [docName, setDocName] = useState('')
+  const [attachErr, setAttachErr] = useState('')
 
   const loadStatus = useCallback(async () => {
     try {
@@ -44,6 +89,34 @@ export default function EofImageStudioPanel() {
     loadStatus()
   }, [loadStatus])
 
+  const onPickRefImage = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAttachErr('')
+    try {
+      const dataUrl = await readReferenceImageFile(file)
+      setRefImageDataUrl(dataUrl)
+      setRefImageName(file.name)
+    } catch (err) {
+      setAttachErr(err instanceof Error ? err.message : 'Could not read the image file.')
+    }
+  }, [])
+
+  const onPickDocument = useCallback(async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAttachErr('')
+    try {
+      const text = await readDocumentTextFile(file)
+      setDocText(text)
+      setDocName(file.name)
+    } catch (err) {
+      setAttachErr(err instanceof Error ? err.message : 'Could not read the document file.')
+    }
+  }, [])
+
   const generate = useCallback(
     async (e) => {
       e.preventDefault()
@@ -55,7 +128,12 @@ export default function EofImageStudioPanel() {
         const res = await apiFetch('/api/admin/eof-image-studio', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: trimmed, aspectRatio }),
+          body: JSON.stringify({
+            prompt: trimmed,
+            aspectRatio,
+            referenceImage: refImageDataUrl || undefined,
+            documentText: docText || undefined,
+          }),
         })
         const j = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(j.error || 'Image generation failed')
@@ -64,10 +142,15 @@ export default function EofImageStudioPanel() {
             {
               id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               prompt: j.prompt || trimmed,
+              userPrompt: j.userPrompt || trimmed,
               aspectRatio: j.aspectRatio || aspectRatio,
               mime: j.mime || 'image/jpeg',
               imageBase64: j.imageBase64,
               createdAt: j.createdAt || new Date().toISOString(),
+              referenceImageUsed: Boolean(j.referenceImageUsed),
+              referenceDescription: j.referenceDescription || '',
+              referenceImageWarning: j.referenceImageWarning || '',
+              documentExcerptUsed: Boolean(j.documentExcerptUsed),
             },
             ...prev,
           ].slice(0, MAX_HISTORY),
@@ -78,7 +161,7 @@ export default function EofImageStudioPanel() {
         setBusy(false)
       }
     },
-    [prompt, aspectRatio, busy],
+    [prompt, aspectRatio, busy, refImageDataUrl, docText],
   )
 
   return (
@@ -127,6 +210,67 @@ export default function EofImageStudioPanel() {
             {busy ? 'Generating…' : 'Generate image'}
           </button>
         </div>
+
+        <div className="rounded-lg border border-[#303030] p-3">
+          <p className={`text-[11px] ${EOF.muted}`}>
+            Optional attachments — folded into the prompt as extra context. xAI can&apos;t do pixel-perfect
+            image-to-image, so a reference photo is described by Grok vision and used as style/subject guidance only.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            <label className="flex flex-col text-xs text-[#aaa]">
+              Reference image (optional)
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={onPickRefImage}
+                className="mt-1 text-[11px] text-[#ccc]"
+              />
+            </label>
+            <label className="flex flex-col text-xs text-[#aaa]">
+              Document (optional, .txt/.md/.csv/.json)
+              <input
+                type="file"
+                accept=".txt,.md,.markdown,.csv,.json"
+                onChange={onPickDocument}
+                className="mt-1 text-[11px] text-[#ccc]"
+              />
+            </label>
+          </div>
+          {attachErr ? <p className="mt-2 text-[11px] text-[#ff8f88]">{attachErr}</p> : null}
+          {refImageDataUrl ? (
+            <div className="mt-2 flex items-center gap-2">
+              <img src={refImageDataUrl} alt="Reference preview" className="h-12 w-12 rounded object-cover" />
+              <span className="text-[11px] text-[#ccc]">{refImageName}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRefImageDataUrl('')
+                  setRefImageName('')
+                }}
+                className={`text-[11px] ${EOF.link}`}
+              >
+                Remove
+              </button>
+            </div>
+          ) : null}
+          {docText ? (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[11px] text-[#ccc]">
+                {docName} ({docText.length.toLocaleString()} chars)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDocText('')
+                  setDocName('')
+                }}
+                className={`text-[11px] ${EOF.link}`}
+              >
+                Remove
+              </button>
+            </div>
+          ) : null}
+        </div>
       </form>
 
       <div className="mt-6 border-t border-[#303030] pt-4">
@@ -141,7 +285,18 @@ export default function EofImageStudioPanel() {
                   alt={item.prompt}
                   className="w-full rounded object-cover"
                 />
-                <p className="mt-2 line-clamp-3 text-[11px] text-[#ccc]">{item.prompt}</p>
+                <p className="mt-2 line-clamp-3 text-[11px] text-[#ccc]">{item.userPrompt || item.prompt}</p>
+                {item.referenceImageUsed ? (
+                  <p className="mt-1 line-clamp-2 text-[10px] text-[#8fb8ff]" title={item.referenceDescription}>
+                    Reference seen as: {item.referenceDescription}
+                  </p>
+                ) : null}
+                {item.referenceImageWarning ? (
+                  <p className="mt-1 text-[10px] text-[#ff8f88]">Reference image skipped: {item.referenceImageWarning}</p>
+                ) : null}
+                {item.documentExcerptUsed ? (
+                  <p className="mt-1 text-[10px] text-[#717171]">Document context included.</p>
+                ) : null}
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[10px] text-[#717171]">{item.aspectRatio}</span>
                   <a

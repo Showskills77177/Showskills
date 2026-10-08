@@ -99,3 +99,98 @@ describe('Image Studio — Grok Imagine aspect ratio + buffer fetch (mocked HTTP
     await assert.rejects(() => fetchEofGrokImagineBuffer({ prompt: '  ' }), /Prompt is required/)
   })
 })
+
+describe('Image Studio — reference image description + prompt composition (mocked HTTP)', () => {
+  const prevFetch = globalThis.fetch
+  const prevKey = process.env.XAI_API_KEY
+
+  before(() => {
+    process.env.XAI_API_KEY = 'test-xai-key'
+  })
+
+  after(() => {
+    globalThis.fetch = prevFetch
+    if (prevKey === undefined) delete process.env.XAI_API_KEY
+    else process.env.XAI_API_KEY = prevKey
+  })
+
+  it('parseEofReferenceImageDataUrl accepts a valid JPEG data URL and rejects garbage', async () => {
+    const { parseEofReferenceImageDataUrl } = await import('../backend/api/lib/eofImageStudioReference.mjs')
+    const tinyJpegB64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')
+    const out = parseEofReferenceImageDataUrl(`data:image/jpeg;base64,${tinyJpegB64}`)
+    assert.equal(out.mime, 'image/jpeg')
+    assert.ok(Buffer.isBuffer(out.buffer))
+
+    assert.throws(() => parseEofReferenceImageDataUrl('not-a-data-url'), /JPEG, PNG, or WEBP/)
+    assert.throws(() => parseEofReferenceImageDataUrl('data:application/pdf;base64,AAAA'), /JPEG, PNG, or WEBP/)
+  })
+
+  it('parseEofReferenceImageDataUrl rejects oversized images', async () => {
+    const { parseEofReferenceImageDataUrl, MAX_REFERENCE_IMAGE_BYTES } = await import(
+      '../backend/api/lib/eofImageStudioReference.mjs'
+    )
+    const big = Buffer.alloc(MAX_REFERENCE_IMAGE_BYTES + 10, 1).toString('base64')
+    assert.throws(() => parseEofReferenceImageDataUrl(`data:image/png;base64,${big}`), /too large/)
+  })
+
+  it('truncateEofDocumentText caps long text and leaves short text untouched', async () => {
+    const { truncateEofDocumentText, MAX_DOCUMENT_TEXT_CHARS } = await import(
+      '../backend/api/lib/eofImageStudioReference.mjs'
+    )
+    assert.equal(truncateEofDocumentText('  hello  '), 'hello')
+    assert.equal(truncateEofDocumentText(''), '')
+    const long = 'x'.repeat(MAX_DOCUMENT_TEXT_CHARS + 500)
+    const out = truncateEofDocumentText(long)
+    assert.ok(out.length <= MAX_DOCUMENT_TEXT_CHARS + 1)
+    assert.ok(out.endsWith('…'))
+  })
+
+  it('describeEofReferenceImage posts a multimodal chat/completions request and returns the text', async () => {
+    let seen = null
+    globalThis.fetch = mock.fn(async (url, init) => {
+      seen = { url: String(url), body: JSON.parse(init.body) }
+      return {
+        ok: true,
+        async json() {
+          return { choices: [{ message: { content: '  A dramatic stadium at night.  ' } }] }
+        },
+        async text() {
+          return ''
+        },
+      }
+    })
+    const { describeEofReferenceImage } = await import('../backend/api/lib/eofImageStudioReference.mjs')
+    const out = await describeEofReferenceImage({ dataUrl: 'data:image/jpeg;base64,AAAA' })
+    assert.equal(out, 'A dramatic stadium at night.')
+    assert.equal(seen.url, 'https://api.x.ai/v1/chat/completions')
+    const imageBlock = seen.body.messages[1].content.find((c) => c.type === 'image_url')
+    assert.equal(imageBlock.image_url.url, 'data:image/jpeg;base64,AAAA')
+  })
+
+  it('describeEofReferenceImage throws on a non-ok response', async () => {
+    globalThis.fetch = mock.fn(async () => ({
+      ok: false,
+      status: 500,
+      async text() {
+        return 'boom'
+      },
+    }))
+    const { describeEofReferenceImage } = await import('../backend/api/lib/eofImageStudioReference.mjs')
+    await assert.rejects(() => describeEofReferenceImage({ dataUrl: 'data:image/jpeg;base64,AAAA' }), /xAI vision 500/)
+  })
+
+  it('buildEofImageStudioPrompt weaves prompt + document + reference description together', async () => {
+    const { buildEofImageStudioPrompt } = await import('../backend/api/lib/eofImageStudioReference.mjs')
+    const onlyPrompt = buildEofImageStudioPrompt({ prompt: 'A bold thumbnail' })
+    assert.equal(onlyPrompt, 'A bold thumbnail')
+
+    const full = buildEofImageStudioPrompt({
+      prompt: 'A bold thumbnail',
+      documentExcerpt: 'Arsenal beat Brighton 3-1',
+      referenceDescription: 'A moody blue-toned stadium photo',
+    })
+    assert.ok(full.startsWith('A bold thumbnail'))
+    assert.ok(full.includes('Arsenal beat Brighton 3-1'))
+    assert.ok(full.includes('A moody blue-toned stadium photo'))
+  })
+})
