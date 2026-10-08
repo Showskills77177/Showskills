@@ -12,9 +12,12 @@ import { isEofFreeGenConfigured } from './eofFreeGenImages.mjs'
 import {
   normalizeEofImageGenMode,
   normalizeEofImageGenProvider,
+  normalizeEofStoryMediaMode,
   listEofImageGenModeOptions,
   listEofImageGenProviderOptions,
+  listEofStoryMediaModeOptions,
   eofImageGenConfigurationNote,
+  eofStoryMediaModeConfigurationNote,
 } from './eofImageGen.mjs'
 
 const ROW_ID = 'default'
@@ -153,6 +156,9 @@ async function ensureImageGenColumns() {
     await query(
       `ALTER TABLE eof_image_provider_settings ADD COLUMN IF NOT EXISTS image_gen_provider TEXT NOT NULL DEFAULT 'auto'`,
     ).catch(() => {})
+    await query(
+      `ALTER TABLE eof_image_provider_settings ADD COLUMN IF NOT EXISTS story_media_mode TEXT NOT NULL DEFAULT 'image'`,
+    ).catch(() => {})
     return
   }
   // SQLite: ADD COLUMN fails if already present — ignore.
@@ -161,6 +167,9 @@ async function ensureImageGenColumns() {
   ).catch(() => {})
   await query(
     `ALTER TABLE eof_image_provider_settings ADD COLUMN image_gen_provider TEXT NOT NULL DEFAULT 'auto'`,
+  ).catch(() => {})
+  await query(
+    `ALTER TABLE eof_image_provider_settings ADD COLUMN story_media_mode TEXT NOT NULL DEFAULT 'image'`,
   ).catch(() => {})
 }
 
@@ -175,6 +184,7 @@ export async function ensureEofImageProviderSchema() {
         image_provider TEXT NOT NULL DEFAULT 'auto',
         image_gen_mode TEXT NOT NULL DEFAULT 'auto',
         image_gen_provider TEXT NOT NULL DEFAULT 'auto',
+        story_media_mode TEXT NOT NULL DEFAULT 'image',
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `)
@@ -185,6 +195,7 @@ export async function ensureEofImageProviderSchema() {
         image_provider TEXT NOT NULL DEFAULT 'auto',
         image_gen_mode TEXT NOT NULL DEFAULT 'auto',
         image_gen_provider TEXT NOT NULL DEFAULT 'auto',
+        story_media_mode TEXT NOT NULL DEFAULT 'image',
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )
     `)
@@ -195,7 +206,7 @@ export async function ensureEofImageProviderSchema() {
   const { rows } = await query(`SELECT id FROM eof_image_provider_settings WHERE id = $1`, [ROW_ID])
   if (!rows[0]) {
     await query(
-      `INSERT INTO eof_image_provider_settings (id, image_provider, image_gen_mode, image_gen_provider) VALUES ($1, 'auto', 'auto', 'auto')`,
+      `INSERT INTO eof_image_provider_settings (id, image_provider, image_gen_mode, image_gen_provider, story_media_mode) VALUES ($1, 'auto', 'auto', 'auto', 'image')`,
       [ROW_ID],
     )
   }
@@ -209,6 +220,7 @@ function rowToSettings(row) {
     imageProvider: normalizeEofImageProvider(row.image_provider),
     imageGenMode: normalizeEofImageGenMode(row.image_gen_mode),
     imageGenProvider: normalizeEofImageGenProvider(row.image_gen_provider),
+    storyMediaMode: normalizeEofStoryMediaMode(row.story_media_mode),
     updatedAt: row.updated_at || null,
   }
 }
@@ -222,6 +234,7 @@ export async function getEofImageProviderSettings() {
       imageProvider: 'auto',
       imageGenMode: 'auto',
       imageGenProvider: 'auto',
+      storyMediaMode: 'image',
       updatedAt: null,
     }
   )
@@ -242,6 +255,10 @@ export async function updateEofImageProviderSettings(patch = {}) {
     patch.imageGenProvider !== undefined
       ? normalizeEofImageGenProvider(patch.imageGenProvider)
       : current.imageGenProvider
+  const storyMediaMode =
+    patch.storyMediaMode !== undefined
+      ? normalizeEofStoryMediaMode(patch.storyMediaMode)
+      : current.storyMediaMode
 
   const nowSql = dbIsPostgres() ? 'now()' : `datetime('now')`
   await query(
@@ -249,9 +266,10 @@ export async function updateEofImageProviderSettings(patch = {}) {
      SET image_provider = $2,
          image_gen_mode = $3,
          image_gen_provider = $4,
+         story_media_mode = $5,
          updated_at = ${nowSql}
      WHERE id = $1`,
-    [ROW_ID, imageProvider, imageGenMode, imageGenProvider],
+    [ROW_ID, imageProvider, imageGenMode, imageGenProvider, storyMediaMode],
   )
   return getEofImageProviderSettings()
 }
@@ -259,7 +277,10 @@ export async function updateEofImageProviderSettings(patch = {}) {
 export {
   listEofImageGenModeOptions,
   listEofImageGenProviderOptions,
+  listEofStoryMediaModeOptions,
   eofImageGenConfigurationNote,
+  eofStoryMediaModeConfigurationNote,
   normalizeEofImageGenMode,
   normalizeEofImageGenProvider,
+  normalizeEofStoryMediaMode,
 }

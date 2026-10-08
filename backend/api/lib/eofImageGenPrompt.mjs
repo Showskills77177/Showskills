@@ -60,3 +60,14 @@ export function buildEofStorySceneImagePrompt(opts = {}) {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+/**
+ * "Daily Stories" per-scene *video* prompt — same illustrated-narrative framing as
+ * the still prompt above, with a short motion cue appended so text-to-video models
+ * animate the scene instead of rendering a static frame.
+ * @param {{ sceneText: string, topic?: string, styleHint?: string }} opts
+ */
+export function buildEofStorySceneVideoPrompt(opts = {}) {
+  const stillPrompt = buildEofStorySceneImagePrompt(opts)
+  return `${stillPrompt} Subtle cinematic camera motion, smooth animation, consistent character and setting throughout.`
+}

@@ -1085,6 +1085,12 @@ export default function EofProductionPanel({
   ])
   const [imageGenNote, setImageGenNote] = useState('')
   const [imageGenBusy, setImageGenBusy] = useState(false)
+  const [storyMediaMode, setStoryMediaMode] = useState('image')
+  const [storyMediaModeOptions, setStoryMediaModeOptions] = useState([
+    { id: 'image', label: 'Illustrated stills', configured: true },
+    { id: 'video', label: 'AI cartoon video (Pollinations)', configured: false },
+  ])
+  const [storyMediaModeNote, setStoryMediaModeNote] = useState('')
   const [buildMode, setBuildMode] = useState('pro')
   const [buildModeSaved, setBuildModeSaved] = useState('pro')
   const [buildModeOptions, setBuildModeOptions] = useState([
@@ -1248,6 +1254,13 @@ export default function EofProductionPanel({
         setImageGenProviderOptions(j.imageGenProviderOptions)
       }
       setImageGenNote(typeof j.imageGenNote === 'string' ? j.imageGenNote : '')
+      if (typeof j.storyMediaMode === 'string' && j.storyMediaMode.trim()) {
+        setStoryMediaMode(j.storyMediaMode.trim().toLowerCase())
+      }
+      if (Array.isArray(j.storyMediaModeOptions) && j.storyMediaModeOptions.length) {
+        setStoryMediaModeOptions(j.storyMediaModeOptions)
+      }
+      setStoryMediaModeNote(typeof j.storyMediaModeNote === 'string' ? j.storyMediaModeNote : '')
       if (typeof j.buildMode === 'string' && j.buildMode.trim()) {
         setBuildMode(j.buildMode.trim().toLowerCase())
       }
@@ -1373,11 +1386,22 @@ export default function EofProductionPanel({
         patch.imageGenProvider !== undefined
           ? String(patch.imageGenProvider || '').trim().toLowerCase()
           : imageGenProvider
-      if (nextMode === imageGenMode && nextProvider === imageGenProvider) return
+      const nextStoryMediaMode =
+        patch.storyMediaMode !== undefined
+          ? String(patch.storyMediaMode || '').trim().toLowerCase()
+          : storyMediaMode
+      if (
+        nextMode === imageGenMode &&
+        nextProvider === imageGenProvider &&
+        nextStoryMediaMode === storyMediaMode
+      )
+        return
       const prevMode = imageGenMode
       const prevProvider = imageGenProvider
+      const prevStoryMediaMode = storyMediaMode
       setImageGenMode(nextMode)
       setImageGenProvider(nextProvider)
+      setStoryMediaMode(nextStoryMediaMode)
       setImageGenBusy(true)
       setErr('')
       try {
@@ -1388,6 +1412,7 @@ export default function EofProductionPanel({
             action: 'update-image-gen',
             imageGenMode: nextMode,
             imageGenProvider: nextProvider,
+            storyMediaMode: nextStoryMediaMode,
           }),
         })
         const j = await res.json().catch(() => ({}))
@@ -1397,18 +1422,22 @@ export default function EofProductionPanel({
         if (Array.isArray(j.imageGenModeOptions)) setImageGenModeOptions(j.imageGenModeOptions)
         if (Array.isArray(j.imageGenProviderOptions)) setImageGenProviderOptions(j.imageGenProviderOptions)
         if (typeof j.imageGenNote === 'string') setImageGenNote(j.imageGenNote)
+        if (typeof j.storyMediaMode === 'string') setStoryMediaMode(j.storyMediaMode)
+        if (Array.isArray(j.storyMediaModeOptions)) setStoryMediaModeOptions(j.storyMediaModeOptions)
+        setStoryMediaModeNote(typeof j.storyMediaModeNote === 'string' ? j.storyMediaModeNote : '')
         setSuccess(
           `Image gen: ${j.imageGenMode || nextMode} / ${j.imageGenProvider || nextProvider}`,
         )
       } catch (e) {
         setImageGenMode(prevMode)
         setImageGenProvider(prevProvider)
+        setStoryMediaMode(prevStoryMediaMode)
         setErr(e instanceof Error ? e.message : 'Could not save image gen settings')
       } finally {
         setImageGenBusy(false)
       }
     },
-    [imageGenMode, imageGenProvider],
+    [imageGenMode, imageGenProvider, storyMediaMode],
   )
 
   useEffect(() => {
@@ -3327,6 +3356,30 @@ export default function EofProductionPanel({
               </select>
             </label>
 
+            {imageProvider === 'gen' ? (
+              <label className="block space-y-1">
+                <span className="text-[#aaaaaa]">Daily Stories media</span>
+                <select
+                  value={storyMediaMode}
+                  disabled={imageGenBusy}
+                  onChange={(e) => saveImageGenSettings({ storyMediaMode: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-[#303030] bg-[#121212] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#555] disabled:opacity-50"
+                >
+                  {storyMediaModeOptions.map((p) => (
+                    <option
+                      key={p.id}
+                      value={p.id}
+                      disabled={p.id !== 'image' && !p.configured}
+                      title={p.detail}
+                    >
+                      {p.label}
+                      {p.id !== 'image' && !p.configured ? ' (not set)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             {imageProvider === 'serpapi' && !imageSources.serpapi ? (
               <p className="text-[#ff9b95]">SerpAPI selected but SERPAPI_API_KEY is not configured.</p>
             ) : null}
@@ -3340,6 +3393,9 @@ export default function EofProductionPanel({
             ) : null}
             {imagesNote ? <p className="text-[#fbbf24]">{imagesNote}</p> : null}
             {imageGenNote ? <p className="text-[#8ab4f8]">{imageGenNote}</p> : null}
+            {imageProvider === 'gen' && storyMediaModeNote ? (
+              <p className="text-[#8ab4f8]">{storyMediaModeNote}</p>
+            ) : null}
             {serpapiStatus?.configured ? (
               <p className={serpapiStatus.ok ? 'text-[#7ee787]' : 'text-[#ff9b95]'}>
                 SerpAPI:{' '}
@@ -3608,6 +3664,29 @@ export default function EofProductionPanel({
                 ))}
               </select>
             </label>
+            {imageProvider === 'gen' ? (
+              <label className={PX.label}>
+                Daily Stories media
+                <select
+                  value={storyMediaMode}
+                  disabled={imageGenBusy}
+                  onChange={(e) => saveImageGenSettings({ storyMediaMode: e.target.value })}
+                  className={inputCls}
+                >
+                  {storyMediaModeOptions.map((p) => (
+                    <option
+                      key={p.id}
+                      value={p.id}
+                      disabled={p.id !== 'image' && !p.configured}
+                      title={p.detail}
+                    >
+                      {p.label}
+                      {p.id !== 'image' && !p.configured ? ' (not set)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
             <label className={PX.label}>
               Voice
@@ -3645,6 +3724,9 @@ export default function EofProductionPanel({
             </p>
           ) : null}
           {imageGenNote ? <p className={`text-xs ${PX.muted} text-[#8ab4f8]`}>{imageGenNote}</p> : null}
+          {imageProvider === 'gen' && storyMediaModeNote ? (
+            <p className={`text-xs ${PX.muted} text-[#8ab4f8]`}>{storyMediaModeNote}</p>
+          ) : null}
           <div
             className={
               selected

@@ -23,9 +23,12 @@ import {
   normalizeEofImageProvider,
   listEofImageGenModeOptions,
   listEofImageGenProviderOptions,
+  listEofStoryMediaModeOptions,
   eofImageGenConfigurationNote,
+  eofStoryMediaModeConfigurationNote,
   normalizeEofImageGenMode,
   normalizeEofImageGenProvider,
+  normalizeEofStoryMediaMode,
 } from '../lib/eofImageProviderSettings.mjs'
 import {
   getEofBuildModeSettings,
@@ -362,6 +365,9 @@ export default async function handler(req, res) {
           mode: imageProviderSettings.imageGenMode,
           provider: imageProviderSettings.imageGenProvider,
         }),
+        storyMediaMode: imageProviderSettings.storyMediaMode || 'image',
+        storyMediaModeOptions: listEofStoryMediaModeOptions(),
+        storyMediaModeNote: eofStoryMediaModeConfigurationNote(imageProviderSettings.storyMediaMode),
         buildMode: buildModeSettings.effectiveMode || buildModeSettings.buildMode || 'pro',
         buildModeSaved: buildModeSettings.buildMode || 'pro',
         buildModeOptions: listEofBuildModeOptions(),
@@ -514,9 +520,13 @@ export default async function handler(req, res) {
         if (body.imageGenProvider !== undefined) {
           patch.imageGenProvider = normalizeEofImageGenProvider(body.imageGenProvider)
         }
+        if (body.storyMediaMode !== undefined) {
+          patch.storyMediaMode = normalizeEofStoryMediaMode(body.storyMediaMode)
+        }
         if (!Object.keys(patch).length) {
           return json(res, 400, {
-            error: 'imageGenMode (off|auto|always) and/or imageGenProvider (auto|grok|free) required.',
+            error:
+              'imageGenMode (off|auto|always), imageGenProvider (auto|grok|free), and/or storyMediaMode (image|video) required.',
           })
         }
         const settings = await updateEofImageProviderSettings(patch)
@@ -532,6 +542,9 @@ export default async function handler(req, res) {
             mode: settings.imageGenMode,
             provider: settings.imageGenProvider,
           }),
+          storyMediaMode: settings.storyMediaMode,
+          storyMediaModeOptions: listEofStoryMediaModeOptions(),
+          storyMediaModeNote: eofStoryMediaModeConfigurationNote(settings.storyMediaMode),
         })
       }
 
