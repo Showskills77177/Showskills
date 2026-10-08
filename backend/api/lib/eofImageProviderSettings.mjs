@@ -7,6 +7,8 @@ import { query, dbIsPostgres } from './db.mjs'
 import { ensureEofProductionSchema } from './ensureEofProductionSchema.mjs'
 import { isEofSerpApiConfigured } from './eofSerpApiImages.mjs'
 import { isEofOxylabsConfigured } from './eofOxylabsImages.mjs'
+import { isEofGrokImagineConfigured } from './eofGrokImagineImages.mjs'
+import { isEofFreeGenConfigured } from './eofFreeGenImages.mjs'
 import {
   normalizeEofImageGenMode,
   normalizeEofImageGenProvider,
@@ -16,7 +18,8 @@ import {
 } from './eofImageGen.mjs'
 
 const ROW_ID = 'default'
-export const EOF_IMAGE_PROVIDER_IDS = new Set(['auto', 'serpapi', 'oxylabs'])
+// 'gen' = Daily Stories: skip real photo search entirely, every scene is AI-generated.
+export const EOF_IMAGE_PROVIDER_IDS = new Set(['auto', 'serpapi', 'oxylabs', 'gen'])
 
 let ensured = false
 
@@ -26,20 +29,29 @@ export function normalizeEofImageProvider(value) {
     .toLowerCase()
   if (v === 'serp' || v === 'serp_api' || v === 'google_serpapi') return 'serpapi'
   if (v === 'oxy' || v === 'oxy_labs') return 'oxylabs'
+  if (v === 'story' || v === 'stories' || v === 'daily-stories' || v === 'ai' || v === 'ai-only' || v === 'ai_only')
+    return 'gen'
   if (EOF_IMAGE_PROVIDER_IDS.has(v)) return v
   return 'auto'
+}
+
+/** Daily Stories: fully AI-generated, no real photo search. */
+export function isEofImageProviderGenOnly(preferred) {
+  return normalizeEofImageProvider(preferred) === 'gen'
 }
 
 /**
  * Ordered Google Images job-pool providers (1 billable query each).
  * Preferred provider first when configured; other configured provider remains as fallback.
  * `auto` = SerpAPI first; Oxylabs only when explicitly opted in (OXYLABS_ENABLED=1).
+ * `gen` (Daily Stories) never touches real photo search — always returns [].
  */
 export function resolveEofImageProviderAttemptOrder(
   preferred,
   { serpapi = false, oxylabs = false } = {},
 ) {
   const pick = normalizeEofImageProvider(preferred)
+  if (pick === 'gen') return []
   const available = []
   if (serpapi) available.push('serpapi')
   if (oxylabs) available.push('oxylabs')
@@ -81,6 +93,15 @@ export function listEofImageProviderOptions() {
         ? 'Prefer Oxylabs for the Google Images job pool (SerpAPI still falls back).'
         : 'Off by default (trial ended). Opt in with OXYLABS_ENABLED=1 + username/password when renewed.',
     },
+    {
+      id: 'gen',
+      label: 'Daily Stories (100% AI-generated)',
+      configured: isEofGrokImagineConfigured() || isEofFreeGenConfigured(),
+      detail:
+        isEofGrokImagineConfigured() || isEofFreeGenConfigured()
+          ? 'No real photo search — every scene is generated from its own narration via xAI Grok (or free gen fallback). For fictional / story scripts.'
+          : 'Needs XAI_API_KEY (or free gen) configured on Vercel staging.',
+    },
   ]
 }
 
@@ -105,6 +126,11 @@ export function eofImageProviderConfigurationNote(preferred = 'auto') {
     return serpapi
       ? 'Google Images: Oxylabs preferred (1 search/Short). SerpAPI + gen/Wikimedia fallback when needed.'
       : 'Google Images: Oxylabs preferred (1 search/Short). SerpAPI not keyed — gen/Wikimedia next.'
+  }
+  if (pick === 'gen') {
+    return isEofGrokImagineConfigured() || isEofFreeGenConfigured()
+      ? 'Daily Stories: real photo search skipped — every scene generated via xAI Grok (one image per scene, from that scene\u2019s own narration).'
+      : 'Daily Stories selected but no gen provider is configured — add XAI_API_KEY (or enable free gen) on Vercel staging.'
   }
 
   if (order[0] === 'serpapi') {

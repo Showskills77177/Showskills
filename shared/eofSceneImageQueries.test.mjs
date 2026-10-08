@@ -497,4 +497,48 @@ describe('eofSceneImageQueries', () => {
     )
     assert.equal(emptyKept.length, 0, 'empty-title hit must be rejected without vision or a URL name cue')
   })
+
+  it('never asks for a player-only beat (training/press conference/sideline) for a two-club match recap', () => {
+    const subject = 'Arsenal Brighton'
+    // "training" caption on a club-vs-club recap must not become "Arsenal Brighton training" —
+    // neither club has a "training" photo concept the way an individual player does.
+    assert.equal(
+      imageAngleFromCaption('They trained hard all week', subject, 'neutral'),
+      'Arsenal Brighton match football',
+    )
+    assert.equal(
+      imageAngleFromCaption('Arsenal gave an interview after the game', subject, 'neutral'),
+      'Arsenal Brighton match football',
+    )
+    assert.equal(
+      imageAngleFromCaption('Brighton stayed on the sideline bench', subject, 'neutral'),
+      'Arsenal Brighton match football',
+    )
+    // Goal/celebration and match beats are still fine at club level.
+    assert.equal(
+      imageAngleFromCaption('Brighton scored a late winner', subject, 'neutral'),
+      'Arsenal Brighton celebrating football',
+    )
+  })
+
+  it('still allows training/press conference/sideline beats for a known individual player or coach', () => {
+    assert.equal(
+      imageAngleFromCaption('He trained hard all week', 'Marc Cucurella', 'neutral'),
+      'Marc Cucurella training',
+    )
+    assert.equal(
+      imageAngleFromCaption('Tuchel gave an interview after', 'Thomas Tuchel', 'coach'),
+      'Thomas Tuchel press conference',
+    )
+  })
+
+  it('buildSceneImageSearchQueries round-robins match-level angles (not training/press) for a club pairing', () => {
+    for (let i = 0; i < 6; i += 1) {
+      const qs = buildSceneImageSearchQueries({ topic: 'Arsenal Brighton', sceneIndex: i })
+      assert.ok(
+        !/training|press conference/i.test(qs[0] || ''),
+        `scene ${i} query must not ask for an individual beat, got “${qs[0]}”`,
+      )
+    }
+  })
 })

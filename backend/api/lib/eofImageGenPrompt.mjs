@@ -33,3 +33,30 @@ export function buildEofImageGenPrompt(opts = {}) {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+/**
+ * "Daily Stories" per-scene prompt — no real-world subject, no press-photo framing.
+ * Each scene gets its own illustrated still built straight from that scene's own
+ * narration/caption, for fictional / narrative scripts where there is nothing real
+ * to photograph.
+ * @param {{ sceneText: string, topic?: string, styleHint?: string }} opts
+ */
+export function buildEofStorySceneImagePrompt(opts = {}) {
+  const sceneText = String(opts.sceneText || '').trim()
+  const topic = String(opts.topic || '').trim()
+  const style =
+    String(opts.styleHint || '').trim() ||
+    'cinematic digital illustration, warm dramatic lighting, rich color, detailed character art'
+
+  return [
+    'Illustrated story scene,',
+    style + ',',
+    sceneText ? `depicting: ${sceneText}.` : topic ? `depicting: ${topic}.` : '',
+    'Vertical 9:16 composition suitable for YouTube Shorts,',
+    'no text, no captions, no watermarks, no logos, no UI elements.',
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
