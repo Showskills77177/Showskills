@@ -50,6 +50,14 @@ describe('buildEofImageGenPrompt', () => {
     assert.match(p, /Harry Kane/)
     assert.match(p, /kit|match/i)
   })
+
+  // Regression: Grok Imagine occasionally rotates a whole multi-figure scene 90°
+  // sideways when asked for a 9:16 crop. Explicitly call out upright framing.
+  it('asks for upright, non-rotated framing', () => {
+    const p = buildEofImageGenPrompt({ subject: 'Marc Cucurella', intent: 'neutral' })
+    assert.match(p, /upright/i)
+    assert.match(p, /sideways|rotated/i)
+  })
 })
 
 describe('resolveEofImageGenCount (auto gapfill)', () => {

@@ -24,6 +24,7 @@ export function buildEofImageGenPrompt(opts = {}) {
     `Photorealistic sports press photograph of ${subject},`,
     roleLine + '.',
     'Vertical 9:16 portrait crop suitable for Instagram/YouTube Shorts,',
+    'upright camera orientation, subject and scene composed straight (never sideways or rotated),',
     'editorial sports photography, natural skin texture, realistic lighting,',
     'no text, no captions, no watermarks, no logos, no collage, no illustration, no CGI.',
     topicHint,
@@ -53,6 +54,8 @@ export function buildEofStorySceneImagePrompt(opts = {}) {
     style + ',',
     sceneText ? `depicting: ${sceneText}.` : topic ? `depicting: ${topic}.` : '',
     'Vertical 9:16 composition suitable for YouTube Shorts,',
+    'upright portrait framing — compose the scene top-to-bottom for a tall frame, never rotate',
+    'or tilt the whole scene sideways, all figures stand/sit upright with heads toward the top,',
     'no text, no captions, no watermarks, no logos, no UI elements.',
   ]
     .filter(Boolean)
