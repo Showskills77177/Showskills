@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it, mock, before, after } from 'node:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 describe('Image Studio — Grok Imagine aspect ratio + buffer fetch (mocked HTTP)', () => {
   const prevFetch = globalThis.fetch
@@ -192,5 +195,203 @@ describe('Image Studio — reference image description + prompt composition (moc
     assert.ok(full.startsWith('A bold thumbnail'))
     assert.ok(full.includes('Arsenal beat Brighton 3-1'))
     assert.ok(full.includes('A moody blue-toned stadium photo'))
+  })
+
+  it('parseEofReferenceImageDataUrls accepts up to MAX_REFERENCE_IMAGES and rejects more', async () => {
+    const { parseEofReferenceImageDataUrls, MAX_REFERENCE_IMAGES } = await import(
+      '../backend/api/lib/eofImageStudioReference.mjs'
+    )
+    const tinyJpegB64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')
+    const oneUrl = `data:image/jpeg;base64,${tinyJpegB64}`
+
+    assert.equal(parseEofReferenceImageDataUrls([]).length, 0)
+    assert.equal(parseEofReferenceImageDataUrls([oneUrl, oneUrl]).length, 2)
+    assert.equal(parseEofReferenceImageDataUrls(Array(MAX_REFERENCE_IMAGES).fill(oneUrl)).length, MAX_REFERENCE_IMAGES)
+    assert.throws(
+      () => parseEofReferenceImageDataUrls(Array(MAX_REFERENCE_IMAGES + 1).fill(oneUrl)),
+      /Up to 5 reference images/,
+    )
+  })
+
+  it('describeEofReferenceImages delegates to the singular call for exactly one image', async () => {
+    let seen = null
+    globalThis.fetch = mock.fn(async (url, init) => {
+      seen = { url: String(url), body: JSON.parse(init.body) }
+      return {
+        ok: true,
+        async json() {
+          return { choices: [{ message: { content: 'A single stadium photo.' } }] }
+        },
+        async text() {
+          return ''
+        },
+      }
+    })
+    const { describeEofReferenceImages } = await import('../backend/api/lib/eofImageStudioReference.mjs')
+    const out = await describeEofReferenceImages({ dataUrls: ['data:image/jpeg;base64,AAAA'] })
+    assert.equal(out, 'A single stadium photo.')
+    // Singular code path sends a single image_url content block, not an array of N images.
+    assert.equal(seen.body.messages[1].content.length, 1)
+  })
+
+  it('describeEofReferenceImages posts all images together in one multimodal request', async () => {
+    let seen = null
+    globalThis.fetch = mock.fn(async (url, init) => {
+      seen = { url: String(url), body: JSON.parse(init.body) }
+      return {
+        ok: true,
+        async json() {
+          return { choices: [{ message: { content: '  Three cohesive football photos.  ' } }] }
+        },
+        async text() {
+          return ''
+        },
+      }
+    })
+    const { describeEofReferenceImages } = await import('../backend/api/lib/eofImageStudioReference.mjs')
+    const dataUrls = ['data:image/jpeg;base64,AAAA', 'data:image/jpeg;base64,BBBB', 'data:image/jpeg;base64,CCCC']
+    const out = await describeEofReferenceImages({ dataUrls })
+    assert.equal(out, 'Three cohesive football photos.')
+    assert.equal(seen.url, 'https://api.x.ai/v1/chat/completions')
+    const imageBlocks = seen.body.messages[1].content.filter((c) => c.type === 'image_url')
+    assert.equal(imageBlocks.length, 3)
+    assert.ok(seen.body.messages[0].content.includes('3 reference images'))
+  })
+
+  it('describeEofReferenceImages throws when given more than MAX_REFERENCE_IMAGES or none', async () => {
+    const { describeEofReferenceImages, MAX_REFERENCE_IMAGES } = await import(
+      '../backend/api/lib/eofImageStudioReference.mjs'
+    )
+    await assert.rejects(() => describeEofReferenceImages({ dataUrls: [] }), /At least one reference image/)
+    await assert.rejects(
+      () => describeEofReferenceImages({ dataUrls: Array(MAX_REFERENCE_IMAGES + 1).fill('data:image/jpeg;base64,AAAA') }),
+      /Up to 5 reference images/,
+    )
+  })
+})
+
+describe('Image Studio — per-user persistent history store (SQLite)', () => {
+  let tmpDir
+  let store
+  const prevSqlite = process.env.SQLITE_PATH
+  const prevDatabaseUrl = process.env.DATABASE_URL
+  const prevPostgresUrl = process.env.POSTGRES_URL
+
+  before(async () => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'eof-image-studio-history-'))
+    process.env.SQLITE_PATH = join(tmpDir, 'test.sqlite')
+    delete process.env.DATABASE_URL
+    delete process.env.POSTGRES_URL
+    store = await import('../backend/api/lib/eofImageStudioHistoryStore.mjs')
+  })
+
+  after(() => {
+    if (prevSqlite === undefined) delete process.env.SQLITE_PATH
+    else process.env.SQLITE_PATH = prevSqlite
+    if (prevDatabaseUrl === undefined) delete process.env.DATABASE_URL
+    else process.env.DATABASE_URL = prevDatabaseUrl
+    if (prevPostgresUrl === undefined) delete process.env.POSTGRES_URL
+    else process.env.POSTGRES_URL = prevPostgresUrl
+    try {
+      rmSync(tmpDir, { recursive: true, force: true })
+    } catch {
+      // best-effort cleanup
+    }
+  })
+
+  it('adds, lists (newest first), and scopes history per user', async () => {
+    const saved1 = await store.addEofImageStudioHistoryEntry({
+      username: 'alice',
+      prompt: 'final prompt 1',
+      userPrompt: 'prompt 1',
+      aspectRatio: '16:9',
+      mime: 'image/jpeg',
+      bytes: 100,
+      imageBase64: 'AAAA',
+    })
+    assert.ok(saved1.id)
+    assert.equal(saved1.username, 'alice')
+
+    await new Promise((r) => setTimeout(r, 5))
+    const saved2 = await store.addEofImageStudioHistoryEntry({
+      username: 'alice',
+      prompt: 'final prompt 2',
+      userPrompt: 'prompt 2',
+      aspectRatio: '9:16',
+      mime: 'image/jpeg',
+      bytes: 200,
+      imageBase64: 'BBBB',
+      referenceImageUsed: true,
+      referenceImageCount: 2,
+    })
+
+    await store.addEofImageStudioHistoryEntry({
+      username: 'bob',
+      prompt: 'bobs prompt',
+      userPrompt: 'bobs prompt',
+      aspectRatio: '1:1',
+      mime: 'image/jpeg',
+      bytes: 50,
+      imageBase64: 'CCCC',
+    })
+
+    const aliceHistory = await store.listEofImageStudioHistory('alice')
+    assert.equal(aliceHistory.length, 2)
+    assert.equal(aliceHistory[0].id, saved2.id) // newest first
+    assert.equal(aliceHistory[1].id, saved1.id)
+    assert.equal(aliceHistory[0].referenceImageUsed, true)
+    assert.equal(aliceHistory[0].referenceImageCount, 2)
+
+    const bobHistory = await store.listEofImageStudioHistory('bob')
+    assert.equal(bobHistory.length, 1)
+    assert.equal(bobHistory[0].username, 'bob')
+  })
+
+  it('deleteEofImageStudioHistoryEntry only removes the owning user\'s entry', async () => {
+    const saved = await store.addEofImageStudioHistoryEntry({
+      username: 'carol',
+      prompt: 'p',
+      userPrompt: 'p',
+      aspectRatio: '16:9',
+      mime: 'image/jpeg',
+      bytes: 10,
+      imageBase64: 'DDDD',
+    })
+
+    const deletedByWrongUser = await store.deleteEofImageStudioHistoryEntry('mallory', saved.id)
+    assert.equal(deletedByWrongUser, false)
+    assert.equal((await store.listEofImageStudioHistory('carol')).length, 1)
+
+    const deletedByOwner = await store.deleteEofImageStudioHistoryEntry('carol', saved.id)
+    assert.equal(deletedByOwner, true)
+    assert.equal((await store.listEofImageStudioHistory('carol')).length, 0)
+  })
+
+  it('clearEofImageStudioHistory removes all of one user\'s entries only', async () => {
+    for (let i = 0; i < 3; i++) {
+      await store.addEofImageStudioHistoryEntry({
+        username: 'dave',
+        prompt: `p${i}`,
+        userPrompt: `p${i}`,
+        aspectRatio: '16:9',
+        mime: 'image/jpeg',
+        bytes: 10,
+        imageBase64: 'EEEE',
+      })
+    }
+    await store.addEofImageStudioHistoryEntry({
+      username: 'erin',
+      prompt: 'erins prompt',
+      userPrompt: 'erins prompt',
+      aspectRatio: '16:9',
+      mime: 'image/jpeg',
+      bytes: 10,
+      imageBase64: 'FFFF',
+    })
+
+    const deletedCount = await store.clearEofImageStudioHistory('dave')
+    assert.equal(deletedCount, 3)
+    assert.equal((await store.listEofImageStudioHistory('dave')).length, 0)
+    assert.equal((await store.listEofImageStudioHistory('erin')).length, 1)
   })
 })
