@@ -30,6 +30,17 @@ describe('buildEofStorySceneImagePrompt', () => {
     })
     assert.match(p, /flat 2D cartoon style/)
   })
+
+  // Regression: multi-figure illustrated scenes (locker rooms, press conferences)
+  // sometimes came back rotated 90° sideways from Grok Imagine. Ask explicitly
+  // for upright, non-rotated portrait framing.
+  it('asks for upright, non-rotated portrait framing', () => {
+    const p = buildEofStorySceneImagePrompt({
+      sceneText: 'A packed locker room full of teammates getting ready before training.',
+    })
+    assert.match(p, /upright/i)
+    assert.match(p, /rotate|tilt/i)
+  })
 })
 
 describe('generateEofStorySceneImage (mocked HTTP)', () => {
