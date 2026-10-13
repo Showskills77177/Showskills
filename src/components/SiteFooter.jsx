@@ -80,9 +80,9 @@ function withOffset(offsets, key, node) {
  * }} props
  */
 export function SiteFooter({ shell, footerLinks, openTerms }) {
+  const { locale, t, region } = useSiteLocale()
   if (shell.footer?.visible === false) return null
 
-  const { locale, t, region } = useSiteLocale()
   const footerOffsets = shell.footerOffsets || {}
   const footerSocial = shell.footer?.socialLinks || {}
   const legalMain =
@@ -106,6 +106,12 @@ export function SiteFooter({ shell, footerLinks, openTerms }) {
             {footerLinks.map((link) => (
               <FooterNavLink key={link.id || link.label} link={link} openTerms={openTerms} locale={locale} />
             ))}
+            <Link
+              to="/recent-winners"
+              className="text-base font-medium text-stone-400 transition hover:text-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-400/50 md:text-sm"
+            >
+              Recent winners
+            </Link>
           </nav>,
         )}
 
