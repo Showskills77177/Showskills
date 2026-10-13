@@ -12,6 +12,7 @@ import { UserAuthProvider } from './auth/UserAuthProvider'
 import { RequireUser } from './auth/RequireUser'
 import HomePage from './pages/HomePage'
 import CompetitionsPage from './pages/CompetitionsPage'
+import RecentWinnersPage from './pages/RecentWinnersPage'
 import KickupsArchivePage from './pages/KickupsArchivePage'
 import AdminLoginPage from './pages/admin/LoginPage'
 import AdminDashboardPage from './pages/admin/DashboardPage'
@@ -129,8 +130,9 @@ export default function App() {
             <Route path="winners" element={<WinnersPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="terms" element={<TermsPage />} />
-            <Route path="privacy" element={<PrivacyPage />} />
+            <Route path="recent-winners" element={<RecentWinnersPage />} />
             <Route path="contact" element={<ContactPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="login" element={<AuthModalRedirect view="login" />} />
             <Route path="register" element={<AuthModalRedirect view="register" />} />

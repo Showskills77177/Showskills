@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function formatWinnerDate(iso) {
   if (!iso) return null
   const d = new Date(iso)
@@ -39,6 +41,12 @@ export function HomeWinnersPanel({ title = 'Recent winners', subtitle = '', winn
             </li>
           ))}
         </ul>
+        <Link
+          to="/recent-winners"
+          className="mt-5 inline-flex text-sm font-semibold text-emerald-300 underline-offset-4 hover:text-emerald-200 hover:underline"
+        >
+          See recent winners →
+        </Link>
       </div>
     </section>
   )
