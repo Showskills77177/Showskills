@@ -1,11 +1,34 @@
-export const EOF_KREA_VIDEO_ENDPOINT = '/generate/video/bytedance/seedance-1.0-pro-fast'
-export const EOF_KREA_VIDEO_MAX_PROMPT_LENGTH = 2000
-export const EOF_KREA_VIDEO_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21']
+export const EOF_KREA_VIDEO_MAX_PROMPT_LENGTH = 5000
+export const EOF_KREA_VIDEO_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4']
 export const EOF_KREA_VIDEO_RESOLUTIONS = ['480p', '720p', '1080p']
+export const EOF_KREA_VIDEO_MODELS = {
+  'seedance-fast': {
+    label: 'Seedance 1.0 Pro Fast',
+    endpoint: '/generate/video/bytedance/seedance-1.0-pro-fast',
+    minDuration: 2,
+    maxDuration: 12,
+    supportsReferences: false,
+  },
+  'seedance-mini': {
+    label: 'Seedance 2.0 Mini',
+    endpoint: '/generate/video/bytedance/seedance-2-mini',
+    minDuration: 4,
+    maxDuration: 15,
+    supportsReferences: true,
+  },
+  'wan-3': {
+    label: 'Wan 3.0',
+    endpoint: '/generate/video/alibaba/wan-3.0',
+    minDuration: 2,
+    maxDuration: 30,
+    supportsReferences: true,
+  },
+}
 
 const KREA_API_BASE = 'https://api.krea.ai'
 const JOB_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const MODEL_IDS = Object.keys(EOF_KREA_VIDEO_MODELS)
 
 export class EofKreaVideoError extends Error {
   constructor(message, statusCode = 502, code = 'KREA_API_ERROR') {
@@ -74,7 +97,7 @@ async function requestKrea(path, { method = 'GET', body, fetchImpl = globalThis.
   }
 }
 
-export function buildEofKreaVideoRequest({ prompt, duration, aspectRatio, resolution }) {
+export function buildEofKreaVideoRequest({ prompt, duration, aspectRatio, resolution, modelId }) {
   const exactPrompt = typeof prompt === 'string' ? prompt : ''
   if (!exactPrompt.trim()) {
     throw new EofKreaVideoError('Enter a video prompt.', 400, 'INVALID_PROMPT')
@@ -87,9 +110,17 @@ export function buildEofKreaVideoRequest({ prompt, duration, aspectRatio, resolu
     )
   }
 
+  const model = EOF_KREA_VIDEO_MODELS[modelId]
+  if (!model) {
+    throw new EofKreaVideoError('The AI selected an unsupported Krea video model. Retry your prompt.', 502, 'INVALID_MODEL_SELECTION')
+  }
   const seconds = Number(duration)
-  if (!Number.isFinite(seconds) || seconds < 2 || seconds > 12) {
-    throw new EofKreaVideoError('Duration must be between 2 and 12 seconds.', 400, 'INVALID_DURATION')
+  if (!Number.isInteger(seconds) || seconds < model.minDuration || seconds > model.maxDuration) {
+    throw new EofKreaVideoError(
+      `${model.label} supports individual clips from ${model.minDuration} to ${model.maxDuration} seconds. Krea does not offer unlimited-length single jobs.`,
+      400,
+      'DURATION_OUT_OF_RANGE',
+    )
   }
   if (!EOF_KREA_VIDEO_ASPECT_RATIOS.includes(aspectRatio)) {
     throw new EofKreaVideoError('Choose a supported aspect ratio.', 400, 'INVALID_ASPECT_RATIO')
@@ -98,7 +129,15 @@ export function buildEofKreaVideoRequest({ prompt, duration, aspectRatio, resolu
     throw new EofKreaVideoError('Choose a supported resolution.', 400, 'INVALID_RESOLUTION')
   }
 
-  return { prompt: exactPrompt, duration: seconds, aspect_ratio: aspectRatio, resolution }
+  return {
+    modelId,
+    model,
+    body: { prompt: exactPrompt, duration: seconds, aspect_ratio: aspectRatio, resolution },
+  }
+}
+
+export function isEofKreaVideoModelId(value) {
+  return MODEL_IDS.includes(value)
 }
 
 export function normalizeEofKreaVideoJob(job) {
@@ -148,7 +187,7 @@ export function extractEofKreaVideoUrl(job) {
 }
 
 export function createEofKreaVideoJob(request) {
-  return requestKrea(EOF_KREA_VIDEO_ENDPOINT, { method: 'POST', body: request })
+  return requestKrea(request.model.endpoint, { method: 'POST', body: request.body })
 }
 
 export function getEofKreaVideoJob(jobId) {

@@ -6,9 +6,18 @@ For **Railway EOF ffmpeg worker** (staging Short encodes off Vercel), see [DEPLO
 
 EOF's **Krea video** tab calls Krea from the authenticated Vercel API. Set
 `KREA_API_KEY` in the **Vercel staging server environment** to enable generation;
-it is not needed on the Railway render worker. The tab sends the prompt directly
-to Krea's [Seedance 1.0 Pro Fast endpoint](https://www.krea.ai/docs/api-reference/video/seedance-10-pro-fast.md),
+it is not needed on the Railway render worker. The EOF Script AI chooses a Krea
+model, then the tab submits the original prompt unchanged to the selected endpoint,
 polls the Krea job, and supports preview, download, and handoff to EOF Upload Studio.
+The EOF Script AI selects among Krea's Seedance Fast, Seedance 2 Mini, and Wan 3.0
+models and reads the requested duration from the chat prompt. Krea's current API
+limits a single job to 30 seconds (model-specific limits are lower); longer
+single-job durations are rejected with that limit explained. Model selection uses
+the existing EOF Script AI credentials configured on Vercel.
+
+Model references: [Seedance Fast](https://www.krea.ai/docs/api-reference/video/seedance-10-pro-fast.md),
+[Seedance 2 Mini](https://www.krea.ai/docs/api-reference/video/seedance-20-mini.md),
+and [Wan 3.0](https://www.krea.ai/docs/api-reference/video/wan-30.md).
 
 ## Serverless function limit (12 max)
 

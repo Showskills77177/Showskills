@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch, apiUrl } from '../../../lib/api'
 
-const ASPECT_RATIOS = ['9:16', '16:9', '1:1', '4:3', '3:4', '21:9', '9:21']
+const ASPECT_RATIOS = ['9:16', '16:9', '1:1', '4:3', '3:4']
 const RESOLUTIONS = ['480p', '720p', '1080p']
 const ACTIVE_STATUSES = new Set([
   'backlogged',
@@ -24,10 +24,10 @@ async function readJsonResponse(response) {
 
 export default function EofKreaVideoPanel({ onUseVideo }) {
   const [prompt, setPrompt] = useState('')
-  const [duration, setDuration] = useState('6')
   const [aspectRatio, setAspectRatio] = useState('9:16')
   const [resolution, setResolution] = useState('720p')
   const [job, setJob] = useState(null)
+  const [selection, setSelection] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [pollError, setPollError] = useState('')
@@ -81,6 +81,7 @@ export default function EofKreaVideoPanel({ onUseVideo }) {
     setPollError('')
     setUseError('')
     setJob(null)
+    setSelection(null)
     setPromptForJob(prompt)
     try {
       const result = await readJsonResponse(
@@ -89,13 +90,13 @@ export default function EofKreaVideoPanel({ onUseVideo }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt,
-            duration: Number(duration),
             aspectRatio,
             resolution,
           }),
         }),
       )
       setJob(result.job)
+      setSelection(result.selection)
     } catch (generateFailure) {
       setError(generateFailure instanceof Error ? generateFailure.message : 'Could not start Krea generation.')
     } finally {
@@ -138,33 +139,23 @@ export default function EofKreaVideoPanel({ onUseVideo }) {
 
         <form onSubmit={generate} className="mt-5 space-y-4">
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-white">Describe the exact video you want</span>
+            <span className="mb-2 block text-sm font-medium text-white">
+              Describe the video and requested length
+            </span>
             <textarea
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              maxLength={2000}
+              maxLength={5000}
               rows={5}
-              placeholder="Write your video prompt…"
+              placeholder="Describe the video you want, including its length (for example, “make a 20-second clip of…”)"
               className="w-full resize-y rounded-lg border border-[#3a3a3a] bg-[#101010] px-3 py-2.5 text-sm text-white outline-none focus:border-[#3ea6ff]"
               required
               aria-label="Video prompt"
             />
-            <span className="mt-1 block text-right text-xs text-[#888]">{prompt.length}/2000</span>
+            <span className="mt-1 block text-right text-xs text-[#888]">{prompt.length}/5000</span>
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="text-sm text-[#ccc]">
-              Duration
-              <select
-                value={duration}
-                onChange={(event) => setDuration(event.target.value)}
-                className="mt-1 block w-full rounded-lg border border-[#3a3a3a] bg-[#101010] px-3 py-2 text-white"
-              >
-                {Array.from({ length: 11 }, (_, index) => index + 2).map((seconds) => (
-                  <option key={seconds} value={seconds}>{seconds} seconds</option>
-                ))}
-              </select>
-            </label>
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm text-[#ccc]">
               Aspect ratio
               <select
@@ -216,8 +207,13 @@ export default function EofKreaVideoPanel({ onUseVideo }) {
           </blockquote>
           {ACTIVE_STATUSES.has(job.status) ? (
             <p role="status" className="mt-4 text-sm text-[#aaa]">
-              Krea is generating your video. This page checks for updates automatically.
+              {selection
+                ? `Krea is generating your ${selection.durationSeconds}-second video with ${selection.modelLabel}. This page checks for updates automatically.`
+                : 'AI is choosing a Krea model and reading the requested video length…'}
             </p>
+          ) : null}
+          {selection?.reason ? (
+            <p className="mt-2 text-xs text-[#888]">Model choice: {selection.reason}</p>
           ) : null}
           {pollError ? <p role="alert" className="mt-3 text-sm text-amber-300">{pollError} Retrying automatically…</p> : null}
           {job.status === 'failed' || job.status === 'cancelled' ? (
