@@ -50,6 +50,7 @@
     "render:eof": "node scripts/render-eof-production.mjs",
     "start:eof-worker": "node scripts/eof-railway-worker.mjs",
     "test:eof-worker": "node --test shared/eofWorkerDispatch.test.mjs",
+    "test:eof-krea-video": "node --test backend/api/admin/eof-krea-video.test.mjs",
     "seed:eof-music": "node scripts/seed-eof-music-catalog.mjs",
     "master:eof-music": "node scripts/master-eof-music-beds.mjs",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",

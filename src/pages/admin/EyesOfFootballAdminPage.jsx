@@ -9,6 +9,7 @@ import EofPublishCalendar from './eof/EofPublishCalendar'
 import EofUploadStudio from './eof/EofUploadStudio'
 import EofProductionPanel from './eof/EofProductionPanel'
 import EofImageStudioPanel from './eof/EofImageStudioPanel'
+import EofKreaVideoPanel from './eof/EofKreaVideoPanel'
 import EofMusicLibrary from './eof/EofMusicLibrary'
 import EofSchedulerPanel from './eof/EofSchedulerPanel'
 import EofProjectList from './eof/EofProjectList'
@@ -23,6 +24,7 @@ function readStoredView() {
       stored === 'studio' ||
       stored === 'production' ||
       stored === 'images' ||
+      stored === 'krea-video' ||
       stored === 'scheduler' ||
       stored === 'music' ||
       stored === 'analytics' ||
@@ -157,6 +159,7 @@ export default function EyesOfFootballAdminPage() {
                   ['studio', 'Studio'],
                   ['production', 'Production'],
                   ['images', 'Image Studio'],
+                  ['krea-video', 'Krea video'],
                   ['scheduler', 'Scheduler'],
                   ['music', 'Music'],
                   ['analytics', 'Analytics'],
@@ -199,6 +202,20 @@ export default function EyesOfFootballAdminPage() {
 
               <div hidden={view !== 'images'} className="mt-6">
                 <EofImageStudioPanel />
+              </div>
+
+              <div hidden={view !== 'krea-video'} className="mt-6">
+                <EofKreaVideoPanel
+                  onUseVideo={(file, videoPrompt) => {
+                    const suggestedTitle = videoPrompt.trim().slice(0, 100)
+                    setStudioDraft({
+                      file,
+                      title: suggestedTitle.length >= 3 ? suggestedTitle : 'Krea generated video',
+                      description: `Generated with Krea from prompt:\n${videoPrompt}`,
+                    })
+                    selectView('studio')
+                  }}
+                />
               </div>
 
               <div hidden={view !== 'music'} className="mt-6">

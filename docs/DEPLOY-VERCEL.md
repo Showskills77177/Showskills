@@ -4,6 +4,12 @@ For a **Cloudflare Pages staging SPA** alongside this Vercel API (preview only, 
 
 For **Railway EOF ffmpeg worker** (staging Short encodes off Vercel), see [DEPLOY-RAILWAY-EOF.md](./DEPLOY-RAILWAY-EOF.md).
 
+EOF's **Krea video** tab calls Krea from the authenticated Vercel API. Set
+`KREA_API_KEY` in the **Vercel staging server environment** to enable generation;
+it is not needed on the Railway render worker. The tab sends the prompt directly
+to Krea's [Seedance 1.0 Pro Fast endpoint](https://www.krea.ai/docs/api-reference/video/seedance-10-pro-fast.md),
+polls the Krea job, and supports preview, download, and handoff to EOF Upload Studio.
+
 ## Serverless function limit (12 max)
 
 API routing uses **five** serverless functions (under the Hobby 12-function limit), all dispatching via `lib/vercelApiDispatch.mjs`:
