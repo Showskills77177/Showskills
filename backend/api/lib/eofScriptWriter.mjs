@@ -1833,8 +1833,15 @@ async function writeDraftPipeline({
 async function researchDeskBriefWithProvider({ provider, topic, format, context, headlinesText }) {
   const system = buildDeskResearchSystemPrompt()
   const user = buildDeskResearchUserPrompt({ topic, format, context, headlinesText })
+  return eofJsonCompletionWithProvider(provider, { system, user, temperature: 0.25 })
+}
+
+async function eofJsonCompletionWithProvider(
+  provider,
+  { system, user, temperature = 0.25, timeoutMs = 45000 } = {},
+) {
   if (provider === 'xai') {
-    return xaiJsonCompletion({ system, user, temperature: 0.25 })
+    return xaiJsonCompletion({ system, user, temperature })
   }
   if (provider === 'openai') {
     const key = envKey('OPENAI_API_KEY')
@@ -1844,23 +1851,48 @@ async function researchDeskBriefWithProvider({ provider, topic, format, context,
       headers: { Authorization: `Bearer ${key}` },
       body: {
         model,
-        temperature: 0.25,
+        temperature,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
       },
-      timeoutMs: 45000,
+      timeoutMs,
     })
   }
   if (provider === 'anthropic') {
-    return anthropicJsonCompletion({ system, user, temperature: 0.25 })
+    return anthropicJsonCompletion({ system, user, temperature })
   }
   if (provider === 'groq') {
-    return groqChatJson({ system, user, temperature: 0.25, timeoutMs: 40000 })
+    return groqChatJson({ system, user, temperature, timeoutMs: Math.min(timeoutMs, 40000) })
   }
-  return null
+  throw new Error(`Unsupported EOF JSON provider: ${provider}`)
+}
+
+/** Run a compact structured decision through the same configured EOF AI providers as Script Maker. */
+export async function eofJsonCompletion({ system, user, temperature = 0.2, timeoutMs = 45000 } = {}) {
+  const providers = resolveScriptProviderAttemptOrder()
+  if (!providers.length) {
+    throw new Error(
+      'AI model selection is not configured. Add ANTHROPIC_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, or XAI_API_KEY to the Vercel staging environment.',
+    )
+  }
+
+  let lastError = null
+  for (const provider of providers) {
+    try {
+      return await eofJsonCompletionWithProvider(provider, { system, user, temperature, timeoutMs })
+    } catch (error) {
+      lastError = error
+      console.warn(
+        '[eof-script] structured decision provider failed',
+        provider,
+        error instanceof Error ? error.message : error,
+      )
+    }
+  }
+  throw lastError || new Error('No configured EOF AI provider could make a selection.')
 }
 
 async function writeDraftWithProvider({

@@ -2,6 +2,7 @@ import { Readable } from 'node:stream'
 import { isShowSkillsStagingServerEnabled } from '../../../shared/stagingSite.mjs'
 import { json, readJsonBody } from '../lib/http.mjs'
 import { requireEofSession } from '../lib/eofYoutubeAuth.mjs'
+import { selectEofKreaVideoModel } from '../lib/eofKreaVideoSelection.mjs'
 import {
   buildEofKreaVideoRequest,
   createEofKreaVideoJob,
@@ -24,6 +25,12 @@ function searchParamsFromReq(req) {
 function handleError(res, error) {
   if (error instanceof EofKreaVideoError) {
     return json(res, error.statusCode, { error: error.message, code: error.code })
+  }
+  if (Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 600) {
+    return json(res, error.statusCode, {
+      error: error.message || 'The Krea model selection failed. Please retry.',
+      code: error.code || 'KREA_REQUEST_FAILED',
+    })
   }
   return json(res, 502, { error: 'The Krea request failed. Please retry.', code: 'KREA_REQUEST_FAILED' })
 }
@@ -107,9 +114,15 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const request = buildEofKreaVideoRequest(await readJsonBody(req))
+      const body = await readJsonBody(req)
+      const selection = await selectEofKreaVideoModel(body)
+      const request = buildEofKreaVideoRequest({
+        ...body,
+        duration: selection.durationSeconds,
+        modelId: selection.modelId,
+      })
       const job = await createEofKreaVideoJob(request)
-      return json(res, 200, { job: normalizeJob(job) })
+      return json(res, 200, { job: normalizeJob(job), selection })
     } catch (error) {
       return handleError(res, error)
     }

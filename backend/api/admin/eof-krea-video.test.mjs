@@ -5,7 +5,7 @@ import { signAdminSession } from '../lib/adminAuth.mjs'
 import handler from './eof-krea-video.js'
 
 const JOB_ID = '2ed18e18-6680-4d18-94da-fdcac8bbabd6'
-const envKeys = ['ADMIN_JWT_SECRET', 'KREA_API_KEY', 'VERCEL_ENV']
+const envKeys = ['ADMIN_JWT_SECRET', 'KREA_API_KEY', 'VERCEL_ENV', 'XAI_API_KEY', 'EOF_SCRIPT_PROVIDER']
 const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]))
 const previousFetch = globalThis.fetch
 
@@ -20,6 +20,8 @@ afterEach(() => {
 async function makeRequest(method, url, body) {
   process.env.ADMIN_JWT_SECRET = 'test-secret-that-is-at-least-thirty-two-characters'
   process.env.VERCEL_ENV = 'preview'
+  process.env.XAI_API_KEY = 'test-selector-key'
+  process.env.EOF_SCRIPT_PROVIDER = 'xai'
   const token = await signAdminSession({ sub: 'eof-admin' })
   const req = {
     method,
@@ -71,28 +73,41 @@ describe('EOF Krea video API', () => {
 
   it('passes the original prompt and selected settings directly to Krea', async () => {
     process.env.KREA_API_KEY = 'test-krea-key'
-    let request
+    process.env.XAI_API_KEY = 'test-selector-key'
+    const requests = []
     globalThis.fetch = async (url, options) => {
-      request = { url: String(url), options }
+      requests.push({ url: String(url), options })
+      if (String(url) === 'https://api.x.ai/v1/responses') {
+        return new Response(
+          JSON.stringify({
+            output_text: JSON.stringify({
+              modelId: 'seedance-fast',
+              durationSeconds: 8,
+              reason: 'A short straightforward clip.',
+            }),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
       return new Response(
         JSON.stringify({ job_id: JOB_ID, status: 'queued', created_at: '2026-10-16T12:00:00Z' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
-    const prompt = '  keep this wording exactly as written  '
+    const prompt = '  keep this wording exactly as written, for 8 seconds  '
     const response = await makeRequest('POST', '/api/admin/eof-krea-video', {
       prompt,
-      duration: 8,
       aspectRatio: '9:16',
       resolution: '720p',
     })
 
     assert.equal(response.statusCode, 200)
-    assert.equal(request.url, 'https://api.krea.ai/generate/video/bytedance/seedance-1.0-pro-fast')
-    assert.equal(request.options.method, 'POST')
-    assert.equal(request.options.headers.Authorization, 'Bearer test-krea-key')
-    assert.deepEqual(JSON.parse(request.options.body), {
+    assert.equal(requests[0].url, 'https://api.x.ai/v1/responses')
+    assert.equal(requests[1].url, 'https://api.krea.ai/generate/video/bytedance/seedance-1.0-pro-fast')
+    assert.equal(requests[1].options.method, 'POST')
+    assert.equal(requests[1].options.headers.Authorization, 'Bearer test-krea-key')
+    assert.deepEqual(JSON.parse(requests[1].options.body), {
       prompt,
       duration: 8,
       aspect_ratio: '9:16',
@@ -104,6 +119,13 @@ describe('EOF Krea video API', () => {
       progress: null,
       error: '',
       hasVideo: false,
+    })
+    assert.deepEqual(JSON.parse(response.body).selection, {
+      modelId: 'seedance-fast',
+      modelLabel: 'Seedance 1.0 Pro Fast',
+      durationSeconds: 8,
+      maxClipDurationSeconds: 12,
+      reason: 'A short straightforward clip.',
     })
     assert.equal(response.body.includes('test-krea-key'), false)
   })
@@ -128,13 +150,13 @@ describe('EOF Krea video API', () => {
 
   it('rejects invalid prompts and settings before calling Krea', async () => {
     process.env.KREA_API_KEY = 'test-krea-key'
+    process.env.XAI_API_KEY = 'test-selector-key'
     globalThis.fetch = async () => {
       assert.fail('Invalid requests must not be sent to Krea')
     }
 
     const response = await makeRequest('POST', '/api/admin/eof-krea-video', {
       prompt: '   ',
-      duration: 6,
       aspectRatio: '9:16',
       resolution: '720p',
     })
@@ -145,21 +167,95 @@ describe('EOF Krea video API', () => {
 
   it('returns Krea rate-limit errors as actionable retry guidance', async () => {
     process.env.KREA_API_KEY = 'test-krea-key'
-    globalThis.fetch = async () =>
-      new Response(JSON.stringify({ error: 'rate limited' }), {
+    globalThis.fetch = async (url) => {
+      if (String(url) === 'https://api.x.ai/v1/responses') {
+        return new Response(
+          JSON.stringify({ output_text: JSON.stringify({ modelId: 'seedance-fast', durationSeconds: 6 }) }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      return new Response(JSON.stringify({ error: 'rate limited' }), {
         status: 429,
         headers: { 'Content-Type': 'application/json' },
       })
+    }
 
     const response = await makeRequest('POST', '/api/admin/eof-krea-video', {
       prompt: 'A close-up football in a stadium',
-      duration: 6,
       aspectRatio: '9:16',
       resolution: '720p',
     })
 
     assert.equal(response.statusCode, 429)
     assert.match(JSON.parse(response.body).error, /Wait and retry/)
+  })
+
+  it('explains Krea single-job duration limits instead of silently shortening longer requests', async () => {
+    process.env.KREA_API_KEY = 'test-krea-key'
+    globalThis.fetch = async (url) => {
+      assert.equal(String(url), 'https://api.x.ai/v1/responses')
+      return new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            modelId: 'wan-3',
+            durationSeconds: 90,
+            reason: 'Long duration requires the model with the largest supported clip length.',
+          }),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const response = await makeRequest('POST', '/api/admin/eof-krea-video', {
+      prompt: 'A 90-second football montage',
+      aspectRatio: '9:16',
+      resolution: '720p',
+    })
+
+    assert.equal(response.statusCode, 400)
+    assert.match(JSON.parse(response.body).error, /individual clips from 2 to 30 seconds/)
+    assert.match(JSON.parse(response.body).error, /unlimited-length single jobs/)
+  })
+
+  it('routes an AI-selected Wan model to its Krea endpoint without rewriting the prompt', async () => {
+    process.env.KREA_API_KEY = 'test-krea-key'
+    const requests = []
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url: String(url), options })
+      if (String(url) === 'https://api.x.ai/v1/responses') {
+        return new Response(
+          JSON.stringify({
+            output_text: JSON.stringify({
+              modelId: 'wan-3',
+              durationSeconds: 20,
+              reason: 'The requested duration exceeds the shorter models.',
+            }),
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+      return new Response(
+        JSON.stringify({ job_id: JOB_ID, status: 'queued' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+    const prompt = '  20-second video: a footballer scores in the rain  '
+
+    const response = await makeRequest('POST', '/api/admin/eof-krea-video', {
+      prompt,
+      aspectRatio: '16:9',
+      resolution: '720p',
+    })
+
+    assert.equal(response.statusCode, 200)
+    assert.equal(requests[1].url, 'https://api.krea.ai/generate/video/alibaba/wan-3.0')
+    assert.deepEqual(JSON.parse(requests[1].options.body), {
+      prompt,
+      duration: 20,
+      aspect_ratio: '16:9',
+      resolution: '720p',
+    })
+    assert.equal(JSON.parse(response.body).selection.modelId, 'wan-3')
   })
 
   it('polls a job and only exposes normalized status data', async () => {
