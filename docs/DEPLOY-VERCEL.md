@@ -19,6 +19,29 @@ Model references: [Seedance Fast](https://www.krea.ai/docs/api-reference/video/s
 [Seedance 2 Mini](https://www.krea.ai/docs/api-reference/video/seedance-20-mini.md),
 and [Wan 3.0](https://www.krea.ai/docs/api-reference/video/wan-30.md).
 
+The same tab also has a **Video enhancer** panel. It stages source videos directly
+to Vercel Blob using multipart browser uploads, then sends the Blob URL to Krea's
+SeedVR 2 (economy/fast, up to 4K) or Topaz Video Upscale (quality, up to 8K)
+enhancer. Configure a Vercel Blob store and add its server-only
+`BLOB_READ_WRITE_TOKEN` alongside `KREA_API_KEY`. Also set
+`EOF_KREA_ENHANCER_MAX_UPLOAD_BYTES` only if you need to override the default
+1 GiB per-file cap; choose a value that fits the Blob store, account quota, and
+your operational policy (positive integer up to 5 TiB). The UI displays the
+active cap and rejects larger selections before transfer.
+Staging Blob URLs are public, unguessable URLs so Krea can retrieve the source;
+an expiring server-signed ownership token binds upload and cleanup to the EOF
+user who initiated the upload. Completed jobs trigger best-effort source
+cleanup. Krea's API documentation does not publish comparable per-model prices,
+so the UI does not claim an exact cheapest model or display an invented price.
+
+Enhancement currently processes one source per Krea job. The Railway worker has
+durable Postgres-backed production jobs and FFmpeg, but its code has no enhancer
+job path or Blob/Krea integration. Krea's enhancer OpenAPI schemas also do not
+document an input duration or file-size limit from which a safe segment size can
+be derived. Long-video segmentation/stitching and native FFmpeg Lanczos/4K
+finishing are therefore not enabled. Unlimited duration, file sizes, or account
+quota are not promised.
+
 ## Serverless function limit (12 max)
 
 API routing uses **five** serverless functions (under the Hobby 12-function limit), all dispatching via `lib/vercelApiDispatch.mjs`:

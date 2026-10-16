@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch, apiUrl } from '../../../lib/api'
+import EofKreaVideoEnhancerPanel from './EofKreaVideoEnhancerPanel'
 
 const ASPECT_RATIOS = ['9:16', '16:9', '1:1', '4:3', '3:4']
 const RESOLUTIONS = ['480p', '720p', '1080p']
@@ -23,6 +24,7 @@ async function readJsonResponse(response) {
 }
 
 export default function EofKreaVideoPanel({ onUseVideo }) {
+  const [tool, setTool] = useState('generate')
   const [prompt, setPrompt] = useState('')
   const [aspectRatio, setAspectRatio] = useState('9:16')
   const [resolution, setResolution] = useState('720p')
@@ -131,10 +133,30 @@ export default function EofKreaVideoPanel({ onUseVideo }) {
 
   return (
     <section className="mx-auto max-w-4xl space-y-5">
+      <nav className="flex gap-2 border-b border-[#303030] pb-2" aria-label="Krea video tools">
+        {[
+          ['generate', 'Generate video'],
+          ['enhance', 'Video enhancer'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTool(id)}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+              tool === id ? 'bg-white text-black' : 'text-[#aaa] hover:bg-[#272727]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {tool === 'enhance' ? <EofKreaVideoEnhancerPanel onUseVideo={onUseVideo} /> : (
+      <>
       <div className="rounded-xl border border-[#303030] bg-[#181818] p-5">
         <h2 className="text-lg font-semibold text-white">Krea video chat</h2>
         <p className="mt-1 text-sm text-[#aaa]">
-          Send your prompt directly to Seedance 1.0 Pro Fast. The prompt is not rewritten.
+          Send your prompt directly to Krea. The AI selects the model and duration; your prompt is not rewritten.
         </p>
 
         <form onSubmit={generate} className="mt-5 space-y-4">
@@ -258,6 +280,8 @@ export default function EofKreaVideoPanel({ onUseVideo }) {
           ) : null}
         </div>
       ) : null}
+      </>
+      )}
     </section>
   )
 }

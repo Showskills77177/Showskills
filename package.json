@@ -50,7 +50,7 @@
     "render:eof": "node scripts/render-eof-production.mjs",
     "start:eof-worker": "node scripts/eof-railway-worker.mjs",
     "test:eof-worker": "node --test shared/eofWorkerDispatch.test.mjs",
-    "test:eof-krea-video": "node --test backend/api/admin/eof-krea-video.test.mjs",
+    "test:eof-krea-video": "node --test backend/api/admin/eof-krea-video.test.mjs backend/api/admin/eof-krea-video-enhancer.test.mjs backend/api/lib/eofKreaVideoEnhancer.test.mjs",
     "seed:eof-music": "node scripts/seed-eof-music-catalog.mjs",
     "master:eof-music": "node scripts/master-eof-music-beds.mjs",
     "test:payment": "playwright test tests/e2e/payment-mocked.spec.js",
@@ -73,6 +73,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.8.2",
     "@vercel/functions": "^3.7.5",
     "altcha": "^3.1.0",
     "altcha-lib": "^2.2.0",
